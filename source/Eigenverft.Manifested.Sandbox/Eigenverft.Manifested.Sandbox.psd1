@@ -31,7 +31,7 @@ CompanyName = 'Eigenverft'
 Copyright = 'Copyright (c) 2026 Eigenverft'
 
 # Description of the functionality provided by this module
-Description = 'Windows-focused PowerShell module for initializing managed PowerShell 7, Node.js, MinGit, and Microsoft Visual C++ runtime prerequisites with persisted invoke state.'
+Description = 'Windows-focused PowerShell module for quickly setting up a usable Windows sandbox or fresh Windows developer environment with managed PowerShell 7, Node.js, MinGit, and Microsoft Visual C++ runtime prerequisites plus persisted invoke state.'
 
 # Minimum version of the PowerShell engine required by this module
 PowerShellVersion = '5.1'

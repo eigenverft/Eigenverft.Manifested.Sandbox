@@ -1,10 +1,12 @@
 # Eigenverft.Manifested.Sandbox
 
-Windows-focused PowerShell module for initializing managed PowerShell 7, Node.js, MinGit, and Microsoft Visual C++ runtime prerequisites.
+Windows-focused PowerShell module for quickly bringing up a usable Windows sandbox or fresh Windows developer environment with managed PowerShell 7, Node.js, MinGit, and Microsoft Visual C++ runtime prerequisites.
+
+The primary intent is fast setup inside a Windows sandbox-style environment, but the module can also be used on a normal Windows machine when you want the same bootstrap flow and state tracking outside Sandbox.
 
 ## Bootstrapper
 
-The bootstrapper installs the required PowerShell package tooling plus `Eigenverft.Manifested.Sandbox` from the PowerShell Gallery, then opens a new Windows PowerShell console for using the module.
+The bootstrapper is optimized for getting a Windows sandbox session ready quickly. It installs the required PowerShell package tooling plus `Eigenverft.Manifested.Sandbox` from the PowerShell Gallery, then opens a new Windows PowerShell console for using the module.
 
 Run it from Windows PowerShell 5.1:
 
