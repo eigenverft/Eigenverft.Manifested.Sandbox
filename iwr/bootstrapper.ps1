@@ -1,8 +1,13 @@
 <#
+Bootstrapper for installing and importing Eigenverft.Manifested.Sandbox from PSGallery.
 
 Use via
 
-iwr -useb https://raw.githubusercontent.com/eigenverft/<reponame>/refs/heads/<branch>/iwr/bootstrapper.ps1 | iex
+iwr -useb https://raw.githubusercontent.com/eigenverft/Eigenverft.Manifested.Sandbox/refs/heads/<branch>/iwr/bootstrapper.ps1 | iex
+
+Then use the imported commands:
+Initialize-NodeRuntime
+Initialize-VCRuntime
 
 #>
 

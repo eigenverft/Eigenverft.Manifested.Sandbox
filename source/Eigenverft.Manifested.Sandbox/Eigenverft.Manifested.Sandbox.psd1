@@ -31,7 +31,7 @@ CompanyName = 'Eigenverft'
 Copyright = 'Copyright (c) 2026 Eigenverft'
 
 # Description of the functionality provided by this module
-Description = 'Windows-focused PowerShell module for initializing the Eigenverft manifested sandbox with a managed Node.js runtime and Microsoft Visual C++ prerequisites.'
+Description = 'Windows-focused PowerShell module for initializing managed Node.js and Microsoft Visual C++ runtime prerequisites with persisted invoke state.'
 
 # Minimum version of the PowerShell engine required by this module
 PowerShellVersion = '5.1'
@@ -71,7 +71,8 @@ PowerShellVersion = '5.1'
 
 # Functions to export from this module, for best performance, do not use wildcards and do not delete the entry, use an empty array if there are no functions to export.
 FunctionsToExport = @(
-    'Initialize-Sandbox'
+    'Initialize-NodeRuntime',
+    'Initialize-VCRuntime'
 )
 
 # Cmdlets to export from this module, for best performance, do not use wildcards and do not delete the entry, use an empty array if there are no cmdlets to export.
@@ -92,7 +93,9 @@ AliasesToExport = @()
 # List of all files packaged with this module
 FileList = @(
     'Eigenverft.Manifested.Sandbox.ps1',
-    'Eigenverft.Manifested.Sandbox.Common.ps1',
+    'Eigenverft.Manifested.Sandbox.Shared.Paths.ps1',
+    'Eigenverft.Manifested.Sandbox.Shared.Cache.ps1',
+    'Eigenverft.Manifested.Sandbox.Shared.State.ps1',
     'Eigenverft.Manifested.Sandbox.NodeRuntimeAndCache.ps1',
     'Eigenverft.Manifested.Sandbox.VCRuntimeAndCache.ps1',
     'Eigenverft.Manifested.Sandbox.psm1',
@@ -118,7 +121,7 @@ PrivateData = @{
         IconUri = 'https://raw.githubusercontent.com/eigenverft/Eigenverft.Manifested.Sandbox/main/resources/evt-logo_on_light_border_128x128.png'
 
         # ReleaseNotes of this module
-        ReleaseNotes = 'Initial sandbox module packaging focused on Node.js and VC runtime initialization.'
+        ReleaseNotes = 'Refactored runtime initialization into explicit Node/VC phases with persisted invoke state.'
 
         # Prerelease string of this module
         Prerelease = ''

@@ -2,9 +2,31 @@
     Eigenverft.Manifested.Sandbox.NodeRuntimeAndCache
 #>
 
-function Get-SandboxNodeFlavor {
+function ConvertTo-NodeVersion {
+    [CmdletBinding()]
+    param(
+        [string]$VersionText
+    )
+
+    if ([string]::IsNullOrWhiteSpace($VersionText)) {
+        return $null
+    }
+
+    $match = [regex]::Match($VersionText, 'v?(\d+\.\d+\.\d+)')
+    if (-not $match.Success) {
+        return $null
+    }
+
+    return [version]$match.Groups[1].Value
+}
+
+function Get-NodeFlavor {
     [CmdletBinding()]
     param()
+
+    if ([System.Environment]::OSVersion.Platform -ne [System.PlatformID]::Win32NT) {
+        throw 'Only Windows hosts are supported by this Node runtime bootstrap.'
+    }
 
     $archHints = @($env:PROCESSOR_ARCHITECTURE, $env:PROCESSOR_ARCHITEW6432) -join ';'
 
@@ -16,14 +38,18 @@ function Get-SandboxNodeFlavor {
         return 'win-x64'
     }
 
-    throw 'Only 64-bit Windows targets are supported by this sandbox bootstrap.'
+    throw 'Only 64-bit Windows targets are supported by this Node runtime bootstrap.'
 }
 
-function Get-SandboxNodeReleaseOnline {
+function Get-NodeRelease {
     [CmdletBinding()]
     param(
-        [string]$Flavor = (Get-SandboxNodeFlavor)
+        [string]$Flavor
     )
+
+    if ([string]::IsNullOrWhiteSpace($Flavor)) {
+        $Flavor = Get-NodeFlavor
+    }
 
     $response = Invoke-WebRequest -Uri 'https://nodejs.org/dist/index.json' -UseBasicParsing
     $items = $response.Content | ConvertFrom-Json
@@ -43,21 +69,28 @@ function Get-SandboxNodeReleaseOnline {
     [pscustomobject]@{
         Version     = $release.version
         Flavor      = $Flavor
-        NpmVersion  = $release.npm
         FileName    = $fileName
+        Path        = $null
+        Source      = 'online'
+        Action      = 'SelectedOnline'
+        NpmVersion  = $release.npm
         DownloadUrl = '{0}/{1}' -f $baseUrl, $fileName
         ShasumsUrl  = '{0}/SHASUMS256.txt' -f $baseUrl
     }
 }
 
-function Get-CachedSandboxNodeZipFiles {
+function Get-CachedNodeRuntimePackages {
     [CmdletBinding()]
     param(
-        [string]$Flavor = (Get-SandboxNodeFlavor),
-        [string]$LocalRoot = (Get-SandboxDefaultLocalRoot)
+        [string]$Flavor,
+        [string]$LocalRoot = (Get-ManifestedLocalRoot)
     )
 
-    $layout = Get-SandboxLayout -LocalRoot $LocalRoot
+    if ([string]::IsNullOrWhiteSpace($Flavor)) {
+        $Flavor = Get-NodeFlavor
+    }
+
+    $layout = Get-ManifestedLayout -LocalRoot $LocalRoot
     if (-not (Test-Path -LiteralPath $layout.NodeCacheRoot)) {
         return @()
     }
@@ -68,10 +101,15 @@ function Get-CachedSandboxNodeZipFiles {
         Where-Object { $_.Name -match $pattern } |
         ForEach-Object {
             [pscustomobject]@{
-                Version = $matches[1]
-                Flavor  = $Flavor
-                Path    = $_.FullName
-                Name    = $_.Name
+                Version     = $matches[1]
+                Flavor      = $Flavor
+                FileName    = $_.Name
+                Path        = $_.FullName
+                Source      = 'cache'
+                Action      = 'SelectedCache'
+                NpmVersion  = $null
+                DownloadUrl = $null
+                ShasumsUrl  = $null
             }
         } |
         Sort-Object -Descending -Property @{ Expression = { ConvertTo-NodeVersion -VersionText $_.Version } }
@@ -79,17 +117,17 @@ function Get-CachedSandboxNodeZipFiles {
     return @($items)
 }
 
-function Get-LatestCachedSandboxNodeZip {
+function Get-LatestCachedNodeRuntimePackage {
     [CmdletBinding()]
     param(
-        [string]$Flavor = (Get-SandboxNodeFlavor),
-        [string]$LocalRoot = (Get-SandboxDefaultLocalRoot)
+        [string]$Flavor,
+        [string]$LocalRoot = (Get-ManifestedLocalRoot)
     )
 
-    return (Get-CachedSandboxNodeZipFiles -Flavor $Flavor -LocalRoot $LocalRoot | Select-Object -First 1)
+    return (Get-CachedNodeRuntimePackages -Flavor $Flavor -LocalRoot $LocalRoot | Select-Object -First 1)
 }
 
-function Get-ManagedSandboxNodeHome {
+function Get-ManagedNodeRuntimeHome {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true)]
@@ -98,14 +136,14 @@ function Get-ManagedSandboxNodeHome {
         [Parameter(Mandatory = $true)]
         [string]$Flavor,
 
-        [string]$LocalRoot = (Get-SandboxDefaultLocalRoot)
+        [string]$LocalRoot = (Get-ManifestedLocalRoot)
     )
 
-    $layout = Get-SandboxLayout -LocalRoot $LocalRoot
+    $layout = Get-ManifestedLayout -LocalRoot $LocalRoot
     return (Join-Path $layout.NodeToolsRoot ($Version.TrimStart('v') + '\' + $Flavor))
 }
 
-function Test-ManagedSandboxNodeHome {
+function Test-NodeRuntime {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true)]
@@ -113,12 +151,72 @@ function Test-ManagedSandboxNodeHome {
     )
 
     $nodeExe = Join-Path $NodeHome 'node.exe'
-    $npmCmd  = Join-Path $NodeHome 'npm.cmd'
+    $npmCmd = Join-Path $NodeHome 'npm.cmd'
 
-    return (Test-Path -LiteralPath $nodeExe) -and (Test-Path -LiteralPath $npmCmd)
+    if (-not (Test-Path -LiteralPath $NodeHome)) {
+        $status = 'Missing'
+    }
+    elseif ((Test-Path -LiteralPath $nodeExe) -and (Test-Path -LiteralPath $npmCmd)) {
+        $status = 'Ready'
+    }
+    else {
+        $status = 'NeedsRepair'
+    }
+
+    [pscustomobject]@{
+        Status   = $status
+        IsReady  = ($status -eq 'Ready')
+        NodeHome = $NodeHome
+        NodeExe  = $nodeExe
+        NpmCmd   = $npmCmd
+    }
 }
 
-function Get-SandboxNodeExpectedSha256 {
+function Get-InstalledNodeRuntime {
+    [CmdletBinding()]
+    param(
+        [string]$Flavor,
+        [string]$LocalRoot = (Get-ManifestedLocalRoot)
+    )
+
+    if ([string]::IsNullOrWhiteSpace($Flavor)) {
+        $Flavor = Get-NodeFlavor
+    }
+
+    $layout = Get-ManifestedLayout -LocalRoot $LocalRoot
+    $entries = @()
+
+    if (Test-Path -LiteralPath $layout.NodeToolsRoot) {
+        $versionRoots = Get-ChildItem -LiteralPath $layout.NodeToolsRoot -Directory -ErrorAction SilentlyContinue |
+            Sort-Object -Descending -Property @{ Expression = { ConvertTo-NodeVersion -VersionText ('v' + $_.Name) } }
+
+        foreach ($versionRoot in $versionRoots) {
+            $nodeHome = Join-Path $versionRoot.FullName $Flavor
+            if (-not (Test-Path -LiteralPath $nodeHome)) {
+                continue
+            }
+
+            $validation = Test-NodeRuntime -NodeHome $nodeHome
+            $entries += [pscustomobject]@{
+                Version    = ('v' + $versionRoot.Name)
+                Flavor     = $Flavor
+                NodeHome   = $nodeHome
+                NodeExe    = $validation.NodeExe
+                NpmCmd     = $validation.NpmCmd
+                Validation = $validation
+                IsReady    = $validation.IsReady
+            }
+        }
+    }
+
+    [pscustomobject]@{
+        Current = ($entries | Where-Object { $_.IsReady } | Select-Object -First 1)
+        Valid   = @($entries | Where-Object { $_.IsReady })
+        Invalid = @($entries | Where-Object { -not $_.IsReady })
+    }
+}
+
+function Get-NodePackageExpectedSha256 {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true)]
@@ -138,86 +236,282 @@ function Get-SandboxNodeExpectedSha256 {
     return (($line -split '\s+')[0]).Trim().ToLowerInvariant()
 }
 
-function Ensure-SandboxNodeZip {
+function Test-NodeRuntimePackage {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [pscustomobject]$PackageInfo
+    )
+
+    if (-not (Test-Path -LiteralPath $PackageInfo.Path)) {
+        return [pscustomobject]@{
+            Status       = 'Missing'
+            Version      = $PackageInfo.Version
+            Flavor       = $PackageInfo.Flavor
+            FileName     = $PackageInfo.FileName
+            Path         = $PackageInfo.Path
+            Source       = $PackageInfo.Source
+            Verified     = $false
+            Verification = 'Missing'
+            ExpectedHash = $null
+            ActualHash   = $null
+        }
+    }
+
+    $status = 'Ready'
+    $verified = $false
+    $verification = 'OfflineCache'
+    $expectedHash = $null
+    $actualHash = $null
+
+    if ($PackageInfo.ShasumsUrl) {
+        $expectedHash = Get-NodePackageExpectedSha256 -ShasumsUrl $PackageInfo.ShasumsUrl -FileName $PackageInfo.FileName
+        $actualHash = (Get-FileHash -LiteralPath $PackageInfo.Path -Algorithm SHA256).Hash.ToLowerInvariant()
+        $verified = $true
+        $verification = 'SHA256'
+        if ($actualHash -ne $expectedHash) {
+            $status = 'CorruptCache'
+        }
+    }
+
+    [pscustomobject]@{
+        Status       = $status
+        Version      = $PackageInfo.Version
+        Flavor       = $PackageInfo.Flavor
+        FileName     = $PackageInfo.FileName
+        Path         = $PackageInfo.Path
+        Source       = $PackageInfo.Source
+        Verified     = $verified
+        Verification = $verification
+        ExpectedHash = $expectedHash
+        ActualHash   = $actualHash
+    }
+}
+
+function Get-NodeRuntimeState {
+    [CmdletBinding()]
+    param(
+        [string]$Flavor,
+        [string]$LocalRoot = (Get-ManifestedLocalRoot)
+    )
+
+    try {
+        if ([string]::IsNullOrWhiteSpace($Flavor)) {
+            $Flavor = Get-NodeFlavor
+        }
+
+        $layout = Get-ManifestedLayout -LocalRoot $LocalRoot
+    }
+    catch {
+        return [pscustomobject]@{
+            Status              = 'Blocked'
+            LocalRoot           = $LocalRoot
+            Layout              = $null
+            Flavor              = $Flavor
+            CurrentVersion      = $null
+            RuntimeHome         = $null
+            Runtime             = $null
+            InvalidRuntimeHomes = @()
+            Package             = $null
+            PackagePath         = $null
+            PartialPaths        = @()
+            BlockedReason       = $_.Exception.Message
+        }
+    }
+
+    $partialPaths = @()
+    if (Test-Path -LiteralPath $layout.NodeCacheRoot) {
+        $partialPaths += @(Get-ChildItem -LiteralPath $layout.NodeCacheRoot -File -Filter '*.download' -ErrorAction SilentlyContinue | Select-Object -ExpandProperty FullName)
+    }
+    $partialPaths += @(Get-ManifestedStageDirectories -RootPath $layout.ToolsRoot -Prefix 'node' | Select-Object -ExpandProperty FullName)
+
+    $installed = Get-InstalledNodeRuntime -Flavor $Flavor -LocalRoot $layout.LocalRoot
+    $currentRuntime = $installed.Current
+    $invalidRuntimeHomes = @($installed.Invalid | Select-Object -ExpandProperty NodeHome)
+    $package = Get-LatestCachedNodeRuntimePackage -Flavor $Flavor -LocalRoot $layout.LocalRoot
+
+    if ($invalidRuntimeHomes.Count -gt 0) {
+        $status = 'NeedsRepair'
+    }
+    elseif ($partialPaths.Count -gt 0) {
+        $status = 'Partial'
+    }
+    elseif ($currentRuntime) {
+        $status = 'Ready'
+    }
+    elseif ($package) {
+        $status = 'NeedsInstall'
+    }
+    else {
+        $status = 'Missing'
+    }
+
+    [pscustomobject]@{
+        Status              = $status
+        LocalRoot           = $layout.LocalRoot
+        Layout              = $layout
+        Flavor              = $Flavor
+        CurrentVersion      = if ($currentRuntime) { $currentRuntime.Version } elseif ($package) { $package.Version } else { $null }
+        RuntimeHome         = if ($currentRuntime) { $currentRuntime.NodeHome } else { $null }
+        Runtime             = if ($currentRuntime) { $currentRuntime.Validation } else { $null }
+        InvalidRuntimeHomes = $invalidRuntimeHomes
+        Package             = $package
+        PackagePath         = if ($package) { $package.Path } else { $null }
+        PartialPaths        = $partialPaths
+        BlockedReason       = $null
+    }
+}
+
+function Repair-NodeRuntime {
+    [CmdletBinding()]
+    param(
+        [pscustomobject]$State,
+        [string[]]$CorruptPackagePaths = @(),
+        [string]$Flavor,
+        [string]$LocalRoot = (Get-ManifestedLocalRoot)
+    )
+
+    if (-not $State) {
+        $State = Get-NodeRuntimeState -Flavor $Flavor -LocalRoot $LocalRoot
+    }
+
+    $pathsToRemove = New-Object System.Collections.Generic.List[string]
+    foreach ($path in @($State.PartialPaths)) {
+        if (-not [string]::IsNullOrWhiteSpace($path)) {
+            $pathsToRemove.Add($path) | Out-Null
+        }
+    }
+    foreach ($path in @($State.InvalidRuntimeHomes)) {
+        if (-not [string]::IsNullOrWhiteSpace($path)) {
+            $pathsToRemove.Add($path) | Out-Null
+        }
+    }
+    foreach ($path in @($CorruptPackagePaths)) {
+        if (-not [string]::IsNullOrWhiteSpace($path)) {
+            $pathsToRemove.Add($path) | Out-Null
+        }
+    }
+
+    $removedPaths = New-Object System.Collections.Generic.List[string]
+    foreach ($path in ($pathsToRemove | Select-Object -Unique)) {
+        if (Remove-ManifestedPath -Path $path) {
+            $removedPaths.Add($path) | Out-Null
+        }
+    }
+
+    [pscustomobject]@{
+        Action       = if ($removedPaths.Count -gt 0) { 'Repaired' } else { 'Skipped' }
+        RemovedPaths = @($removedPaths)
+        LocalRoot    = $State.LocalRoot
+        Layout       = $State.Layout
+    }
+}
+
+function Save-NodeRuntimePackage {
     [CmdletBinding()]
     param(
         [switch]$RefreshNode,
-        [string]$Flavor = (Get-SandboxNodeFlavor),
-        [string]$LocalRoot = (Get-SandboxDefaultLocalRoot)
+        [string]$Flavor,
+        [string]$LocalRoot = (Get-ManifestedLocalRoot)
     )
 
-    $layout = Get-SandboxLayout -LocalRoot $LocalRoot
-    Ensure-SandboxDirectory -Path $layout.NodeCacheRoot | Out-Null
+    if ([string]::IsNullOrWhiteSpace($Flavor)) {
+        $Flavor = Get-NodeFlavor
+    }
 
-    $onlineRelease = $null
+    $layout = Get-ManifestedLayout -LocalRoot $LocalRoot
+    New-ManifestedDirectory -Path $layout.NodeCacheRoot | Out-Null
 
+    $release = $null
     try {
-        $onlineRelease = Get-SandboxNodeReleaseOnline -Flavor $Flavor
+        $release = Get-NodeRelease -Flavor $Flavor
     }
     catch {
-        $onlineRelease = $null
+        $release = $null
     }
 
-    if ($onlineRelease) {
-        $zipPath = Join-Path $layout.NodeCacheRoot $onlineRelease.FileName
+    if ($release) {
+        $packagePath = Join-Path $layout.NodeCacheRoot $release.FileName
+        $downloadPath = Get-ManifestedDownloadPath -TargetPath $packagePath
+        $action = 'ReusedCache'
 
-        if ($RefreshNode -or -not (Test-Path -LiteralPath $zipPath)) {
-            Write-Host "Downloading Node.js $($onlineRelease.Version) ($Flavor)..."
-            Invoke-WebRequest -Uri $onlineRelease.DownloadUrl -OutFile $zipPath -UseBasicParsing
-        }
+        if ($RefreshNode -or -not (Test-Path -LiteralPath $packagePath)) {
+            Remove-ManifestedPath -Path $downloadPath | Out-Null
 
-        $expectedHash = Get-SandboxNodeExpectedSha256 -ShasumsUrl $onlineRelease.ShasumsUrl -FileName $onlineRelease.FileName
-        $actualHash = (Get-FileHash -LiteralPath $zipPath -Algorithm SHA256).Hash.ToLowerInvariant()
+            try {
+                Write-Host "Downloading Node.js $($release.Version) ($Flavor)..."
+                Invoke-WebRequest -Uri $release.DownloadUrl -OutFile $downloadPath -UseBasicParsing
+                Move-Item -LiteralPath $downloadPath -Destination $packagePath -Force
+                $action = 'Downloaded'
+            }
+            catch {
+                Remove-ManifestedPath -Path $downloadPath | Out-Null
+                if (-not (Test-Path -LiteralPath $packagePath)) {
+                    throw
+                }
 
-        if ($actualHash -ne $expectedHash) {
-            throw "SHA256 mismatch for $($onlineRelease.FileName)."
+                Write-Warning ('Could not refresh the Node.js package. Using cached copy. ' + $_.Exception.Message)
+                $action = 'ReusedCache'
+            }
         }
 
         return [pscustomobject]@{
-            Version    = $onlineRelease.Version
-            Flavor     = $Flavor
-            ZipPath    = $zipPath
-            Source     = 'online'
-            NpmVersion = $onlineRelease.NpmVersion
+            Version     = $release.Version
+            Flavor      = $Flavor
+            FileName    = $release.FileName
+            Path        = $packagePath
+            Source      = if ($action -eq 'Downloaded') { 'online' } else { 'cache' }
+            Action      = $action
+            NpmVersion  = $release.NpmVersion
+            DownloadUrl = $release.DownloadUrl
+            ShasumsUrl  = $release.ShasumsUrl
         }
     }
 
-    $cached = Get-LatestCachedSandboxNodeZip -Flavor $Flavor -LocalRoot $LocalRoot
-    if (-not $cached) {
+    $cachedPackage = Get-LatestCachedNodeRuntimePackage -Flavor $Flavor -LocalRoot $LocalRoot
+    if (-not $cachedPackage) {
         throw 'Could not reach nodejs.org and no cached Node.js ZIP was found.'
     }
 
     return [pscustomobject]@{
-        Version    = $cached.Version
-        Flavor     = $Flavor
-        ZipPath    = $cached.Path
-        Source     = 'cache'
-        NpmVersion = $null
+        Version     = $cachedPackage.Version
+        Flavor      = $cachedPackage.Flavor
+        FileName    = $cachedPackage.FileName
+        Path        = $cachedPackage.Path
+        Source      = 'cache'
+        Action      = 'SelectedCache'
+        NpmVersion  = $null
+        DownloadUrl = $null
+        ShasumsUrl  = $null
     }
 }
 
-function Ensure-SandboxNodeRuntime {
+function Install-NodeRuntime {
     [CmdletBinding()]
     param(
-        [switch]$RefreshNode,
-        [string]$Flavor = (Get-SandboxNodeFlavor),
-        [string]$LocalRoot = (Get-SandboxDefaultLocalRoot)
+        [Parameter(Mandatory = $true)]
+        [pscustomobject]$PackageInfo,
+
+        [string]$Flavor,
+        [string]$LocalRoot = (Get-ManifestedLocalRoot)
     )
 
-    $zipInfo = Ensure-SandboxNodeZip -RefreshNode:$RefreshNode -Flavor $Flavor -LocalRoot $LocalRoot
-    $nodeHome = Get-ManagedSandboxNodeHome -Version $zipInfo.Version -Flavor $zipInfo.Flavor -LocalRoot $LocalRoot
+    if ([string]::IsNullOrWhiteSpace($Flavor)) {
+        $Flavor = if ($PackageInfo.Flavor) { $PackageInfo.Flavor } else { Get-NodeFlavor }
+    }
 
-    if (-not (Test-ManagedSandboxNodeHome -NodeHome $nodeHome)) {
-        $layout = Get-SandboxLayout -LocalRoot $LocalRoot
-        Ensure-SandboxDirectory -Path (Split-Path -Parent $nodeHome) | Out-Null
+    $nodeHome = Get-ManagedNodeRuntimeHome -Version $PackageInfo.Version -Flavor $Flavor -LocalRoot $LocalRoot
+    $currentValidation = Test-NodeRuntime -NodeHome $nodeHome
 
-        $tempExtractRoot = Join-Path $layout.ToolsRoot ('_tmp_node_' + [Guid]::NewGuid().ToString('N'))
-        Ensure-SandboxDirectory -Path $tempExtractRoot | Out-Null
+    if ($currentValidation.Status -ne 'Ready') {
+        $layout = Get-ManifestedLayout -LocalRoot $LocalRoot
+        New-ManifestedDirectory -Path (Split-Path -Parent $nodeHome) | Out-Null
 
+        $stagePath = New-ManifestedStageDirectory -RootPath $layout.ToolsRoot -Prefix 'node'
         try {
-            Expand-Archive -LiteralPath $zipInfo.ZipPath -DestinationPath $tempExtractRoot -Force
+            Expand-Archive -LiteralPath $PackageInfo.Path -DestinationPath $stagePath -Force
 
-            $expandedRoot = Get-ChildItem -LiteralPath $tempExtractRoot -Directory | Select-Object -First 1
+            $expandedRoot = Get-ChildItem -LiteralPath $stagePath -Directory | Select-Object -First 1
             if (-not $expandedRoot) {
                 throw 'The Node.js ZIP did not extract as expected.'
             }
@@ -226,26 +520,254 @@ function Ensure-SandboxNodeRuntime {
                 Remove-Item -LiteralPath $nodeHome -Recurse -Force
             }
 
-            Ensure-SandboxDirectory -Path $nodeHome | Out-Null
-
+            New-ManifestedDirectory -Path $nodeHome | Out-Null
             Get-ChildItem -LiteralPath $expandedRoot.FullName -Force | ForEach-Object {
                 Move-Item -LiteralPath $_.FullName -Destination $nodeHome -Force
             }
         }
         finally {
-            if (Test-Path -LiteralPath $tempExtractRoot) {
-                Remove-Item -LiteralPath $tempExtractRoot -Recurse -Force -ErrorAction SilentlyContinue
-            }
+            Remove-ManifestedPath -Path $stagePath | Out-Null
         }
     }
 
-    [pscustomobject]@{
-        Version    = $zipInfo.Version
-        Flavor     = $zipInfo.Flavor
-        NodeHome   = $nodeHome
-        NodeExe    = (Join-Path $nodeHome 'node.exe')
-        NpmCmd     = (Join-Path $nodeHome 'npm.cmd')
-        Source     = $zipInfo.Source
-        NpmVersion = $zipInfo.NpmVersion
+    $validation = Test-NodeRuntime -NodeHome $nodeHome
+    if ($validation.Status -ne 'Ready') {
+        throw "Node runtime validation failed after install at $nodeHome."
     }
+
+    [pscustomobject]@{
+        Action     = if ($currentValidation.Status -eq 'Ready') { 'Skipped' } else { 'Installed' }
+        Version    = $PackageInfo.Version
+        Flavor     = $Flavor
+        NodeHome   = $nodeHome
+        NodeExe    = $validation.NodeExe
+        NpmCmd     = $validation.NpmCmd
+        Source     = $PackageInfo.Source
+        NpmVersion = $PackageInfo.NpmVersion
+    }
+}
+
+function Initialize-NodeRuntime {
+    [CmdletBinding(SupportsShouldProcess = $true)]
+    param(
+        [switch]$RefreshNode,
+        [string]$LocalRoot = (Get-ManifestedLocalRoot)
+    )
+
+    $actionsTaken = New-Object System.Collections.Generic.List[string]
+    $plannedActions = New-Object System.Collections.Generic.List[string]
+    $repairResult = $null
+    $packageInfo = $null
+    $packageTest = $null
+    $installResult = $null
+
+    $initialState = Get-NodeRuntimeState -LocalRoot $LocalRoot
+    $state = $initialState
+
+    if ($state.Status -eq 'Blocked') {
+        $result = [pscustomobject]@{
+            LocalRoot       = $state.LocalRoot
+            Layout          = $state.Layout
+            InitialState    = $initialState
+            FinalState      = $state
+            ActionTaken     = @('None')
+            PlannedActions  = @()
+            RestartRequired = $false
+            Package         = $null
+            PackageTest     = $null
+            RuntimeTest     = $null
+            RepairResult    = $null
+            InstallResult   = $null
+        }
+
+        if ($WhatIfPreference) {
+            Add-Member -InputObject $result -NotePropertyName PersistedStatePath -NotePropertyValue $null -Force
+            return $result
+        }
+
+        $statePath = Save-ManifestedInvokeState -CommandName 'Initialize-NodeRuntime' -Result $result -LocalRoot $LocalRoot -Details @{
+            Version     = $state.CurrentVersion
+            PackagePath = $state.PackagePath
+            RuntimeHome = $state.RuntimeHome
+        }
+        Add-Member -InputObject $result -NotePropertyName PersistedStatePath -NotePropertyValue $statePath -Force
+        return $result
+    }
+
+    $needsRepair = $state.Status -in @('Partial', 'NeedsRepair')
+    $needsInstall = $RefreshNode -or -not $state.RuntimeHome
+    $needsAcquire = $RefreshNode -or (-not $state.PackagePath)
+
+    if ($needsRepair) {
+        $plannedActions.Add('Repair-NodeRuntime') | Out-Null
+    }
+    if ($needsInstall -and $needsAcquire) {
+        $plannedActions.Add('Save-NodeRuntimePackage') | Out-Null
+    }
+    if ($needsInstall) {
+        $plannedActions.Add('Test-NodeRuntimePackage') | Out-Null
+        $plannedActions.Add('Install-NodeRuntime') | Out-Null
+    }
+
+    if ($needsRepair) {
+        if (-not $PSCmdlet.ShouldProcess($state.Layout.NodeToolsRoot, 'Repair Node runtime state')) {
+            return [pscustomobject]@{
+                LocalRoot           = $state.LocalRoot
+                Layout              = $state.Layout
+                InitialState        = $initialState
+                FinalState          = $state
+                ActionTaken         = @('WhatIf')
+                PlannedActions      = @($plannedActions)
+                RestartRequired     = $false
+                Package             = $null
+                PackageTest         = $null
+                RuntimeTest         = $state.Runtime
+                RepairResult        = $null
+                InstallResult       = $null
+                PersistedStatePath  = $null
+            }
+        }
+
+        $repairResult = Repair-NodeRuntime -State $state -Flavor $state.Flavor -LocalRoot $state.LocalRoot
+        if ($repairResult.Action -eq 'Repaired') {
+            $actionsTaken.Add('Repair-NodeRuntime') | Out-Null
+        }
+
+        $state = Get-NodeRuntimeState -Flavor $state.Flavor -LocalRoot $state.LocalRoot
+        $needsInstall = $RefreshNode -or -not $state.RuntimeHome
+        $needsAcquire = $RefreshNode -or (-not $state.PackagePath)
+    }
+
+    if ($needsInstall) {
+        if ($needsAcquire) {
+            if (-not $PSCmdlet.ShouldProcess($state.Layout.NodeCacheRoot, 'Acquire Node runtime package')) {
+                return [pscustomobject]@{
+                    LocalRoot          = $state.LocalRoot
+                    Layout             = $state.Layout
+                    InitialState       = $initialState
+                    FinalState         = $state
+                    ActionTaken        = @('WhatIf')
+                    PlannedActions     = @($plannedActions)
+                    RestartRequired    = $false
+                    Package            = $null
+                    PackageTest        = $null
+                    RuntimeTest        = $state.Runtime
+                    RepairResult       = $repairResult
+                    InstallResult      = $null
+                    PersistedStatePath = $null
+                }
+            }
+
+            $packageInfo = Save-NodeRuntimePackage -RefreshNode:$RefreshNode -Flavor $state.Flavor -LocalRoot $state.LocalRoot
+            if ($packageInfo.Action -eq 'Downloaded') {
+                $actionsTaken.Add('Save-NodeRuntimePackage') | Out-Null
+            }
+        }
+        else {
+            $packageInfo = $state.Package
+        }
+
+        $packageTest = Test-NodeRuntimePackage -PackageInfo $packageInfo
+        if ($packageTest.Status -eq 'CorruptCache') {
+            if (-not $PSCmdlet.ShouldProcess($packageInfo.Path, 'Repair corrupt Node runtime package')) {
+                return [pscustomobject]@{
+                    LocalRoot          = $state.LocalRoot
+                    Layout             = $state.Layout
+                    InitialState       = $initialState
+                    FinalState         = $state
+                    ActionTaken        = @('WhatIf')
+                    PlannedActions     = @($plannedActions)
+                    RestartRequired    = $false
+                    Package            = $packageInfo
+                    PackageTest        = $packageTest
+                    RuntimeTest        = $state.Runtime
+                    RepairResult       = $repairResult
+                    InstallResult      = $null
+                    PersistedStatePath = $null
+                }
+            }
+
+            $repairResult = Repair-NodeRuntime -State $state -CorruptPackagePaths @($packageInfo.Path) -Flavor $state.Flavor -LocalRoot $state.LocalRoot
+            if ($repairResult.Action -eq 'Repaired') {
+                $actionsTaken.Add('Repair-NodeRuntime') | Out-Null
+            }
+
+            $packageInfo = Save-NodeRuntimePackage -RefreshNode:$true -Flavor $state.Flavor -LocalRoot $state.LocalRoot
+            if ($packageInfo.Action -eq 'Downloaded') {
+                $actionsTaken.Add('Save-NodeRuntimePackage') | Out-Null
+            }
+
+            $packageTest = Test-NodeRuntimePackage -PackageInfo $packageInfo
+        }
+
+        if ($packageTest.Status -ne 'Ready') {
+            throw "Node runtime package validation failed with status $($packageTest.Status)."
+        }
+
+        if (-not $PSCmdlet.ShouldProcess($state.Layout.NodeToolsRoot, 'Install Node runtime')) {
+            return [pscustomobject]@{
+                LocalRoot          = $state.LocalRoot
+                Layout             = $state.Layout
+                InitialState       = $initialState
+                FinalState         = $state
+                ActionTaken        = @('WhatIf')
+                PlannedActions     = @($plannedActions)
+                RestartRequired    = $false
+                Package            = $packageInfo
+                PackageTest        = $packageTest
+                RuntimeTest        = $state.Runtime
+                RepairResult       = $repairResult
+                InstallResult      = $null
+                PersistedStatePath = $null
+            }
+        }
+
+        $installResult = Install-NodeRuntime -PackageInfo $packageInfo -Flavor $state.Flavor -LocalRoot $state.LocalRoot
+        if ($installResult.Action -eq 'Installed') {
+            $actionsTaken.Add('Install-NodeRuntime') | Out-Null
+        }
+    }
+
+    $finalState = Get-NodeRuntimeState -Flavor $state.Flavor -LocalRoot $state.LocalRoot
+    $runtimeTest = if ($finalState.RuntimeHome) {
+        Test-NodeRuntime -NodeHome $finalState.RuntimeHome
+    }
+    else {
+        [pscustomobject]@{
+            Status   = 'Missing'
+            IsReady  = $false
+            NodeHome = $null
+            NodeExe  = $null
+            NpmCmd   = $null
+        }
+    }
+
+    $result = [pscustomobject]@{
+        LocalRoot       = $finalState.LocalRoot
+        Layout          = $finalState.Layout
+        InitialState    = $initialState
+        FinalState      = $finalState
+        ActionTaken     = if ($actionsTaken.Count -gt 0) { @($actionsTaken) } else { @('None') }
+        PlannedActions  = @($plannedActions)
+        RestartRequired = $false
+        Package         = $packageInfo
+        PackageTest     = $packageTest
+        RuntimeTest     = $runtimeTest
+        RepairResult    = $repairResult
+        InstallResult   = $installResult
+    }
+
+    if ($WhatIfPreference) {
+        Add-Member -InputObject $result -NotePropertyName PersistedStatePath -NotePropertyValue $null -Force
+        return $result
+    }
+
+    $statePath = Save-ManifestedInvokeState -CommandName 'Initialize-NodeRuntime' -Result $result -LocalRoot $LocalRoot -Details @{
+        Version     = $finalState.CurrentVersion
+        PackagePath = $finalState.PackagePath
+        RuntimeHome = $finalState.RuntimeHome
+    }
+    Add-Member -InputObject $result -NotePropertyName PersistedStatePath -NotePropertyValue $statePath -Force
+
+    return $result
 }

@@ -2,7 +2,7 @@
     Eigenverft.Manifested.Sandbox.VCRuntimeAndCache
 #>
 
-function ConvertTo-SandboxVCRuntimeVersion {
+function ConvertTo-VCRuntimeVersion {
     [CmdletBinding()]
     param(
         [string]$VersionText
@@ -20,7 +20,7 @@ function ConvertTo-SandboxVCRuntimeVersion {
     return [version]$match.Value
 }
 
-function Format-SandboxProcessArgument {
+function Format-VCRuntimeProcessArgument {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true)]
@@ -34,13 +34,13 @@ function Format-SandboxProcessArgument {
     return $Value
 }
 
-function Get-SandboxVCRuntimeInstallerInfo {
+function Get-VCRuntimeInstallerInfo {
     [CmdletBinding()]
     param(
-        [string]$LocalRoot = (Get-SandboxDefaultLocalRoot)
+        [string]$LocalRoot = (Get-ManifestedLocalRoot)
     )
 
-    $layout = Get-SandboxLayout -LocalRoot $LocalRoot
+    $layout = Get-ManifestedLayout -LocalRoot $LocalRoot
 
     [pscustomobject]@{
         Architecture = 'x64'
@@ -50,31 +50,34 @@ function Get-SandboxVCRuntimeInstallerInfo {
     }
 }
 
-function Get-CachedSandboxVCRuntimeInstaller {
+function Get-CachedVCRuntimeInstaller {
     [CmdletBinding()]
     param(
-        [string]$LocalRoot = (Get-SandboxDefaultLocalRoot)
+        [string]$LocalRoot = (Get-ManifestedLocalRoot)
     )
 
-    $info = Get-SandboxVCRuntimeInstallerInfo -LocalRoot $LocalRoot
+    $info = Get-VCRuntimeInstallerInfo -LocalRoot $LocalRoot
     if (-not (Test-Path -LiteralPath $info.CachePath)) {
         return $null
     }
 
     $item = Get-Item -LiteralPath $info.CachePath
-    $versionObject = ConvertTo-SandboxVCRuntimeVersion -VersionText $item.VersionInfo.FileVersion
+    $versionObject = ConvertTo-VCRuntimeVersion -VersionText $item.VersionInfo.FileVersion
 
     [pscustomobject]@{
-        Architecture = $info.Architecture
-        FileName     = $info.FileName
-        Path         = $info.CachePath
-        Version      = if ($versionObject) { $versionObject.ToString() } else { $item.VersionInfo.FileVersion }
+        Architecture  = $info.Architecture
+        FileName      = $info.FileName
+        Path          = $info.CachePath
+        Version       = if ($versionObject) { $versionObject.ToString() } else { $item.VersionInfo.FileVersion }
         VersionObject = $versionObject
         LastWriteTime = $item.LastWriteTimeUtc
+        Source        = 'cache'
+        Action        = 'SelectedCache'
+        DownloadUrl   = $info.DownloadUrl
     }
 }
 
-function Get-InstalledSandboxVCRuntime {
+function Get-InstalledVCRuntime {
     [CmdletBinding()]
     param()
 
@@ -97,7 +100,7 @@ function Get-InstalledSandboxVCRuntime {
                 try {
                     $installed = [int]$subKey.GetValue('Installed', 0)
                     $versionText = [string]$subKey.GetValue('Version', '')
-                    $versionObject = ConvertTo-SandboxVCRuntimeVersion -VersionText $versionText
+                    $versionObject = ConvertTo-VCRuntimeVersion -VersionText $versionText
 
                     if (-not $versionObject) {
                         $major = $subKey.GetValue('Major', $null)
@@ -113,12 +116,12 @@ function Get-InstalledSandboxVCRuntime {
 
                     if ($installed -eq 1) {
                         return [pscustomobject]@{
-                            Installed   = $true
-                            Architecture = 'x64'
-                            Version     = $versionText
+                            Installed     = $true
+                            Architecture  = 'x64'
+                            Version       = $versionText
                             VersionObject = $versionObject
-                            KeyPath     = $subKeyPath
-                            RegistryView = $view.ToString()
+                            KeyPath       = $subKeyPath
+                            RegistryView  = $view.ToString()
                         }
                     }
                 }
@@ -133,52 +136,166 @@ function Get-InstalledSandboxVCRuntime {
     }
 
     [pscustomobject]@{
-        Installed    = $false
-        Architecture = 'x64'
-        Version      = $null
+        Installed     = $false
+        Architecture  = 'x64'
+        Version       = $null
         VersionObject = $null
-        KeyPath      = $null
-        RegistryView = $null
+        KeyPath       = $null
+        RegistryView  = $null
     }
 }
 
-function Ensure-SandboxVCRuntimeInstaller {
+function Test-VCRuntime {
+    [CmdletBinding()]
+    param(
+        [pscustomobject]$InstalledRuntime = (Get-InstalledVCRuntime)
+    )
+
+    $status = if ($InstalledRuntime.Installed) { 'Ready' } else { 'Missing' }
+
+    [pscustomobject]@{
+        Status        = $status
+        Installed     = $InstalledRuntime.Installed
+        Architecture  = $InstalledRuntime.Architecture
+        Version       = $InstalledRuntime.Version
+        VersionObject = $InstalledRuntime.VersionObject
+        KeyPath       = $InstalledRuntime.KeyPath
+        RegistryView  = $InstalledRuntime.RegistryView
+    }
+}
+
+function Get-VCRuntimeState {
+    [CmdletBinding()]
+    param(
+        [string]$LocalRoot = (Get-ManifestedLocalRoot)
+    )
+
+    if ([System.Environment]::OSVersion.Platform -ne [System.PlatformID]::Win32NT) {
+        return [pscustomobject]@{
+            Status         = 'Blocked'
+            LocalRoot      = $LocalRoot
+            Layout         = $null
+            CurrentVersion = $null
+            InstalledRuntime = $null
+            Runtime        = $null
+            Installer      = $null
+            InstallerPath  = $null
+            PartialPaths   = @()
+            BlockedReason  = 'Only Windows hosts are supported by this VC runtime bootstrap.'
+        }
+    }
+
+    $layout = Get-ManifestedLayout -LocalRoot $LocalRoot
+    $installerInfo = Get-VCRuntimeInstallerInfo -LocalRoot $layout.LocalRoot
+    $partialPaths = @()
+    $downloadPath = Get-ManifestedDownloadPath -TargetPath $installerInfo.CachePath
+    if (Test-Path -LiteralPath $downloadPath) {
+        $partialPaths += $downloadPath
+    }
+
+    $installedRuntime = Get-InstalledVCRuntime
+    $runtime = Test-VCRuntime -InstalledRuntime $installedRuntime
+    $installer = Get-CachedVCRuntimeInstaller -LocalRoot $layout.LocalRoot
+
+    if ($partialPaths.Count -gt 0) {
+        $status = 'Partial'
+    }
+    elseif ($runtime.Status -eq 'Ready') {
+        $status = 'Ready'
+    }
+    elseif ($installer) {
+        $status = 'NeedsInstall'
+    }
+    else {
+        $status = 'Missing'
+    }
+
+    [pscustomobject]@{
+        Status           = $status
+        LocalRoot        = $layout.LocalRoot
+        Layout           = $layout
+        CurrentVersion   = if ($runtime.Version) { $runtime.Version } elseif ($installer) { $installer.Version } else { $null }
+        InstalledRuntime = $installedRuntime
+        Runtime          = $runtime
+        Installer        = $installer
+        InstallerPath    = if ($installer) { $installer.Path } else { $installerInfo.CachePath }
+        PartialPaths     = $partialPaths
+        BlockedReason    = $null
+    }
+}
+
+function Repair-VCRuntime {
+    [CmdletBinding()]
+    param(
+        [pscustomobject]$State,
+        [string[]]$CorruptInstallerPaths = @(),
+        [string]$LocalRoot = (Get-ManifestedLocalRoot)
+    )
+
+    if (-not $State) {
+        $State = Get-VCRuntimeState -LocalRoot $LocalRoot
+    }
+
+    $pathsToRemove = New-Object System.Collections.Generic.List[string]
+    foreach ($path in @($State.PartialPaths)) {
+        if (-not [string]::IsNullOrWhiteSpace($path)) {
+            $pathsToRemove.Add($path) | Out-Null
+        }
+    }
+    foreach ($path in @($CorruptInstallerPaths)) {
+        if (-not [string]::IsNullOrWhiteSpace($path)) {
+            $pathsToRemove.Add($path) | Out-Null
+        }
+    }
+
+    $removedPaths = New-Object System.Collections.Generic.List[string]
+    foreach ($path in ($pathsToRemove | Select-Object -Unique)) {
+        if (Remove-ManifestedPath -Path $path) {
+            $removedPaths.Add($path) | Out-Null
+        }
+    }
+
+    [pscustomobject]@{
+        Action       = if ($removedPaths.Count -gt 0) { 'Repaired' } else { 'Skipped' }
+        RemovedPaths = @($removedPaths)
+        LocalRoot    = $State.LocalRoot
+        Layout       = $State.Layout
+    }
+}
+
+function Save-VCRuntimeInstaller {
     [CmdletBinding()]
     param(
         [switch]$RefreshVCRuntime,
-        [string]$LocalRoot = (Get-SandboxDefaultLocalRoot)
+        [string]$LocalRoot = (Get-ManifestedLocalRoot)
     )
 
-    $layout = Get-SandboxLayout -LocalRoot $LocalRoot
-    $info = Get-SandboxVCRuntimeInstallerInfo -LocalRoot $LocalRoot
-    Ensure-SandboxDirectory -Path $layout.VCRuntimeCacheRoot | Out-Null
+    $layout = Get-ManifestedLayout -LocalRoot $LocalRoot
+    $info = Get-VCRuntimeInstallerInfo -LocalRoot $layout.LocalRoot
+    New-ManifestedDirectory -Path $layout.VCRuntimeCacheRoot | Out-Null
 
     $cacheExists = Test-Path -LiteralPath $info.CachePath
-    $source = if ($cacheExists) { 'cache' } else { $null }
+    $downloadPath = Get-ManifestedDownloadPath -TargetPath $info.CachePath
+    $action = 'ReusedCache'
 
     if ($RefreshVCRuntime -or -not $cacheExists) {
-        $downloadPath = $info.CachePath + '.download'
-        if (Test-Path -LiteralPath $downloadPath) {
-            Remove-Item -LiteralPath $downloadPath -Force -ErrorAction SilentlyContinue
-        }
+        Remove-ManifestedPath -Path $downloadPath | Out-Null
 
         try {
             Write-Host 'Downloading Microsoft Visual C++ Redistributable bootstrapper...'
             Invoke-WebRequest -Uri $info.DownloadUrl -OutFile $downloadPath -UseBasicParsing
             Move-Item -LiteralPath $downloadPath -Destination $info.CachePath -Force
-            $source = 'online'
+            $action = 'Downloaded'
         }
         catch {
-            if (Test-Path -LiteralPath $downloadPath) {
-                Remove-Item -LiteralPath $downloadPath -Force -ErrorAction SilentlyContinue
-            }
+            Remove-ManifestedPath -Path $downloadPath | Out-Null
 
             if (-not $cacheExists) {
                 throw
             }
 
             Write-Warning ('Could not refresh the VC++ redistributable bootstrapper. Using cached copy. ' + $_.Exception.Message)
-            $source = 'cache'
+            $action = 'ReusedCache'
         }
     }
 
@@ -186,16 +303,7 @@ function Ensure-SandboxVCRuntimeInstaller {
         throw 'Could not acquire the VC++ redistributable bootstrapper and no cached copy was found.'
     }
 
-    $signature = Get-AuthenticodeSignature -FilePath $info.CachePath
-    if ($signature.Status -ne [System.Management.Automation.SignatureStatus]::Valid) {
-        throw "The cached VC++ redistributable bootstrapper signature is $($signature.Status)."
-    }
-
-    if (-not $signature.SignerCertificate -or $signature.SignerCertificate.Subject -notmatch 'Microsoft Corporation') {
-        throw 'The cached VC++ redistributable bootstrapper is not signed by Microsoft Corporation.'
-    }
-
-    $cached = Get-CachedSandboxVCRuntimeInstaller -LocalRoot $LocalRoot
+    $cached = Get-CachedVCRuntimeInstaller -LocalRoot $layout.LocalRoot
 
     [pscustomobject]@{
         Architecture  = $info.Architecture
@@ -204,11 +312,52 @@ function Ensure-SandboxVCRuntimeInstaller {
         Path          = $info.CachePath
         Version       = if ($cached) { $cached.Version } else { $null }
         VersionObject = if ($cached) { $cached.VersionObject } else { $null }
-        Source        = $source
+        Source        = if ($action -eq 'Downloaded') { 'online' } else { 'cache' }
+        Action        = $action
     }
 }
 
-function Invoke-SandboxVCRuntimeInstaller {
+function Test-VCRuntimeInstaller {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [pscustomobject]$InstallerInfo
+    )
+
+    if (-not (Test-Path -LiteralPath $InstallerInfo.Path)) {
+        return [pscustomobject]@{
+            Status          = 'Missing'
+            Architecture    = $InstallerInfo.Architecture
+            Path            = $InstallerInfo.Path
+            Version         = $InstallerInfo.Version
+            VersionObject   = $InstallerInfo.VersionObject
+            SignatureStatus = 'Missing'
+            SignerSubject   = $null
+        }
+    }
+
+    $signature = Get-AuthenticodeSignature -FilePath $InstallerInfo.Path
+    $status = 'Ready'
+
+    if ($signature.Status -ne [System.Management.Automation.SignatureStatus]::Valid) {
+        $status = 'CorruptCache'
+    }
+    elseif (-not $signature.SignerCertificate -or $signature.SignerCertificate.Subject -notmatch 'Microsoft Corporation') {
+        $status = 'CorruptCache'
+    }
+
+    [pscustomobject]@{
+        Status          = $status
+        Architecture    = $InstallerInfo.Architecture
+        Path            = $InstallerInfo.Path
+        Version         = $InstallerInfo.Version
+        VersionObject   = $InstallerInfo.VersionObject
+        SignatureStatus = $signature.Status.ToString()
+        SignerSubject   = if ($signature.SignerCertificate) { $signature.SignerCertificate.Subject } else { $null }
+    }
+}
+
+function Invoke-VCRuntimeInstaller {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true)]
@@ -216,11 +365,11 @@ function Invoke-SandboxVCRuntimeInstaller {
 
         [int]$TimeoutSec = 300,
 
-        [string]$LocalRoot = (Get-SandboxDefaultLocalRoot)
+        [string]$LocalRoot = (Get-ManifestedLocalRoot)
     )
 
-    $layout = Get-SandboxLayout -LocalRoot $LocalRoot
-    Ensure-SandboxDirectory -Path $layout.VCRuntimeCacheRoot | Out-Null
+    $layout = Get-ManifestedLayout -LocalRoot $LocalRoot
+    New-ManifestedDirectory -Path $layout.VCRuntimeCacheRoot | Out-Null
 
     $timestamp = Get-Date -Format 'yyyyMMdd-HHmmss'
     $logPath = Join-Path $layout.VCRuntimeCacheRoot ("vc_redist.install.$timestamp.log")
@@ -230,7 +379,7 @@ function Invoke-SandboxVCRuntimeInstaller {
         '/passive',
         '/norestart',
         '/log',
-        (Format-SandboxProcessArgument -Value $logPath)
+        (Format-VCRuntimeProcessArgument -Value $logPath)
     )
 
     $process = Start-Process -FilePath $InstallerPath -ArgumentList $argumentList -PassThru
@@ -251,28 +400,29 @@ function Invoke-SandboxVCRuntimeInstaller {
     }
 }
 
-function Ensure-SandboxVCRuntime {
+function Install-VCRuntime {
     [CmdletBinding()]
     param(
-        [switch]$RefreshVCRuntime,
+        [Parameter(Mandatory = $true)]
+        [pscustomobject]$InstallerInfo,
+
         [int]$InstallTimeoutSec = 300,
-        [string]$LocalRoot = (Get-SandboxDefaultLocalRoot)
+        [string]$LocalRoot = (Get-ManifestedLocalRoot)
     )
 
-    $installed = Get-InstalledSandboxVCRuntime
-    $installer = Ensure-SandboxVCRuntimeInstaller -RefreshVCRuntime:$RefreshVCRuntime -LocalRoot $LocalRoot
+    $installed = Get-InstalledVCRuntime
 
     if ($installed.Installed) {
-        if (-not $installer.VersionObject -or ($installed.VersionObject -and $installed.VersionObject -ge $installer.VersionObject)) {
+        if (-not $InstallerInfo.VersionObject -or ($installed.VersionObject -and $installed.VersionObject -ge $InstallerInfo.VersionObject)) {
             return [pscustomobject]@{
+                Action           = 'Skipped'
                 Installed        = $true
                 Architecture     = $installed.Architecture
                 Version          = $installed.Version
                 VersionObject    = $installed.VersionObject
-                InstallerVersion = $installer.Version
-                InstallerPath    = $installer.Path
-                InstallerSource  = $installer.Source
-                Action           = 'skipped'
+                InstallerVersion = $InstallerInfo.Version
+                InstallerPath    = $InstallerInfo.Path
+                InstallerSource  = $InstallerInfo.Source
                 ExitCode         = 0
                 RestartRequired  = $false
                 LogPath          = $null
@@ -280,16 +430,16 @@ function Ensure-SandboxVCRuntime {
         }
     }
 
-    Write-Host 'Installing Microsoft Visual C++ Redistributable prerequisites for the sandbox...'
-    $installResult = Invoke-SandboxVCRuntimeInstaller -InstallerPath $installer.Path -TimeoutSec $InstallTimeoutSec -LocalRoot $LocalRoot
-    $refreshed = Get-InstalledSandboxVCRuntime
+    Write-Host 'Installing Microsoft Visual C++ Redistributable prerequisites for the runtime...'
+    $installResult = Invoke-VCRuntimeInstaller -InstallerPath $InstallerInfo.Path -TimeoutSec $InstallTimeoutSec -LocalRoot $LocalRoot
+    $refreshed = Get-InstalledVCRuntime
 
     if (-not $refreshed.Installed) {
         throw "VC++ redistributable installation exited with code $($installResult.ExitCode), but the runtime was not detected afterwards. Check $($installResult.LogPath)."
     }
 
-    if ($installer.VersionObject -and $refreshed.VersionObject -and $refreshed.VersionObject -lt $installer.VersionObject) {
-        throw "VC++ redistributable installation completed, but version $($refreshed.Version) is still older than the cached installer version $($installer.Version). Check $($installResult.LogPath)."
+    if ($InstallerInfo.VersionObject -and $refreshed.VersionObject -and $refreshed.VersionObject -lt $InstallerInfo.VersionObject) {
+        throw "VC++ redistributable installation completed, but version $($refreshed.Version) is still older than the cached installer version $($InstallerInfo.Version). Check $($installResult.LogPath)."
     }
 
     if ($installResult.ExitCode -notin @(0, 3010, 1638)) {
@@ -297,16 +447,229 @@ function Ensure-SandboxVCRuntime {
     }
 
     [pscustomobject]@{
+        Action           = 'Installed'
         Installed        = $true
         Architecture     = $refreshed.Architecture
         Version          = $refreshed.Version
         VersionObject    = $refreshed.VersionObject
-        InstallerVersion = $installer.Version
-        InstallerPath    = $installer.Path
-        InstallerSource  = $installer.Source
-        Action           = 'installed'
+        InstallerVersion = $InstallerInfo.Version
+        InstallerPath    = $InstallerInfo.Path
+        InstallerSource  = $InstallerInfo.Source
         ExitCode         = $installResult.ExitCode
         RestartRequired  = $installResult.RestartRequired
         LogPath          = $installResult.LogPath
     }
+}
+
+function Initialize-VCRuntime {
+    [CmdletBinding(SupportsShouldProcess = $true)]
+    param(
+        [switch]$RefreshVCRuntime,
+        [int]$InstallTimeoutSec = 300,
+        [string]$LocalRoot = (Get-ManifestedLocalRoot)
+    )
+
+    $actionsTaken = New-Object System.Collections.Generic.List[string]
+    $plannedActions = New-Object System.Collections.Generic.List[string]
+    $repairResult = $null
+    $installerInfo = $null
+    $installerTest = $null
+    $installResult = $null
+
+    $initialState = Get-VCRuntimeState -LocalRoot $LocalRoot
+    $state = $initialState
+
+    if ($state.Status -eq 'Blocked') {
+        $result = [pscustomobject]@{
+            LocalRoot       = $state.LocalRoot
+            Layout          = $state.Layout
+            InitialState    = $initialState
+            FinalState      = $state
+            ActionTaken     = @('None')
+            PlannedActions  = @()
+            RestartRequired = $false
+            Installer       = $null
+            InstallerTest   = $null
+            RuntimeTest     = $null
+            RepairResult    = $null
+            InstallResult   = $null
+        }
+
+        if ($WhatIfPreference) {
+            Add-Member -InputObject $result -NotePropertyName PersistedStatePath -NotePropertyValue $null -Force
+            return $result
+        }
+
+        $statePath = Save-ManifestedInvokeState -CommandName 'Initialize-VCRuntime' -Result $result -LocalRoot $LocalRoot -Details @{
+            Version       = $state.CurrentVersion
+            InstallerPath = $state.InstallerPath
+        }
+        Add-Member -InputObject $result -NotePropertyName PersistedStatePath -NotePropertyValue $statePath -Force
+        return $result
+    }
+
+    $needsRepair = $state.Status -in @('Partial', 'NeedsRepair')
+    $needsInstall = $RefreshVCRuntime -or ($state.Status -ne 'Ready')
+    $needsAcquire = $RefreshVCRuntime -or (-not $state.InstallerPath) -or (-not (Test-Path -LiteralPath $state.InstallerPath))
+
+    if ($needsRepair) {
+        $plannedActions.Add('Repair-VCRuntime') | Out-Null
+    }
+    if ($needsInstall -and $needsAcquire) {
+        $plannedActions.Add('Save-VCRuntimeInstaller') | Out-Null
+    }
+    if ($needsInstall) {
+        $plannedActions.Add('Test-VCRuntimeInstaller') | Out-Null
+        $plannedActions.Add('Install-VCRuntime') | Out-Null
+    }
+
+    if ($needsRepair) {
+        if (-not $PSCmdlet.ShouldProcess($state.InstallerPath, 'Repair VC runtime state')) {
+            return [pscustomobject]@{
+                LocalRoot          = $state.LocalRoot
+                Layout             = $state.Layout
+                InitialState       = $initialState
+                FinalState         = $state
+                ActionTaken        = @('WhatIf')
+                PlannedActions     = @($plannedActions)
+                RestartRequired    = $false
+                Installer          = $null
+                InstallerTest      = $null
+                RuntimeTest        = $state.Runtime
+                RepairResult       = $null
+                InstallResult      = $null
+                PersistedStatePath = $null
+            }
+        }
+
+        $repairResult = Repair-VCRuntime -State $state -LocalRoot $state.LocalRoot
+        if ($repairResult.Action -eq 'Repaired') {
+            $actionsTaken.Add('Repair-VCRuntime') | Out-Null
+        }
+
+        $state = Get-VCRuntimeState -LocalRoot $state.LocalRoot
+        $needsInstall = $RefreshVCRuntime -or ($state.Status -ne 'Ready')
+        $needsAcquire = $RefreshVCRuntime -or (-not $state.InstallerPath) -or (-not (Test-Path -LiteralPath $state.InstallerPath))
+    }
+
+    if ($needsInstall) {
+        if ($needsAcquire) {
+            if (-not $PSCmdlet.ShouldProcess($state.Layout.VCRuntimeCacheRoot, 'Acquire VC runtime installer')) {
+                return [pscustomobject]@{
+                    LocalRoot          = $state.LocalRoot
+                    Layout             = $state.Layout
+                    InitialState       = $initialState
+                    FinalState         = $state
+                    ActionTaken        = @('WhatIf')
+                    PlannedActions     = @($plannedActions)
+                    RestartRequired    = $false
+                    Installer          = $null
+                    InstallerTest      = $null
+                    RuntimeTest        = $state.Runtime
+                    RepairResult       = $repairResult
+                    InstallResult      = $null
+                    PersistedStatePath = $null
+                }
+            }
+
+            $installerInfo = Save-VCRuntimeInstaller -RefreshVCRuntime:$RefreshVCRuntime -LocalRoot $state.LocalRoot
+            if ($installerInfo.Action -eq 'Downloaded') {
+                $actionsTaken.Add('Save-VCRuntimeInstaller') | Out-Null
+            }
+        }
+        else {
+            $installerInfo = $state.Installer
+        }
+
+        $installerTest = Test-VCRuntimeInstaller -InstallerInfo $installerInfo
+        if ($installerTest.Status -eq 'CorruptCache') {
+            if (-not $PSCmdlet.ShouldProcess($installerInfo.Path, 'Repair corrupt VC runtime installer')) {
+                return [pscustomobject]@{
+                    LocalRoot          = $state.LocalRoot
+                    Layout             = $state.Layout
+                    InitialState       = $initialState
+                    FinalState         = $state
+                    ActionTaken        = @('WhatIf')
+                    PlannedActions     = @($plannedActions)
+                    RestartRequired    = $false
+                    Installer          = $installerInfo
+                    InstallerTest      = $installerTest
+                    RuntimeTest        = $state.Runtime
+                    RepairResult       = $repairResult
+                    InstallResult      = $null
+                    PersistedStatePath = $null
+                }
+            }
+
+            $repairResult = Repair-VCRuntime -State $state -CorruptInstallerPaths @($installerInfo.Path) -LocalRoot $state.LocalRoot
+            if ($repairResult.Action -eq 'Repaired') {
+                $actionsTaken.Add('Repair-VCRuntime') | Out-Null
+            }
+
+            $installerInfo = Save-VCRuntimeInstaller -RefreshVCRuntime:$true -LocalRoot $state.LocalRoot
+            if ($installerInfo.Action -eq 'Downloaded') {
+                $actionsTaken.Add('Save-VCRuntimeInstaller') | Out-Null
+            }
+
+            $installerTest = Test-VCRuntimeInstaller -InstallerInfo $installerInfo
+        }
+
+        if ($installerTest.Status -ne 'Ready') {
+            throw "VC runtime installer validation failed with status $($installerTest.Status)."
+        }
+
+        if (-not $PSCmdlet.ShouldProcess('Microsoft Visual C++ Redistributable (x64)', 'Install VC runtime')) {
+            return [pscustomobject]@{
+                LocalRoot          = $state.LocalRoot
+                Layout             = $state.Layout
+                InitialState       = $initialState
+                FinalState         = $state
+                ActionTaken        = @('WhatIf')
+                PlannedActions     = @($plannedActions)
+                RestartRequired    = $false
+                Installer          = $installerInfo
+                InstallerTest      = $installerTest
+                RuntimeTest        = $state.Runtime
+                RepairResult       = $repairResult
+                InstallResult      = $null
+                PersistedStatePath = $null
+            }
+        }
+
+        $installResult = Install-VCRuntime -InstallerInfo $installerInfo -InstallTimeoutSec $InstallTimeoutSec -LocalRoot $state.LocalRoot
+        if ($installResult.Action -eq 'Installed') {
+            $actionsTaken.Add('Install-VCRuntime') | Out-Null
+        }
+    }
+
+    $finalState = Get-VCRuntimeState -LocalRoot $state.LocalRoot
+    $runtimeTest = Test-VCRuntime -InstalledRuntime $finalState.InstalledRuntime
+
+    $result = [pscustomobject]@{
+        LocalRoot       = $finalState.LocalRoot
+        Layout          = $finalState.Layout
+        InitialState    = $initialState
+        FinalState      = $finalState
+        ActionTaken     = if ($actionsTaken.Count -gt 0) { @($actionsTaken) } else { @('None') }
+        PlannedActions  = @($plannedActions)
+        RestartRequired = if ($installResult) { [bool]$installResult.RestartRequired } else { $false }
+        Installer       = $installerInfo
+        InstallerTest   = $installerTest
+        RuntimeTest     = $runtimeTest
+        RepairResult    = $repairResult
+        InstallResult   = $installResult
+    }
+
+    if ($WhatIfPreference) {
+        Add-Member -InputObject $result -NotePropertyName PersistedStatePath -NotePropertyValue $null -Force
+        return $result
+    }
+
+    $statePath = Save-ManifestedInvokeState -CommandName 'Initialize-VCRuntime' -Result $result -LocalRoot $LocalRoot -Details @{
+        Version       = $finalState.CurrentVersion
+        InstallerPath = $finalState.InstallerPath
+    }
+    Add-Member -InputObject $result -NotePropertyName PersistedStatePath -NotePropertyValue $statePath -Force
+
+    return $result
 }
