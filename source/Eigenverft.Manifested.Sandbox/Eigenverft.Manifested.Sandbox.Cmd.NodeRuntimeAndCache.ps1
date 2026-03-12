@@ -1,5 +1,5 @@
 <#
-    Eigenverft.Manifested.Sandbox.NodeRuntimeAndCache
+    Eigenverft.Manifested.Sandbox.Cmd.NodeRuntimeAndCache
 #>
 
 function ConvertTo-NodeVersion {
@@ -216,6 +216,58 @@ function Get-InstalledNodeRuntime {
     }
 }
 
+function Get-SystemNodeRuntime {
+    [CmdletBinding()]
+    param(
+        [string]$LocalRoot = (Get-ManifestedLocalRoot)
+    )
+
+    $layout = Get-ManifestedLayout -LocalRoot $LocalRoot
+    $additionalPaths = @()
+    if (-not [string]::IsNullOrWhiteSpace($env:ProgramFiles)) {
+        $additionalPaths += (Join-Path $env:ProgramFiles 'nodejs\node.exe')
+    }
+
+    $nodeExe = Get-ManifestedApplicationPath -CommandName 'node.exe' -ExcludedRoots @($layout.NodeToolsRoot) -AdditionalPaths $additionalPaths
+    if ([string]::IsNullOrWhiteSpace($nodeExe)) {
+        return $null
+    }
+
+    $nodeHome = Split-Path -Parent $nodeExe
+    $validation = Test-NodeRuntime -NodeHome $nodeHome
+    if (-not $validation.IsReady) {
+        return $null
+    }
+
+    $reportedVersion = $null
+    try {
+        $reportedVersion = (& $nodeExe --version 2>$null | Select-Object -First 1)
+        if ($reportedVersion) {
+            $reportedVersion = $reportedVersion.ToString().Trim()
+        }
+    }
+    catch {
+        $reportedVersion = $null
+    }
+
+    $versionObject = ConvertTo-NodeVersion -VersionText $reportedVersion
+    if (-not $versionObject) {
+        return $null
+    }
+
+    [pscustomobject]@{
+        Version    = ('v' + $versionObject.ToString())
+        Flavor     = $null
+        NodeHome   = $nodeHome
+        NodeExe    = $validation.NodeExe
+        NpmCmd     = $validation.NpmCmd
+        Validation = $validation
+        IsReady    = $true
+        Source     = 'External'
+        Discovery  = 'Path'
+    }
+}
+
 function Get-NodePackageExpectedSha256 {
     [CmdletBinding()]
     param(
@@ -310,6 +362,8 @@ function Get-NodeRuntimeState {
             Flavor              = $Flavor
             CurrentVersion      = $null
             RuntimeHome         = $null
+            RuntimeSource       = $null
+            ExecutablePath      = $null
             Runtime             = $null
             InvalidRuntimeHomes = @()
             Package             = $null
@@ -326,7 +380,14 @@ function Get-NodeRuntimeState {
     $partialPaths += @(Get-ManifestedStageDirectories -RootPath $layout.ToolsRoot -Prefix 'node' | Select-Object -ExpandProperty FullName)
 
     $installed = Get-InstalledNodeRuntime -Flavor $Flavor -LocalRoot $layout.LocalRoot
-    $currentRuntime = $installed.Current
+    $managedRuntime = $installed.Current
+    $externalRuntime = $null
+    if (-not $managedRuntime) {
+        $externalRuntime = Get-SystemNodeRuntime -LocalRoot $layout.LocalRoot
+    }
+
+    $currentRuntime = if ($managedRuntime) { $managedRuntime } else { $externalRuntime }
+    $runtimeSource = if ($managedRuntime) { 'Managed' } elseif ($externalRuntime) { 'External' } else { $null }
     $invalidRuntimeHomes = @($installed.Invalid | Select-Object -ExpandProperty NodeHome)
     $package = Get-LatestCachedNodeRuntimePackage -Flavor $Flavor -LocalRoot $layout.LocalRoot
 
@@ -353,6 +414,8 @@ function Get-NodeRuntimeState {
         Flavor              = $Flavor
         CurrentVersion      = if ($currentRuntime) { $currentRuntime.Version } elseif ($package) { $package.Version } else { $null }
         RuntimeHome         = if ($currentRuntime) { $currentRuntime.NodeHome } else { $null }
+        RuntimeSource       = $runtimeSource
+        ExecutablePath      = if ($currentRuntime) { $currentRuntime.NodeExe } else { $null }
         Runtime             = if ($currentRuntime) { $currentRuntime.Validation } else { $null }
         InvalidRuntimeHomes = $invalidRuntimeHomes
         Package             = $package
@@ -550,9 +613,11 @@ function Install-NodeRuntime {
 function Initialize-NodeRuntime {
     [CmdletBinding(SupportsShouldProcess = $true)]
     param(
-        [switch]$RefreshNode,
-        [string]$LocalRoot = (Get-ManifestedLocalRoot)
+        [switch]$RefreshNode
     )
+
+    $LocalRoot = (Get-ManifestedLayout).LocalRoot
+    $selfElevationContext = Get-ManifestedSelfElevationContext
 
     $actionsTaken = New-Object System.Collections.Generic.List[string]
     $plannedActions = New-Object System.Collections.Generic.List[string]
@@ -563,6 +628,7 @@ function Initialize-NodeRuntime {
 
     $initialState = Get-NodeRuntimeState -LocalRoot $LocalRoot
     $state = $initialState
+    $elevationPlan = Get-ManifestedCommandElevationPlan -CommandName 'Initialize-NodeRuntime' -LocalRoot $LocalRoot -SkipSelfElevation:$selfElevationContext.SkipSelfElevation -WasSelfElevated:$selfElevationContext.WasSelfElevated -WhatIfMode:$WhatIfPreference
 
     if ($state.Status -eq 'Blocked') {
         $result = [pscustomobject]@{
@@ -578,6 +644,7 @@ function Initialize-NodeRuntime {
             RuntimeTest     = $null
             RepairResult    = $null
             InstallResult   = $null
+            Elevation       = $elevationPlan
         }
 
         if ($WhatIfPreference) {
@@ -589,6 +656,8 @@ function Initialize-NodeRuntime {
             Version     = $state.CurrentVersion
             PackagePath = $state.PackagePath
             RuntimeHome = $state.RuntimeHome
+            RuntimeSource = $state.RuntimeSource
+            ExecutablePath = $state.ExecutablePath
         }
         Add-Member -InputObject $result -NotePropertyName PersistedStatePath -NotePropertyValue $statePath -Force
         return $result
@@ -609,6 +678,8 @@ function Initialize-NodeRuntime {
         $plannedActions.Add('Install-NodeRuntime') | Out-Null
     }
 
+    $elevationPlan = Get-ManifestedCommandElevationPlan -CommandName 'Initialize-NodeRuntime' -PlannedActions @($plannedActions) -LocalRoot $LocalRoot -SkipSelfElevation:$selfElevationContext.SkipSelfElevation -WasSelfElevated:$selfElevationContext.WasSelfElevated -WhatIfMode:$WhatIfPreference
+
     if ($needsRepair) {
         if (-not $PSCmdlet.ShouldProcess($state.Layout.NodeToolsRoot, 'Repair Node runtime state')) {
             return [pscustomobject]@{
@@ -625,6 +696,7 @@ function Initialize-NodeRuntime {
                 RepairResult        = $null
                 InstallResult       = $null
                 PersistedStatePath  = $null
+                Elevation           = $elevationPlan
             }
         }
 
@@ -655,6 +727,7 @@ function Initialize-NodeRuntime {
                     RepairResult       = $repairResult
                     InstallResult      = $null
                     PersistedStatePath = $null
+                    Elevation          = $elevationPlan
                 }
             }
 
@@ -684,6 +757,7 @@ function Initialize-NodeRuntime {
                     RepairResult       = $repairResult
                     InstallResult      = $null
                     PersistedStatePath = $null
+                    Elevation          = $elevationPlan
                 }
             }
 
@@ -704,6 +778,19 @@ function Initialize-NodeRuntime {
             throw "Node runtime package validation failed with status $($packageTest.Status)."
         }
 
+        $commandParameters = @{}
+        if ($RefreshNode) {
+            $commandParameters['RefreshNode'] = $true
+        }
+        if ($PSBoundParameters.ContainsKey('WhatIf')) {
+            $commandParameters['WhatIf'] = $true
+        }
+
+        $elevatedResult = Invoke-ManifestedElevatedCommand -ElevationPlan $elevationPlan -CommandName 'Initialize-NodeRuntime' -CommandParameters $commandParameters
+        if ($null -ne $elevatedResult) {
+            return $elevatedResult
+        }
+
         if (-not $PSCmdlet.ShouldProcess($state.Layout.NodeToolsRoot, 'Install Node runtime')) {
             return [pscustomobject]@{
                 LocalRoot          = $state.LocalRoot
@@ -719,6 +806,7 @@ function Initialize-NodeRuntime {
                 RepairResult       = $repairResult
                 InstallResult      = $null
                 PersistedStatePath = $null
+                Elevation          = $elevationPlan
             }
         }
 
@@ -755,6 +843,7 @@ function Initialize-NodeRuntime {
         RuntimeTest     = $runtimeTest
         RepairResult    = $repairResult
         InstallResult   = $installResult
+        Elevation       = $elevationPlan
     }
 
     if ($WhatIfPreference) {
@@ -766,6 +855,8 @@ function Initialize-NodeRuntime {
         Version     = $finalState.CurrentVersion
         PackagePath = $finalState.PackagePath
         RuntimeHome = $finalState.RuntimeHome
+        RuntimeSource = $finalState.RuntimeSource
+        ExecutablePath = $finalState.ExecutablePath
     }
     Add-Member -InputObject $result -NotePropertyName PersistedStatePath -NotePropertyValue $statePath -Force
 

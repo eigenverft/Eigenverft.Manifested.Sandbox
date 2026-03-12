@@ -31,7 +31,7 @@ CompanyName = 'Eigenverft'
 Copyright = 'Copyright (c) 2026 Eigenverft'
 
 # Description of the functionality provided by this module
-Description = 'Windows-focused PowerShell module for initializing managed Node.js and Microsoft Visual C++ runtime prerequisites with persisted invoke state.'
+Description = 'Windows-focused PowerShell module for initializing managed PowerShell 7, Node.js, MinGit, and Microsoft Visual C++ runtime prerequisites with persisted invoke state.'
 
 # Minimum version of the PowerShell engine required by this module
 PowerShellVersion = '5.1'
@@ -71,7 +71,10 @@ PowerShellVersion = '5.1'
 
 # Functions to export from this module, for best performance, do not use wildcards and do not delete the entry, use an empty array if there are no functions to export.
 FunctionsToExport = @(
+    'Get-SandboxState',
+    'Initialize-GitRuntime',
     'Initialize-NodeRuntime',
+    'Initialize-Ps7Runtime',
     'Initialize-VCRuntime'
 )
 
@@ -96,8 +99,12 @@ FileList = @(
     'Eigenverft.Manifested.Sandbox.Shared.Paths.ps1',
     'Eigenverft.Manifested.Sandbox.Shared.Cache.ps1',
     'Eigenverft.Manifested.Sandbox.Shared.State.ps1',
-    'Eigenverft.Manifested.Sandbox.NodeRuntimeAndCache.ps1',
-    'Eigenverft.Manifested.Sandbox.VCRuntimeAndCache.ps1',
+    'Eigenverft.Manifested.Sandbox.Shared.Elevation.ps1',
+    'Eigenverft.Manifested.Sandbox.Shared.GitHubReleases.ps1',
+    'Eigenverft.Manifested.Sandbox.Cmd.Ps7RuntimeAndCache.ps1',
+    'Eigenverft.Manifested.Sandbox.Cmd.NodeRuntimeAndCache.ps1',
+    'Eigenverft.Manifested.Sandbox.Cmd.GitRuntimeAndCache.ps1',
+    'Eigenverft.Manifested.Sandbox.Cmd.VCRuntimeAndCache.ps1',
     'Eigenverft.Manifested.Sandbox.psm1',
     'Eigenverft.Manifested.Sandbox.psd1',
     'LICENSE.txt'
@@ -109,7 +116,7 @@ PrivateData = @{
     PSData = @{
 
         # Tags applied to this module. These help with module discovery in online galleries.
-        Tags = @('Eigenverft', 'Manifested', 'Sandbox', 'PowerShell', 'Node.js', 'Windows')
+        Tags = @('Eigenverft', 'Manifested', 'Sandbox', 'PowerShell', 'Node.js', 'Git', 'Windows')
 
         # A URL to the license for this module.
         LicenseUri = 'https://github.com/eigenverft/Eigenverft.Manifested.Sandbox/blob/main/LICENSE'
@@ -121,7 +128,7 @@ PrivateData = @{
         IconUri = 'https://raw.githubusercontent.com/eigenverft/Eigenverft.Manifested.Sandbox/main/resources/evt-logo_on_light_border_128x128.png'
 
         # ReleaseNotes of this module
-        ReleaseNotes = 'Refactored runtime initialization into explicit Node/VC phases with persisted invoke state.'
+        ReleaseNotes = 'Added GitHub-first portable PowerShell 7 and MinGit runtime initialization with persisted sandbox state.'
 
         # Prerelease string of this module
         Prerelease = 'dev'

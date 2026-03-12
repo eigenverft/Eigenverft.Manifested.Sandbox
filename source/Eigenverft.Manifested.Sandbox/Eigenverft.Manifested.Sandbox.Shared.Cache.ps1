@@ -30,6 +30,23 @@ function Get-ManifestedStageDirectories {
     return @(Get-ChildItem -LiteralPath $RootPath -Directory -ErrorAction SilentlyContinue | Where-Object { $_.Name -like $pattern })
 }
 
+function Get-ManifestedExpandedArchiveRoot {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$StagePath
+    )
+
+    $directories = @(Get-ChildItem -LiteralPath $StagePath -Directory -Force -ErrorAction SilentlyContinue)
+    $files = @(Get-ChildItem -LiteralPath $StagePath -File -Force -ErrorAction SilentlyContinue)
+
+    if ($directories.Count -eq 1 -and $files.Count -eq 0) {
+        return $directories[0].FullName
+    }
+
+    return $StagePath
+}
+
 function Remove-ManifestedPath {
     [CmdletBinding()]
     param(

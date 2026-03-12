@@ -1,5 +1,5 @@
 <#
-    Eigenverft.Manifested.Sandbox.VCRuntimeAndCache
+    Eigenverft.Manifested.Sandbox.Cmd.VCRuntimeAndCache
 #>
 
 function ConvertTo-VCRuntimeVersion {
@@ -465,9 +465,11 @@ function Initialize-VCRuntime {
     [CmdletBinding(SupportsShouldProcess = $true)]
     param(
         [switch]$RefreshVCRuntime,
-        [int]$InstallTimeoutSec = 300,
-        [string]$LocalRoot = (Get-ManifestedLocalRoot)
+        [int]$InstallTimeoutSec = 300
     )
+
+    $LocalRoot = (Get-ManifestedLayout).LocalRoot
+    $selfElevationContext = Get-ManifestedSelfElevationContext
 
     $actionsTaken = New-Object System.Collections.Generic.List[string]
     $plannedActions = New-Object System.Collections.Generic.List[string]
@@ -478,6 +480,7 @@ function Initialize-VCRuntime {
 
     $initialState = Get-VCRuntimeState -LocalRoot $LocalRoot
     $state = $initialState
+    $elevationPlan = Get-ManifestedCommandElevationPlan -CommandName 'Initialize-VCRuntime' -LocalRoot $LocalRoot -SkipSelfElevation:$selfElevationContext.SkipSelfElevation -WasSelfElevated:$selfElevationContext.WasSelfElevated -WhatIfMode:$WhatIfPreference
 
     if ($state.Status -eq 'Blocked') {
         $result = [pscustomobject]@{
@@ -493,6 +496,7 @@ function Initialize-VCRuntime {
             RuntimeTest     = $null
             RepairResult    = $null
             InstallResult   = $null
+            Elevation       = $elevationPlan
         }
 
         if ($WhatIfPreference) {
@@ -523,6 +527,8 @@ function Initialize-VCRuntime {
         $plannedActions.Add('Install-VCRuntime') | Out-Null
     }
 
+    $elevationPlan = Get-ManifestedCommandElevationPlan -CommandName 'Initialize-VCRuntime' -PlannedActions @($plannedActions) -LocalRoot $LocalRoot -SkipSelfElevation:$selfElevationContext.SkipSelfElevation -WasSelfElevated:$selfElevationContext.WasSelfElevated -WhatIfMode:$WhatIfPreference
+
     if ($needsRepair) {
         if (-not $PSCmdlet.ShouldProcess($state.InstallerPath, 'Repair VC runtime state')) {
             return [pscustomobject]@{
@@ -539,6 +545,7 @@ function Initialize-VCRuntime {
                 RepairResult       = $null
                 InstallResult      = $null
                 PersistedStatePath = $null
+                Elevation          = $elevationPlan
             }
         }
 
@@ -569,6 +576,7 @@ function Initialize-VCRuntime {
                     RepairResult       = $repairResult
                     InstallResult      = $null
                     PersistedStatePath = $null
+                    Elevation          = $elevationPlan
                 }
             }
 
@@ -598,6 +606,7 @@ function Initialize-VCRuntime {
                     RepairResult       = $repairResult
                     InstallResult      = $null
                     PersistedStatePath = $null
+                    Elevation          = $elevationPlan
                 }
             }
 
@@ -618,6 +627,26 @@ function Initialize-VCRuntime {
             throw "VC runtime installer validation failed with status $($installerTest.Status)."
         }
 
+        $elevationPlan = Get-ManifestedCommandElevationPlan -CommandName 'Initialize-VCRuntime' -PlannedActions @($plannedActions) -Context @{
+            InstalledRuntime = $state.InstalledRuntime
+            InstallerInfo    = $installerInfo
+        } -LocalRoot $state.LocalRoot -SkipSelfElevation:$selfElevationContext.SkipSelfElevation -WasSelfElevated:$selfElevationContext.WasSelfElevated -WhatIfMode:$WhatIfPreference
+
+        $commandParameters = @{
+            InstallTimeoutSec = $InstallTimeoutSec
+        }
+        if ($RefreshVCRuntime) {
+            $commandParameters['RefreshVCRuntime'] = $true
+        }
+        if ($PSBoundParameters.ContainsKey('WhatIf')) {
+            $commandParameters['WhatIf'] = $true
+        }
+
+        $elevatedResult = Invoke-ManifestedElevatedCommand -ElevationPlan $elevationPlan -CommandName 'Initialize-VCRuntime' -CommandParameters $commandParameters
+        if ($null -ne $elevatedResult) {
+            return $elevatedResult
+        }
+
         if (-not $PSCmdlet.ShouldProcess('Microsoft Visual C++ Redistributable (x64)', 'Install VC runtime')) {
             return [pscustomobject]@{
                 LocalRoot          = $state.LocalRoot
@@ -633,6 +662,7 @@ function Initialize-VCRuntime {
                 RepairResult       = $repairResult
                 InstallResult      = $null
                 PersistedStatePath = $null
+                Elevation          = $elevationPlan
             }
         }
 
@@ -658,6 +688,7 @@ function Initialize-VCRuntime {
         RuntimeTest     = $runtimeTest
         RepairResult    = $repairResult
         InstallResult   = $installResult
+        Elevation       = $elevationPlan
     }
 
     if ($WhatIfPreference) {

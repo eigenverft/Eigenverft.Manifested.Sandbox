@@ -34,6 +34,134 @@ function Get-ManifestedStateDocument {
     return $document
 }
 
+function Get-ManifestedCommandState {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$CommandName,
+
+        [string]$LocalRoot = (Get-ManifestedLocalRoot)
+    )
+
+    $document = Get-ManifestedStateDocument -LocalRoot $LocalRoot
+    if (-not $document.PSObject.Properties['Commands']) {
+        return $null
+    }
+
+    $commandProperty = $document.Commands.PSObject.Properties[$CommandName]
+    if (-not $commandProperty) {
+        return $null
+    }
+
+    return $commandProperty.Value
+}
+
+function Get-ManifestedRuntimeSnapshots {
+    [CmdletBinding()]
+    param(
+        [string]$LocalRoot = (Get-ManifestedLocalRoot)
+    )
+
+    $layout = Get-ManifestedLayout -LocalRoot $LocalRoot
+    $definitions = @(
+        @{ Name = 'NodeRuntime'; FunctionName = 'Get-NodeRuntimeState'; PathProperty = 'RuntimeHome' },
+        @{ Name = 'Ps7Runtime'; FunctionName = 'Get-Ps7RuntimeState'; PathProperty = 'RuntimeHome' },
+        @{ Name = 'GitRuntime'; FunctionName = 'Get-GitRuntimeState'; PathProperty = 'RuntimeHome' },
+        @{ Name = 'VCRuntime'; FunctionName = 'Get-VCRuntimeState'; PathProperty = 'InstallerPath' }
+    )
+
+    $items = @()
+    foreach ($definition in $definitions) {
+        if (-not (Get-Command -Name $definition.FunctionName -CommandType Function -ErrorAction SilentlyContinue)) {
+            continue
+        }
+
+        try {
+            $state = & $definition.FunctionName -LocalRoot $layout.LocalRoot
+            $resourcePath = $null
+            if ($state -and $state.PSObject.Properties[$definition.PathProperty]) {
+                $resourcePath = $state.($definition.PathProperty)
+            }
+
+            $items += [pscustomobject]@{
+                Name           = $definition.Name
+                Status         = if ($state -and $state.PSObject.Properties['Status']) { $state.Status } else { $null }
+                RuntimeSource  = if ($state -and $state.PSObject.Properties['RuntimeSource']) { $state.RuntimeSource } else { $null }
+                CurrentVersion = if ($state -and $state.PSObject.Properties['CurrentVersion']) { $state.CurrentVersion } else { $null }
+                ResourcePath   = $resourcePath
+                BlockedReason  = if ($state -and $state.PSObject.Properties['BlockedReason']) { $state.BlockedReason } else { $null }
+                State          = $state
+            }
+        }
+        catch {
+            $items += [pscustomobject]@{
+                Name           = $definition.Name
+                Status         = 'Error'
+                RuntimeSource  = $null
+                CurrentVersion = $null
+                ResourcePath   = $null
+                BlockedReason  = $_.Exception.Message
+                State          = $null
+            }
+        }
+    }
+
+    return @($items)
+}
+
+function Get-SandboxState {
+    [CmdletBinding()]
+    param(
+        [switch]$Raw
+    )
+
+    $layout = Get-ManifestedLayout
+    $stateExists = Test-Path -LiteralPath $layout.StatePath
+    $document = Get-ManifestedStateDocument -LocalRoot $layout.LocalRoot
+    $runtimeSnapshots = Get-ManifestedRuntimeSnapshots -LocalRoot $layout.LocalRoot
+
+    if ($Raw) {
+        return [pscustomobject]@{
+            LocalRoot   = $layout.LocalRoot
+            Layout      = $layout
+            StatePath   = $layout.StatePath
+            StateExists = $stateExists
+            Runtimes    = @($runtimeSnapshots)
+            Document    = $document
+        }
+    }
+
+    $commands = @()
+    foreach ($property in $document.Commands.PSObject.Properties) {
+        $commandState = $property.Value
+
+        $commands += [pscustomobject]@{
+            Command          = $property.Name
+            Status           = if ($commandState.PSObject.Properties['Status']) { $commandState.Status } else { $null }
+            LastInvokedAtUtc = if ($commandState.PSObject.Properties['LastInvokedAtUtc']) { $commandState.LastInvokedAtUtc } else { $null }
+            ActionTaken      = if ($commandState.PSObject.Properties['ActionTaken']) { [string[]]@($commandState.ActionTaken) } else { [string[]]@() }
+            RestartRequired  = if ($commandState.PSObject.Properties['RestartRequired']) { [bool]$commandState.RestartRequired } else { $false }
+            StatePath        = if ($commandState.PSObject.Properties['Paths'] -and $commandState.Paths) { $commandState.Paths.StatePath } else { $layout.StatePath }
+            LocalRoot        = if ($commandState.PSObject.Properties['Paths'] -and $commandState.Paths) { $commandState.Paths.LocalRoot } else { $layout.LocalRoot }
+            Elevation        = if ($commandState.PSObject.Properties['Elevation']) { $commandState.Elevation } else { $null }
+            Details          = if ($commandState.PSObject.Properties['Details']) { $commandState.Details } else { $null }
+        }
+    }
+
+    [pscustomobject]@{
+        LocalRoot     = $layout.LocalRoot
+        Layout        = $layout
+        StatePath     = $layout.StatePath
+        StateExists   = $stateExists
+        SchemaVersion = if ($document.PSObject.Properties['SchemaVersion']) { $document.SchemaVersion } else { $null }
+        UpdatedAtUtc  = if ($document.PSObject.Properties['UpdatedAtUtc']) { $document.UpdatedAtUtc } else { $null }
+        CommandCount  = @($commands).Count
+        Commands      = @($commands)
+        Runtimes      = @($runtimeSnapshots | Select-Object Name, Status, RuntimeSource, CurrentVersion, ResourcePath, BlockedReason)
+        Document      = $document
+    }
+}
+
 function Save-ManifestedStateDocument {
     [CmdletBinding(SupportsShouldProcess = $true)]
     param(
@@ -48,7 +176,7 @@ function Save-ManifestedStateDocument {
 
     $StateDocument.UpdatedAtUtc = (Get-Date).ToUniversalTime().ToString('o')
     if ($PSCmdlet.ShouldProcess($layout.StatePath, 'Set Content')) {
-        $StateDocument | ConvertTo-Json -Depth 10 | Set-Content -LiteralPath $layout.StatePath -Encoding UTF8
+        $StateDocument | ConvertTo-Json -Depth 20 | Set-Content -LiteralPath $layout.StatePath -Encoding UTF8
     }
 
     return $layout.StatePath
@@ -88,10 +216,14 @@ function Save-ManifestedInvokeState {
             [ordered]@{
                 LocalRoot          = $layout.LocalRoot
                 CacheRoot          = $layout.CacheRoot
+                Ps7CacheRoot       = $layout.Ps7CacheRoot
                 NodeCacheRoot      = $layout.NodeCacheRoot
+                GitCacheRoot       = $layout.GitCacheRoot
                 VCRuntimeCacheRoot = $layout.VCRuntimeCacheRoot
                 ToolsRoot          = $layout.ToolsRoot
+                Ps7ToolsRoot       = $layout.Ps7ToolsRoot
                 NodeToolsRoot      = $layout.NodeToolsRoot
+                GitToolsRoot       = $layout.GitToolsRoot
                 StatePath          = $layout.StatePath
             }
         }
@@ -99,6 +231,7 @@ function Save-ManifestedInvokeState {
             $null
         }
         SystemState      = $Result.FinalState
+        Elevation        = if ($Result.PSObject.Properties['Elevation']) { $Result.Elevation } else { $null }
         Details          = $Details
     }) -Force
 
