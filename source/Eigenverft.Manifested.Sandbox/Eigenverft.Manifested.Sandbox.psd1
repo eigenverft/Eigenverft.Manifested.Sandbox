@@ -13,7 +13,7 @@
 RootModule = 'Eigenverft.Manifested.Sandbox.psm1'
 
 # Version number of this module.
-ModuleVersion = '0.20261.29249'
+ModuleVersion = '0.20261.30130'
 
 # Supported PSEditions
 CompatiblePSEditions = @('Desktop', 'Core')
@@ -124,7 +124,7 @@ PrivateData = @{
         ReleaseNotes = 'Refactored runtime initialization into explicit Node/VC phases with persisted invoke state.'
 
         # Prerelease string of this module
-        Prerelease = ''
+        Prerelease = 'dev'
 
         # Flag to indicate whether the module requires explicit user acceptance for install/update/save
         # RequireLicenseAcceptance = $false
