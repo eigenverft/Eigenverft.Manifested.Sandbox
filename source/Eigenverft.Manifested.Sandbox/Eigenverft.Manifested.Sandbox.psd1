@@ -13,7 +13,7 @@
 RootModule = 'Eigenverft.Manifested.Sandbox.psm1'
 
 # Version number of this module.
-ModuleVersion = '0.20261.30130'
+ModuleVersion = '0.20261.30222'
 
 # Supported PSEditions
 CompatiblePSEditions = @('Desktop', 'Core')
@@ -131,7 +131,7 @@ PrivateData = @{
         ReleaseNotes = 'Added GitHub-first portable PowerShell 7 and MinGit runtime initialization with persisted sandbox state.'
 
         # Prerelease string of this module
-        Prerelease = 'dev'
+        Prerelease = ''
 
         # Flag to indicate whether the module requires explicit user acceptance for install/update/save
         # RequireLicenseAcceptance = $false
