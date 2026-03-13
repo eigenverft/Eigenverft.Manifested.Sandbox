@@ -144,6 +144,7 @@ function Get-SandboxState {
             StatePath        = if ($commandState.PSObject.Properties['Paths'] -and $commandState.Paths) { $commandState.Paths.StatePath } else { $layout.StatePath }
             LocalRoot        = if ($commandState.PSObject.Properties['Paths'] -and $commandState.Paths) { $commandState.Paths.LocalRoot } else { $layout.LocalRoot }
             Elevation        = if ($commandState.PSObject.Properties['Elevation']) { $commandState.Elevation } else { $null }
+            CommandEnvironment = if ($commandState.PSObject.Properties['CommandEnvironment']) { $commandState.CommandEnvironment } else { $null }
             Details          = if ($commandState.PSObject.Properties['Details']) { $commandState.Details } else { $null }
         }
     }
@@ -232,6 +233,7 @@ function Save-ManifestedInvokeState {
         }
         SystemState      = $Result.FinalState
         Elevation        = if ($Result.PSObject.Properties['Elevation']) { $Result.Elevation } else { $null }
+        CommandEnvironment = if ($Result.PSObject.Properties['CommandEnvironment']) { $Result.CommandEnvironment } else { $null }
         Details          = $Details
     }) -Force
 

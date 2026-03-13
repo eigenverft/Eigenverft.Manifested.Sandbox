@@ -710,12 +710,14 @@ function Initialize-GitRuntime {
     $packageInfo = $null
     $packageTest = $null
     $installResult = $null
+    $commandEnvironment = $null
 
     $initialState = Get-GitRuntimeState -LocalRoot $LocalRoot
     $state = $initialState
     $elevationPlan = Get-ManifestedCommandElevationPlan -CommandName 'Initialize-GitRuntime' -LocalRoot $LocalRoot -SkipSelfElevation:$selfElevationContext.SkipSelfElevation -WasSelfElevated:$selfElevationContext.WasSelfElevated -WhatIfMode:$WhatIfPreference
 
     if ($state.Status -eq 'Blocked') {
+        $commandEnvironment = Get-ManifestedCommandEnvironmentResult -CommandName 'Initialize-GitRuntime' -RuntimeState $state
         $result = [pscustomobject]@{
             LocalRoot       = $state.LocalRoot
             Layout          = $state.Layout
@@ -729,6 +731,7 @@ function Initialize-GitRuntime {
             RuntimeTest     = $null
             RepairResult    = $null
             InstallResult   = $null
+            CommandEnvironment = $commandEnvironment
             Elevation       = $elevationPlan
         }
 
@@ -762,6 +765,7 @@ function Initialize-GitRuntime {
         $plannedActions.Add('Test-GitRuntimePackage') | Out-Null
         $plannedActions.Add('Install-GitRuntime') | Out-Null
     }
+    $plannedActions.Add('Sync-ManifestedCommandLineEnvironment') | Out-Null
 
     $elevationPlan = Get-ManifestedCommandElevationPlan -CommandName 'Initialize-GitRuntime' -PlannedActions @($plannedActions) -LocalRoot $LocalRoot -SkipSelfElevation:$selfElevationContext.SkipSelfElevation -WasSelfElevated:$selfElevationContext.WasSelfElevated -WhatIfMode:$WhatIfPreference
 
@@ -780,6 +784,7 @@ function Initialize-GitRuntime {
                 RuntimeTest        = $state.Runtime
                 RepairResult       = $null
                 InstallResult      = $null
+                CommandEnvironment = (Get-ManifestedCommandEnvironmentResult -CommandName 'Initialize-GitRuntime' -RuntimeState $state)
                 PersistedStatePath = $null
                 Elevation          = $elevationPlan
             }
@@ -811,6 +816,7 @@ function Initialize-GitRuntime {
                     RuntimeTest        = $state.Runtime
                     RepairResult       = $repairResult
                     InstallResult      = $null
+                    CommandEnvironment = (Get-ManifestedCommandEnvironmentResult -CommandName 'Initialize-GitRuntime' -RuntimeState $state)
                     PersistedStatePath = $null
                     Elevation          = $elevationPlan
                 }
@@ -841,6 +847,7 @@ function Initialize-GitRuntime {
                     RuntimeTest        = $state.Runtime
                     RepairResult       = $repairResult
                     InstallResult      = $null
+                    CommandEnvironment = (Get-ManifestedCommandEnvironmentResult -CommandName 'Initialize-GitRuntime' -RuntimeState $state)
                     PersistedStatePath = $null
                     Elevation          = $elevationPlan
                 }
@@ -894,6 +901,7 @@ function Initialize-GitRuntime {
                 RuntimeTest        = $state.Runtime
                 RepairResult       = $repairResult
                 InstallResult      = $null
+                CommandEnvironment = (Get-ManifestedCommandEnvironmentResult -CommandName 'Initialize-GitRuntime' -RuntimeState $state)
                 PersistedStatePath = $null
                 Elevation          = $elevationPlan
             }
@@ -908,6 +916,34 @@ function Initialize-GitRuntime {
     $finalState = Get-GitRuntimeState -Flavor $state.Flavor -LocalRoot $state.LocalRoot
     $runtimeTest = if ($finalState.RuntimeHome) { Test-GitRuntime -RuntimeHome $finalState.RuntimeHome } else { $null }
 
+    $commandEnvironment = Get-ManifestedCommandEnvironmentResult -CommandName 'Initialize-GitRuntime' -RuntimeState $finalState
+    if ($commandEnvironment.Applicable) {
+        if (-not $PSCmdlet.ShouldProcess($commandEnvironment.DesiredCommandDirectory, 'Synchronize Git command-line environment')) {
+            return [pscustomobject]@{
+                LocalRoot          = $finalState.LocalRoot
+                Layout             = $finalState.Layout
+                InitialState       = $initialState
+                FinalState         = $finalState
+                ActionTaken        = @('WhatIf')
+                PlannedActions     = @($plannedActions)
+                RestartRequired    = $false
+                Package            = $packageInfo
+                PackageTest        = $packageTest
+                RuntimeTest        = $runtimeTest
+                RepairResult       = $repairResult
+                InstallResult      = $installResult
+                CommandEnvironment = $commandEnvironment
+                PersistedStatePath = $null
+                Elevation          = $elevationPlan
+            }
+        }
+
+        $commandEnvironment = Sync-ManifestedCommandLineEnvironment -Specification (Get-ManifestedCommandEnvironmentSpec -CommandName 'Initialize-GitRuntime' -RuntimeState $finalState)
+        if ($commandEnvironment.Status -eq 'Updated') {
+            $actionsTaken.Add('Sync-ManifestedCommandLineEnvironment') | Out-Null
+        }
+    }
+
     $result = [pscustomobject]@{
         LocalRoot       = $finalState.LocalRoot
         Layout          = $finalState.Layout
@@ -921,6 +957,7 @@ function Initialize-GitRuntime {
         RuntimeTest     = $runtimeTest
         RepairResult    = $repairResult
         InstallResult   = $installResult
+        CommandEnvironment = $commandEnvironment
         Elevation       = $elevationPlan
     }
 

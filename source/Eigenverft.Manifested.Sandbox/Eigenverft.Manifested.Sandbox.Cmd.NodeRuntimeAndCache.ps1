@@ -625,12 +625,14 @@ function Initialize-NodeRuntime {
     $packageInfo = $null
     $packageTest = $null
     $installResult = $null
+    $commandEnvironment = $null
 
     $initialState = Get-NodeRuntimeState -LocalRoot $LocalRoot
     $state = $initialState
     $elevationPlan = Get-ManifestedCommandElevationPlan -CommandName 'Initialize-NodeRuntime' -LocalRoot $LocalRoot -SkipSelfElevation:$selfElevationContext.SkipSelfElevation -WasSelfElevated:$selfElevationContext.WasSelfElevated -WhatIfMode:$WhatIfPreference
 
     if ($state.Status -eq 'Blocked') {
+        $commandEnvironment = Get-ManifestedCommandEnvironmentResult -CommandName 'Initialize-NodeRuntime' -RuntimeState $state
         $result = [pscustomobject]@{
             LocalRoot       = $state.LocalRoot
             Layout          = $state.Layout
@@ -644,6 +646,7 @@ function Initialize-NodeRuntime {
             RuntimeTest     = $null
             RepairResult    = $null
             InstallResult   = $null
+            CommandEnvironment = $commandEnvironment
             Elevation       = $elevationPlan
         }
 
@@ -677,6 +680,7 @@ function Initialize-NodeRuntime {
         $plannedActions.Add('Test-NodeRuntimePackage') | Out-Null
         $plannedActions.Add('Install-NodeRuntime') | Out-Null
     }
+    $plannedActions.Add('Sync-ManifestedCommandLineEnvironment') | Out-Null
 
     $elevationPlan = Get-ManifestedCommandElevationPlan -CommandName 'Initialize-NodeRuntime' -PlannedActions @($plannedActions) -LocalRoot $LocalRoot -SkipSelfElevation:$selfElevationContext.SkipSelfElevation -WasSelfElevated:$selfElevationContext.WasSelfElevated -WhatIfMode:$WhatIfPreference
 
@@ -695,6 +699,7 @@ function Initialize-NodeRuntime {
                 RuntimeTest         = $state.Runtime
                 RepairResult        = $null
                 InstallResult       = $null
+                CommandEnvironment  = (Get-ManifestedCommandEnvironmentResult -CommandName 'Initialize-NodeRuntime' -RuntimeState $state)
                 PersistedStatePath  = $null
                 Elevation           = $elevationPlan
             }
@@ -726,6 +731,7 @@ function Initialize-NodeRuntime {
                     RuntimeTest        = $state.Runtime
                     RepairResult       = $repairResult
                     InstallResult      = $null
+                    CommandEnvironment = (Get-ManifestedCommandEnvironmentResult -CommandName 'Initialize-NodeRuntime' -RuntimeState $state)
                     PersistedStatePath = $null
                     Elevation          = $elevationPlan
                 }
@@ -756,6 +762,7 @@ function Initialize-NodeRuntime {
                     RuntimeTest        = $state.Runtime
                     RepairResult       = $repairResult
                     InstallResult      = $null
+                    CommandEnvironment = (Get-ManifestedCommandEnvironmentResult -CommandName 'Initialize-NodeRuntime' -RuntimeState $state)
                     PersistedStatePath = $null
                     Elevation          = $elevationPlan
                 }
@@ -805,6 +812,7 @@ function Initialize-NodeRuntime {
                 RuntimeTest        = $state.Runtime
                 RepairResult       = $repairResult
                 InstallResult      = $null
+                CommandEnvironment = (Get-ManifestedCommandEnvironmentResult -CommandName 'Initialize-NodeRuntime' -RuntimeState $state)
                 PersistedStatePath = $null
                 Elevation          = $elevationPlan
             }
@@ -830,6 +838,34 @@ function Initialize-NodeRuntime {
         }
     }
 
+    $commandEnvironment = Get-ManifestedCommandEnvironmentResult -CommandName 'Initialize-NodeRuntime' -RuntimeState $finalState
+    if ($commandEnvironment.Applicable) {
+        if (-not $PSCmdlet.ShouldProcess($commandEnvironment.DesiredCommandDirectory, 'Synchronize Node command-line environment')) {
+            return [pscustomobject]@{
+                LocalRoot          = $finalState.LocalRoot
+                Layout             = $finalState.Layout
+                InitialState       = $initialState
+                FinalState         = $finalState
+                ActionTaken        = @('WhatIf')
+                PlannedActions     = @($plannedActions)
+                RestartRequired    = $false
+                Package            = $packageInfo
+                PackageTest        = $packageTest
+                RuntimeTest        = $runtimeTest
+                RepairResult       = $repairResult
+                InstallResult      = $installResult
+                CommandEnvironment = $commandEnvironment
+                PersistedStatePath = $null
+                Elevation          = $elevationPlan
+            }
+        }
+
+        $commandEnvironment = Sync-ManifestedCommandLineEnvironment -Specification (Get-ManifestedCommandEnvironmentSpec -CommandName 'Initialize-NodeRuntime' -RuntimeState $finalState)
+        if ($commandEnvironment.Status -eq 'Updated') {
+            $actionsTaken.Add('Sync-ManifestedCommandLineEnvironment') | Out-Null
+        }
+    }
+
     $result = [pscustomobject]@{
         LocalRoot       = $finalState.LocalRoot
         Layout          = $finalState.Layout
@@ -843,6 +879,7 @@ function Initialize-NodeRuntime {
         RuntimeTest     = $runtimeTest
         RepairResult    = $repairResult
         InstallResult   = $installResult
+        CommandEnvironment = $commandEnvironment
         Elevation       = $elevationPlan
     }
 

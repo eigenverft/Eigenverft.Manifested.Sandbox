@@ -101,6 +101,7 @@ FileList = @(
     'Eigenverft.Manifested.Sandbox.Shared.State.ps1',
     'Eigenverft.Manifested.Sandbox.Shared.Elevation.ps1',
     'Eigenverft.Manifested.Sandbox.Shared.GitHubReleases.ps1',
+    'Eigenverft.Manifested.Sandbox.Shared.CommandEnvironment.ps1',
     'Eigenverft.Manifested.Sandbox.Cmd.Ps7RuntimeAndCache.ps1',
     'Eigenverft.Manifested.Sandbox.Cmd.NodeRuntimeAndCache.ps1',
     'Eigenverft.Manifested.Sandbox.Cmd.GitRuntimeAndCache.ps1',

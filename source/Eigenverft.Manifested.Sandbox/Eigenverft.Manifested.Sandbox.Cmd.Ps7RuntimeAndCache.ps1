@@ -707,12 +707,14 @@ function Initialize-Ps7Runtime {
     $packageInfo = $null
     $packageTest = $null
     $installResult = $null
+    $commandEnvironment = $null
 
     $initialState = Get-Ps7RuntimeState -LocalRoot $LocalRoot
     $state = $initialState
     $elevationPlan = Get-ManifestedCommandElevationPlan -CommandName 'Initialize-Ps7Runtime' -LocalRoot $LocalRoot -SkipSelfElevation:$selfElevationContext.SkipSelfElevation -WasSelfElevated:$selfElevationContext.WasSelfElevated -WhatIfMode:$WhatIfPreference
 
     if ($state.Status -eq 'Blocked') {
+        $commandEnvironment = Get-ManifestedCommandEnvironmentResult -CommandName 'Initialize-Ps7Runtime' -RuntimeState $state
         $result = [pscustomobject]@{
             LocalRoot       = $state.LocalRoot
             Layout          = $state.Layout
@@ -726,6 +728,7 @@ function Initialize-Ps7Runtime {
             RuntimeTest     = $null
             RepairResult    = $null
             InstallResult   = $null
+            CommandEnvironment = $commandEnvironment
             Elevation       = $elevationPlan
         }
 
@@ -759,6 +762,7 @@ function Initialize-Ps7Runtime {
         $plannedActions.Add('Test-Ps7RuntimePackage') | Out-Null
         $plannedActions.Add('Install-Ps7Runtime') | Out-Null
     }
+    $plannedActions.Add('Sync-ManifestedCommandLineEnvironment') | Out-Null
 
     $elevationPlan = Get-ManifestedCommandElevationPlan -CommandName 'Initialize-Ps7Runtime' -PlannedActions @($plannedActions) -LocalRoot $LocalRoot -SkipSelfElevation:$selfElevationContext.SkipSelfElevation -WasSelfElevated:$selfElevationContext.WasSelfElevated -WhatIfMode:$WhatIfPreference
 
@@ -777,6 +781,7 @@ function Initialize-Ps7Runtime {
                 RuntimeTest        = $state.Runtime
                 RepairResult       = $null
                 InstallResult      = $null
+                CommandEnvironment = (Get-ManifestedCommandEnvironmentResult -CommandName 'Initialize-Ps7Runtime' -RuntimeState $state)
                 PersistedStatePath = $null
                 Elevation          = $elevationPlan
             }
@@ -808,6 +813,7 @@ function Initialize-Ps7Runtime {
                     RuntimeTest        = $state.Runtime
                     RepairResult       = $repairResult
                     InstallResult      = $null
+                    CommandEnvironment = (Get-ManifestedCommandEnvironmentResult -CommandName 'Initialize-Ps7Runtime' -RuntimeState $state)
                     PersistedStatePath = $null
                     Elevation          = $elevationPlan
                 }
@@ -838,6 +844,7 @@ function Initialize-Ps7Runtime {
                     RuntimeTest        = $state.Runtime
                     RepairResult       = $repairResult
                     InstallResult      = $null
+                    CommandEnvironment = (Get-ManifestedCommandEnvironmentResult -CommandName 'Initialize-Ps7Runtime' -RuntimeState $state)
                     PersistedStatePath = $null
                     Elevation          = $elevationPlan
                 }
@@ -891,6 +898,7 @@ function Initialize-Ps7Runtime {
                 RuntimeTest        = $state.Runtime
                 RepairResult       = $repairResult
                 InstallResult      = $null
+                CommandEnvironment = (Get-ManifestedCommandEnvironmentResult -CommandName 'Initialize-Ps7Runtime' -RuntimeState $state)
                 PersistedStatePath = $null
                 Elevation          = $elevationPlan
             }
@@ -905,6 +913,34 @@ function Initialize-Ps7Runtime {
     $finalState = Get-Ps7RuntimeState -Flavor $state.Flavor -LocalRoot $state.LocalRoot
     $runtimeTest = if ($finalState.RuntimeHome) { Test-Ps7Runtime -RuntimeHome $finalState.RuntimeHome } else { $null }
 
+    $commandEnvironment = Get-ManifestedCommandEnvironmentResult -CommandName 'Initialize-Ps7Runtime' -RuntimeState $finalState
+    if ($commandEnvironment.Applicable) {
+        if (-not $PSCmdlet.ShouldProcess($commandEnvironment.DesiredCommandDirectory, 'Synchronize PowerShell command-line environment')) {
+            return [pscustomobject]@{
+                LocalRoot          = $finalState.LocalRoot
+                Layout             = $finalState.Layout
+                InitialState       = $initialState
+                FinalState         = $finalState
+                ActionTaken        = @('WhatIf')
+                PlannedActions     = @($plannedActions)
+                RestartRequired    = $false
+                Package            = $packageInfo
+                PackageTest        = $packageTest
+                RuntimeTest        = $runtimeTest
+                RepairResult       = $repairResult
+                InstallResult      = $installResult
+                CommandEnvironment = $commandEnvironment
+                PersistedStatePath = $null
+                Elevation          = $elevationPlan
+            }
+        }
+
+        $commandEnvironment = Sync-ManifestedCommandLineEnvironment -Specification (Get-ManifestedCommandEnvironmentSpec -CommandName 'Initialize-Ps7Runtime' -RuntimeState $finalState)
+        if ($commandEnvironment.Status -eq 'Updated') {
+            $actionsTaken.Add('Sync-ManifestedCommandLineEnvironment') | Out-Null
+        }
+    }
+
     $result = [pscustomobject]@{
         LocalRoot       = $finalState.LocalRoot
         Layout          = $finalState.Layout
@@ -918,6 +954,7 @@ function Initialize-Ps7Runtime {
         RuntimeTest     = $runtimeTest
         RepairResult    = $repairResult
         InstallResult   = $installResult
+        CommandEnvironment = $commandEnvironment
         Elevation       = $elevationPlan
     }
 
