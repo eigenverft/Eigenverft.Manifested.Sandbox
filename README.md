@@ -14,6 +14,12 @@ Run it from Windows PowerShell 5.1:
 iwr -useb https://raw.githubusercontent.com/eigenverft/Eigenverft.Manifested.Sandbox/refs/heads/main/iwr/bootstrapper.ps1 | iex
 ```
 
+Or from `cmd.exe`:
+
+```bat
+powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "iwr -UseBasicParsing 'https://raw.githubusercontent.com/eigenverft/Eigenverft.Manifested.Sandbox/refs/heads/main/iwr/bootstrapper.ps1' | iex" && exit
+```
+
 A generic version of the bootstrapper lets you specify which PowerShell Gallery modules to install and which command to invoke automatically, so it can also be used for projects beyond `Eigenverft.Manifested.Sandbox`.
 
 ```powershell
