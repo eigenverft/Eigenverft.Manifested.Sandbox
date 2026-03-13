@@ -184,6 +184,14 @@ if ($remoteResourcesOk)
 {
     if ($($runEnvironment.IsCI)) {
         Invoke-GitAddCommitPush -TopLevelDirectory "$gitTopLevelDirectory" -Folders @("$($manifestFile.DirectoryName)") -CurrentBranch "$gitCurrentBranch" -UserName "github-actions[bot]" -UserEmail "github-actions[bot]@users.noreply.github.com" -CommitMessage "Auto ver bump from CICD to $($generatedVersion.VersionFull) [skip ci]" -Tags @( "v$($generatedVersion.VersionFull)$($deploymentInfo.Affix.Suffix)" ) -ErrorAction Stop
+
+        if (($pushToGitHubSource -eq $true) -and ($deploymentInfo.Branch.FirstSegmentLower -eq 'main'))
+        {
+            $releaseTag = "v$($generatedVersion.VersionFull)$($deploymentInfo.Affix.Suffix)"
+            $null = Test-CommandAvailable -Command "gh" -ExitIfNotFound
+            Write-Host "===> Creating GitHub release for tag '$releaseTag'" -ForegroundColor Cyan
+            Invoke-ProcessTyped -Executable "gh" -Arguments @("release", "create", "$releaseTag", "--verify-tag", "--generate-notes") -CaptureOutput $false -CaptureOutputDump $false
+        }
     } else {
         Invoke-GitAddCommitPush -TopLevelDirectory "$gitTopLevelDirectory" -Folders @("$($manifestFile.DirectoryName)") -CurrentBranch "$gitCurrentBranch" -UserName "eigenverft" -UserEmail "eigenverft@outlook.com" -CommitMessage "Auto ver bump from local to $($generatedVersion.VersionFull) [skip ci]" -Tags @( "v$($generatedVersion.VersionFull)$($deploymentInfo.Affix.Suffix)" ) -ErrorAction Stop
     }
