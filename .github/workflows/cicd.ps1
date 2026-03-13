@@ -112,19 +112,20 @@ Update-ManifestPrerelease -ManifestPath "$($manifestFile.DirectoryName)" -NewPre
 Write-Host "===> Testing module manifest at: $($manifestFile.FullName)" -ForegroundColor Cyan
 Test-ModuleManifest -Path $($manifestFile.FullName)
 
-$pushToPsGallery = $false
-$pushToGitHubSource = $false
+
 
 $pushToLocalSource = $true
-
-if ($remoteResourcesOk)
-{
-    $pushToPsGallery = $true
-}
+$pushToGitHubSource = $false
+$pushToPsGallery = $false
 
 if ($remoteResourcesOk -and -not [string]::IsNullOrWhiteSpace($NuGetGitHubPush))
 {
     $pushToGitHubSource = $true
+}
+
+if ($remoteResourcesOk)
+{
+    $pushToPsGallery = $true
 }
 
 # Deploy generated module packages to the appropriate destinations
@@ -148,24 +149,28 @@ if ($pushToGitHubSource -eq $true)
     try
     {
         Write-Host "===> Registering temporary GitHub source '$GitHubSourceName' at '$GitHubSourceUri'" -ForegroundColor Cyan
-        $ExistingGitHubSource = Get-PSRepository -Name "$GitHubSourceName" -ErrorAction SilentlyContinue
-        if ($null -ne $ExistingGitHubSource)
+        $ExistingGitHubPsRepository = Get-PSRepository -Name "$GitHubSourceName" -ErrorAction SilentlyContinue
+        if ($null -ne $ExistingGitHubPsRepository)
         {
             Unregister-PSRepository -Name "$GitHubSourceName" -ErrorAction Stop
         }
 
+        Unregister-LocalNuGetDotNetPackageSource -SourceName "$GitHubSourceName"
+        Invoke-ProcessTyped -Executable "dotnet" -Arguments @("nuget", "add", "source", "--username", "$GitHubPackagesUser", "--password", "$NuGetGitHubPush", "--store-password-in-clear-text", "--name", "$GitHubSourceName", "$GitHubSourceUri") -CaptureOutput $false -CaptureOutputDump $false -HideValues @($NuGetGitHubPush)
         Register-PSRepository @GitHubSourceRegistration -ErrorAction Stop | Out-Null
         Write-Host "===> Publishing module to GitHub source '$GitHubSourceName'" -ForegroundColor Cyan
         Publish-Module -Path $($manifestFile.DirectoryName) -Repository "$GitHubSourceName" -NuGetApiKey "$NuGetGitHubPush"
     }
     finally
     {
-        $ExistingGitHubSource = Get-PSRepository -Name "$GitHubSourceName" -ErrorAction SilentlyContinue
-        if ($null -ne $ExistingGitHubSource)
+        $ExistingGitHubPsRepository = Get-PSRepository -Name "$GitHubSourceName" -ErrorAction SilentlyContinue
+        if ($null -ne $ExistingGitHubPsRepository)
         {
             Write-Host "===> Unregistering temporary GitHub source '$GitHubSourceName'" -ForegroundColor Cyan
             Unregister-PSRepository -Name "$GitHubSourceName" -ErrorAction Stop
         }
+
+        Unregister-LocalNuGetDotNetPackageSource -SourceName "$GitHubSourceName"
     }
 }
 
@@ -183,4 +188,3 @@ if ($remoteResourcesOk)
         Invoke-GitAddCommitPush -TopLevelDirectory "$gitTopLevelDirectory" -Folders @("$($manifestFile.DirectoryName)") -CurrentBranch "$gitCurrentBranch" -UserName "eigenverft" -UserEmail "eigenverft@outlook.com" -CommitMessage "Auto ver bump from local to $($generatedVersion.VersionFull) [skip ci]" -Tags @( "v$($generatedVersion.VersionFull)$($deploymentInfo.Affix.Suffix)" ) -ErrorAction Stop
     }
 }
-
