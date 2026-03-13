@@ -1,12 +1,31 @@
 # Eigenverft.Manifested.Sandbox
 
-Windows-focused PowerShell module for quickly bringing up a usable Windows sandbox or fresh Windows developer environment with managed PowerShell 7, Node.js, MinGit, and Microsoft Visual C++ runtime prerequisites.
+[![PowerShell Gallery Version](https://img.shields.io/powershellgallery/v/Eigenverft.Manifested.Sandbox?label=PSGallery&logo=powershell)](https://www.powershellgallery.com/packages/Eigenverft.Manifested.Sandbox) [![PowerShell Gallery Downloads](https://img.shields.io/powershellgallery/dt/Eigenverft.Manifested.Sandbox?label=Downloads&logo=powershell)](https://www.powershellgallery.com/packages/Eigenverft.Manifested.Sandbox) [![PowerShell Support](https://img.shields.io/badge/PowerShell-5.1%2B%20Desktop%2FCore-5391FE?logo=powershell&logoColor=white)](source/Eigenverft.Manifested.Sandbox/Eigenverft.Manifested.Sandbox.psd1) [![Build Status](https://img.shields.io/github/actions/workflow/status/eigenverft/Eigenverft.Manifested.Sandbox/cicd.yml?branch=main&label=build)](https://github.com/eigenverft/Eigenverft.Manifested.Sandbox/actions/workflows/cicd.yml) [![License](https://img.shields.io/github/license/eigenverft/Eigenverft.Manifested.Sandbox?logo=mit)](LICENSE)
 
-The primary intent is fast setup inside a Windows sandbox-style environment, but the module can also be used on a normal Windows machine when you want the same bootstrap flow and state tracking outside Sandbox.
+Windows-focused PowerShell module and bootstrap flow for quickly bringing up a usable Windows sandbox or fresh Windows developer environment. It can provision managed PowerShell 7, Node.js, MinGit, and Microsoft Visual C++ runtime prerequisites when you want them.
+
+The primary intent is fast setup inside a Windows sandbox-style environment, but the same bootstrap pattern also works on a normal Windows machine or from a Windows Sandbox `.wsb` file when you want a small versioned PowerShell entrypoint with state tracking.
 
 ## Bootstrapper
 
 The bootstrapper is optimized for getting a Windows sandbox session ready quickly. It installs the required PowerShell package tooling plus `Eigenverft.Manifested.Sandbox` from the PowerShell Gallery, then opens a new Windows PowerShell console and runs the default follow-up command.
+
+Even if you do not end up using this module's managed runtime installers, the bootstrapper is still useful as a reusable startup pattern. It gives you a simple way to install a chosen set of PowerShell Gallery modules, open a fresh console, and immediately run a preset command chain. The installers are one use of that flow, not the only reason to use it.
+
+PowerShell Gallery package: [Eigenverft.Manifested.Sandbox](https://www.powershellgallery.com/packages/Eigenverft.Manifested.Sandbox)
+
+### Trust / Install Notes
+
+The published bootstrap one-liner first downloads [`iwr/bootstrapper.ps1`](https://raw.githubusercontent.com/eigenverft/Eigenverft.Manifested.Sandbox/refs/heads/main/iwr/bootstrapper.ps1) from `raw.githubusercontent.com` and then, in Windows PowerShell 5.1:
+
+- enables TLS 1.2 if possible
+- tries to set the current user's execution policy to `Unrestricted`
+- bootstraps the `NuGet` package provider in `CurrentUser` scope
+- trusts or registers `PSGallery`
+- installs `PowerShellGet`, `PackageManagement`, and `Eigenverft.Manifested.Sandbox` in `CurrentUser` scope
+- opens a new Windows PowerShell session and runs `Get-SandboxVersion`
+
+Admin rights are not required for the bootstrap or module install path. Later runtime actions can have different requirements; for example, `Initialize-VCRuntime` may still require elevation when the VC++ runtime needs to be installed or repaired.
 
 Run it from Windows PowerShell 5.1:
 
@@ -20,7 +39,7 @@ Or from `cmd.exe`:
 powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "iwr -UseBasicParsing 'https://raw.githubusercontent.com/eigenverft/Eigenverft.Manifested.Sandbox/refs/heads/main/iwr/bootstrapper.ps1' | iex" && exit
 ```
 
-A generic version of the bootstrapper lets you specify which PowerShell Gallery modules to install and which command to invoke automatically, so it can also be used for projects beyond `Eigenverft.Manifested.Sandbox`.
+A generic version of the bootstrapper lets you specify which PowerShell Gallery modules to install and which command to invoke automatically, so it can be reused for projects beyond `Eigenverft.Manifested.Sandbox` and for repo-specific bootstrap flows that just need a clean handoff into PowerShell.
 
 ```powershell
 $c='Initialize-VCRuntime;Initialize-Ps7Runtime;Initialize-GitRuntime;Initialize-VSCodeRuntime;Initialize-NodeRuntime;Get-SandboxState';$i='PowerShellGet','PackageManagement','Eigenverft.Manifested.Sandbox';iwr -useb https://raw.githubusercontent.com/eigenverft/Eigenverft.Manifested.Sandbox/refs/heads/main/iwr/bootstrapper.sandbox.generic.ps1 | iex
@@ -35,7 +54,7 @@ $i='PowerShellGet','PackageManagement','Eigenverft.Manifested.Sandbox'
 $c='Get-SandboxVersion'
 ```
 
-The configurable variant keeps the same overall bootstrap pattern, but lets you preset `$i` and `$c` before invocation.
+The configurable variant keeps the same overall bootstrap pattern, but lets you preset `$i` and `$c` before invocation. That same pattern also maps well to Windows Sandbox `.wsb` startup definitions, where you often want the XML to stay small while the real startup behavior lives in versioned PowerShell.
 
 ## Windows Sandbox `.wsb` Example
 
@@ -77,6 +96,8 @@ If you want a ready-to-use Windows Sandbox entry file, save something like this 
 ```
 
 This is a practical starting point for a disposable Windows Sandbox session that immediately pulls the bootstrapper from GitHub and opens PowerShell for the follow-up init commands.
+
+The `.wsb` scenario is one of the clearest reasons to keep the bootstrapper flexible. The XML only needs to launch PowerShell and point at the bootstrap script, while the module list and startup command can stay in versioned PowerShell instead of being baked directly into the sandbox definition. If you want a different startup flow, switch the `LogonCommand` to the generic bootstrapper variant and preset `$i` and `$c` there.
 
 ## Demo Commands
 
