@@ -89,7 +89,7 @@ if (-not [string]::IsNullOrWhiteSpace($NuGetGitHubPush))
 $deploymentInfo = Convert-BranchToDeploymentInfo -BranchName "$gitCurrentBranch"
 
 # Generates a version based on the current date time to verify the version functions work as expected
-$generatedVersion = Convert-DateTimeTo64SecPowershellVersion -VersionBuild 0
+$generatedVersion = Convert-DateTimeTo64SecPowershellVersion -VersionBuild 1
 $probeGeneratedVersion = Convert-64SecPowershellVersionToDateTime -VersionBuild $generatedVersion.VersionBuild -VersionMajor $generatedVersion.VersionMajor -VersionMinor $generatedVersion.VersionMinor 
 Test-VariableValue -Variable { $generatedVersion } -ExitIfNullOrEmpty
 Test-VariableValue -Variable { $probeGeneratedVersion } -ExitIfNullOrEmpty
@@ -185,7 +185,7 @@ $commitDatePrefix = Get-Date -Format 'yy-MM-dd'
 if ($remoteResourcesOk)
 {
     if ($($runEnvironment.IsCI)) {
-        Invoke-GitAddCommitPush -TopLevelDirectory "$gitTopLevelDirectory" -Folders @("$($manifestFile.DirectoryName)") -CurrentBranch "$gitCurrentBranch" -UserName "eigenverft" -UserEmail "227559461+eigenverft@users.noreply.github.com" -CommitMessage "$commitDatePrefix Auto ver bump from CICD to $($generatedVersion.VersionFull) [skip ci]" -Tags @( "v$($generatedVersion.VersionFull)$($deploymentInfo.Affix.Suffix)" ) -ErrorAction Stop
+        Invoke-GitAddCommitPush -TopLevelDirectory "$gitTopLevelDirectory" -Folders @("$($manifestFile.DirectoryName)") -CurrentBranch "$gitCurrentBranch" -UserName "eigenverft" -UserEmail "227559461+eigenverft@users.noreply.github.com" -CommitMessage "[$commitDatePrefix] Auto ver bump from CICD to $($generatedVersion.VersionFull) [skip ci]" -Tags @( "v$($generatedVersion.VersionFull)$($deploymentInfo.Affix.Suffix)" ) -ErrorAction Stop
 
         if (($pushToGitHubSource -eq $true) -and ($deploymentInfo.Branch.FirstSegmentLower -eq 'main'))
         {
@@ -195,6 +195,6 @@ if ($remoteResourcesOk)
             Invoke-ProcessTyped -Executable "gh" -Arguments @("release", "create", "$releaseTag", "--verify-tag", "--generate-notes") -CaptureOutput $false -CaptureOutputDump $false
         }
     } else {
-        Invoke-GitAddCommitPush -TopLevelDirectory "$gitTopLevelDirectory" -Folders @("$($manifestFile.DirectoryName)") -CurrentBranch "$gitCurrentBranch" -UserName "eigenverft" -UserEmail "eigenverft@outlook.com" -CommitMessage "$commitDatePrefix Auto ver bump from local to $($generatedVersion.VersionFull) [skip ci]" -Tags @( "v$($generatedVersion.VersionFull)$($deploymentInfo.Affix.Suffix)" ) -ErrorAction Stop
+        Invoke-GitAddCommitPush -TopLevelDirectory "$gitTopLevelDirectory" -Folders @("$($manifestFile.DirectoryName)") -CurrentBranch "$gitCurrentBranch" -UserName "eigenverft" -UserEmail "eigenverft@outlook.com" -CommitMessage "[$commitDatePrefix] Auto ver bump from local to $($generatedVersion.VersionFull) [skip ci]" -Tags @( "v$($generatedVersion.VersionFull)$($deploymentInfo.Affix.Suffix)" ) -ErrorAction Stop
     }
 }
