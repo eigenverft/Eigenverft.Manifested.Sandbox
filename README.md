@@ -2,15 +2,25 @@
 
 [![PowerShell Gallery Version](https://img.shields.io/powershellgallery/v/Eigenverft.Manifested.Sandbox?label=PSGallery&logo=powershell)](https://www.powershellgallery.com/packages/Eigenverft.Manifested.Sandbox) [![PowerShell Gallery Downloads](https://img.shields.io/powershellgallery/dt/Eigenverft.Manifested.Sandbox?label=Downloads&logo=powershell)](https://www.powershellgallery.com/packages/Eigenverft.Manifested.Sandbox) [![PowerShell Support](https://img.shields.io/badge/PowerShell-5.1%2B%20Desktop%2FCore-5391FE?logo=powershell&logoColor=white)](source/Eigenverft.Manifested.Sandbox/Eigenverft.Manifested.Sandbox.psd1) [![Build Status](https://img.shields.io/github/actions/workflow/status/eigenverft/Eigenverft.Manifested.Sandbox/cicd.yml?branch=main&label=build)](https://github.com/eigenverft/Eigenverft.Manifested.Sandbox/actions/workflows/cicd.yml) [![License](https://img.shields.io/github/license/eigenverft/Eigenverft.Manifested.Sandbox?logo=mit)](LICENSE)
 
-Windows-focused PowerShell module and bootstrap flow for quickly bringing up a usable Windows sandbox or fresh Windows developer environment. It can provision managed PowerShell 7, Node.js, MinGit, and Microsoft Visual C++ runtime prerequisites when you want them.
+Windows-focused PowerShell module and bootstrap flow for quickly bringing up a usable Windows Sandbox session, especially from a `.wsb` startup entrypoint. It can provision managed PowerShell 7, Node.js, MinGit, and Microsoft Visual C++ runtime prerequisites when you want them.
 
-The primary intent is fast setup inside a Windows sandbox-style environment, but the same bootstrap pattern also works on a normal Windows machine or from a Windows Sandbox `.wsb` file when you want a small versioned PowerShell entrypoint with state tracking.
+The primary intent is fast, repeatable setup inside Windows Sandbox. The same bootstrap pattern can also run on a normal Windows machine, but that is a secondary use case rather than the main focus of this repo.
 
 ## Motivation
 
 Windows Sandbox is ideal for disposable setup checks: bootstrap a repo, validate installer behavior, and test fresh-machine assumptions without touching your main workstation.
 
-The problem is that a blank sandbox still takes manual work to become useful. This project turns that repeated setup into a small versioned PowerShell entrypoint so the environment is quick to reuse instead of tedious to rebuild.
+The problem is that a blank `.wsb` session still takes manual work to become useful. This project turns that repeated setup into a small versioned PowerShell entrypoint so the environment is quick to reuse instead of tedious to rebuild.
+
+## Host Requirements
+
+Windows Sandbox on the host requires:
+
+- Windows 10/11 `1903+`
+- Pro, Enterprise, Education, Pro Education, or SE
+- virtualization enabled
+- 4 GB RAM, 1 GB free disk, 2 CPU cores
+- the `Windows Sandbox` feature enabled
 
 ## Preview
 
@@ -85,7 +95,7 @@ If you want a ready-to-use Windows Sandbox entry file, save something like this 
   <PrinterRedirection>Enable</PrinterRedirection>
   <ClipboardRedirection>Enable</ClipboardRedirection>
 
-  <MemoryInMB>8192</MemoryInMB>
+  <MemoryInMB>4096</MemoryInMB>
 
   <!-- Map host folder into the sandbox -->
   <MappedFolders>
