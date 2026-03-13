@@ -190,6 +190,7 @@ function Get-ManifestedCommandEnvironmentSpec {
 
     $runtimeHome = if ($RuntimeState -and $RuntimeState.PSObject.Properties['RuntimeHome']) { $RuntimeState.RuntimeHome } else { $null }
     $executablePath = if ($RuntimeState -and $RuntimeState.PSObject.Properties['ExecutablePath']) { $RuntimeState.ExecutablePath } else { $null }
+    $cliCommandPath = if ($RuntimeState -and $RuntimeState.PSObject.Properties['CliCommandPath']) { $RuntimeState.CliCommandPath } else { $null }
     $runtimeSource = if ($RuntimeState -and $RuntimeState.PSObject.Properties['RuntimeSource']) { $RuntimeState.RuntimeSource } else { $null }
 
     $desiredCommandDirectory = $null
@@ -221,6 +222,18 @@ function Get-ManifestedCommandEnvironmentSpec {
             if (-not [string]::IsNullOrWhiteSpace($executablePath)) {
                 $desiredCommandDirectory = Split-Path -Parent $executablePath
                 $expectedCommandPaths['git.exe'] = (Get-ManifestedFullPath -Path $executablePath)
+            }
+        }
+        'Initialize-VSCodeRuntime' {
+            if (-not [string]::IsNullOrWhiteSpace($cliCommandPath)) {
+                $desiredCommandDirectory = Split-Path -Parent $cliCommandPath
+                $expectedCommandPaths['code'] = (Get-ManifestedFullPath -Path $cliCommandPath)
+                $expectedCommandPaths['code.cmd'] = (Get-ManifestedFullPath -Path $cliCommandPath)
+            }
+            elseif (-not [string]::IsNullOrWhiteSpace($runtimeHome)) {
+                $desiredCommandDirectory = Join-Path $runtimeHome 'bin'
+                $expectedCommandPaths['code'] = (Get-ManifestedFullPath -Path (Join-Path $desiredCommandDirectory 'code.cmd'))
+                $expectedCommandPaths['code.cmd'] = (Get-ManifestedFullPath -Path (Join-Path $desiredCommandDirectory 'code.cmd'))
             }
         }
     }

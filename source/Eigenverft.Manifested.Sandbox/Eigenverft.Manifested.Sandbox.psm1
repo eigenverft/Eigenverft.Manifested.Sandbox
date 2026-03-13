@@ -12,5 +12,6 @@
 . "$PSScriptRoot\Eigenverft.Manifested.Sandbox.Cmd.Ps7RuntimeAndCache.ps1"
 . "$PSScriptRoot\Eigenverft.Manifested.Sandbox.Cmd.NodeRuntimeAndCache.ps1"
 . "$PSScriptRoot\Eigenverft.Manifested.Sandbox.Cmd.GitRuntimeAndCache.ps1"
+. "$PSScriptRoot\Eigenverft.Manifested.Sandbox.Cmd.VsCodeRuntimeAndCache.ps1"
 . "$PSScriptRoot\Eigenverft.Manifested.Sandbox.Cmd.VCRuntimeAndCache.ps1"
 

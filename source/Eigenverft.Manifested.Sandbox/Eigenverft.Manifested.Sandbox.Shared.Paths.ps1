@@ -143,11 +143,13 @@ function Get-ManifestedLayout {
         Ps7CacheRoot       = (Join-Path $cacheRoot 'powershell')
         NodeCacheRoot      = (Join-Path $cacheRoot 'node')
         GitCacheRoot       = (Join-Path $cacheRoot 'git')
+        VsCodeCacheRoot    = (Join-Path $cacheRoot 'vscode')
         VCRuntimeCacheRoot = (Join-Path $cacheRoot 'vc-runtime')
         ToolsRoot          = $toolsRoot
         Ps7ToolsRoot       = (Join-Path $toolsRoot 'powershell')
         NodeToolsRoot      = (Join-Path $toolsRoot 'node')
         GitToolsRoot       = (Join-Path $toolsRoot 'git')
+        VsCodeToolsRoot    = (Join-Path $toolsRoot 'vscode')
         StatePath          = (Join-Path $resolvedRoot 'state.json')
     }
 }

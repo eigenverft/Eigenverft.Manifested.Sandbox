@@ -67,6 +67,7 @@ function Get-ManifestedRuntimeSnapshots {
         @{ Name = 'NodeRuntime'; FunctionName = 'Get-NodeRuntimeState'; PathProperty = 'RuntimeHome' },
         @{ Name = 'Ps7Runtime'; FunctionName = 'Get-Ps7RuntimeState'; PathProperty = 'RuntimeHome' },
         @{ Name = 'GitRuntime'; FunctionName = 'Get-GitRuntimeState'; PathProperty = 'RuntimeHome' },
+        @{ Name = 'VSCodeRuntime'; FunctionName = 'Get-VSCodeRuntimeState'; PathProperty = 'RuntimeHome' },
         @{ Name = 'VCRuntime'; FunctionName = 'Get-VCRuntimeState'; PathProperty = 'InstallerPath' }
     )
 
@@ -220,11 +221,13 @@ function Save-ManifestedInvokeState {
                 Ps7CacheRoot       = $layout.Ps7CacheRoot
                 NodeCacheRoot      = $layout.NodeCacheRoot
                 GitCacheRoot       = $layout.GitCacheRoot
+                VsCodeCacheRoot    = $layout.VsCodeCacheRoot
                 VCRuntimeCacheRoot = $layout.VCRuntimeCacheRoot
                 ToolsRoot          = $layout.ToolsRoot
                 Ps7ToolsRoot       = $layout.Ps7ToolsRoot
                 NodeToolsRoot      = $layout.NodeToolsRoot
                 GitToolsRoot       = $layout.GitToolsRoot
+                VsCodeToolsRoot    = $layout.VsCodeToolsRoot
                 StatePath          = $layout.StatePath
             }
         }

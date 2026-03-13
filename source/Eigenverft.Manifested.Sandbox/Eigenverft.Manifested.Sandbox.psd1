@@ -75,6 +75,7 @@ FunctionsToExport = @(
     'Initialize-GitRuntime',
     'Initialize-NodeRuntime',
     'Initialize-Ps7Runtime',
+    'Initialize-VSCodeRuntime',
     'Initialize-VCRuntime'
 )
 
@@ -105,6 +106,7 @@ FileList = @(
     'Eigenverft.Manifested.Sandbox.Cmd.Ps7RuntimeAndCache.ps1',
     'Eigenverft.Manifested.Sandbox.Cmd.NodeRuntimeAndCache.ps1',
     'Eigenverft.Manifested.Sandbox.Cmd.GitRuntimeAndCache.ps1',
+    'Eigenverft.Manifested.Sandbox.Cmd.VsCodeRuntimeAndCache.ps1',
     'Eigenverft.Manifested.Sandbox.Cmd.VCRuntimeAndCache.ps1',
     'Eigenverft.Manifested.Sandbox.psm1',
     'Eigenverft.Manifested.Sandbox.psd1',
@@ -129,7 +131,7 @@ PrivateData = @{
         IconUri = 'https://raw.githubusercontent.com/eigenverft/Eigenverft.Manifested.Sandbox/main/resources/evt-logo_on_light_border_128x128.png'
 
         # ReleaseNotes of this module
-        ReleaseNotes = 'Added GitHub-first portable PowerShell 7 and MinGit runtime initialization with persisted sandbox state.'
+        ReleaseNotes = 'Added portable VS Code runtime initialization alongside the sandbox-managed PowerShell 7, Node.js, MinGit, and VC runtime flows.'
 
         # Prerelease string of this module
         Prerelease = ''
