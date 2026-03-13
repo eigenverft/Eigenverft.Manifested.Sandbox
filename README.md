@@ -16,6 +16,44 @@ iwr -useb https://raw.githubusercontent.com/eigenverft/Eigenverft.Manifested.San
 
 To test another branch, replace `main` with the branch name in the URL.
 
+## Windows Sandbox `.wsb` Example
+
+If you want a ready-to-use Windows Sandbox entry file, save something like this as `sandbox.wsb` and launch it:
+
+```xml
+<Configuration>
+
+  <!-- Hardware / integration toggles -->
+  <VGpu>Enable</VGpu>
+  <Networking>Enable</Networking>
+
+  <AudioInput>Enable</AudioInput>
+  <VideoInput>Enable</VideoInput>
+
+  <PrinterRedirection>Enable</PrinterRedirection>
+  <ClipboardRedirection>Enable</ClipboardRedirection>
+
+  <MemoryInMB>8192</MemoryInMB>
+
+  <!-- Map host folder into the sandbox -->
+  <MappedFolders>
+    <MappedFolder>
+      <HostFolder>C:\temp</HostFolder>
+      <SandboxFolder>C:\temp</SandboxFolder>
+      <ReadOnly>false</ReadOnly>
+    </MappedFolder>
+  </MappedFolders>
+
+  <!-- Auto-start: PowerShell startup -->
+  <LogonCommand>
+    <Command>cmd /c start "" powershell.exe -NoExit -Command "iwr -useb https://raw.githubusercontent.com/eigenverft/Eigenverft.Manifested.Sandbox/refs/heads/main/iwr/bootstrapper.ps1 | iex"</Command>
+  </LogonCommand>
+
+</Configuration>
+```
+
+This is a practical starting point for a disposable Windows Sandbox session that immediately pulls the bootstrapper from GitHub and opens PowerShell for the follow-up init commands.
+
 ## Demo Commands
 
 After the bootstrapper opens the new console, run:
