@@ -130,12 +130,8 @@ if ($remoteResourcesOk -and -not [string]::IsNullOrWhiteSpace($NuGetGitHubPush))
 # Deploy generated module packages to the appropriate destinations
 if ($pushToLocalSource -eq $true)
 {
+    Write-Host "===> Publishing module to local source '$LocalPowershellGalleryName'" -ForegroundColor Cyan
     Publish-Module -Path $($manifestFile.DirectoryName) -Repository "$LocalPowershellGalleryName"
-}
-
-if ($pushToPsGallery -eq $true)
-{
-    Publish-Module -Path $($manifestFile.DirectoryName) -Repository "PSGallery" -NuGetApiKey "$PsGalleryApiKey"
 }
 
 if ($pushToGitHubSource -eq $true)
@@ -151,6 +147,7 @@ if ($pushToGitHubSource -eq $true)
 
     try
     {
+        Write-Host "===> Registering temporary GitHub source '$GitHubSourceName' at '$GitHubSourceUri'" -ForegroundColor Cyan
         $ExistingGitHubSource = Get-PSRepository -Name "$GitHubSourceName" -ErrorAction SilentlyContinue
         if ($null -ne $ExistingGitHubSource)
         {
@@ -158,6 +155,7 @@ if ($pushToGitHubSource -eq $true)
         }
 
         Register-PSRepository @GitHubSourceRegistration -ErrorAction Stop | Out-Null
+        Write-Host "===> Publishing module to GitHub source '$GitHubSourceName'" -ForegroundColor Cyan
         Publish-Module -Path $($manifestFile.DirectoryName) -Repository "$GitHubSourceName" -NuGetApiKey "$NuGetGitHubPush"
     }
     finally
@@ -165,9 +163,16 @@ if ($pushToGitHubSource -eq $true)
         $ExistingGitHubSource = Get-PSRepository -Name "$GitHubSourceName" -ErrorAction SilentlyContinue
         if ($null -ne $ExistingGitHubSource)
         {
+            Write-Host "===> Unregistering temporary GitHub source '$GitHubSourceName'" -ForegroundColor Cyan
             Unregister-PSRepository -Name "$GitHubSourceName" -ErrorAction Stop
         }
     }
+}
+
+if ($pushToPsGallery -eq $true)
+{
+    Write-Host "===> Publishing module to PSGallery" -ForegroundColor Cyan
+    Publish-Module -Path $($manifestFile.DirectoryName) -Repository "PSGallery" -NuGetApiKey "$PsGalleryApiKey"
 }
 
 if ($remoteResourcesOk)
