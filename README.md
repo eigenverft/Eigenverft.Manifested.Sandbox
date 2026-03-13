@@ -6,6 +6,18 @@ Windows-focused PowerShell module and bootstrap flow for quickly bringing up a u
 
 The primary intent is fast setup inside a Windows sandbox-style environment, but the same bootstrap pattern also works on a normal Windows machine or from a Windows Sandbox `.wsb` file when you want a small versioned PowerShell entrypoint with state tracking.
 
+## Motivation
+
+Windows Sandbox is ideal for disposable setup checks: bootstrap a repo, validate installer behavior, and test fresh-machine assumptions without touching your main workstation.
+
+The problem is that a blank sandbox still takes manual work to become useful. This project turns that repeated setup into a small versioned PowerShell entrypoint so the environment is quick to reuse instead of tedious to rebuild.
+
+## Preview
+
+![Windows Sandbox preview showing the module version in PowerShell and a follow-up runtime command](resources/screenshots/windows-sandbox-bootstrap-preview.png)
+
+Example Windows Sandbox session after the bootstrapper opens PowerShell and the follow-up runtime commands are available.
+
 ## Bootstrapper
 
 The bootstrapper is optimized for getting a Windows sandbox session ready quickly. It installs the required PowerShell package tooling plus `Eigenverft.Manifested.Sandbox` from the PowerShell Gallery, then opens a new Windows PowerShell console and runs the default follow-up command.

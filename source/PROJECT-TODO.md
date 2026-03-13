@@ -31,10 +31,6 @@
   $u='https://raw.githubusercontent.com/eigenverft/Eigenverft.Manifested.Sandbox/refs/heads/main/iwr/bootstrapper.ps1';try{[Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12}catch{};$p=[System.Net.WebRequest]::GetSystemWebProxy();if(-not $p.IsBypassed($u)){iwr $u -Proxy ($p.GetProxy($u).AbsoluteUri) -ProxyUseDefaultCredentials -UseBasicParsing|iex}else{iwr $u -UseBasicParsing|iex}
   ```
 #### Release
-- Create the first proper GitHub Release so the project has a stable public release target for sharing and discovery.
-  Still open as of 2026-03-13: the public GitHub releases page still shows no releases, so tags alone are not enough to close this item.
-- Decide whether the public versioning signal should stay on `0.x` while the project is still evolving or move to `1.0` when it is solid enough for broader visibility.
-  Still open as of 2026-03-13: the public tags still signal `0.x`, but the todo does not yet record an explicit decision to stay on `0.x` or define the condition for moving to `1.0`.
 
 ### [P3] Normal
 #### Tooling
@@ -43,8 +39,6 @@
 - Add a managed Python bootstrap and cache flow so the sandbox has a common scripting baseline for Codex-assisted build and repo tasks.
   Still open: the current repo surface and `README.md` do not yet expose a managed Python bootstrap or cache flow.
 #### Visual polish
-- Add one screenshot or short GIF that shows the sandbox result or expected terminal output for first-time visitors.
-  Still open: the current `README.md` does not yet include a screenshot or GIF reference.
 
 ### [P4] Low
 
@@ -57,6 +51,9 @@
 - Decide which Python version should be pinned for the Codex-oriented sandbox baseline.
 
 ## Closed
+- [P3] Visual polish - 2026-03-13: Added a README screenshot that shows the Windows Sandbox result and expected terminal output for first-time visitors.
+- [P2] Release - 2026-03-13: Created the first proper GitHub Release so the project now has a stable public release target for sharing and discovery.
+- [P2] Release - 2026-03-13: Moved the public versioning signal from `0.x` to `1.x`, including published tag and manifest version `1.20261.31334`.
 - [P2] Trust - 2026-03-13: Enabled GitHub private vulnerability reporting and updated `SECURITY.md` to use it as the primary private disclosure path.
 - [P1] Trust - 2026-03-13: Added a PSGallery link near the install section and a bootstrap trust note that explains what the bootstrap downloads, where it installs, and whether admin rights are required.
 - [P1] Trust - 2026-03-13: Added `SECURITY.md` with public vulnerability reporting guidance and a private email fallback.
