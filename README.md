@@ -14,6 +14,12 @@ Run it from Windows PowerShell 5.1:
 iwr -useb https://raw.githubusercontent.com/eigenverft/Eigenverft.Manifested.Sandbox/refs/heads/main/iwr/bootstrapper.ps1 | iex
 ```
 
+A generic version of the bootstrapper lets you specify which PowerShell Gallery modules to install and which command to invoke automatically, so it can also be used for projects beyond `Eigenverft.Manifested.Sandbox`.
+
+```powershell
+$c='Initialize-VCRuntime;Initialize-Ps7Runtime;Initialize-GitRuntime;Initialize-VSCodeRuntime;Initialize-NodeRuntime;Get-SandboxState';$i='PowerShellGet','PackageManagement','Eigenverft.Manifested.Sandbox';iwr -useb https://raw.githubusercontent.com/eigenverft/Eigenverft.Manifested.Sandbox/refs/heads/main/iwr/bootstrapper.sandbox.generic.ps1 | iex
+```
+
 To test another branch, replace `main` with the branch name in the URL.
 
 ## Windows Sandbox `.wsb` Example
@@ -61,14 +67,15 @@ After the bootstrapper opens the new console, run:
 ```powershell
 Initialize-Ps7Runtime
 Initialize-GitRuntime
+Initialize-VSCodeRuntime
 Initialize-NodeRuntime
 Initialize-VCRuntime
 Get-SandboxState
 ```
 
-`Initialize-Ps7Runtime`, `Initialize-GitRuntime`, and `Initialize-NodeRuntime` are intended to run in a normal user session. They prefer sandbox-managed portable runtimes under `LocalAppData`, using GitHub as the download source for PowerShell 7 and MinGit.
+`Initialize-Ps7Runtime`, `Initialize-GitRuntime`, `Initialize-VSCodeRuntime`, and `Initialize-NodeRuntime` are intended to run in a normal user session. They prefer sandbox-managed portable runtimes under `LocalAppData`, using GitHub as the download source for PowerShell 7 and MinGit and the official VS Code Windows ZIP archive with portable `data` mode for VS Code.
 
-Those three commands also check for an already-usable `pwsh`, `git`, or `node` that exists outside prior sandbox state. If a compatible runtime is already available on `PATH` or in a common install location, the command can treat it as ready and persist it as an external runtime instead of downloading a new copy. If you explicitly use a refresh switch such as `-RefreshGit`, `-RefreshPs7`, or `-RefreshNode`, the command will still acquire and install the sandbox-managed copy.
+Those commands also check for an already-usable `pwsh`, `git`, `code`, or `node` that exists outside prior sandbox state. If a compatible runtime is already available on `PATH` or in a common install location, the command can treat it as ready and persist it as an external runtime instead of downloading a new copy. If you explicitly use a refresh switch such as `-RefreshGit`, `-RefreshPs7`, `-RefreshVSCode`, or `-RefreshNode`, the command will still acquire and install the sandbox-managed copy.
 
 `Initialize-VCRuntime` is different because the VC runtime is a machine/runtime prerequisite rather than a sandbox-managed portable tool.
 
@@ -82,4 +89,3 @@ If you prefer installing the module directly instead of using the bootstrapper:
 Install-Module Eigenverft.Manifested.Sandbox -Scope CurrentUser -Repository PSGallery
 Import-Module Eigenverft.Manifested.Sandbox
 ```
-

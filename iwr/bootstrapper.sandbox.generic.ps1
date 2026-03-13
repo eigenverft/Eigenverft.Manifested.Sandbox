@@ -1,21 +1,25 @@
 <#
-Generic PSGallery bootstrapper for installing/importing configurable modules,
+Generic sandbox PSGallery bootstrapper for installing/importing configurable modules,
 then opening a new Windows PowerShell console and invoking a configurable command.
 
 Configure:
 
 $i = modules to install and import
-$c = command to invoke in the new console
+$c = command to invoke in the new console after bootstrap
 
 Current defaults:
 
 $i='PowerShellGet','PackageManagement','Eigenverft.Manifested.Sandbox'
 $c=''
 
-This is the more generic variant of iwr/bootstrapper.ps1.
-The published bootstrapper one-liner stays unchanged.
+If $i or $c are already set before invocation, this script keeps those values.
 
-$c='';$i='PowerShellGet','PackageManagement','Eigenverft.Manifested.Sandbox';iwr -useb https://raw.githubusercontent.com/eigenverft/Eigenverft.Manifested.Sandbox/refs/heads/main/iwr/bootstrapper.generic.ps1 | iex
+Use via
+
+iwr -useb https://raw.githubusercontent.com/eigenverft/Eigenverft.Manifested.Sandbox/refs/heads/<branch>/iwr/bootstrapper.sandbox.generic.ps1 | iex
+
+This is the configurable variant of iwr/bootstrapper.ps1.
+The published bootstrapper one-liner stays unchanged.
 
 #>
 

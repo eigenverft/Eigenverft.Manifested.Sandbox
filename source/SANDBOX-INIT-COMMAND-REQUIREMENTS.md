@@ -2,127 +2,168 @@
 
 ## Objective
 
-This note defines the meta-flow requirement for any future combined sandbox initialization command, for example `Initialize-Sandbox`.
+This note defines the current orchestration contract for the sandbox init commands and the baseline for any future combined command such as `Initialize-Sandbox`.
 
-The main point is not the public name. The main point is that the command must follow a bulletproof orchestration flow built around state discovery, plan derivation, revalidation after each mutation, and persistence from observed final state.
+The important part is not a specific public command name. The important part is that each init command behaves like a small state-machine coordinator:
 
-The future combined command should behave like a robust state machine coordinator, not like a one-pass script.
+- read real state first
+- derive a plan from that state
+- execute one bounded mutation at a time
+- re-read state after each meaningful mutation
+- persist only from the observed final state
+
+This currently applies to these exported init commands:
+
+- `Initialize-Ps7Runtime`
+- `Initialize-GitRuntime`
+- `Initialize-VSCodeRuntime`
+- `Initialize-NodeRuntime`
+- `Initialize-VCRuntime`
+
+The related inspection surface is:
+
+- `Get-SandboxState`
 
 ## Public Command Simplicity
 
-Exported commands should stay minimal and user-meaningful.
-
-Required rule:
-
-- Public commands should not expose root-selection or self-elevation plumbing such as `-LocalRoot`, `-SkipSelfElevation`, or `-WasSelfElevated`.
-- The public sandbox location should always resolve from the default per-user `LocalAppData` root.
-- Path pinning is still required, but it is an internal implementation concern, not a public command option.
-- Internal helpers may carry the pinned root across process boundaries, but callers should not need to pass it.
-
-## Runtime Discovery Policy
-
-Portable runtime commands such as `Initialize-Ps7Runtime`, `Initialize-GitRuntime`, and `Initialize-NodeRuntime` should prefer the sandbox-managed copy under the pinned `LocalAppData` root, but they must also detect a compatible runtime that already exists outside prior sandbox state.
-
-Required rule:
-
-- A compatible runtime already visible on `PATH` or in a common default install location should satisfy readiness even if it was not initialized by the sandbox command before.
-- A runtime discovered under the sandbox-managed tools root should be treated as `Managed`.
-- A runtime discovered outside the sandbox-managed tools root should be treated as `External`.
-- Refresh switches may still force acquisition and installation of the sandbox-managed copy even when an external runtime already satisfies readiness.
-- Machine/runtime prerequisites such as `Initialize-VCRuntime` are different: they should evaluate the real machine state because they are not portable sandbox-owned tools.
-
-## Core Requirement
-
-The combined init command must use the same meta-flow style as the current init commands:
-
-- get current state first
-- derive a plan from that state
-- execute at most one logical transition at a time
-- re-read state after each transition that can change reality
-- only persist from the final observed state
-
-The command must never trust an earlier assumption after repair, download, install, or elevation boundaries have been crossed.
-
-## Required Meta-Flow
-
-The expected control flow is:
-
-1. Resolve the default `LocalAppData` sandbox root and pin it internally immediately.
-2. Build the derived layout from the pinned root.
-3. Read the initial state from the real system and file layout.
-4. Derive `PlannedActions` from the initial state.
-5. Decide whether the command is blocked, already satisfied, partial, repairable, or needs acquire/install work.
-6. If a repair step is needed, execute only the repair step.
-7. Re-read state after repair.
-8. Recompute the plan from the refreshed state.
-9. If an acquire or refresh step is needed, execute only that step.
-10. Revalidate the acquired artifact.
-11. Recompute whether elevation is actually required for the next step.
-12. If elevation is required and the current process is not elevated, self-reinvoke using the pinned root and the same logical request.
-13. Execute the install or apply step.
-14. Re-read final state from the real system.
-15. Persist invoke state from the final observed state unless running in `-WhatIf`.
-16. Return a structured result that includes both the initial and final picture.
-
-This is the baseline. A future combined command may orchestrate multiple subsystems, but it should not skip the re-read and re-plan phases between meaningful transitions.
-
-## State-Machine Rules
-
-The command should be treated as a state-machine driver.
+Public init commands should stay minimal and user-meaningful.
 
 Required rules:
 
-- Each phase must consume a known state and produce either:
-  - an unchanged state with a decision, or
-  - one bounded mutation followed by a required state refresh.
+- Public commands should not expose root-selection or self-elevation plumbing such as `-LocalRoot`, `-SkipSelfElevation`, or `-WasSelfElevated`.
+- The sandbox root should resolve from the default per-user `LocalAppData` location and be pinned internally before meaningful work starts.
+- Portable runtime commands may expose focused refresh switches such as `-RefreshPs7`, `-RefreshGit`, `-RefreshVSCode`, and `-RefreshNode`.
+- `Initialize-VCRuntime` may expose install-specific tuning, but it should still hide the same internal root and elevation plumbing.
+- `SupportsShouldProcess` and `-WhatIf` behavior are part of the public contract.
+
+## Current Command Families
+
+- `Initialize-Ps7Runtime`, `Initialize-GitRuntime`, `Initialize-VSCodeRuntime`, and `Initialize-NodeRuntime` manage portable user-scoped runtimes under the sandbox root.
+- `Initialize-VCRuntime` manages a machine/runtime prerequisite and evaluates the real installed machine state.
+- `Get-SandboxState` is the read-only inspection surface for the persisted command state document plus live runtime snapshots.
+
+## Runtime Discovery Policy
+
+Portable runtime commands should prefer the sandbox-managed copy under the pinned root, but they must also detect a compatible runtime that already exists outside prior sandbox state.
+
+Required rules:
+
+- A compatible runtime already visible on `PATH` or in a common install location may satisfy readiness even if the sandbox command did not install it.
+- A runtime discovered under the sandbox-managed tools root should be treated as `Managed`.
+- A runtime discovered outside the sandbox-managed tools root should be treated as `External`.
+- Refresh switches may still force acquisition and installation of the sandbox-managed copy even when an external runtime already satisfies readiness.
+- VS Code follows the same managed-versus-external model, but a managed VS Code runtime must validate as portable-mode capable.
+- Machine/runtime prerequisites such as `Initialize-VCRuntime` are different because they are not portable sandbox-owned tools. They should evaluate the real machine state.
+
+## Shared Orchestration Contract
+
+Current init commands should continue to follow this meta-flow:
+
+1. Resolve the default sandbox root and pin it internally immediately.
+2. Build the derived layout from the pinned root.
+3. Read the initial state from the real system and file layout.
+4. Derive `PlannedActions` from the observed initial state.
+5. Decide whether the command is blocked, ready, partial, repairable, or needs acquire/install work.
+6. If a repair step is needed, execute only the repair step.
+7. Re-read state after repair.
+8. Recompute acquire/install needs from the refreshed state.
+9. If an acquire step is needed, acquire only the package or installer for that phase.
+10. Validate the acquired artifact before install.
+11. Recompute whether elevation is actually required for the next mutation.
+12. If elevation is required and the current process is not elevated, self-reinvoke using the pinned root and the same logical request.
+13. Execute the install or apply step.
+14. Re-read final state from the real system.
+15. For portable runtime commands, synchronize the command-line environment from the final observed runtime state.
+16. Persist invoke state from the final observed result unless running in `-WhatIf`.
+17. Return a structured result that explains what really happened.
+
+The command must never trust an earlier assumption after repair, download, install, or elevation boundaries have been crossed.
+
+## State-Machine Rules
+
+Required rules:
+
+- Each phase must consume a known state and produce either an unchanged decision or one bounded mutation followed by a required state refresh.
 - A mutation must not be followed by more assumptions based on stale state.
-- If a step can change files, registry, installed runtimes, extracted tools, or cache contents, the next phase must use a fresh state read.
+- If a step can change files, extracted tools, installed runtimes, registry state, or cache contents, the next phase must use a fresh state read.
 - The command should fail closed on ambiguous state instead of guessing.
-- The command should remain idempotent: rerunning it against a ready system should produce no destructive work.
+- The command should remain idempotent. Rerunning it against a ready system should not trigger destructive work.
+
+## Command-Line Environment Synchronization
+
+The portable runtime commands now share command-line environment synchronization as part of the init contract.
+
+Required rules:
+
+- `Initialize-Ps7Runtime`, `Initialize-GitRuntime`, `Initialize-NodeRuntime`, and `Initialize-VSCodeRuntime` should derive a desired command directory from the final runtime state.
+- They should update both the process `PATH` and the user `PATH` so the desired directory is present and preferred.
+- Synchronization must validate actual command resolution after the update. It must not assume a `PATH` write succeeded just because the environment variable changed.
+- The expected command set is currently `pwsh.exe` for PowerShell 7, `git.exe` for Git, `node.exe` and `npm.cmd` for Node.js, and `code` plus `code.cmd` for VS Code.
+- The command result and persisted invoke state should surface `CommandEnvironment` for these portable runtime commands.
+- `Initialize-VCRuntime` does not participate in command-line environment sync.
 
 ## Bulletproofness Requirements
 
-To keep the command safe and predictable:
+To keep the commands safe and predictable:
 
 - Do not combine repair, acquire, validate, and install into one blind action block.
 - Do not assume a cached artifact remains valid after repair or refresh.
 - Do not assume install succeeded just because a process exited with a nominal code.
 - Do not persist state before the final verification pass.
-- Do not derive final return values from intended actions; derive them from observed final state.
+- Do not derive final return values from intended actions. Derive them from observed final state.
 - Do not cross into an elevated process without carrying the pinned root and the same logical command intent.
 - Do not let elevated and non-elevated runs drift into different `state.json`, cache, or tools paths.
 
 ## Path and Identity Pinning
 
-The command must pin its execution identity before it mutates anything.
+The commands must pin their execution identity before they mutate anything.
 
 At minimum, the following must stay stable across normal and elevated execution:
 
 - `LocalRoot`
 - `CacheRoot`
-- `ToolsRoot`
-- `NodeToolsRoot`
+- `Ps7CacheRoot`
+- `NodeCacheRoot`
+- `GitCacheRoot`
+- `VsCodeCacheRoot`
 - `VCRuntimeCacheRoot`
+- `ToolsRoot`
+- `Ps7ToolsRoot`
+- `NodeToolsRoot`
+- `GitToolsRoot`
+- `VsCodeToolsRoot`
 - `StatePath`
 - stage directories under the pinned root
-- logs written under the pinned root
 
 `state.json` must represent one logical sandbox state document, regardless of whether a privileged child process was used.
 
-The elevated child process must receive the caller's pinned `LocalRoot`. It must not recompute its own root from user profile or process context differences.
-This pinning should happen internally. The caller should still experience a simple command surface with no root override option.
+The elevated child process must receive the caller's pinned `LocalRoot`. It must not recompute its own root from user profile or process-context differences.
+
+## State Persistence
+
+Persisted state is part of the current feature set, not just an implementation detail.
+
+Required rules:
+
+- `Save-ManifestedInvokeState` is the baseline persistence path for init commands.
+- Persisted command entries should capture `ActionTaken`, `Status`, `RestartRequired`, layout paths, `Elevation`, and command-specific `Details`.
+- Portable runtime command entries should also persist `CommandEnvironment`.
+- `Get-SandboxState` should continue to expose both the persisted command document and runtime snapshots for `NodeRuntime`, `Ps7Runtime`, `GitRuntime`, `VSCodeRuntime`, and `VCRuntime`.
+- `PersistedStatePath` should be `$null` in `-WhatIf` results.
 
 ## Elevation Requirement
 
-Elevation is a planning concern, not a hardcoded property of the whole command.
+Elevation is a planning concern, not a hardcoded property of every command.
 
 Required behavior:
 
-- Determine whether the next real transition requires elevation.
+- Determine whether the next real mutation requires elevation.
 - Skip self-elevation when the process is already elevated.
 - Skip self-elevation when the next step does not require it.
 - Never trigger elevation in `-WhatIf`.
 - After self-reinvoke, continue the same logical flow with the same pinned root and same request intent.
+- Under the current implementation, `Initialize-VCRuntime` is the command that may require elevation for install or repair work.
+- Portable runtime commands should still return an `Elevation` object even when no elevation is required.
 
 The current shared elevation pattern is the baseline to reuse:
 
@@ -131,41 +172,49 @@ The current shared elevation pattern is the baseline to reuse:
 
 ## Return Contract Requirement
 
-The combined command should return a result object that exposes the orchestration clearly.
+Init commands should return structured result objects whose final picture comes from observed final state.
 
-At minimum, the top-level result should include:
+At minimum, every init command result should include:
 
 - `LocalRoot`
 - `Layout`
 - `InitialState`
 - `FinalState`
-- `PlannedActions`
 - `ActionTaken`
+- `PlannedActions`
 - `RestartRequired`
 - `Elevation`
 - `PersistedStatePath`
 
-If the command coordinates subsystems, it should include their sub-results explicitly, for example:
+Portable runtime commands should also include:
 
-- `NodeRuntime`
-- `VCRuntime`
+- `Package`
+- `PackageTest`
+- `RuntimeTest`
+- `RepairResult`
+- `InstallResult`
+- `CommandEnvironment`
+
+`Initialize-VCRuntime` should return the installer-oriented equivalents:
+
+- `Installer`
+- `InstallerTest`
+- `RuntimeTest`
+- `RepairResult`
+- `InstallResult`
 
 The result should explain what really happened, not just what the command intended to do.
 
-## Recommended Combined Flow
+## Future Combined Command
 
-For a future `Initialize-Sandbox` style command, the preferred shape is:
+If a combined `Initialize-Sandbox` style command is added later, it should orchestrate the existing per-command pattern instead of inventing a shortcut path that bypasses the current guarantees.
 
-1. Pin `LocalRoot`.
-2. Read top-level combined state.
-3. Decide which subsystems need work.
-4. For each subsystem, follow the same meta-flow:
-   get state -> derive plan -> mutate one phase -> re-read state.
-5. If a subsystem requires elevation, reinvoke once with the same pinned root and continue the same logical operation.
-6. Aggregate subsystem final states and sub-results.
-7. Persist only from the final aggregated state.
+Required rules:
 
-The combined command should orchestrate the existing patterns, not invent a separate shortcut path.
+- Preserve the same pinned root and path identity across the whole run.
+- Reuse the same per-subsystem state -> plan -> mutate -> re-read discipline.
+- Preserve current persistence rules and final observed-state return semantics.
+- Aggregate sub-results without hiding the underlying runtime-specific outcomes.
 
 ## Current Reference Implementations
 
@@ -174,9 +223,11 @@ Use these files as the current baseline references:
 - `source/Eigenverft.Manifested.Sandbox/Eigenverft.Manifested.Sandbox.Cmd.Ps7RuntimeAndCache.ps1`
 - `source/Eigenverft.Manifested.Sandbox/Eigenverft.Manifested.Sandbox.Cmd.NodeRuntimeAndCache.ps1`
 - `source/Eigenverft.Manifested.Sandbox/Eigenverft.Manifested.Sandbox.Cmd.GitRuntimeAndCache.ps1`
+- `source/Eigenverft.Manifested.Sandbox/Eigenverft.Manifested.Sandbox.Cmd.VsCodeRuntimeAndCache.ps1`
 - `source/Eigenverft.Manifested.Sandbox/Eigenverft.Manifested.Sandbox.Cmd.VCRuntimeAndCache.ps1`
+- `source/Eigenverft.Manifested.Sandbox/Eigenverft.Manifested.Sandbox.Shared.CommandEnvironment.ps1`
 - `source/Eigenverft.Manifested.Sandbox/Eigenverft.Manifested.Sandbox.Shared.Elevation.ps1`
 - `source/Eigenverft.Manifested.Sandbox/Eigenverft.Manifested.Sandbox.Shared.Paths.ps1`
 - `source/Eigenverft.Manifested.Sandbox/Eigenverft.Manifested.Sandbox.Shared.State.ps1`
 
-The future combined command does not need to copy the current code literally, but it should preserve the same orchestration discipline.
+The future combined command does not need to copy the current code literally, but it should preserve the same orchestration discipline and current feature guarantees.

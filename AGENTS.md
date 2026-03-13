@@ -11,15 +11,16 @@
 - For trivial, localized, single-file edits, skip task decomposition and execute directly.
 - Before finishing, reconcile the full task structure so every task or subtask is marked as completed, blocked, cancelled, or intentionally deferred.
 
-## General PowerShell source/modulename Requirements
-- All code must be compatible with PowerShell 5.1, if there is a way to keep it working with PS5.1 and PS7 this is prefered.
-- This project is a PowerShell NuGet package intended for the PowerShell Gallery.
-- Files that are meant to be published are located in `source/modulename`.
-- Be careful not to place unrelated files in `source/modulename`, because that directory is part of the published package.
+## General PowerShell Requirements
+- All code must remain compatible with PowerShell 5.1.
+- When there is a reasonable choice, prefer implementations that work in both Windows PowerShell 5.1 and PowerShell 7+.
+- Treat this repository as a PowerShell module project intended for PowerShell Gallery distribution.
 
 ## Directory Structure
-- The `resources` directory contains assets such as `.ico` and `.png` files that are referenced by the module manifest.
-- `iwr/bootstrapper.ps1` contains a one-liner bootstrap script that can be executed through an `iwr | iex` chain.
-- The root of the `source` directory must contain a file named `.TestImports.ps1`.
-- `.TestImports.ps1` is intended to be run manually from Visual Studio Code for testing specific import scenarios.
-- The behavior and expectations of `.TestImports.ps1` should stay aligned with `Eigenverft.Manifested.Sandbox.psm1`.
+- `source` is the project source area. Files directly under `source` can be part of the repository without being part of the published PowerShell module.
+- `source/<ModuleName>` is the publishable module directory. Its folder name must match the module name, and files that should ship in the PowerShell Gallery package belong in that directory.
+- Keep unrelated project files out of `source/<ModuleName>`. Repository-only notes, helper scripts, and other project files can live elsewhere under `source` or at the repo root.
+- `source/<ModuleName>.TestImports.ps1` is a manual import-validation script intended to be run from Visual Studio Code for testing import scenarios. Its behavior and expectations should stay aligned with `source/<ModuleName>/<ModuleName>.psm1`.
+- `resources` contains assets referenced by the module manifest, such as icons or images.
+- `iwr` contains bootstrapper scripts, including the entry point intended for `iwr | iex` usage.
+- `.agents` contains repo-specific agent instructions and reusable skills. It is for repository workflow guidance, not for the published module payload.
