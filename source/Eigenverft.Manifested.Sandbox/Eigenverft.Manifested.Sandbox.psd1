@@ -31,7 +31,7 @@ CompanyName = 'Eigenverft'
 Copyright = 'Copyright (c) 2026 Eigenverft'
 
 # Description of the functionality provided by this module
-Description = 'Windows-focused PowerShell module for quickly setting up a usable Windows sandbox or fresh Windows developer environment with managed PowerShell 7, Node.js, MinGit, and Microsoft Visual C++ runtime prerequisites plus persisted invoke state.'
+Description = 'Windows-focused PowerShell module for quickly bringing up a usable Windows sandbox or fresh Windows developer environment, while also supporting the same bootstrap flow and state tracking on a normal Windows machine.'
 
 # Minimum version of the PowerShell engine required by this module
 PowerShellVersion = '5.1'
@@ -71,6 +71,7 @@ PowerShellVersion = '5.1'
 
 # Functions to export from this module, for best performance, do not use wildcards and do not delete the entry, use an empty array if there are no functions to export.
 FunctionsToExport = @(
+    'Get-SandboxVersion',
     'Get-SandboxState',
     'Initialize-GitRuntime',
     'Initialize-NodeRuntime',

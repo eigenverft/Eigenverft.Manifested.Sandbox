@@ -6,7 +6,7 @@ The primary intent is fast setup inside a Windows sandbox-style environment, but
 
 ## Bootstrapper
 
-The bootstrapper is optimized for getting a Windows sandbox session ready quickly. It installs the required PowerShell package tooling plus `Eigenverft.Manifested.Sandbox` from the PowerShell Gallery, then opens a new Windows PowerShell console for using the module.
+The bootstrapper is optimized for getting a Windows sandbox session ready quickly. It installs the required PowerShell package tooling plus `Eigenverft.Manifested.Sandbox` from the PowerShell Gallery, then opens a new Windows PowerShell console and runs the default follow-up command.
 
 Run it from Windows PowerShell 5.1:
 
@@ -21,6 +21,15 @@ $c='Initialize-VCRuntime;Initialize-Ps7Runtime;Initialize-GitRuntime;Initialize-
 ```
 
 To test another branch, replace `main` with the branch name in the URL.
+
+The published default bootstrapper currently uses:
+
+```powershell
+$i='PowerShellGet','PackageManagement','Eigenverft.Manifested.Sandbox'
+$c='Get-SandboxVersion'
+```
+
+The configurable variant keeps the same overall bootstrap pattern, but lets you preset `$i` and `$c` before invocation.
 
 ## Windows Sandbox `.wsb` Example
 
@@ -52,6 +61,9 @@ If you want a ready-to-use Windows Sandbox entry file, save something like this 
 
   <!-- Auto-start: PowerShell startup -->
   <LogonCommand>
+    <!-- Dev-friendly generic variant:
+         <Command>cmd /c start "" powershell.exe -NoExit -Command "$c='Get-SandboxVersion;Initialize-Ps7Runtime;Initialize-GitRuntime;Initialize-VSCodeRuntime;Initialize-NodeRuntime;Get-SandboxState';$i='PowerShellGet','PackageManagement','Eigenverft.Manifested.Sandbox';iwr -useb https://raw.githubusercontent.com/eigenverft/Eigenverft.Manifested.Sandbox/refs/heads/main/iwr/bootstrapper.sandbox.generic.ps1 | iex"</Command>
+    -->
     <Command>cmd /c start "" powershell.exe -NoExit -Command "iwr -useb https://raw.githubusercontent.com/eigenverft/Eigenverft.Manifested.Sandbox/refs/heads/main/iwr/bootstrapper.ps1 | iex"</Command>
   </LogonCommand>
 
@@ -65,6 +77,7 @@ This is a practical starting point for a disposable Windows Sandbox session that
 After the bootstrapper opens the new console, run:
 
 ```powershell
+Get-SandboxVersion
 Initialize-Ps7Runtime
 Initialize-GitRuntime
 Initialize-VSCodeRuntime
@@ -72,6 +85,8 @@ Initialize-NodeRuntime
 Initialize-VCRuntime
 Get-SandboxState
 ```
+
+`Get-SandboxVersion` is the quick way to show the latest available installed module version on the system.
 
 `Initialize-Ps7Runtime`, `Initialize-GitRuntime`, `Initialize-VSCodeRuntime`, and `Initialize-NodeRuntime` are intended to run in a normal user session. They prefer sandbox-managed portable runtimes under `LocalAppData`, using GitHub as the download source for PowerShell 7 and MinGit and the official VS Code Windows ZIP archive with portable `data` mode for VS Code.
 
