@@ -376,7 +376,7 @@ function Invoke-VCRuntimeInstaller {
 
     $argumentList = @(
         '/install',
-        '/passive',
+        '/quiet',
         '/norestart',
         '/log',
         (Format-VCRuntimeProcessArgument -Value $logPath)
