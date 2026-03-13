@@ -1,5 +1,6 @@
 param (
-    [string]$PsGalleryApiKey
+    [string]$PsGalleryApiKey,
+    [string]$NuGetGitHubPush
 ) 
 
 # Fail-fast defaults for reliable CI/local runs:
@@ -47,7 +48,9 @@ Uninstall-PreviousModuleVersions -ModuleName 'Eigenverft.Manifested.Drydock'
 
 # In the case the secrets are not passed as parameters, try to get them from the secrets file, local development or CI/CD environment
 # TBD https://learn.microsoft.com/de-de/powershell/utility-modules/secretmanagement/overview?view=ps-modules
+$NuGetGitHubPush = Get-ConfigValue -Check $NuGetGitHubPush -FilePath (Join-Path $PSScriptRoot 'cicd.secrets.json') -Property 'NuGetGitHubPush'
 $PsGalleryApiKey = Get-ConfigValue -Check $PsGalleryApiKey -FilePath (Join-Path $PSScriptRoot 'cicd.secrets.json') -Property 'PsGalleryApiKey'
+Test-VariableValue -Variable { $NuGetGitHubPush } -WarnIfNullOrEmpty -HideValue
 Test-VariableValue -Variable { $PsGalleryApiKey } -ExitIfNullOrEmpty -HideValue
 
 # Verify required commands are available
@@ -64,6 +67,9 @@ $gitCurrentBranch = Get-GitCurrentBranch
 $gitCurrentBranchRoot = Get-GitCurrentBranchRoot
 $gitRepositoryName = Get-GitRepositoryName
 $gitRemoteUrl = Get-GitRemoteUrl
+$GitHubPackagesUser = "eigenverft"
+$GitHubSourceName = "github"
+$GitHubSourceUri = $null
 
 # Failfast / guard if any of the required preloaded environment information is not available
 Test-VariableValue -Variable { $runEnvironment } -ExitIfNullOrEmpty
@@ -72,6 +78,12 @@ Test-VariableValue -Variable { $gitCurrentBranch } -ExitIfNullOrEmpty
 Test-VariableValue -Variable { $gitCurrentBranchRoot } -ExitIfNullOrEmpty
 Test-VariableValue -Variable { $gitRepositoryName } -ExitIfNullOrEmpty
 Test-VariableValue -Variable { $gitRemoteUrl } -ExitIfNullOrEmpty
+
+if (-not [string]::IsNullOrWhiteSpace($NuGetGitHubPush))
+{
+    $GitHubSourceUri = "https://nuget.pkg.github.com/$GitHubPackagesUser/index.json"
+    Test-VariableValue -Variable { $GitHubSourceUri } -ExitIfNullOrEmpty
+}
 
 # Generate deployment info based on the current branch name
 $deploymentInfo = Convert-BranchToDeploymentInfo -BranchName "$gitCurrentBranch"
@@ -100,11 +112,62 @@ Update-ManifestPrerelease -ManifestPath "$($manifestFile.DirectoryName)" -NewPre
 Write-Host "===> Testing module manifest at: $($manifestFile.FullName)" -ForegroundColor Cyan
 Test-ModuleManifest -Path $($manifestFile.FullName)
 
-Publish-Module -Path $($manifestFile.DirectoryName) -Repository "$LocalPowershellGalleryName"
+$pushToPsGallery = $false
+$pushToGitHubSource = $false
+
+$pushToLocalSource = $true
 
 if ($remoteResourcesOk)
 {
+    $pushToPsGallery = $true
+}
+
+if ($remoteResourcesOk -and -not [string]::IsNullOrWhiteSpace($NuGetGitHubPush))
+{
+    $pushToGitHubSource = $true
+}
+
+# Deploy generated module packages to the appropriate destinations
+if ($pushToLocalSource -eq $true)
+{
+    Publish-Module -Path $($manifestFile.DirectoryName) -Repository "$LocalPowershellGalleryName"
+}
+
+if ($pushToPsGallery -eq $true)
+{
     Publish-Module -Path $($manifestFile.DirectoryName) -Repository "PSGallery" -NuGetApiKey "$PsGalleryApiKey"
+}
+
+if ($pushToGitHubSource -eq $true)
+{
+    $GitHubSourceRegistration = @{
+        Name                 = "$GitHubSourceName"
+        SourceLocation       = "$GitHubSourceUri"
+        PublishLocation      = "$GitHubSourceUri"
+        ScriptSourceLocation = "$GitHubSourceUri"
+        ScriptPublishLocation= "$GitHubSourceUri"
+        InstallationPolicy   = 'Trusted'
+    }
+
+    try
+    {
+        $ExistingGitHubSource = Get-PSRepository -Name "$GitHubSourceName" -ErrorAction SilentlyContinue
+        if ($null -ne $ExistingGitHubSource)
+        {
+            Unregister-PSRepository -Name "$GitHubSourceName" -ErrorAction Stop
+        }
+
+        Register-PSRepository @GitHubSourceRegistration -ErrorAction Stop | Out-Null
+        Publish-Module -Path $($manifestFile.DirectoryName) -Repository "$GitHubSourceName" -NuGetApiKey "$NuGetGitHubPush"
+    }
+    finally
+    {
+        $ExistingGitHubSource = Get-PSRepository -Name "$GitHubSourceName" -ErrorAction SilentlyContinue
+        if ($null -ne $ExistingGitHubSource)
+        {
+            Unregister-PSRepository -Name "$GitHubSourceName" -ErrorAction Stop
+        }
+    }
 }
 
 if ($remoteResourcesOk)

@@ -19,6 +19,7 @@
 ### [P2] High
 #### Bootstrap
 - Add low-overhead first-bootstrap-request proxy handling for the published GitHub `iwr ... | iex` entrypoints by explicitly using the discovered system proxy with default credentials when the URL is not bypassed, and review `README.md` plus both `iwr` bootstrapper scripts so home/private, corporate, and Windows Sandbox flows stay aligned.
+  Still open: `README.md` still publishes plain `iwr ... | iex` entrypoints, and both `iwr` bootstrapper scripts only set `DefaultWebProxy` after the bootstrap script has already been downloaded from `raw.githubusercontent.com`, which is too late to fix the initial fetch.
   Preserve this sample in the item details because it captures the intended first-request behavior and the environments the change needs to keep working in:
 
   ```powershell
@@ -31,14 +32,19 @@
   ```
 #### Release
 - Create the first proper GitHub Release so the project has a stable public release target for sharing and discovery.
+  Still open as of 2026-03-13: the public GitHub releases page still shows no releases, so tags alone are not enough to close this item.
 - Decide whether the public versioning signal should stay on `0.x` while the project is still evolving or move to `1.0` when it is solid enough for broader visibility.
+  Still open as of 2026-03-13: the public tags still signal `0.x`, but the todo does not yet record an explicit decision to stay on `0.x` or define the condition for moving to `1.0`.
 
 ### [P3] Normal
 #### Tooling
 - Add a managed .NET bootstrap path so the sandbox has the baseline local tooling needed for Codex-assisted build and repo tasks.
+  Still open: the current repo surface and `README.md` do not yet expose a managed .NET bootstrap command or documented .NET bootstrap path.
 - Add a managed Python bootstrap and cache flow so the sandbox has a common scripting baseline for Codex-assisted build and repo tasks.
+  Still open: the current repo surface and `README.md` do not yet expose a managed Python bootstrap or cache flow.
 #### Visual polish
 - Add one screenshot or short GIF that shows the sandbox result or expected terminal output for first-time visitors.
+  Still open: the current `README.md` does not yet include a screenshot or GIF reference.
 
 ### [P4] Low
 
