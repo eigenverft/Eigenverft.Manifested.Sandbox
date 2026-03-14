@@ -7,7 +7,7 @@ description: Verify a branch is fully synced, switch to mainline, refresh mainli
 
 ## Overview
 
-Use this skill when the goal is to bring the current non-main branch onto the repository's mainline branch. The skill verifies that the source branch is fully synced with its remote upstream first, switches to the detected mainline branch, refreshes mainline from remote again, and then merges the source branch into mainline locally. The default outcome is a local mainline merge result that can be reviewed and pushed afterward.
+Use this skill when the goal is to bring the current non-main branch onto the repository's mainline branch. The skill verifies that the source branch is fully synced with its remote upstream first, switches to the detected mainline branch, refreshes mainline from remote again, and then merges the source branch into mainline locally. When the merge is safely represented on mainline, the skill can also clean up the source branch locally and remotely. The default outcome is a local mainline merge result that can be reviewed and pushed afterward, with source-branch cleanup performed only when it is safe.
 
 ## When To Use
 
@@ -73,6 +73,15 @@ Use this skill when the goal is to bring the current non-main branch onto the re
 - Do not push mainline by default. The default endpoint of this skill is a local mainline merge result ready for review or a later explicit push.
 - If the user explicitly asks to push after the merge, only then perform a normal push and report the result.
 
+### 5. Source Branch Cleanup
+
+- Consider source-branch cleanup only after a successful merge and while currently checked out on the detected mainline branch.
+- Before deleting the source branch anywhere, verify that the source branch tip is fully contained in local mainline.
+- If the source tip is not contained in local mainline, stop and report that cleanup is unsafe.
+- If the source tip is contained in local mainline, delete the local source branch with a normal safe delete such as `git branch -d <source-branch>`.
+- If the source tip is contained in local mainline, remote cleanup is also allowed even when mainline has not been pushed yet. Delete the remote source branch with a normal delete such as `git push origin --delete <source-branch>`.
+- If the source branch was already fully contained in mainline before the merge step, the same cleanup rules still apply.
+
 ## Final Reporting
 
 - For a clean successful run, keep the summary short:
@@ -82,6 +91,8 @@ Use this skill when the goal is to bring the current non-main branch onto the re
   - whether mainline was refreshed from remote
   - resulting merge commit or "already up to date"
   - whether mainline is now ahead of remote locally
+  - whether the source branch was deleted locally
+  - whether the source branch was deleted remotely or intentionally left in place
 - Expand only when there are blockers, sync mismatches, conflicts, or the user asks for more detail.
 
 ## Execution Guardrails
@@ -91,4 +102,5 @@ Use this skill when the goal is to bring the current non-main branch onto the re
 - Do not promote a source branch that is not fully synced with its remote upstream.
 - Do not guess a merge strategy beyond the default local merge commit flow.
 - Do not auto-push mainline unless the user explicitly asks for it.
+- Do not delete the source branch from local or remote if the merge result is not safely present on local mainline first.
 - Do not suppress checkout, pull, or merge blockers; report them clearly.
