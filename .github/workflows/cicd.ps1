@@ -180,7 +180,7 @@ if ($pushToPsGallery -eq $true)
     Publish-Module -Path $($manifestFile.DirectoryName) -Repository "PSGallery" -NuGetApiKey "$PsGalleryApiKey"
 }
 
-$commitDatePrefix = Get-Date -Format 'yy-MM-dd'
+$commitDatePrefix = Get-Date -Format 'yyyy-MM-dd'
 
 if ($remoteResourcesOk)
 {
