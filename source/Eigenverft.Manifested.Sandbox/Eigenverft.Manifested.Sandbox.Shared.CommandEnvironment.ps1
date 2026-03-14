@@ -233,6 +233,13 @@ function Get-ManifestedCommandEnvironmentSpec {
                 $expectedCommandPaths['codex.cmd'] = $codexCommandPath
             }
         }
+        'Initialize-GHCliRuntime' {
+            if (-not [string]::IsNullOrWhiteSpace($executablePath)) {
+                $desiredCommandDirectory = Split-Path -Parent $executablePath
+                $expectedCommandPaths['gh'] = (Get-ManifestedFullPath -Path $executablePath)
+                $expectedCommandPaths['gh.exe'] = (Get-ManifestedFullPath -Path $executablePath)
+            }
+        }
         'Initialize-Ps7Runtime' {
             if (-not [string]::IsNullOrWhiteSpace($executablePath)) {
                 $desiredCommandDirectory = Split-Path -Parent $executablePath
