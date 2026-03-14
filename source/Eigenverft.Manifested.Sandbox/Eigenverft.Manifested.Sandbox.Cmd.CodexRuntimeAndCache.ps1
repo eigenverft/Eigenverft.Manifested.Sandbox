@@ -452,9 +452,9 @@ function Initialize-CodexRuntime {
         $plannedActions.Add('Repair-CodexRuntime') | Out-Null
     }
     if ($needsInstall) {
+        $plannedActions.Add('Initialize-VCRuntime') | Out-Null
         $nodePlanState = Get-NodeRuntimeState -LocalRoot $LocalRoot
         if ($nodePlanState.Status -ne 'Ready') {
-            $plannedActions.Add('Initialize-VCRuntime') | Out-Null
             $plannedActions.Add('Initialize-NodeRuntime') | Out-Null
         }
 
@@ -511,13 +511,13 @@ function Initialize-CodexRuntime {
             }
         }
 
+        $vcResult = Initialize-VCRuntime
+        if (@(@($vcResult.ActionTaken) | Where-Object { $_ -and $_ -ne 'None' }).Count -gt 0) {
+            $actionsTaken.Add('Initialize-VCRuntime') | Out-Null
+        }
+
         $nodeState = Get-NodeRuntimeState -LocalRoot $LocalRoot
         if ($nodeState.Status -ne 'Ready') {
-            $vcResult = Initialize-VCRuntime
-            if (@(@($vcResult.ActionTaken) | Where-Object { $_ -and $_ -ne 'None' }).Count -gt 0) {
-                $actionsTaken.Add('Initialize-VCRuntime') | Out-Null
-            }
-
             $nodeResult = Initialize-NodeRuntime
             if (@(@($nodeResult.ActionTaken) | Where-Object { $_ -and $_ -ne 'None' }).Count -gt 0) {
                 $actionsTaken.Add('Initialize-NodeRuntime') | Out-Null

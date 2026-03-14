@@ -136,7 +136,7 @@ Get-SandboxState
 
 Those commands also check for an already-usable `pwsh`, `git`, `code`, `node`, or `codex` that exists outside prior sandbox state. If a compatible runtime is already available on `PATH` or in a common install location, the command can treat it as ready and persist it as an external runtime instead of downloading or installing a new copy. If you explicitly use a refresh switch such as `-RefreshGit`, `-RefreshPs7`, `-RefreshVSCode`, `-RefreshNode`, or `-RefreshCodex`, the command will still acquire and install the sandbox-managed copy.
 
-`Initialize-CodexRuntime` installs `@openai/codex` into the sandbox-managed tool root and prefers that managed copy when refreshed. If no usable Node/npm is available yet, it first ensures the required Node runtime and, when necessary, the VC runtime prerequisite.
+`Initialize-CodexRuntime` installs `@openai/codex` into the sandbox-managed tool root and prefers that managed copy when refreshed. It always ensures the VC runtime prerequisite before install, and if no usable Node/npm is available yet it also ensures the required Node runtime first.
 
 `Initialize-VCRuntime` is different because the VC runtime is a machine/runtime prerequisite rather than a sandbox-managed portable tool.
 
