@@ -2,7 +2,7 @@
 
 [![PowerShell Gallery Version](https://img.shields.io/powershellgallery/v/Eigenverft.Manifested.Sandbox?label=PSGallery&logo=powershell)](https://www.powershellgallery.com/packages/Eigenverft.Manifested.Sandbox) [![PowerShell Gallery Downloads](https://img.shields.io/powershellgallery/dt/Eigenverft.Manifested.Sandbox?label=Downloads&logo=powershell)](https://www.powershellgallery.com/packages/Eigenverft.Manifested.Sandbox) [![PowerShell Support](https://img.shields.io/badge/PowerShell-5.1%2B%20Desktop%2FCore-5391FE?logo=powershell&logoColor=white)](source/Eigenverft.Manifested.Sandbox/Eigenverft.Manifested.Sandbox.psd1) [![Build Status](https://img.shields.io/github/actions/workflow/status/eigenverft/Eigenverft.Manifested.Sandbox/cicd.yml?branch=main&label=build)](https://github.com/eigenverft/Eigenverft.Manifested.Sandbox/actions/workflows/cicd.yml) [![License](https://img.shields.io/github/license/eigenverft/Eigenverft.Manifested.Sandbox?logo=mit)](LICENSE)
 
-Windows-focused PowerShell module and bootstrap flow for quickly bringing up a usable Windows Sandbox session, especially from a `.wsb` startup entrypoint. It can provision managed PowerShell 7, Node.js, MinGit, and Microsoft Visual C++ runtime prerequisites when you want them.
+Windows-focused PowerShell module and bootstrap flow for quickly bringing up a usable Windows Sandbox session, especially from a `.wsb` startup entrypoint. It can provision managed PowerShell 7, Node.js, MinGit, VS Code, Codex CLI, and Microsoft Visual C++ runtime prerequisites when you want them.
 
 The primary intent is fast, repeatable setup inside Windows Sandbox. The same bootstrap pattern can also run on a normal Windows machine, but that is a secondary use case rather than the main focus of this repo.
 
@@ -14,13 +14,7 @@ The problem is that a blank `.wsb` session still takes manual work to become use
 
 ## Host Requirements
 
-Windows Sandbox on the host requires:
-
-- Windows 10/11 `1903+`
-- Pro, Enterprise, Education, Pro Education, or SE
-- virtualization enabled
-- 4 GB RAM, 1 GB free disk, 2 CPU cores
-- the `Windows Sandbox` feature enabled
+Windows Sandbox on the host requires Windows 10/11 `1903+`, Pro/Enterprise/Education/Pro Education/SE, virtualization enabled, 4 GB RAM, 1 GB free disk, 2 CPU cores, and the `Windows Sandbox` feature enabled.
 
 ## Preview
 
@@ -64,7 +58,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "iwr -UseBasicParsing
 A generic version of the bootstrapper lets you specify which PowerShell Gallery modules to install and which command to invoke automatically, so it can be reused for projects beyond `Eigenverft.Manifested.Sandbox` and for repo-specific bootstrap flows that just need a clean handoff into PowerShell.
 
 ```powershell
-$c='Initialize-VCRuntime;Initialize-Ps7Runtime;Initialize-GitRuntime;Initialize-VSCodeRuntime;Initialize-NodeRuntime;Get-SandboxState';$i='PowerShellGet','PackageManagement','Eigenverft.Manifested.Sandbox';iwr -useb https://raw.githubusercontent.com/eigenverft/Eigenverft.Manifested.Sandbox/refs/heads/main/iwr/bootstrapper.sandbox.generic.ps1 | iex
+$c='Initialize-VCRuntime;Initialize-Ps7Runtime;Initialize-GitRuntime;Initialize-VSCodeRuntime;Initialize-NodeRuntime;Initialize-CodexRuntime;Get-SandboxState';$i='PowerShellGet','PackageManagement','Eigenverft.Manifested.Sandbox';iwr -useb https://raw.githubusercontent.com/eigenverft/Eigenverft.Manifested.Sandbox/refs/heads/main/iwr/bootstrapper.sandbox.generic.ps1 | iex
 ```
 
 To test another branch, replace `main` with the branch name in the URL.
@@ -109,7 +103,7 @@ If you want a ready-to-use Windows Sandbox entry file, save something like this 
   <!-- Auto-start: PowerShell startup -->
   <LogonCommand>
     <!-- Dev-friendly generic variant:
-         <Command>cmd /c start "" powershell.exe -NoExit -Command "$c='Get-SandboxVersion;Initialize-Ps7Runtime;Initialize-GitRuntime;Initialize-VSCodeRuntime;Initialize-NodeRuntime;Get-SandboxState';$i='PowerShellGet','PackageManagement','Eigenverft.Manifested.Sandbox';iwr -useb https://raw.githubusercontent.com/eigenverft/Eigenverft.Manifested.Sandbox/refs/heads/main/iwr/bootstrapper.sandbox.generic.ps1 | iex"</Command>
+         <Command>cmd /c start "" powershell.exe -NoExit -Command "$c='Get-SandboxVersion;Initialize-Ps7Runtime;Initialize-GitRuntime;Initialize-VSCodeRuntime;Initialize-NodeRuntime;Initialize-CodexRuntime;Get-SandboxState';$i='PowerShellGet','PackageManagement','Eigenverft.Manifested.Sandbox';iwr -useb https://raw.githubusercontent.com/eigenverft/Eigenverft.Manifested.Sandbox/refs/heads/main/iwr/bootstrapper.sandbox.generic.ps1 | iex"</Command>
     -->
     <Command>cmd /c start "" powershell.exe -NoExit -Command "iwr -useb https://raw.githubusercontent.com/eigenverft/Eigenverft.Manifested.Sandbox/refs/heads/main/iwr/bootstrapper.ps1 | iex"</Command>
   </LogonCommand>
@@ -131,15 +125,18 @@ Initialize-Ps7Runtime
 Initialize-GitRuntime
 Initialize-VSCodeRuntime
 Initialize-NodeRuntime
+Initialize-CodexRuntime
 Initialize-VCRuntime
 Get-SandboxState
 ```
 
 `Get-SandboxVersion` is the quick way to show the latest available installed module version on the system.
 
-`Initialize-Ps7Runtime`, `Initialize-GitRuntime`, `Initialize-VSCodeRuntime`, and `Initialize-NodeRuntime` are intended to run in a normal user session. They prefer sandbox-managed portable runtimes under `LocalAppData`, using GitHub as the download source for PowerShell 7 and MinGit and the official VS Code Windows ZIP archive with portable `data` mode for VS Code.
+`Initialize-Ps7Runtime`, `Initialize-GitRuntime`, `Initialize-VSCodeRuntime`, `Initialize-NodeRuntime`, and `Initialize-CodexRuntime` are intended to run in a normal user session. They prefer sandbox-managed portable runtimes under `LocalAppData`, using GitHub as the download source for PowerShell 7 and MinGit, the official VS Code Windows ZIP archive with portable `data` mode for VS Code, and an npm-based managed install for Codex.
 
-Those commands also check for an already-usable `pwsh`, `git`, `code`, or `node` that exists outside prior sandbox state. If a compatible runtime is already available on `PATH` or in a common install location, the command can treat it as ready and persist it as an external runtime instead of downloading a new copy. If you explicitly use a refresh switch such as `-RefreshGit`, `-RefreshPs7`, `-RefreshVSCode`, or `-RefreshNode`, the command will still acquire and install the sandbox-managed copy.
+Those commands also check for an already-usable `pwsh`, `git`, `code`, `node`, or `codex` that exists outside prior sandbox state. If a compatible runtime is already available on `PATH` or in a common install location, the command can treat it as ready and persist it as an external runtime instead of downloading or installing a new copy. If you explicitly use a refresh switch such as `-RefreshGit`, `-RefreshPs7`, `-RefreshVSCode`, `-RefreshNode`, or `-RefreshCodex`, the command will still acquire and install the sandbox-managed copy.
+
+`Initialize-CodexRuntime` installs `@openai/codex` into the sandbox-managed tool root and prefers that managed copy when refreshed. If no usable Node/npm is available yet, it first ensures the required Node runtime and, when necessary, the VC runtime prerequisite.
 
 `Initialize-VCRuntime` is different because the VC runtime is a machine/runtime prerequisite rather than a sandbox-managed portable tool.
 
