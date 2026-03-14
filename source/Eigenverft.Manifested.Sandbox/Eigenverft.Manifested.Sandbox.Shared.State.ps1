@@ -66,6 +66,7 @@ function Get-ManifestedRuntimeSnapshots {
     $definitions = @(
         @{ Name = 'NodeRuntime'; FunctionName = 'Get-NodeRuntimeState'; PathProperty = 'RuntimeHome' },
         @{ Name = 'CodexRuntime'; FunctionName = 'Get-CodexRuntimeState'; PathProperty = 'RuntimeHome' },
+        @{ Name = 'GHCliRuntime'; FunctionName = 'Get-GHCliRuntimeState'; PathProperty = 'RuntimeHome' },
         @{ Name = 'Ps7Runtime'; FunctionName = 'Get-Ps7RuntimeState'; PathProperty = 'RuntimeHome' },
         @{ Name = 'GitRuntime'; FunctionName = 'Get-GitRuntimeState'; PathProperty = 'RuntimeHome' },
         @{ Name = 'VSCodeRuntime'; FunctionName = 'Get-VSCodeRuntimeState'; PathProperty = 'RuntimeHome' },
@@ -222,6 +223,7 @@ function Save-ManifestedInvokeState {
                 Ps7CacheRoot       = $layout.Ps7CacheRoot
                 NodeCacheRoot      = $layout.NodeCacheRoot
                 CodexCacheRoot     = $layout.CodexCacheRoot
+                GHCliCacheRoot     = $layout.GHCliCacheRoot
                 GitCacheRoot       = $layout.GitCacheRoot
                 VsCodeCacheRoot    = $layout.VsCodeCacheRoot
                 VCRuntimeCacheRoot = $layout.VCRuntimeCacheRoot
@@ -229,6 +231,7 @@ function Save-ManifestedInvokeState {
                 Ps7ToolsRoot       = $layout.Ps7ToolsRoot
                 NodeToolsRoot      = $layout.NodeToolsRoot
                 CodexToolsRoot     = $layout.CodexToolsRoot
+                GHCliToolsRoot     = $layout.GHCliToolsRoot
                 GitToolsRoot       = $layout.GitToolsRoot
                 VsCodeToolsRoot    = $layout.VsCodeToolsRoot
                 StatePath          = $layout.StatePath

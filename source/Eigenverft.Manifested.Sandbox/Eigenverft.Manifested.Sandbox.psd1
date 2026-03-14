@@ -13,7 +13,7 @@
 RootModule = 'Eigenverft.Manifested.Sandbox.psm1'
 
 # Version number of this module.
-ModuleVersion = '1.20261.32738'
+ModuleVersion = '1.20261.32939'
 
 # Supported PSEditions
 CompatiblePSEditions = @('Desktop', 'Core')
@@ -74,6 +74,7 @@ FunctionsToExport = @(
     'Get-SandboxVersion',
     'Get-SandboxState',
     'Initialize-CodexRuntime',
+    'Initialize-GHCliRuntime',
     'Initialize-GitRuntime',
     'Initialize-NodeRuntime',
     'Initialize-Ps7Runtime',
@@ -109,6 +110,7 @@ FileList = @(
     'Eigenverft.Manifested.Sandbox.Cmd.Ps7RuntimeAndCache.ps1',
     'Eigenverft.Manifested.Sandbox.Cmd.NodeRuntimeAndCache.ps1',
     'Eigenverft.Manifested.Sandbox.Cmd.CodexRuntimeAndCache.ps1',
+    'Eigenverft.Manifested.Sandbox.Cmd.GHCliRuntimeAndCache.ps1',
     'Eigenverft.Manifested.Sandbox.Cmd.GitRuntimeAndCache.ps1',
     'Eigenverft.Manifested.Sandbox.Cmd.VsCodeRuntimeAndCache.ps1',
     'Eigenverft.Manifested.Sandbox.Cmd.VCRuntimeAndCache.ps1',
@@ -138,7 +140,7 @@ PrivateData = @{
         ReleaseNotes = 'Added portable VS Code runtime initialization alongside the sandbox-managed PowerShell 7, Node.js, MinGit, and VC runtime flows.'
 
         # Prerelease string of this module
-        Prerelease = ''
+        Prerelease = 'dev'
 
         # Flag to indicate whether the module requires explicit user acceptance for install/update/save
         # RequireLicenseAcceptance = $false
