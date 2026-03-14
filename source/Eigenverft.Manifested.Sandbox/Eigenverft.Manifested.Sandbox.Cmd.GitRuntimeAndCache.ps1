@@ -460,7 +460,7 @@ function Get-GitRuntimeState {
     if (Test-Path -LiteralPath $layout.GitCacheRoot) {
         $partialPaths += @(Get-ChildItem -LiteralPath $layout.GitCacheRoot -File -Filter '*.download' -ErrorAction SilentlyContinue | Select-Object -ExpandProperty FullName)
     }
-    $partialPaths += @(Get-ManifestedStageDirectories -RootPath $layout.ToolsRoot -Prefix 'git' | Select-Object -ExpandProperty FullName)
+    $partialPaths += @(Get-ManifestedStageDirectories -Prefix 'git' -Mode TemporaryShort -LegacyRootPaths @($layout.ToolsRoot) | Select-Object -ExpandProperty FullName)
 
     $installed = Get-InstalledGitRuntime -Flavor $Flavor -LocalRoot $layout.LocalRoot
     $managedRuntime = $installed.Current
@@ -658,22 +658,23 @@ function Install-GitRuntime {
         $layout = Get-ManifestedLayout -LocalRoot $LocalRoot
         New-ManifestedDirectory -Path (Split-Path -Parent $runtimeHome) | Out-Null
 
-        $stagePath = New-ManifestedStageDirectory -RootPath $layout.ToolsRoot -Prefix 'git'
+        $stageInfo = $null
         try {
-            Expand-Archive -LiteralPath $PackageInfo.Path -DestinationPath $stagePath -Force
-            $expandedRoot = Get-ManifestedExpandedArchiveRoot -StagePath $stagePath
+            $stageInfo = Expand-ManifestedArchiveToStage -PackagePath $PackageInfo.Path -Prefix 'git'
 
             if (Test-Path -LiteralPath $runtimeHome) {
                 Remove-Item -LiteralPath $runtimeHome -Recurse -Force
             }
 
             New-ManifestedDirectory -Path $runtimeHome | Out-Null
-            Get-ChildItem -LiteralPath $expandedRoot -Force | ForEach-Object {
+            Get-ChildItem -LiteralPath $stageInfo.ExpandedRoot -Force | ForEach-Object {
                 Move-Item -LiteralPath $_.FullName -Destination $runtimeHome -Force
             }
         }
         finally {
-            Remove-ManifestedPath -Path $stagePath | Out-Null
+            if ($stageInfo) {
+                Remove-ManifestedPath -Path $stageInfo.StagePath | Out-Null
+            }
         }
     }
 

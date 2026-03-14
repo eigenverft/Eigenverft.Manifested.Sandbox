@@ -377,7 +377,7 @@ function Get-NodeRuntimeState {
     if (Test-Path -LiteralPath $layout.NodeCacheRoot) {
         $partialPaths += @(Get-ChildItem -LiteralPath $layout.NodeCacheRoot -File -Filter '*.download' -ErrorAction SilentlyContinue | Select-Object -ExpandProperty FullName)
     }
-    $partialPaths += @(Get-ManifestedStageDirectories -RootPath $layout.ToolsRoot -Prefix 'node' | Select-Object -ExpandProperty FullName)
+    $partialPaths += @(Get-ManifestedStageDirectories -Prefix 'node' -Mode TemporaryShort -LegacyRootPaths @($layout.ToolsRoot) | Select-Object -ExpandProperty FullName)
 
     $installed = Get-InstalledNodeRuntime -Flavor $Flavor -LocalRoot $layout.LocalRoot
     $managedRuntime = $installed.Current
@@ -570,12 +570,10 @@ function Install-NodeRuntime {
         $layout = Get-ManifestedLayout -LocalRoot $LocalRoot
         New-ManifestedDirectory -Path (Split-Path -Parent $nodeHome) | Out-Null
 
-        $stagePath = New-ManifestedStageDirectory -RootPath $layout.ToolsRoot -Prefix 'node'
+        $stageInfo = $null
         try {
-            Expand-Archive -LiteralPath $PackageInfo.Path -DestinationPath $stagePath -Force
-
-            $expandedRoot = Get-ChildItem -LiteralPath $stagePath -Directory | Select-Object -First 1
-            if (-not $expandedRoot) {
+            $stageInfo = Expand-ManifestedArchiveToStage -PackagePath $PackageInfo.Path -Prefix 'node'
+            if (-not (Test-Path -LiteralPath $stageInfo.ExpandedRoot)) {
                 throw 'The Node.js ZIP did not extract as expected.'
             }
 
@@ -584,12 +582,14 @@ function Install-NodeRuntime {
             }
 
             New-ManifestedDirectory -Path $nodeHome | Out-Null
-            Get-ChildItem -LiteralPath $expandedRoot.FullName -Force | ForEach-Object {
+            Get-ChildItem -LiteralPath $stageInfo.ExpandedRoot -Force | ForEach-Object {
                 Move-Item -LiteralPath $_.FullName -Destination $nodeHome -Force
             }
         }
         finally {
-            Remove-ManifestedPath -Path $stagePath | Out-Null
+            if ($stageInfo) {
+                Remove-ManifestedPath -Path $stageInfo.StagePath | Out-Null
+            }
         }
     }
 

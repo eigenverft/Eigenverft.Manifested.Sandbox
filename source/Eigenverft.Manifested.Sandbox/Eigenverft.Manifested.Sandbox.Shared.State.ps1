@@ -65,6 +65,7 @@ function Get-ManifestedRuntimeSnapshots {
     $layout = Get-ManifestedLayout -LocalRoot $LocalRoot
     $definitions = @(
         @{ Name = 'NodeRuntime'; FunctionName = 'Get-NodeRuntimeState'; PathProperty = 'RuntimeHome' },
+        @{ Name = 'CodexRuntime'; FunctionName = 'Get-CodexRuntimeState'; PathProperty = 'RuntimeHome' },
         @{ Name = 'Ps7Runtime'; FunctionName = 'Get-Ps7RuntimeState'; PathProperty = 'RuntimeHome' },
         @{ Name = 'GitRuntime'; FunctionName = 'Get-GitRuntimeState'; PathProperty = 'RuntimeHome' },
         @{ Name = 'VSCodeRuntime'; FunctionName = 'Get-VSCodeRuntimeState'; PathProperty = 'RuntimeHome' },
@@ -220,12 +221,14 @@ function Save-ManifestedInvokeState {
                 CacheRoot          = $layout.CacheRoot
                 Ps7CacheRoot       = $layout.Ps7CacheRoot
                 NodeCacheRoot      = $layout.NodeCacheRoot
+                CodexCacheRoot     = $layout.CodexCacheRoot
                 GitCacheRoot       = $layout.GitCacheRoot
                 VsCodeCacheRoot    = $layout.VsCodeCacheRoot
                 VCRuntimeCacheRoot = $layout.VCRuntimeCacheRoot
                 ToolsRoot          = $layout.ToolsRoot
                 Ps7ToolsRoot       = $layout.Ps7ToolsRoot
                 NodeToolsRoot      = $layout.NodeToolsRoot
+                CodexToolsRoot     = $layout.CodexToolsRoot
                 GitToolsRoot       = $layout.GitToolsRoot
                 VsCodeToolsRoot    = $layout.VsCodeToolsRoot
                 StatePath          = $layout.StatePath

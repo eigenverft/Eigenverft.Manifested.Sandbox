@@ -12,24 +12,6 @@ function Get-ManifestedDownloadPath {
     return ($TargetPath + '.download')
 }
 
-function Get-ManifestedStageDirectories {
-    [CmdletBinding()]
-    param(
-        [Parameter(Mandatory = $true)]
-        [string]$RootPath,
-
-        [Parameter(Mandatory = $true)]
-        [string]$Prefix
-    )
-
-    if (-not (Test-Path -LiteralPath $RootPath)) {
-        return @()
-    }
-
-    $pattern = '_stage_{0}_*' -f $Prefix
-    return @(Get-ChildItem -LiteralPath $RootPath -Directory -ErrorAction SilentlyContinue | Where-Object { $_.Name -like $pattern })
-}
-
 function Get-ManifestedExpandedArchiveRoot {
     [CmdletBinding()]
     param(

@@ -212,6 +212,27 @@ function Get-ManifestedCommandEnvironmentSpec {
                 $expectedCommandPaths['npm.cmd'] = (Get-ManifestedFullPath -Path (Join-Path $runtimeHome 'npm.cmd'))
             }
         }
+        'Initialize-CodexRuntime' {
+            if (-not [string]::IsNullOrWhiteSpace($runtimeHome)) {
+                $desiredCommandDirectory = $runtimeHome
+            }
+            elseif (-not [string]::IsNullOrWhiteSpace($executablePath)) {
+                $desiredCommandDirectory = Split-Path -Parent $executablePath
+            }
+
+            $codexCommandPath = $null
+            if (-not [string]::IsNullOrWhiteSpace($executablePath)) {
+                $codexCommandPath = (Get-ManifestedFullPath -Path $executablePath)
+            }
+            elseif (-not [string]::IsNullOrWhiteSpace($runtimeHome)) {
+                $codexCommandPath = (Get-ManifestedFullPath -Path (Join-Path $runtimeHome 'codex.cmd'))
+            }
+
+            if (-not [string]::IsNullOrWhiteSpace($codexCommandPath)) {
+                $expectedCommandPaths['codex'] = $codexCommandPath
+                $expectedCommandPaths['codex.cmd'] = $codexCommandPath
+            }
+        }
         'Initialize-Ps7Runtime' {
             if (-not [string]::IsNullOrWhiteSpace($executablePath)) {
                 $desiredCommandDirectory = Split-Path -Parent $executablePath

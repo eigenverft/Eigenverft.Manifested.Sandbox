@@ -142,32 +142,23 @@ function Get-ManifestedLayout {
         CacheRoot          = $cacheRoot
         Ps7CacheRoot       = (Join-Path $cacheRoot 'powershell')
         NodeCacheRoot      = (Join-Path $cacheRoot 'node')
+        CodexCacheRoot     = (Join-Path $cacheRoot 'codex')
         GitCacheRoot       = (Join-Path $cacheRoot 'git')
         VsCodeCacheRoot    = (Join-Path $cacheRoot 'vscode')
         VCRuntimeCacheRoot = (Join-Path $cacheRoot 'vc-runtime')
         ToolsRoot          = $toolsRoot
         Ps7ToolsRoot       = (Join-Path $toolsRoot 'powershell')
         NodeToolsRoot      = (Join-Path $toolsRoot 'node')
+        CodexToolsRoot     = (Join-Path $toolsRoot 'codex')
         GitToolsRoot       = (Join-Path $toolsRoot 'git')
         VsCodeToolsRoot    = (Join-Path $toolsRoot 'vscode')
         StatePath          = (Join-Path $resolvedRoot 'state.json')
     }
 }
 
-function New-ManifestedStageDirectory {
+function Get-ManifestedTemporaryRoot {
     [CmdletBinding()]
-    param(
-        [Parameter(Mandatory = $true)]
-        [string]$RootPath,
+    param()
 
-        [Parameter(Mandatory = $true)]
-        [string]$Prefix
-    )
-
-    New-ManifestedDirectory -Path $RootPath | Out-Null
-
-    $stagePath = Join-Path $RootPath ('_stage_{0}_{1}' -f $Prefix, [Guid]::NewGuid().ToString('N'))
-    New-ManifestedDirectory -Path $stagePath | Out-Null
-
-    return $stagePath
+    return ([System.IO.Path]::GetFullPath([System.IO.Path]::Combine([System.IO.Path]::GetTempPath(), 'evf', 'stg')))
 }
