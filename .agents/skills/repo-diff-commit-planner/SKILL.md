@@ -117,18 +117,27 @@ Use this skill to inspect current repository differences, decide how to group th
 - State whether push succeeded or failed.
 - If anything remains tracked and modified or staged at the end, explain exactly why it was not committed and whether that came from an explicit user instruction or a blocking constraint.
 - If ignored local-only files remain, mention them only when they are relevant to explain an untrack action or a policy conflict.
+- Prefer a short close-out when the run is clean: brief repository summary, compact list of created commits, push result, and any truly relevant leftover note.
+- Expand to the fuller report structure only when there are deferred items, blockers, non-obvious grouping decisions, risky files, sync problems, or a failed push.
 
 ## Output Format
 
 Keep the final report concise by default. Compress file-by-file detail unless it is needed to explain grouping or a deferred risk.
 
-Provide results using this structure:
+For clean runs, prefer a compact format such as:
+
+- short repository change summary
+- compact execution results like `<hash> [YYYY-MM-DD] <subject>`
+- push result
+- deferred items only if any remain
+
+Use the fuller structure below only when the run is not clean or when the user explicitly asks for more detail:
 
 1. Repository change summary
 2. Commit readiness table (`commit-now` / `hold` / `needs-review`)
 3. Proposed commit groups with short rationale
 4. Ordered commit plan
-5. Draft commit messages (subject and optional body when needed)
+5. Draft commit messages when they add value
 6. Execution result per committed group
 7. Push result
 8. Deferred items and assumptions
@@ -139,10 +148,12 @@ Prefer:
 - compact execution results like `<hash> [YYYY-MM-DD] <subject>`
 - compact push result like `push succeeded` or `push failed: non-fast-forward`
 - brief deferred-item notes
+- omit sections such as draft messages or readiness tables when they add no signal in a clean run
 
 Only expand beyond that when:
 - a group boundary is non-obvious
 - a risky file is being held back
+- the run was blocked or partially complete
 - the user explicitly asks for a detailed breakdown
 
 ## Execution Guardrails
