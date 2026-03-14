@@ -13,7 +13,7 @@
 RootModule = 'Eigenverft.Manifested.Sandbox.psm1'
 
 # Version number of this module.
-ModuleVersion = '1.20261.32939'
+ModuleVersion = '1.20261.32942'
 
 # Supported PSEditions
 CompatiblePSEditions = @('Desktop', 'Core')
@@ -140,7 +140,7 @@ PrivateData = @{
         ReleaseNotes = 'Added portable VS Code runtime initialization alongside the sandbox-managed PowerShell 7, Node.js, MinGit, and VC runtime flows.'
 
         # Prerelease string of this module
-        Prerelease = 'dev'
+        Prerelease = ''
 
         # Flag to indicate whether the module requires explicit user acceptance for install/update/save
         # RequireLicenseAcceptance = $false
