@@ -18,18 +18,6 @@
 
 ### [P2] High
 #### Bootstrap
-- Add low-overhead first-bootstrap-request proxy handling for the published GitHub `iwr ... | iex` entrypoints by explicitly using the discovered system proxy with default credentials when the URL is not bypassed, and review `README.md` plus both `iwr` bootstrapper scripts so home/private, corporate, and Windows Sandbox flows stay aligned.
-  Still open: `README.md` still publishes plain `iwr ... | iex` entrypoints, and both `iwr` bootstrapper scripts only set `DefaultWebProxy` after the bootstrap script has already been downloaded from `raw.githubusercontent.com`, which is too late to fix the initial fetch.
-  Preserve this sample in the item details because it captures the intended first-request behavior and the environments the change needs to keep working in:
-
-  ```powershell
-  # Explicitly use the discovered system proxy with default credentials for the first bootstrap
-  # request. This avoids initial Invoke-WebRequest failures in corporate environments,
-  # especially inside Windows Sandbox, where proxy auth is not always applied automatically.
-  # Typically works on home/private clients and sandboxes, normal corporate clients, and
-  # corporate sandboxes when the proxy is discoverable and accepts DefaultCredentials.
-  $u='https://raw.githubusercontent.com/eigenverft/Eigenverft.Manifested.Sandbox/refs/heads/main/iwr/bootstrapper.ps1';try{[Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12}catch{};$p=[System.Net.WebRequest]::GetSystemWebProxy();if(-not $p.IsBypassed($u)){iwr $u -Proxy ($p.GetProxy($u).AbsoluteUri) -ProxyUseDefaultCredentials -UseBasicParsing|iex}else{iwr $u -UseBasicParsing|iex}
-  ```
 #### Release
 
 ### [P3] Normal
@@ -51,6 +39,7 @@
 - Decide which Python version should be pinned for the Codex-oriented sandbox baseline.
 
 ## Closed
+- [P2] Bootstrap - 2026-03-17: Added low-overhead first-bootstrap-request proxy handling for the published GitHub `iwr ... | iex` entrypoints by explicitly using the discovered system proxy with default credentials when the URL is not bypassed. Updated `README.md` and both `iwr` bootstrapper script comments.
 - [P3] Visual polish - 2026-03-13: Added a README screenshot that shows the Windows Sandbox result and expected terminal output for first-time visitors.
 - [P2] Release - 2026-03-13: Created the first proper GitHub Release so the project now has a stable public release target for sharing and discovery.
 - [P2] Release - 2026-03-13: Moved the public versioning signal from `0.x` to `1.x`, including published tag and manifest version `1.20261.31334`.
