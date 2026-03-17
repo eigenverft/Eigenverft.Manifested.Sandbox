@@ -55,6 +55,8 @@ Admin rights are not required for the bootstrap or module install path. Later ru
 
 ### ▶️ Run It
 
+> 💡 **Why is this command so long?** It includes a built-in proxy handshake. In heavily managed corporate environments, basic downloads often fail. This one-liner explicitly checks for and dynamically authenticates through your system's proxy with default network credentials before downloading the bootstrap script.
+
 From Windows PowerShell 5.1:
 
 ```powershell
