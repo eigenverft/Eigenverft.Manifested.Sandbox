@@ -18,7 +18,7 @@ function Write-StandardMessage {
     $gate=$sevMap[$min];if($null -eq $gate){$min='INF';$gate=$sevMap['INF']}
     if($sev -ge 4 -and $sev -lt $gate -and $gate -ge 4){$lvl=$min;$sev=$gate}
     if($sev -lt $gate){return}
-    $ts=[DateTime]::UtcNow.ToString('yy-MM-dd HH:mm:ss.ff')
+    $ts=[DateTime]::UtcNow.ToString('yy-MM-dd HH:mm:ss')
     $stack=Get-PSCallStack ; $helperName=$MyInvocation.MyCommand.Name ; $helperScript=$MyInvocation.MyCommand.ScriptBlock.File ; $caller=$null
     if($stack){
         # 1: prefer first non-underscore function not defined in the helper's own file
@@ -66,7 +66,8 @@ function Write-StandardMessage {
     $file=if($caller.ScriptName){Split-Path -Leaf $caller.ScriptName}else{'cmd'}
     if($file -ne 'console' -and $lineNumber){$file="{0}:{1}" -f $file,$lineNumber}
     $prefix="[$ts "
-    $suffix="] [$file] $Message"
+    #$suffix="] [$file] $Message"
+    $suffix="] $Message"
     $cfg=@{TRC=@{Fore='DarkGray';Back=$null};DBG=@{Fore='Cyan';Back=$null};INF=@{Fore='Green';Back=$null};WRN=@{Fore='Yellow';Back=$null};ERR=@{Fore='Red';Back=$null};FTL=@{Fore='Red';Back='DarkRed'}}[$lvl]
     $fore=$cfg.Fore
     $back=$cfg.Back
@@ -262,6 +263,50 @@ function Invoke-WebRequestEx {
         [Parameter()]
         [switch]$UseStreamingDownload
     )
+
+    function _UriDisplayShortener {
+        param(
+            [Parameter(Mandatory = $true)]
+            [uri]$TargetUri
+        )
+
+        $originalText = [string]$TargetUri
+        if ([string]::IsNullOrWhiteSpace($originalText)) {
+            return $originalText
+        }
+
+        try {
+            $authority = $TargetUri.GetLeftPart([System.UriPartial]::Authority)
+            $absolutePath = $TargetUri.AbsolutePath
+
+            $querySuffix = if (-not [string]::IsNullOrEmpty($TargetUri.Query)) { '?...' } else { '' }
+            $fragmentSuffix = if (-not [string]::IsNullOrEmpty($TargetUri.Fragment)) { '#...' } else { '' }
+
+            if ([string]::IsNullOrEmpty($absolutePath) -or $absolutePath -eq '/') {
+                return ($authority + '/' + $querySuffix + $fragmentSuffix)
+            }
+
+            $segments = @($absolutePath -split '/' | Where-Object { $_ -ne '' })
+
+            if ($segments.Count -le 1) {
+                return ($authority + $absolutePath + $querySuffix + $fragmentSuffix)
+            }
+
+            if ($segments.Count -eq 2) {
+                return ($authority + '/' + $segments[0] + '/' + $segments[1] + $querySuffix + $fragmentSuffix)
+            }
+
+            if ($absolutePath.EndsWith('/')) {
+                return ($authority + '/..../' + $querySuffix + $fragmentSuffix)
+            }
+
+            $lastSegment = $segments[$segments.Count - 1]
+            return ($authority + '/..../' + $lastSegment + $querySuffix + $fragmentSuffix)
+        }
+        catch {
+            return $originalText
+        }
+    }
 
     function _GetResponseFromErrorRecord {
         param(
@@ -471,13 +516,15 @@ function Invoke-WebRequestEx {
         }
 
         return [pscustomobject]@{
-            IsIntranetLike   = ($signals.Count -gt 0)
-            Signals          = @($signals.ToArray())
+            IsIntranetLike    = ($signals.Count -gt 0)
+            Signals           = @($signals.ToArray())
             ResolvedAddresses = @($resolvedAddresses.ToArray())
         }
     }
 
-    Write-StandardMessage -Message ("[STATUS] Initializing Invoke-WebRequestEx for '{0}'." -f $Uri) -Level INF
+    $uriDisplay = _UriDisplayShortener -TargetUri $Uri
+
+    Write-StandardMessage -Message ("[STATUS] Initializing Invoke-WebRequestEx for '{0}'." -f $uriDisplay) -Level INF
 
     $effectiveMethod = if ($PSBoundParameters.ContainsKey('Method') -and $null -ne $Method) {
         $Method.ToString().ToUpperInvariant()
@@ -570,22 +617,22 @@ function Invoke-WebRequestEx {
                 if ($null -ne $proxyUri -and $proxyUri.AbsoluteUri -ne $Uri.AbsoluteUri) {
                     $callParams['Proxy'] = $proxyUri
                     $callParams['ProxyUseDefaultCredentials'] = $true
-                    Write-StandardMessage -Message ("[STATUS] Using auto-discovered proxy '{0}' for '{1}'." -f $proxyUri.AbsoluteUri, $Uri) -Level INF
+                    Write-StandardMessage -Message ("[STATUS] Using auto-discovered proxy '{0}' for '{1}'." -f $proxyUri.AbsoluteUri, $uriDisplay) -Level INF
                 }
                 else {
-                    Write-StandardMessage -Message ("[STATUS] System proxy configuration resolved no distinct proxy for '{0}'." -f $Uri) -Level INF
+                    Write-StandardMessage -Message ("[STATUS] System proxy configuration resolved no distinct proxy for '{0}'." -f $uriDisplay) -Level INF
                 }
             }
             else {
-                Write-StandardMessage -Message ("[STATUS] System proxy bypass is active for '{0}'." -f $Uri) -Level INF
+                Write-StandardMessage -Message ("[STATUS] System proxy bypass is active for '{0}'." -f $uriDisplay) -Level INF
             }
         }
         catch {
-            Write-StandardMessage -Message ("[WRN] Failed to auto-discover proxy for '{0}': {1}" -f $Uri, $_.Exception.Message) -Level WRN
+            Write-StandardMessage -Message ("[WRN] Failed to auto-discover proxy for '{0}': {1}" -f $uriDisplay, $_.Exception.Message) -Level WRN
         }
     }
     else {
-        Write-StandardMessage -Message ("[STATUS] Caller supplied proxy-related parameters for '{0}'. Auto-discovery is skipped." -f $Uri) -Level INF
+        Write-StandardMessage -Message ("[STATUS] Caller supplied proxy-related parameters for '{0}'. Auto-discovery is skipped." -f $uriDisplay) -Level INF
     }
 
     # --- Decide whether the streaming download engine can be used safely ---
@@ -636,7 +683,7 @@ function Invoke-WebRequestEx {
         }
         elseif ($UseStreamingDownload) {
             Write-StandardMessage -Message (
-                "[WRN] Streaming download was requested, but the current parameter combination is not safely compatible. Falling back to native Invoke-WebRequest for '{0}'." -f $Uri
+                "[WRN] Streaming download was requested, but the current parameter combination is not safely compatible. Falling back to native Invoke-WebRequest for '{0}'." -f $uriDisplay
             ) -Level WRN
         }
     }
@@ -645,15 +692,15 @@ function Invoke-WebRequestEx {
         $useStreamingEngine = $false
         Write-StandardMessage -Message (
             "[STATUS] PowerShell {0} will pass -SkipCertificateCheck directly to native Invoke-WebRequest. Streaming path is disabled for '{1}'." -f
-            $PSVersionTable.PSVersion, $Uri
+            $PSVersionTable.PSVersion, $uriDisplay
         ) -Level INF
     }
 
     if ($useStreamingEngine) {
-        Write-StandardMessage -Message ("[STATUS] Using the streaming download path for '{0}'." -f $Uri) -Level INF
+        Write-StandardMessage -Message ("[STATUS] Using the streaming download path for '{0}'." -f $uriDisplay) -Level INF
     }
     else {
-        Write-StandardMessage -Message ("[STATUS] Using the native Invoke-WebRequest path for '{0}'." -f $Uri) -Level INF
+        Write-StandardMessage -Message ("[STATUS] Using the native Invoke-WebRequest path for '{0}'." -f $uriDisplay) -Level INF
     }
 
     # --- Certificate validation bypass for PS 5.1 (.NET Framework) ---
@@ -662,7 +709,7 @@ function Invoke-WebRequestEx {
 
     try {
         if ($SkipCertificateCheck -and -not $nativeSupportsSkipCertificateCheck) {
-            Write-StandardMessage -Message ("[STATUS] Enabling temporary certificate validation bypass for '{0}'." -f $Uri) -Level INF
+            Write-StandardMessage -Message ("[STATUS] Enabling temporary certificate validation bypass for '{0}'." -f $uriDisplay) -Level INF
 
             if (-not ('CertificateValidationHelper' -as [type])) {
                 Add-Type -TypeDefinition @'
@@ -722,7 +769,7 @@ public static class CertificateValidationHelper
 
             if ($attemptIndex -gt 1) {
                 Write-StandardMessage -Message (
-                    "[STATUS] Starting attempt {0} of {1} for {2} {3}." -f $attemptIndex, $RetryCount, $effectiveMethod, $Uri
+                    "[STATUS] Starting attempt {0} of {1} for {2} {3}." -f $attemptIndex, $RetryCount, $effectiveMethod, $uriDisplay
                 ) -Level INF
             }
 
@@ -737,7 +784,7 @@ public static class CertificateValidationHelper
                         try {
                             $request = [System.Net.HttpWebRequest][System.Net.WebRequest]::Create($Uri)
                             if ($null -eq $request) {
-                                throw ("Failed to create HttpWebRequest for '{0}'." -f $Uri)
+                                throw ("Failed to create HttpWebRequest for '{0}'." -f $uriDisplay)
                             }
 
                             $request.Method = 'GET'
@@ -847,13 +894,13 @@ public static class CertificateValidationHelper
                                 }
                             }
 
-                            Write-StandardMessage -Message ("[STATUS] Sending streaming GET request to '{0}'." -f $Uri) -Level INF
+                            Write-StandardMessage -Message ("[STATUS] Sending streaming GET request to '{0}'." -f $uriDisplay) -Level INF
 
                             $response = [System.Net.HttpWebResponse]$request.GetResponse()
                             $responseStream = $response.GetResponseStream()
 
                             if ($null -eq $responseStream) {
-                                throw ("The remote server returned an empty response stream for '{0}'." -f $Uri)
+                                throw ("The remote server returned an empty response stream for '{0}'." -f $uriDisplay)
                             }
 
                             $fileStream = [System.IO.File]::Open(
@@ -866,6 +913,8 @@ public static class CertificateValidationHelper
                             $buffer = New-Object byte[] $BufferSizeBytes
                             $totalBytes = 0L
                             $contentLength = [long]$response.ContentLength
+                            $displayThresholdBytes = 1048576L
+                            $useMegabyteDisplay = $contentLength -gt $displayThresholdBytes
 
                             if ($contentLength -gt 0) {
                                 $progressThresholdBytes = [long][Math]::Floor($contentLength * ($ProgressIntervalPercent / 100.0))
@@ -899,16 +948,27 @@ public static class CertificateValidationHelper
                                             $percent = 100
                                         }
 
-                                        Write-StandardMessage -Message (
-                                            "[PROGRESS] Downloaded {0} of {1} bytes ({2} percent) for '{3}'." -f
-                                            $totalBytes, $contentLength, $percent, $Uri
-                                        ) -Level INF
+                                        if ($useMegabyteDisplay) {
+                                            $downloadedMb = [Math]::Round($totalBytes / 1048576.0, 1)
+                                            $contentLengthMb = [Math]::Round($contentLength / 1048576.0, 1)
+
+                                            Write-StandardMessage -Message (
+                                                "[PROGRESS] Downloaded {0} MB of {1} MB ({2} percent) for '{3}'." -f
+                                                $downloadedMb, $contentLengthMb, $percent, $uriDisplay
+                                            ) -Level INF
+                                        }
+                                        else {
+                                            Write-StandardMessage -Message (
+                                                "[PROGRESS] Downloaded {0} of {1} bytes ({2} percent) for '{3}'." -f
+                                                $totalBytes, $contentLength, $percent, $uriDisplay
+                                            ) -Level INF
+                                        }
                                     }
                                     else {
                                         $megaBytes = [Math]::Round($totalBytes / 1048576.0, 1)
                                         Write-StandardMessage -Message (
                                             "[PROGRESS] Downloaded approximately {0} MB from '{1}'." -f
-                                            $megaBytes, $Uri
+                                            $megaBytes, $uriDisplay
                                         ) -Level INF
                                     }
 
@@ -917,22 +977,33 @@ public static class CertificateValidationHelper
                             }
 
                             if ($contentLength -gt 0) {
-                                Write-StandardMessage -Message (
-                                    "[PROGRESS] Downloaded {0} of {1} bytes (100 percent) for '{2}'." -f
-                                    $totalBytes, $contentLength, $Uri
-                                ) -Level INF
+                                if ($useMegabyteDisplay) {
+                                    $totalMb = [Math]::Round($totalBytes / 1048576.0, 1)
+                                    $contentLengthMb = [Math]::Round($contentLength / 1048576.0, 1)
+
+                                    Write-StandardMessage -Message (
+                                        "[PROGRESS] Downloaded {0} MB of {1} MB (100 percent) for '{2}'." -f
+                                        $totalMb, $contentLengthMb, $uriDisplay
+                                    ) -Level INF
+                                }
+                                else {
+                                    Write-StandardMessage -Message (
+                                        "[PROGRESS] Downloaded {0} of {1} bytes (100 percent) for '{2}'." -f
+                                        $totalBytes, $contentLength, $uriDisplay
+                                    ) -Level INF
+                                }
                             }
                             else {
                                 $finalMb = [Math]::Round($totalBytes / 1048576.0, 1)
                                 Write-StandardMessage -Message (
                                     "[PROGRESS] Download complete, total {0} MB from '{1}'." -f
-                                    $finalMb, $Uri
+                                    $finalMb, $uriDisplay
                                 ) -Level INF
                             }
 
                             Write-StandardMessage -Message (
                                 "[OK] Downloaded {0} bytes from '{1}' to '{2}' on attempt {3} of {4}." -f
-                                $totalBytes, $Uri, $OutFile, $attemptIndex, $RetryCount
+                                $totalBytes, $uriDisplay, $OutFile, $attemptIndex, $RetryCount
                             ) -Level INF
 
                             return
@@ -956,7 +1027,7 @@ public static class CertificateValidationHelper
 
                         Write-StandardMessage -Message (
                             "[OK] Request completed successfully on attempt {0} of {1} for {2} {3}." -f
-                            $attemptIndex, $RetryCount, $effectiveMethod, $Uri
+                            $attemptIndex, $RetryCount, $effectiveMethod, $uriDisplay
                         ) -Level INF
 
                         return $result
@@ -980,7 +1051,7 @@ public static class CertificateValidationHelper
                         if ($autoUseDefaultCredentialsGuardInfo.IsIntranetLike) {
                             Write-StandardMessage -Message (
                                 "[STATUS] Automatic default-credentials guard passed for '{0}'. Signal(s): {1}" -f
-                                $Uri, ($autoUseDefaultCredentialsGuardInfo.Signals -join '; ')
+                                $uriDisplay, ($autoUseDefaultCredentialsGuardInfo.Signals -join '; ')
                             ) -Level INF
                         }
                         else {
@@ -993,7 +1064,7 @@ public static class CertificateValidationHelper
 
                             Write-StandardMessage -Message (
                                 "[STATUS] Automatic default-credentials guard blocked upgrade for '{0}'. No intranet-like signals were found. Resolved address(es): {1}" -f
-                                $Uri, $resolvedAddressText
+                                $uriDisplay, $resolvedAddressText
                             ) -Level INF
                         }
                     }
@@ -1013,7 +1084,7 @@ public static class CertificateValidationHelper
 
                         Write-StandardMessage -Message (
                             "[STATUS] Received 401 with WWW-Authenticate challenge for '{0}'. Retrying the current attempt with default credentials. Challenge(s): {1}" -f
-                            $Uri, ($wwwAuthenticateValues -join ', ')
+                            $uriDisplay, ($wwwAuthenticateValues -join ', ')
                         ) -Level WRN
 
                         continue
@@ -1031,13 +1102,13 @@ public static class CertificateValidationHelper
                         if ($retryBudgetExpired) {
                             Write-StandardMessage -Message (
                                 "[ERR] Retry budget expired after {0} ms while processing {1} {2}: {3}" -f
-                                $retryStopwatch.ElapsedMilliseconds, $effectiveMethod, $Uri, $_.Exception.Message
+                                $retryStopwatch.ElapsedMilliseconds, $effectiveMethod, $uriDisplay, $_.Exception.Message
                             ) -Level ERR
                         }
                         else {
                             Write-StandardMessage -Message (
                                 "[ERR] Attempt {0} of {1} failed and no retries remain for {2} {3}: {4}" -f
-                                $attemptIndex, $RetryCount, $effectiveMethod, $Uri, $_.Exception.Message
+                                $attemptIndex, $RetryCount, $effectiveMethod, $uriDisplay, $_.Exception.Message
                             ) -Level ERR
                         }
 
@@ -1055,7 +1126,7 @@ public static class CertificateValidationHelper
 
                     Write-StandardMessage -Message (
                         "[RETRY] Attempt {0} of {1} failed for {2} {3}: {4}. Retrying in {5} ms." -f
-                        $attemptIndex, $RetryCount, $effectiveMethod, $Uri, $_.Exception.Message, $sleepMilliseconds
+                        $attemptIndex, $RetryCount, $effectiveMethod, $uriDisplay, $_.Exception.Message, $sleepMilliseconds
                     ) -Level WRN
 
                     if ($sleepMilliseconds -gt 0) {
