@@ -1,4 +1,3 @@
-please just confirm with i have read and understand.
 function Write-StandardMessage {
     [Diagnostics.CodeAnalysis.SuppressMessage("PSUseApprovedVerbs","")]
     param(
