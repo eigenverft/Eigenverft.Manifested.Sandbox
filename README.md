@@ -48,7 +48,7 @@ The published bootstrap one-liner first downloads [`iwr/bootstrapper.ps1`](https
 - Tries to set the current user's execution policy to `Unrestricted`
 - Bootstraps the `NuGet` package provider in `CurrentUser` scope
 - Trusts or registers `PSGallery`
-- Installs `PowerShellGet`, `PackageManagement`, and `Eigenverft.Manifested.Sandbox` in `CurrentUser` scope
+- Installs `PackageManagement`, `PowerShellGet`, and `Eigenverft.Manifested.Sandbox` in `CurrentUser` scope
 - Opens a new Windows PowerShell session and runs `Get-SandboxVersion`
 
 Admin rights are not required for the bootstrap or module install path. Later runtime actions can have different requirements; for example, `Initialize-VCRuntime` may still require elevation when the VC++ runtime needs to be installed or repaired.
@@ -74,7 +74,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "$u='https://raw.gith
 A generic version of the bootstrapper lets you specify which PowerShell Gallery modules to install and which command to invoke automatically, so it can be reused for projects beyond `Eigenverft.Manifested.Sandbox` and for repo-specific bootstrap flows that just need a clean handoff into PowerShell.
 
 ```powershell
-$c='Initialize-VCRuntime;Initialize-Ps7Runtime;Initialize-GitRuntime;Initialize-GHCliRuntime;Initialize-VSCodeRuntime;Initialize-NodeRuntime;Initialize-CodexRuntime;Get-SandboxState';$i='PowerShellGet','PackageManagement','Eigenverft.Manifested.Sandbox';$u='https://raw.githubusercontent.com/eigenverft/Eigenverft.Manifested.Sandbox/refs/heads/main/iwr/bootstrapper.sandbox.generic.ps1';try{[Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12}catch{};$p=[System.Net.WebRequest]::GetSystemWebProxy();if(-not $p.IsBypassed($u)){iwr $u -Proxy ($p.GetProxy($u).AbsoluteUri) -ProxyUseDefaultCredentials -UseBasicParsing|iex}else{iwr $u -UseBasicParsing|iex}
+$c='Initialize-VCRuntime;Initialize-Ps7Runtime;Initialize-GitRuntime;Initialize-GHCliRuntime;Initialize-VSCodeRuntime;Initialize-NodeRuntime;Initialize-CodexRuntime;Get-SandboxState';$i='PackageManagement','PowerShellGet','Eigenverft.Manifested.Sandbox';$u='https://raw.githubusercontent.com/eigenverft/Eigenverft.Manifested.Sandbox/refs/heads/main/iwr/bootstrapper.sandbox.generic.ps1';try{[Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12}catch{};$p=[System.Net.WebRequest]::GetSystemWebProxy();if(-not $p.IsBypassed($u)){iwr $u -Proxy ($p.GetProxy($u).AbsoluteUri) -ProxyUseDefaultCredentials -UseBasicParsing|iex}else{iwr $u -UseBasicParsing|iex}
 ```
 
 > 💡 To test another branch, replace `main` with the branch name in the URL.
@@ -82,7 +82,7 @@ $c='Initialize-VCRuntime;Initialize-Ps7Runtime;Initialize-GitRuntime;Initialize-
 The published default bootstrapper currently uses:
 
 ```powershell
-$i='PowerShellGet','PackageManagement','Eigenverft.Manifested.Sandbox'
+$i='PackageManagement','PowerShellGet','Eigenverft.Manifested.Sandbox'
 $c='Get-SandboxVersion'
 ```
 
@@ -121,7 +121,7 @@ If you want a ready-to-use Windows Sandbox entry file, save something like this 
   <!-- Auto-start: PowerShell startup -->
   <LogonCommand>
     <!-- Dev-friendly generic variant:
-         <Command>cmd /c start "" powershell.exe -NoExit -Command "$c='Get-SandboxVersion;Initialize-Ps7Runtime;Initialize-GitRuntime;Initialize-GHCliRuntime;Initialize-VSCodeRuntime;Initialize-NodeRuntime;Initialize-CodexRuntime;Get-SandboxState';$i='PowerShellGet','PackageManagement','Eigenverft.Manifested.Sandbox';$u='https://raw.githubusercontent.com/eigenverft/Eigenverft.Manifested.Sandbox/refs/heads/main/iwr/bootstrapper.sandbox.generic.ps1';try{[Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12}catch{};$p=[System.Net.WebRequest]::GetSystemWebProxy();if(-not $p.IsBypassed($u)){iwr $u -Proxy ($p.GetProxy($u).AbsoluteUri) -ProxyUseDefaultCredentials -UseBasicParsing|iex}else{iwr $u -UseBasicParsing|iex}"</Command>
+         <Command>cmd /c start "" powershell.exe -NoExit -Command "$c='Get-SandboxVersion;Initialize-Ps7Runtime;Initialize-GitRuntime;Initialize-GHCliRuntime;Initialize-VSCodeRuntime;Initialize-NodeRuntime;Initialize-CodexRuntime;Get-SandboxState';$i='PackageManagement','PowerShellGet','Eigenverft.Manifested.Sandbox';$u='https://raw.githubusercontent.com/eigenverft/Eigenverft.Manifested.Sandbox/refs/heads/main/iwr/bootstrapper.sandbox.generic.ps1';try{[Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12}catch{};$p=[System.Net.WebRequest]::GetSystemWebProxy();if(-not $p.IsBypassed($u)){iwr $u -Proxy ($p.GetProxy($u).AbsoluteUri) -ProxyUseDefaultCredentials -UseBasicParsing|iex}else{iwr $u -UseBasicParsing|iex}"</Command>
     -->
     <Command>cmd /c start "" powershell.exe -NoExit -Command "$u='https://raw.githubusercontent.com/eigenverft/Eigenverft.Manifested.Sandbox/refs/heads/main/iwr/bootstrapper.ps1';try{[Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12}catch{};$p=[System.Net.WebRequest]::GetSystemWebProxy();if(-not $p.IsBypassed($u)){iwr $u -Proxy ($p.GetProxy($u).AbsoluteUri) -ProxyUseDefaultCredentials -UseBasicParsing|iex}else{iwr $u -UseBasicParsing|iex}"</Command>
   </LogonCommand>
