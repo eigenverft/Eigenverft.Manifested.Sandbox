@@ -587,7 +587,7 @@ function Save-GitRuntimePackage {
             try {
                 Write-Host "Downloading MinGit $($release.Version) ($Flavor)..."
                 Enable-ManifestedTls12Support
-                Invoke-WebRequest -Uri $release.DownloadUrl -Headers @{ 'User-Agent' = 'Eigenverft.Manifested.Sandbox' } -OutFile $downloadPath -UseBasicParsing
+                Invoke-WebRequestEx -Uri $release.DownloadUrl -Headers @{ 'User-Agent' = 'Eigenverft.Manifested.Sandbox' } -OutFile $downloadPath -UseBasicParsing
                 Move-Item -LiteralPath $downloadPath -Destination $packagePath -Force
                 $action = 'Downloaded'
             }

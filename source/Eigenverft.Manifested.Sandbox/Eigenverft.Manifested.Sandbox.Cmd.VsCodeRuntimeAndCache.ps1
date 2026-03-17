@@ -756,7 +756,7 @@ function Save-VSCodeRuntimePackage {
             try {
                 Write-Host "Downloading VS Code $($release.Version) ($Flavor)..."
                 Enable-ManifestedTls12Support
-                Invoke-WebRequest -Uri $release.DownloadUrl -Headers @{ 'User-Agent' = 'Eigenverft.Manifested.Sandbox' } -OutFile $downloadPath -UseBasicParsing
+                Invoke-WebRequestEx -Uri $release.DownloadUrl -Headers @{ 'User-Agent' = 'Eigenverft.Manifested.Sandbox' } -OutFile $downloadPath -UseBasicParsing
                 Move-Item -LiteralPath $downloadPath -Destination $packagePath -Force
                 $action = 'Downloaded'
             }

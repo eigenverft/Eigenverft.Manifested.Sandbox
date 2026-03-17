@@ -46,7 +46,7 @@ function Invoke-ManifestedGitHubWebRequest {
     )
 
     Enable-ManifestedTls12Support
-    return (Invoke-WebRequest -Uri $Uri -Headers @{ 'User-Agent' = 'Eigenverft.Manifested.Sandbox' } -UseBasicParsing -ErrorAction Stop)
+    return (Invoke-WebRequestEx -Uri $Uri -Headers @{ 'User-Agent' = 'Eigenverft.Manifested.Sandbox' } -UseBasicParsing -ErrorAction Stop)
 }
 
 function ConvertTo-ManifestedSha256Digest {

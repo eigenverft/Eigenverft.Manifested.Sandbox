@@ -51,7 +51,7 @@ function Get-NodeRelease {
         $Flavor = Get-NodeFlavor
     }
 
-    $response = Invoke-WebRequest -Uri 'https://nodejs.org/dist/index.json' -UseBasicParsing
+    $response = Invoke-WebRequestEx -Uri 'https://nodejs.org/dist/index.json' -UseBasicParsing
     $items = $response.Content | ConvertFrom-Json
 
     $release = $items |
@@ -278,7 +278,7 @@ function Get-NodePackageExpectedSha256 {
         [string]$FileName
     )
 
-    $response = Invoke-WebRequest -Uri $ShasumsUrl -UseBasicParsing
+    $response = Invoke-WebRequestEx -Uri $ShasumsUrl -UseBasicParsing
     $line = ($response.Content -split "`n" | Where-Object { $_ -match ('\s' + [regex]::Escape($FileName) + '$') } | Select-Object -First 1)
 
     if (-not $line) {
@@ -503,7 +503,7 @@ function Save-NodeRuntimePackage {
 
             try {
                 Write-Host "Downloading Node.js $($release.Version) ($Flavor)..."
-                Invoke-WebRequest -Uri $release.DownloadUrl -OutFile $downloadPath -UseBasicParsing
+                Invoke-WebRequestEx -Uri $release.DownloadUrl -OutFile $downloadPath -UseBasicParsing
                 Move-Item -LiteralPath $downloadPath -Destination $packagePath -Force
                 $action = 'Downloaded'
             }

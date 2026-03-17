@@ -3,6 +3,7 @@
 #>
 
 . "$PSScriptRoot\Eigenverft.Manifested.Sandbox.ps1"
+. "$PSScriptRoot\Eigenverft.Manifested.Sandbox.Base.Invoke-WebRequestEx.ps1"
 . "$PSScriptRoot\Eigenverft.Manifested.Sandbox.Shared.Paths.ps1"
 . "$PSScriptRoot\Eigenverft.Manifested.Sandbox.Shared.Cache.ps1"
 . "$PSScriptRoot\Eigenverft.Manifested.Sandbox.Shared.Extraction.ps1"

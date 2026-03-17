@@ -283,7 +283,7 @@ function Save-VCRuntimeInstaller {
 
         try {
             Write-Host 'Downloading Microsoft Visual C++ Redistributable bootstrapper...'
-            Invoke-WebRequest -Uri $info.DownloadUrl -OutFile $downloadPath -UseBasicParsing
+            Invoke-WebRequestEx -Uri $info.DownloadUrl -OutFile $downloadPath -UseBasicParsing
             Move-Item -LiteralPath $downloadPath -Destination $info.CachePath -Force
             $action = 'Downloaded'
         }

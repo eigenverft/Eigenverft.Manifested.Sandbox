@@ -584,7 +584,7 @@ function Save-Ps7RuntimePackage {
             try {
                 Write-Host "Downloading PowerShell $($release.Version) ($Flavor)..."
                 Enable-ManifestedTls12Support
-                Invoke-WebRequest -Uri $release.DownloadUrl -Headers @{ 'User-Agent' = 'Eigenverft.Manifested.Sandbox' } -OutFile $downloadPath -UseBasicParsing
+                Invoke-WebRequestEx -Uri $release.DownloadUrl -Headers @{ 'User-Agent' = 'Eigenverft.Manifested.Sandbox' } -OutFile $downloadPath -UseBasicParsing
                 Move-Item -LiteralPath $downloadPath -Destination $packagePath -Force
                 $action = 'Downloaded'
             }
