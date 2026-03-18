@@ -275,32 +275,28 @@ function Invoke-WebRequestEx {
         }
 
         try {
-            $authority = $TargetUri.GetLeftPart([System.UriPartial]::Authority)
+            $hostDisplay = $TargetUri.Host
             $absolutePath = $TargetUri.AbsolutePath
 
             $querySuffix = if (-not [string]::IsNullOrEmpty($TargetUri.Query)) { '?...' } else { '' }
             $fragmentSuffix = if (-not [string]::IsNullOrEmpty($TargetUri.Fragment)) { '#...' } else { '' }
 
             if ([string]::IsNullOrEmpty($absolutePath) -or $absolutePath -eq '/') {
-                return ($authority + '/' + $querySuffix + $fragmentSuffix)
+                return ($hostDisplay + '/' + $querySuffix + $fragmentSuffix)
             }
 
             $segments = @($absolutePath -split '/' | Where-Object { $_ -ne '' })
 
             if ($segments.Count -le 1) {
-                return ($authority + $absolutePath + $querySuffix + $fragmentSuffix)
-            }
-
-            if ($segments.Count -eq 2) {
-                return ($authority + '/' + $segments[0] + '/' + $segments[1] + $querySuffix + $fragmentSuffix)
+                return ($hostDisplay + $absolutePath + $querySuffix + $fragmentSuffix)
             }
 
             if ($absolutePath.EndsWith('/')) {
-                return ($authority + '/..../' + $querySuffix + $fragmentSuffix)
+                return ($hostDisplay + '/.../' + $querySuffix + $fragmentSuffix)
             }
 
             $lastSegment = $segments[$segments.Count - 1]
-            return ($authority + '/..../' + $lastSegment + $querySuffix + $fragmentSuffix)
+            return ($hostDisplay + '/.../' + $lastSegment + $querySuffix + $fragmentSuffix)
         }
         catch {
             return $originalText
@@ -948,26 +944,32 @@ public static class CertificateValidationHelper
                                         }
 
                                         if ($useMegabyteDisplay) {
-                                            $downloadedMb = [Math]::Round($totalBytes / 1048576.0, 1)
-                                            $contentLengthMb = [Math]::Round($contentLength / 1048576.0, 1)
+                                            $downloadedMbText    = ([int64][Math]::Round($totalBytes / 1048576.0, 0)).ToString()
+                                            $contentLengthMbText = ([int64][Math]::Round($contentLength / 1048576.0, 0)).ToString()
+                                            $percentText         = $percent.ToString('0.#').PadLeft(5)
+
+                                            $downloadedMbText = $downloadedMbText.PadLeft($contentLengthMbText.Length)
 
                                             Write-StandardMessage -Message (
-                                                "[PROGRESS] Downloaded {0} MB of {1} MB ({2} percent) for '{3}'." -f
-                                                $downloadedMb, $contentLengthMb, $percent, $uriDisplay
+                                                "[DL] {0} MB of {1} MB ({2} %) for '{3}'." -f
+                                                $downloadedMbText, $contentLengthMbText, $percentText, $uriDisplay
                                             ) -Level INF
                                         }
                                         else {
+                                            $percentText = $percent.ToString('0.#').PadLeft(5)
+
                                             Write-StandardMessage -Message (
-                                                "[PROGRESS] Downloaded {0} of {1} bytes ({2} percent) for '{3}'." -f
-                                                $totalBytes, $contentLength, $percent, $uriDisplay
+                                                "[DL] {0} of {1} bytes ({2} %) for '{3}'." -f
+                                                $totalBytes, $contentLength, $percentText, $uriDisplay
                                             ) -Level INF
                                         }
                                     }
                                     else {
-                                        $megaBytes = [Math]::Round($totalBytes / 1048576.0, 1)
+                                        $megaBytesText = ([int64][Math]::Round($totalBytes / 1048576.0, 0)).ToString()
+
                                         Write-StandardMessage -Message (
-                                            "[PROGRESS] Downloaded approximately {0} MB from '{1}'." -f
-                                            $megaBytes, $uriDisplay
+                                            "[DL] ~{0} MB from '{1}'." -f
+                                            $megaBytesText, $uriDisplay
                                         ) -Level INF
                                     }
 
@@ -977,26 +979,28 @@ public static class CertificateValidationHelper
 
                             if ($contentLength -gt 0) {
                                 if ($useMegabyteDisplay) {
-                                    $totalMb = [Math]::Round($totalBytes / 1048576.0, 1)
-                                    $contentLengthMb = [Math]::Round($contentLength / 1048576.0, 1)
+                                    $totalMbText         = ([int64][Math]::Round($totalBytes / 1048576.0, 0)).ToString()
+                                    $contentLengthMbText = ([int64][Math]::Round($contentLength / 1048576.0, 0)).ToString()
+
+                                    $totalMbText = $totalMbText.PadLeft($contentLengthMbText.Length)
 
                                     Write-StandardMessage -Message (
-                                        "[PROGRESS] Downloaded {0} MB of {1} MB (100 percent) for '{2}'." -f
-                                        $totalMb, $contentLengthMb, $uriDisplay
+                                        "[DL] {0} MB of {1} MB (100 %) for '{2}'." -f
+                                        $totalMbText, $contentLengthMbText, $uriDisplay
                                     ) -Level INF
                                 }
                                 else {
                                     Write-StandardMessage -Message (
-                                        "[PROGRESS] Downloaded {0} of {1} bytes (100 percent) for '{2}'." -f
+                                        "[DL] {0} of {1} bytes (100 %) for '{2}'." -f
                                         $totalBytes, $contentLength, $uriDisplay
                                     ) -Level INF
                                 }
                             }
                             else {
-                                $finalMb = [Math]::Round($totalBytes / 1048576.0, 1)
+                                $finalMbText = ([int64][Math]::Round($totalBytes / 1048576.0, 0)).ToString()
                                 Write-StandardMessage -Message (
-                                    "[PROGRESS] Download complete, total {0} MB from '{1}'." -f
-                                    $finalMb, $uriDisplay
+                                    "[DL] Complete, total {0} MB from '{1}'." -f
+                                    $finalMbText, $uriDisplay
                                 ) -Level INF
                             }
 
