@@ -66,6 +66,7 @@ function Get-ManifestedRuntimeSnapshots {
     $definitions = @(
         @{ Name = 'NodeRuntime'; FunctionName = 'Get-NodeRuntimeState'; PathProperty = 'RuntimeHome' },
         @{ Name = 'GeminiRuntime'; FunctionName = 'Get-GeminiRuntimeState'; PathProperty = 'RuntimeHome' },
+        @{ Name = 'QwenRuntime'; FunctionName = 'Get-QwenRuntimeState'; PathProperty = 'RuntimeHome' },
         @{ Name = 'CodexRuntime'; FunctionName = 'Get-CodexRuntimeState'; PathProperty = 'RuntimeHome' },
         @{ Name = 'GHCliRuntime'; FunctionName = 'Get-GHCliRuntimeState'; PathProperty = 'RuntimeHome' },
         @{ Name = 'Ps7Runtime'; FunctionName = 'Get-Ps7RuntimeState'; PathProperty = 'RuntimeHome' },
@@ -224,6 +225,7 @@ function Save-ManifestedInvokeState {
                 Ps7CacheRoot       = $layout.Ps7CacheRoot
                 NodeCacheRoot      = $layout.NodeCacheRoot
                 GeminiCacheRoot    = $layout.GeminiCacheRoot
+                QwenCacheRoot      = $layout.QwenCacheRoot
                 CodexCacheRoot     = $layout.CodexCacheRoot
                 GHCliCacheRoot     = $layout.GHCliCacheRoot
                 GitCacheRoot       = $layout.GitCacheRoot
@@ -233,6 +235,7 @@ function Save-ManifestedInvokeState {
                 Ps7ToolsRoot       = $layout.Ps7ToolsRoot
                 NodeToolsRoot      = $layout.NodeToolsRoot
                 GeminiToolsRoot    = $layout.GeminiToolsRoot
+                QwenToolsRoot      = $layout.QwenToolsRoot
                 CodexToolsRoot     = $layout.CodexToolsRoot
                 GHCliToolsRoot     = $layout.GHCliToolsRoot
                 GitToolsRoot       = $layout.GitToolsRoot

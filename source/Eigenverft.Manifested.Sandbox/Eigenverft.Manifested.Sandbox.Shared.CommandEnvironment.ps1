@@ -254,6 +254,27 @@ function Get-ManifestedCommandEnvironmentSpec {
                 $expectedCommandPaths['gemini.cmd'] = $geminiCommandPath
             }
         }
+        'Initialize-QwenRuntime' {
+            if (-not [string]::IsNullOrWhiteSpace($runtimeHome)) {
+                $desiredCommandDirectory = $runtimeHome
+            }
+            elseif (-not [string]::IsNullOrWhiteSpace($executablePath)) {
+                $desiredCommandDirectory = Split-Path -Parent $executablePath
+            }
+
+            $qwenCommandPath = $null
+            if (-not [string]::IsNullOrWhiteSpace($executablePath)) {
+                $qwenCommandPath = (Get-ManifestedFullPath -Path $executablePath)
+            }
+            elseif (-not [string]::IsNullOrWhiteSpace($runtimeHome)) {
+                $qwenCommandPath = (Get-ManifestedFullPath -Path (Join-Path $runtimeHome 'qwen.cmd'))
+            }
+
+            if (-not [string]::IsNullOrWhiteSpace($qwenCommandPath)) {
+                $expectedCommandPaths['qwen'] = $qwenCommandPath
+                $expectedCommandPaths['qwen.cmd'] = $qwenCommandPath
+            }
+        }
         'Initialize-GHCliRuntime' {
             if (-not [string]::IsNullOrWhiteSpace($executablePath)) {
                 $desiredCommandDirectory = Split-Path -Parent $executablePath
