@@ -625,6 +625,7 @@ function Initialize-NodeRuntime {
     $packageInfo = $null
     $packageTest = $null
     $installResult = $null
+    $npmProxyConfiguration = $null
     $commandEnvironment = $null
 
     $initialState = Get-NodeRuntimeState -LocalRoot $LocalRoot
@@ -646,6 +647,7 @@ function Initialize-NodeRuntime {
             RuntimeTest     = $null
             RepairResult    = $null
             InstallResult   = $null
+            NpmProxyConfiguration = $null
             CommandEnvironment = $commandEnvironment
             Elevation       = $elevationPlan
         }
@@ -680,6 +682,9 @@ function Initialize-NodeRuntime {
         $plannedActions.Add('Test-NodeRuntimePackage') | Out-Null
         $plannedActions.Add('Install-NodeRuntime') | Out-Null
     }
+    if ($needsInstall -or $state.RuntimeSource -eq 'Managed') {
+        $plannedActions.Add('Sync-ManifestedNpmProxyConfiguration') | Out-Null
+    }
     $plannedActions.Add('Sync-ManifestedCommandLineEnvironment') | Out-Null
 
     $elevationPlan = Get-ManifestedCommandElevationPlan -CommandName 'Initialize-NodeRuntime' -PlannedActions @($plannedActions) -LocalRoot $LocalRoot -SkipSelfElevation:$selfElevationContext.SkipSelfElevation -WasSelfElevated:$selfElevationContext.WasSelfElevated -WhatIfMode:$WhatIfPreference
@@ -699,6 +704,7 @@ function Initialize-NodeRuntime {
                 RuntimeTest         = $state.Runtime
                 RepairResult        = $null
                 InstallResult       = $null
+                NpmProxyConfiguration = $null
                 CommandEnvironment  = (Get-ManifestedCommandEnvironmentResult -CommandName 'Initialize-NodeRuntime' -RuntimeState $state)
                 PersistedStatePath  = $null
                 Elevation           = $elevationPlan
@@ -731,6 +737,7 @@ function Initialize-NodeRuntime {
                     RuntimeTest        = $state.Runtime
                     RepairResult       = $repairResult
                     InstallResult      = $null
+                    NpmProxyConfiguration = $null
                     CommandEnvironment = (Get-ManifestedCommandEnvironmentResult -CommandName 'Initialize-NodeRuntime' -RuntimeState $state)
                     PersistedStatePath = $null
                     Elevation          = $elevationPlan
@@ -762,6 +769,7 @@ function Initialize-NodeRuntime {
                     RuntimeTest        = $state.Runtime
                     RepairResult       = $repairResult
                     InstallResult      = $null
+                    NpmProxyConfiguration = $null
                     CommandEnvironment = (Get-ManifestedCommandEnvironmentResult -CommandName 'Initialize-NodeRuntime' -RuntimeState $state)
                     PersistedStatePath = $null
                     Elevation          = $elevationPlan
@@ -812,6 +820,7 @@ function Initialize-NodeRuntime {
                 RuntimeTest        = $state.Runtime
                 RepairResult       = $repairResult
                 InstallResult      = $null
+                NpmProxyConfiguration = $null
                 CommandEnvironment = (Get-ManifestedCommandEnvironmentResult -CommandName 'Initialize-NodeRuntime' -RuntimeState $state)
                 PersistedStatePath = $null
                 Elevation          = $elevationPlan
@@ -838,6 +847,38 @@ function Initialize-NodeRuntime {
         }
     }
 
+    if ($finalState.RuntimeSource -eq 'Managed' -and $runtimeTest.IsReady -and -not [string]::IsNullOrWhiteSpace($runtimeTest.NpmCmd) -and (Test-Path -LiteralPath $runtimeTest.NpmCmd)) {
+        $npmProxyConfiguration = Get-ManifestedNpmProxyConfigurationStatus -NpmCmd $runtimeTest.NpmCmd -LocalRoot $finalState.LocalRoot
+
+        if ($npmProxyConfiguration.Action -eq 'NeedsManagedGlobalProxy') {
+            if (-not $PSCmdlet.ShouldProcess($npmProxyConfiguration.GlobalConfigPath, 'Configure managed npm proxy settings')) {
+                return [pscustomobject]@{
+                    LocalRoot          = $finalState.LocalRoot
+                    Layout             = $finalState.Layout
+                    InitialState       = $initialState
+                    FinalState         = $finalState
+                    ActionTaken        = @('WhatIf')
+                    PlannedActions     = @($plannedActions)
+                    RestartRequired    = $false
+                    Package            = $packageInfo
+                    PackageTest        = $packageTest
+                    RuntimeTest        = $runtimeTest
+                    RepairResult       = $repairResult
+                    InstallResult      = $installResult
+                    NpmProxyConfiguration = $npmProxyConfiguration
+                    CommandEnvironment = (Get-ManifestedCommandEnvironmentResult -CommandName 'Initialize-NodeRuntime' -RuntimeState $finalState)
+                    PersistedStatePath = $null
+                    Elevation          = $elevationPlan
+                }
+            }
+
+            $npmProxyConfiguration = Sync-ManifestedNpmProxyConfiguration -NpmCmd $runtimeTest.NpmCmd -Status $npmProxyConfiguration -LocalRoot $finalState.LocalRoot
+            if ($npmProxyConfiguration.Action -eq 'ConfiguredManagedGlobalProxy') {
+                $actionsTaken.Add('Sync-ManifestedNpmProxyConfiguration') | Out-Null
+            }
+        }
+    }
+
     $commandEnvironment = Get-ManifestedCommandEnvironmentResult -CommandName 'Initialize-NodeRuntime' -RuntimeState $finalState
     if ($commandEnvironment.Applicable) {
         if (-not $PSCmdlet.ShouldProcess($commandEnvironment.DesiredCommandDirectory, 'Synchronize Node command-line environment')) {
@@ -854,6 +895,7 @@ function Initialize-NodeRuntime {
                 RuntimeTest        = $runtimeTest
                 RepairResult       = $repairResult
                 InstallResult      = $installResult
+                NpmProxyConfiguration = $npmProxyConfiguration
                 CommandEnvironment = $commandEnvironment
                 PersistedStatePath = $null
                 Elevation          = $elevationPlan
@@ -879,6 +921,7 @@ function Initialize-NodeRuntime {
         RuntimeTest     = $runtimeTest
         RepairResult    = $repairResult
         InstallResult   = $installResult
+        NpmProxyConfiguration = $npmProxyConfiguration
         CommandEnvironment = $commandEnvironment
         Elevation       = $elevationPlan
     }

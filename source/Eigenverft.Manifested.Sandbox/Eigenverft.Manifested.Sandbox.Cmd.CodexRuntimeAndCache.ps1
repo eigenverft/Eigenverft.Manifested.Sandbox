@@ -352,9 +352,13 @@ function Install-CodexRuntime {
     New-ManifestedDirectory -Path $layout.CodexToolsRoot | Out-Null
 
     $stagePath = New-ManifestedStageDirectory -Prefix 'codex' -Mode TemporaryShort
+    $npmConfiguration = Get-ManifestedManagedNpmCommandArguments -NpmCmd $NpmCmd -LocalRoot $LocalRoot
+    $npmArguments = @('install', '-g', '--prefix', $stagePath, '--cache', $layout.CodexCacheRoot)
+    $npmArguments += @($npmConfiguration.CommandArguments)
+    $npmArguments += $script:ManifestedSandboxCodexPackage
 
     Write-Host 'Installing Codex CLI into managed sandbox tools...'
-    & $NpmCmd install -g --prefix $stagePath --cache $layout.CodexCacheRoot $script:ManifestedSandboxCodexPackage
+    & $NpmCmd @npmArguments
     if ($LASTEXITCODE -ne 0) {
         throw "npm install for Codex exited with code $LASTEXITCODE."
     }

@@ -399,9 +399,13 @@ function Install-QwenRuntime {
     New-ManifestedDirectory -Path $layout.QwenToolsRoot | Out-Null
 
     $stagePath = New-ManifestedStageDirectory -Prefix 'qwen' -Mode TemporaryShort
+    $npmConfiguration = Get-ManifestedManagedNpmCommandArguments -NpmCmd $NpmCmd -LocalRoot $LocalRoot
+    $npmArguments = @('install', '-g', '--prefix', $stagePath, '--cache', $layout.QwenCacheRoot)
+    $npmArguments += @($npmConfiguration.CommandArguments)
+    $npmArguments += $script:ManifestedSandboxQwenPackage
 
     Write-Host 'Installing Qwen CLI into managed sandbox tools...'
-    & $NpmCmd install -g --prefix $stagePath --cache $layout.QwenCacheRoot $script:ManifestedSandboxQwenPackage
+    & $NpmCmd @npmArguments
     if ($LASTEXITCODE -ne 0) {
         throw "npm install for Qwen exited with code $LASTEXITCODE."
     }

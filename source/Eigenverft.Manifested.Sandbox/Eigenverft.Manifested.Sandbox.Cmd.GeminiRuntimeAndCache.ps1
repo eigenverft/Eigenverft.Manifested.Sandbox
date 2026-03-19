@@ -399,9 +399,13 @@ function Install-GeminiRuntime {
     New-ManifestedDirectory -Path $layout.GeminiToolsRoot | Out-Null
 
     $stagePath = New-ManifestedStageDirectory -Prefix 'gemini' -Mode TemporaryShort
+    $npmConfiguration = Get-ManifestedManagedNpmCommandArguments -NpmCmd $NpmCmd -LocalRoot $LocalRoot
+    $npmArguments = @('install', '-g', '--prefix', $stagePath, '--cache', $layout.GeminiCacheRoot)
+    $npmArguments += @($npmConfiguration.CommandArguments)
+    $npmArguments += $script:ManifestedSandboxGeminiPackage
 
     Write-Host 'Installing Gemini CLI into managed sandbox tools...'
-    & $NpmCmd install -g --prefix $stagePath --cache $layout.GeminiCacheRoot $script:ManifestedSandboxGeminiPackage
+    & $NpmCmd @npmArguments
     if ($LASTEXITCODE -ne 0) {
         throw "npm install for Gemini exited with code $LASTEXITCODE."
     }
