@@ -2,13 +2,13 @@
 
 [![PowerShell Gallery Version](https://img.shields.io/powershellgallery/v/Eigenverft.Manifested.Sandbox?label=PSGallery&logo=powershell)](https://www.powershellgallery.com/packages/Eigenverft.Manifested.Sandbox) [![PowerShell Gallery Downloads](https://img.shields.io/powershellgallery/dt/Eigenverft.Manifested.Sandbox?label=Downloads&logo=powershell)](https://www.powershellgallery.com/packages/Eigenverft.Manifested.Sandbox) [![PowerShell Support](https://img.shields.io/badge/PowerShell-5.1%2B%20Desktop%2FCore-5391FE?logo=powershell&logoColor=white)](source/Eigenverft.Manifested.Sandbox/Eigenverft.Manifested.Sandbox.psd1) [![Build Status](https://img.shields.io/github/actions/workflow/status/eigenverft/Eigenverft.Manifested.Sandbox/cicd.yml?branch=main&label=build)](https://github.com/eigenverft/Eigenverft.Manifested.Sandbox/actions/workflows/cicd.yml) [![License](https://img.shields.io/github/license/eigenverft/Eigenverft.Manifested.Sandbox?logo=mit)](LICENSE)
 
-Windows-focused PowerShell module and bootstrap flow for quickly turning a fresh Windows Sandbox session into a usable development environment, especially from a `.wsb` startup entrypoint. It can provision managed PowerShell 7, Node.js, GitHub CLI, MinGit, VS Code, Codex CLI, and Microsoft Visual C++ runtime prerequisites when you want them.
+Windows-focused PowerShell module and bootstrap flow for quickly turning a fresh Windows Sandbox session into a usable development environment, especially from a `.wsb` startup entrypoint. It can provision managed PowerShell 7, Node.js, GitHub CLI, MinGit, VS Code, Gemini CLI, Codex CLI, and Microsoft Visual C++ runtime prerequisites when you want them.
 
 The primary intent is fast, repeatable setup inside Windows Sandbox. The same bootstrap pattern can also run on a normal Windows machine, but that is a secondary use case rather than the main focus of this repo.
 
 🚀 **Key Features:**
 - Fast Windows Sandbox bring-up from a `.wsb` startup command or a manual shell
-- Managed runtime provisioning for `pwsh`, `git`, `gh`, `code`, `node`, `codex`, and VC++ prerequisites
+- Managed runtime provisioning for `pwsh`, `git`, `gh`, `code`, `node`, `gemini`, `codex`, and VC++ prerequisites
 - Reusable `iwr | iex` bootstrap flow for repo-specific or generic PowerShell handoff scenarios
 - PowerShell 5.1-first bootstrap path with normal Windows machine support as a secondary workflow
 
@@ -146,15 +146,17 @@ Initialize-GitRuntime
 Initialize-GHCliRuntime
 Initialize-VSCodeRuntime
 Initialize-NodeRuntime
+Initialize-GeminiRuntime
 Initialize-CodexRuntime
 Initialize-VCRuntime
 Get-SandboxState
 ```
 
 - `Get-SandboxVersion` is the quick way to show the latest available installed module version on the system.
-- `Initialize-Ps7Runtime`, `Initialize-GitRuntime`, `Initialize-GHCliRuntime`, `Initialize-VSCodeRuntime`, `Initialize-NodeRuntime`, and `Initialize-CodexRuntime` are intended to run in a normal user session. They prefer sandbox-managed portable runtimes under `LocalAppData`, using GitHub as the download source for PowerShell 7, MinGit, and GitHub CLI, the official VS Code Windows ZIP archive with portable `data` mode for VS Code, and an npm-based managed install for Codex.
-- Those commands also check for an already-usable `pwsh`, `git`, `gh`, `code`, `node`, or `codex` that exists outside prior sandbox state. If a compatible runtime is already available on `PATH` or in a common install location, the command can treat it as ready and persist it as an external runtime instead of downloading or installing a new copy. If you explicitly use a refresh switch such as `-RefreshGit`, `-RefreshGHCli`, `-RefreshPs7`, `-RefreshVSCode`, `-RefreshNode`, or `-RefreshCodex`, the command will still acquire and install the sandbox-managed copy.
+- `Initialize-Ps7Runtime`, `Initialize-GitRuntime`, `Initialize-GHCliRuntime`, `Initialize-VSCodeRuntime`, `Initialize-NodeRuntime`, `Initialize-GeminiRuntime`, and `Initialize-CodexRuntime` are intended to run in a normal user session. They prefer sandbox-managed portable runtimes under `LocalAppData`, using GitHub as the download source for PowerShell 7, MinGit, and GitHub CLI, the official VS Code Windows ZIP archive with portable `data` mode for VS Code, and npm-based managed installs for Gemini and Codex.
+- Those commands also check for an already-usable `pwsh`, `git`, `gh`, `code`, `node`, `gemini`, or `codex` that exists outside prior sandbox state. If a compatible runtime is already available on `PATH` or in a common install location, the command can treat it as ready and persist it as an external runtime instead of downloading or installing a new copy. If you explicitly use a refresh switch such as `-RefreshGit`, `-RefreshGHCli`, `-RefreshPs7`, `-RefreshVSCode`, `-RefreshNode`, `-RefreshGemini`, or `-RefreshCodex`, the command will still acquire and install the sandbox-managed copy.
 - `Initialize-GHCliRuntime` installs a managed `gh.exe` from the official GitHub CLI Windows ZIP release and validates the package against GitHub's published checksum asset before making that runtime active on `PATH`.
+- `Initialize-GeminiRuntime` installs `@google/gemini-cli` into the sandbox-managed tool root and prefers that managed copy when refreshed. Gemini CLI's official docs currently recommend Node.js `20.0.0+` and Windows 11 `24H2+`; this module follows a best-effort Windows policy and ensures a compatible Node runtime before managed install when needed.
 - `Initialize-CodexRuntime` installs `@openai/codex` into the sandbox-managed tool root and prefers that managed copy when refreshed. It always ensures the VC runtime prerequisite before install, and if no usable Node/npm is available yet it also ensures the required Node runtime first.
 - `Initialize-VCRuntime` is different because the VC runtime is a machine/runtime prerequisite rather than a sandbox-managed portable tool.
 - `Initialize-VCRuntime` should be run in an elevated PowerShell process when the Microsoft Visual C++ Redistributable needs to be installed or repaired.
@@ -171,6 +173,7 @@ Import-Module Eigenverft.Manifested.Sandbox
 ## 📝 Usage Tips
 
 - Use the refresh switches when you want the sandbox-managed runtime even if a compatible tool already exists elsewhere on the machine.
+- Gemini remains opt-in for now; the published bootstrap command chains stay unchanged unless you add `Initialize-GeminiRuntime` yourself.
 - Replace `main` in the bootstrap URLs to test another branch without changing the overall bootstrap flow.
 - Keep `.wsb` files small and let versioned PowerShell own the real startup logic whenever you want a more maintainable sandbox launch path.
 - Run `Initialize-VCRuntime` in an elevated PowerShell session if the Microsoft Visual C++ Redistributable needs installation or repair.

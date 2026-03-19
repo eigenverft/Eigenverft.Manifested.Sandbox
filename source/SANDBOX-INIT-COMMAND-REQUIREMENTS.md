@@ -18,6 +18,9 @@ This currently applies to these exported init commands:
 - `Initialize-GitRuntime`
 - `Initialize-VSCodeRuntime`
 - `Initialize-NodeRuntime`
+- `Initialize-GeminiRuntime`
+- `Initialize-CodexRuntime`
+- `Initialize-GHCliRuntime`
 - `Initialize-VCRuntime`
 
 The related inspection surface is:
@@ -38,7 +41,7 @@ Required rules:
 
 ## Current Command Families
 
-- `Initialize-Ps7Runtime`, `Initialize-GitRuntime`, `Initialize-VSCodeRuntime`, and `Initialize-NodeRuntime` manage portable user-scoped runtimes under the sandbox root.
+- `Initialize-Ps7Runtime`, `Initialize-GitRuntime`, `Initialize-VSCodeRuntime`, `Initialize-NodeRuntime`, `Initialize-GeminiRuntime`, `Initialize-CodexRuntime`, and `Initialize-GHCliRuntime` manage portable user-scoped runtimes under the sandbox root.
 - `Initialize-VCRuntime` manages a machine/runtime prerequisite and evaluates the real installed machine state.
 - `Get-SandboxState` is the read-only inspection surface for the persisted command state document plus live runtime snapshots.
 
@@ -95,10 +98,10 @@ The portable runtime commands now share command-line environment synchronization
 
 Required rules:
 
-- `Initialize-Ps7Runtime`, `Initialize-GitRuntime`, `Initialize-NodeRuntime`, and `Initialize-VSCodeRuntime` should derive a desired command directory from the final runtime state.
+- `Initialize-Ps7Runtime`, `Initialize-GitRuntime`, `Initialize-NodeRuntime`, `Initialize-GeminiRuntime`, `Initialize-CodexRuntime`, `Initialize-GHCliRuntime`, and `Initialize-VSCodeRuntime` should derive a desired command directory from the final runtime state.
 - They should update both the process `PATH` and the user `PATH` so the desired directory is present and preferred.
 - Synchronization must validate actual command resolution after the update. It must not assume a `PATH` write succeeded just because the environment variable changed.
-- The expected command set is currently `pwsh.exe` for PowerShell 7, `git.exe` for Git, `node.exe` and `npm.cmd` for Node.js, and `code` plus `code.cmd` for VS Code.
+- The expected command set is currently `pwsh.exe` for PowerShell 7, `git.exe` for Git, `node.exe` and `npm.cmd` for Node.js, `gemini` plus `gemini.cmd` for Gemini CLI, `codex` plus `codex.cmd` for Codex CLI, `gh` plus `gh.exe` for GitHub CLI, and `code` plus `code.cmd` for VS Code.
 - The command result and persisted invoke state should surface `CommandEnvironment` for these portable runtime commands.
 - `Initialize-VCRuntime` does not participate in command-line environment sync.
 
@@ -124,12 +127,18 @@ At minimum, the following must stay stable across normal and elevated execution:
 - `CacheRoot`
 - `Ps7CacheRoot`
 - `NodeCacheRoot`
+- `GeminiCacheRoot`
+- `CodexCacheRoot`
+- `GHCliCacheRoot`
 - `GitCacheRoot`
 - `VsCodeCacheRoot`
 - `VCRuntimeCacheRoot`
 - `ToolsRoot`
 - `Ps7ToolsRoot`
 - `NodeToolsRoot`
+- `GeminiToolsRoot`
+- `CodexToolsRoot`
+- `GHCliToolsRoot`
 - `GitToolsRoot`
 - `VsCodeToolsRoot`
 - `StatePath`
@@ -148,7 +157,7 @@ Required rules:
 - `Save-ManifestedInvokeState` is the baseline persistence path for init commands.
 - Persisted command entries should capture `ActionTaken`, `Status`, `RestartRequired`, layout paths, `Elevation`, and command-specific `Details`.
 - Portable runtime command entries should also persist `CommandEnvironment`.
-- `Get-SandboxState` should continue to expose both the persisted command document and runtime snapshots for `NodeRuntime`, `Ps7Runtime`, `GitRuntime`, `VSCodeRuntime`, and `VCRuntime`.
+- `Get-SandboxState` should continue to expose both the persisted command document and runtime snapshots for `NodeRuntime`, `GeminiRuntime`, `CodexRuntime`, `GHCliRuntime`, `Ps7Runtime`, `GitRuntime`, `VSCodeRuntime`, and `VCRuntime`.
 - `PersistedStatePath` should be `$null` in `-WhatIf` results.
 
 ## Elevation Requirement
@@ -222,6 +231,9 @@ Use these files as the current baseline references:
 
 - `source/Eigenverft.Manifested.Sandbox/Eigenverft.Manifested.Sandbox.Cmd.Ps7RuntimeAndCache.ps1`
 - `source/Eigenverft.Manifested.Sandbox/Eigenverft.Manifested.Sandbox.Cmd.NodeRuntimeAndCache.ps1`
+- `source/Eigenverft.Manifested.Sandbox/Eigenverft.Manifested.Sandbox.Cmd.GeminiRuntimeAndCache.ps1`
+- `source/Eigenverft.Manifested.Sandbox/Eigenverft.Manifested.Sandbox.Cmd.CodexRuntimeAndCache.ps1`
+- `source/Eigenverft.Manifested.Sandbox/Eigenverft.Manifested.Sandbox.Cmd.GHCliRuntimeAndCache.ps1`
 - `source/Eigenverft.Manifested.Sandbox/Eigenverft.Manifested.Sandbox.Cmd.GitRuntimeAndCache.ps1`
 - `source/Eigenverft.Manifested.Sandbox/Eigenverft.Manifested.Sandbox.Cmd.VsCodeRuntimeAndCache.ps1`
 - `source/Eigenverft.Manifested.Sandbox/Eigenverft.Manifested.Sandbox.Cmd.VCRuntimeAndCache.ps1`

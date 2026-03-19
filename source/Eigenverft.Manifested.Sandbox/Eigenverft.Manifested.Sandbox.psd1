@@ -73,6 +73,7 @@ PowerShellVersion = '5.1'
 FunctionsToExport = @(
     'Get-SandboxVersion',
     'Get-SandboxState',
+    'Initialize-GeminiRuntime',
     'Initialize-CodexRuntime',
     'Initialize-GHCliRuntime',
     'Initialize-GitRuntime',
@@ -109,6 +110,7 @@ FileList = @(
     'Eigenverft.Manifested.Sandbox.Shared.CommandEnvironment.ps1',
     'Eigenverft.Manifested.Sandbox.Cmd.Ps7RuntimeAndCache.ps1',
     'Eigenverft.Manifested.Sandbox.Cmd.NodeRuntimeAndCache.ps1',
+    'Eigenverft.Manifested.Sandbox.Cmd.GeminiRuntimeAndCache.ps1',
     'Eigenverft.Manifested.Sandbox.Cmd.CodexRuntimeAndCache.ps1',
     'Eigenverft.Manifested.Sandbox.Cmd.GHCliRuntimeAndCache.ps1',
     'Eigenverft.Manifested.Sandbox.Cmd.GitRuntimeAndCache.ps1',

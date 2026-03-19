@@ -233,6 +233,27 @@ function Get-ManifestedCommandEnvironmentSpec {
                 $expectedCommandPaths['codex.cmd'] = $codexCommandPath
             }
         }
+        'Initialize-GeminiRuntime' {
+            if (-not [string]::IsNullOrWhiteSpace($runtimeHome)) {
+                $desiredCommandDirectory = $runtimeHome
+            }
+            elseif (-not [string]::IsNullOrWhiteSpace($executablePath)) {
+                $desiredCommandDirectory = Split-Path -Parent $executablePath
+            }
+
+            $geminiCommandPath = $null
+            if (-not [string]::IsNullOrWhiteSpace($executablePath)) {
+                $geminiCommandPath = (Get-ManifestedFullPath -Path $executablePath)
+            }
+            elseif (-not [string]::IsNullOrWhiteSpace($runtimeHome)) {
+                $geminiCommandPath = (Get-ManifestedFullPath -Path (Join-Path $runtimeHome 'gemini.cmd'))
+            }
+
+            if (-not [string]::IsNullOrWhiteSpace($geminiCommandPath)) {
+                $expectedCommandPaths['gemini'] = $geminiCommandPath
+                $expectedCommandPaths['gemini.cmd'] = $geminiCommandPath
+            }
+        }
         'Initialize-GHCliRuntime' {
             if (-not [string]::IsNullOrWhiteSpace($executablePath)) {
                 $desiredCommandDirectory = Split-Path -Parent $executablePath
