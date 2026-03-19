@@ -212,6 +212,27 @@ function Get-ManifestedCommandEnvironmentSpec {
                 $expectedCommandPaths['npm.cmd'] = (Get-ManifestedFullPath -Path (Join-Path $runtimeHome 'npm.cmd'))
             }
         }
+        'Initialize-OpenCodeRuntime' {
+            if (-not [string]::IsNullOrWhiteSpace($runtimeHome)) {
+                $desiredCommandDirectory = $runtimeHome
+            }
+            elseif (-not [string]::IsNullOrWhiteSpace($executablePath)) {
+                $desiredCommandDirectory = Split-Path -Parent $executablePath
+            }
+
+            $openCodeCommandPath = $null
+            if (-not [string]::IsNullOrWhiteSpace($executablePath)) {
+                $openCodeCommandPath = (Get-ManifestedFullPath -Path $executablePath)
+            }
+            elseif (-not [string]::IsNullOrWhiteSpace($runtimeHome)) {
+                $openCodeCommandPath = (Get-ManifestedFullPath -Path (Join-Path $runtimeHome 'opencode.cmd'))
+            }
+
+            if (-not [string]::IsNullOrWhiteSpace($openCodeCommandPath)) {
+                $expectedCommandPaths['opencode'] = $openCodeCommandPath
+                $expectedCommandPaths['opencode.cmd'] = $openCodeCommandPath
+            }
+        }
         'Initialize-CodexRuntime' {
             if (-not [string]::IsNullOrWhiteSpace($runtimeHome)) {
                 $desiredCommandDirectory = $runtimeHome

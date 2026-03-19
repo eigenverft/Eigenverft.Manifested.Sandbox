@@ -142,6 +142,7 @@ function Get-ManifestedLayout {
         CacheRoot          = $cacheRoot
         Ps7CacheRoot       = (Join-Path $cacheRoot 'powershell')
         NodeCacheRoot      = (Join-Path $cacheRoot 'node')
+        OpenCodeCacheRoot  = (Join-Path $cacheRoot 'opencode')
         GeminiCacheRoot    = (Join-Path $cacheRoot 'gemini')
         QwenCacheRoot      = (Join-Path $cacheRoot 'qwen')
         CodexCacheRoot     = (Join-Path $cacheRoot 'codex')
@@ -152,6 +153,7 @@ function Get-ManifestedLayout {
         ToolsRoot          = $toolsRoot
         Ps7ToolsRoot       = (Join-Path $toolsRoot 'powershell')
         NodeToolsRoot      = (Join-Path $toolsRoot 'node')
+        OpenCodeToolsRoot  = (Join-Path $toolsRoot 'opencode')
         GeminiToolsRoot    = (Join-Path $toolsRoot 'gemini')
         QwenToolsRoot      = (Join-Path $toolsRoot 'qwen')
         CodexToolsRoot     = (Join-Path $toolsRoot 'codex')
