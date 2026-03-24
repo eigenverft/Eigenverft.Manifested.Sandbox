@@ -567,7 +567,6 @@ function Install-NodeRuntime {
     $currentValidation = Test-NodeRuntime -NodeHome $nodeHome
 
     if ($currentValidation.Status -ne 'Ready') {
-        $layout = Get-ManifestedLayout -LocalRoot $LocalRoot
         New-ManifestedDirectory -Path (Split-Path -Parent $nodeHome) | Out-Null
 
         $stageInfo = $null

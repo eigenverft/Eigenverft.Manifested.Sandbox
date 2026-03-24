@@ -655,7 +655,6 @@ function Install-GitRuntime {
     $currentValidation = Test-GitRuntime -RuntimeHome $runtimeHome
 
     if ($currentValidation.Status -ne 'Ready') {
-        $layout = Get-ManifestedLayout -LocalRoot $LocalRoot
         New-ManifestedDirectory -Path (Split-Path -Parent $runtimeHome) | Out-Null
 
         $stageInfo = $null

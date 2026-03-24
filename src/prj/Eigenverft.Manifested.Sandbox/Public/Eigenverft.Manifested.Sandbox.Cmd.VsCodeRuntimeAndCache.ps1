@@ -826,7 +826,6 @@ function Install-VSCodeRuntime {
     $currentValidation = Test-VSCodeRuntime -RuntimeHome $runtimeHome -RequirePortableMode
 
     if ($currentValidation.Status -ne 'Ready') {
-        $layout = Get-ManifestedLayout -LocalRoot $LocalRoot
         New-ManifestedDirectory -Path (Split-Path -Parent $runtimeHome) | Out-Null
 
         $stageInfo = $null
