@@ -367,3 +367,5 @@ FodyWeavers.xsd
 *[Kk][Ee][Yy]*
 /artifacts/**/*
 /reports/**/*
+AGENTS.md
+.agents/**/*

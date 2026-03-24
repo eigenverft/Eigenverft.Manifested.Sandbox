@@ -907,6 +907,7 @@ public static class CertificateValidationHelper
 
                             $buffer = New-Object byte[] $BufferSizeBytes
                             $totalBytes = 0L
+                            $lastReportedPercent = $null
                             $contentLength = [long]$response.ContentLength
                             $displayThresholdBytes = 1048576L
                             $useMegabyteDisplay = $contentLength -gt $displayThresholdBytes
@@ -938,15 +939,23 @@ public static class CertificateValidationHelper
 
                                 if ($totalBytes -ge $nextProgressBytes) {
                                     if ($contentLength -gt 0) {
-                                        $percent = [Math]::Round(($totalBytes * 100.0) / $contentLength, 1)
+                                        $percent = [int][Math]::Floor(($totalBytes * 100.0) / $contentLength)
+                                        if ($ProgressIntervalPercent -gt 1) {
+                                            $percent = [int]([Math]::Floor($percent / [double]$ProgressIntervalPercent) * $ProgressIntervalPercent)
+                                        }
+                                        if ($percent -lt $ProgressIntervalPercent) {
+                                            $percent = $ProgressIntervalPercent
+                                        }
                                         if ($percent -gt 100) {
                                             $percent = 100
                                         }
 
+                                        $lastReportedPercent = $percent
+
                                         if ($useMegabyteDisplay) {
                                             $downloadedMbText    = ([int64][Math]::Round($totalBytes / 1048576.0, 0)).ToString()
                                             $contentLengthMbText = ([int64][Math]::Round($contentLength / 1048576.0, 0)).ToString()
-                                            $percentText         = $percent.ToString('0.#').PadLeft(5)
+                                            $percentText         = $percent.ToString().PadLeft(3)
 
                                             $downloadedMbText = $downloadedMbText.PadLeft($contentLengthMbText.Length)
 
@@ -956,7 +965,7 @@ public static class CertificateValidationHelper
                                             ) -Level INF
                                         }
                                         else {
-                                            $percentText = $percent.ToString('0.#').PadLeft(5)
+                                            $percentText = $percent.ToString().PadLeft(3)
 
                                             Write-StandardMessage -Message (
                                                 "[DL] {0} of {1} bytes ({2} %) for '{3}'." -f
@@ -978,22 +987,24 @@ public static class CertificateValidationHelper
                             }
 
                             if ($contentLength -gt 0) {
-                                if ($useMegabyteDisplay) {
-                                    $totalMbText         = ([int64][Math]::Round($totalBytes / 1048576.0, 0)).ToString()
-                                    $contentLengthMbText = ([int64][Math]::Round($contentLength / 1048576.0, 0)).ToString()
+                                if ($lastReportedPercent -ne 100) {
+                                    if ($useMegabyteDisplay) {
+                                        $totalMbText         = ([int64][Math]::Round($totalBytes / 1048576.0, 0)).ToString()
+                                        $contentLengthMbText = ([int64][Math]::Round($contentLength / 1048576.0, 0)).ToString()
 
-                                    $totalMbText = $totalMbText.PadLeft($contentLengthMbText.Length)
+                                        $totalMbText = $totalMbText.PadLeft($contentLengthMbText.Length)
 
-                                    Write-StandardMessage -Message (
-                                        "[DL] {0} MB of {1} MB (100 %) for '{2}'." -f
-                                        $totalMbText, $contentLengthMbText, $uriDisplay
-                                    ) -Level INF
-                                }
-                                else {
-                                    Write-StandardMessage -Message (
-                                        "[DL] {0} of {1} bytes (100 %) for '{2}'." -f
-                                        $totalBytes, $contentLength, $uriDisplay
-                                    ) -Level INF
+                                        Write-StandardMessage -Message (
+                                            "[DL] {0} MB of {1} MB (100 %) for '{2}'." -f
+                                            $totalMbText, $contentLengthMbText, $uriDisplay
+                                        ) -Level INF
+                                    }
+                                    else {
+                                        Write-StandardMessage -Message (
+                                            "[DL] {0} of {1} bytes (100 %) for '{2}'." -f
+                                            $totalBytes, $contentLength, $uriDisplay
+                                        ) -Level INF
+                                    }
                                 }
                             }
                             else {

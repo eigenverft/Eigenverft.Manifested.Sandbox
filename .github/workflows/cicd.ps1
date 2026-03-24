@@ -105,7 +105,13 @@ $LocalNugetSourceName = Register-LocalNuGetDotNetPackageSource -SourceName "$Loc
 ##############################################################################
 # Main CICD Logic
 
-$manifestFile = Find-FilesByPattern -Path "$gitTopLevelDirectory" -Pattern "*.psd1" | Select-Object -First 1
+$manifestPath = Join-Path $gitTopLevelDirectory 'src\prj\Eigenverft.Manifested.Sandbox\Eigenverft.Manifested.Sandbox.psd1'
+if (-not (Test-Path -LiteralPath $manifestPath))
+{
+    throw "Expected module manifest was not found at '$manifestPath'."
+}
+
+$manifestFile = Get-Item -LiteralPath $manifestPath -ErrorAction Stop
 Update-ManifestModuleVersion -ManifestPath "$($manifestFile.DirectoryName)" -NewVersion "$($generatedVersion.VersionFull)"
 Update-ManifestPrerelease -ManifestPath "$($manifestFile.DirectoryName)" -NewPrerelease "$($deploymentInfo.Affix.Label)"
 

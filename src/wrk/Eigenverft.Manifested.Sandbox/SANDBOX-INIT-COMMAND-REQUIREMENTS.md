@@ -231,19 +231,19 @@ Required rules:
 
 Use these files as the current baseline references:
 
-- `source/Eigenverft.Manifested.Sandbox/Eigenverft.Manifested.Sandbox.Cmd.Ps7RuntimeAndCache.ps1`
-- `source/Eigenverft.Manifested.Sandbox/Eigenverft.Manifested.Sandbox.Cmd.NodeRuntimeAndCache.ps1`
-- `source/Eigenverft.Manifested.Sandbox/Eigenverft.Manifested.Sandbox.Cmd.GeminiRuntimeAndCache.ps1`
-- `source/Eigenverft.Manifested.Sandbox/Eigenverft.Manifested.Sandbox.Cmd.QwenRuntimeAndCache.ps1`
-- `source/Eigenverft.Manifested.Sandbox/Eigenverft.Manifested.Sandbox.Cmd.CodexRuntimeAndCache.ps1`
-- `source/Eigenverft.Manifested.Sandbox/Eigenverft.Manifested.Sandbox.Cmd.OpenCodeRuntimeAndCache.ps1`
-- `source/Eigenverft.Manifested.Sandbox/Eigenverft.Manifested.Sandbox.Cmd.GHCliRuntimeAndCache.ps1`
-- `source/Eigenverft.Manifested.Sandbox/Eigenverft.Manifested.Sandbox.Cmd.GitRuntimeAndCache.ps1`
-- `source/Eigenverft.Manifested.Sandbox/Eigenverft.Manifested.Sandbox.Cmd.VsCodeRuntimeAndCache.ps1`
-- `source/Eigenverft.Manifested.Sandbox/Eigenverft.Manifested.Sandbox.Cmd.VCRuntimeAndCache.ps1`
-- `source/Eigenverft.Manifested.Sandbox/Eigenverft.Manifested.Sandbox.Shared.CommandEnvironment.ps1`
-- `source/Eigenverft.Manifested.Sandbox/Eigenverft.Manifested.Sandbox.Shared.Elevation.ps1`
-- `source/Eigenverft.Manifested.Sandbox/Eigenverft.Manifested.Sandbox.Shared.Paths.ps1`
-- `source/Eigenverft.Manifested.Sandbox/Eigenverft.Manifested.Sandbox.Shared.State.ps1`
+- `src/prj/Eigenverft.Manifested.Sandbox/Public/Eigenverft.Manifested.Sandbox.Cmd.Ps7RuntimeAndCache.ps1`
+- `src/prj/Eigenverft.Manifested.Sandbox/Public/Eigenverft.Manifested.Sandbox.Cmd.NodeRuntimeAndCache.ps1`
+- `src/prj/Eigenverft.Manifested.Sandbox/Public/Eigenverft.Manifested.Sandbox.Cmd.GeminiRuntimeAndCache.ps1`
+- `src/prj/Eigenverft.Manifested.Sandbox/Public/Eigenverft.Manifested.Sandbox.Cmd.QwenRuntimeAndCache.ps1`
+- `src/prj/Eigenverft.Manifested.Sandbox/Public/Eigenverft.Manifested.Sandbox.Cmd.CodexRuntimeAndCache.ps1`
+- `src/prj/Eigenverft.Manifested.Sandbox/Public/Eigenverft.Manifested.Sandbox.Cmd.OpenCodeRuntimeAndCache.ps1`
+- `src/prj/Eigenverft.Manifested.Sandbox/Public/Eigenverft.Manifested.Sandbox.Cmd.GHCliRuntimeAndCache.ps1`
+- `src/prj/Eigenverft.Manifested.Sandbox/Public/Eigenverft.Manifested.Sandbox.Cmd.GitRuntimeAndCache.ps1`
+- `src/prj/Eigenverft.Manifested.Sandbox/Public/Eigenverft.Manifested.Sandbox.Cmd.VsCodeRuntimeAndCache.ps1`
+- `src/prj/Eigenverft.Manifested.Sandbox/Public/Eigenverft.Manifested.Sandbox.Cmd.VCRuntimeAndCache.ps1`
+- `src/prj/Eigenverft.Manifested.Sandbox/Private/Logic/Eigenverft.Manifested.Sandbox.Shared.CommandEnvironment.ps1`
+- `src/prj/Eigenverft.Manifested.Sandbox/Private/Infra/Eigenverft.Manifested.Sandbox.Shared.Elevation.ps1`
+- `src/prj/Eigenverft.Manifested.Sandbox/Private/Common/Eigenverft.Manifested.Sandbox.Shared.Paths.ps1`
+- `src/prj/Eigenverft.Manifested.Sandbox/Public/Eigenverft.Manifested.Sandbox.Shared.State.ps1`
 
 The future combined command does not need to copy the current code literally, but it should preserve the same orchestration discipline and current feature guarantees.
