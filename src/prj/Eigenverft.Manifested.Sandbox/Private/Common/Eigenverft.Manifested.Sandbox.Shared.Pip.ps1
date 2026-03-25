@@ -567,7 +567,7 @@ This helper is intended for managed runtimes only.
         '@echo off',
         'setlocal',
         'set "PIP_CONFIG_FILE=%~dp0pip.ini"',
-        'set "PIP_CACHE_DIR=' + $pipCacheRoot + '"',
+        ('set "PIP_CACHE_DIR={0}"' -f $pipCacheRoot),
         '"%~dp0python.exe" -m pip %*',
         'exit /b %ERRORLEVEL%'
     )
