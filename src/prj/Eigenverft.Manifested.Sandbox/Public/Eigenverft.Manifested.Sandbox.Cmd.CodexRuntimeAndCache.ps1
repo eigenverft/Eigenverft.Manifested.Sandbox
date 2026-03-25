@@ -5,6 +5,23 @@
 $script:ManifestedSandboxCodexPackage = '@openai/codex@latest'
 
 function ConvertTo-CodexVersion {
+<#
+.SYNOPSIS
+Normalizes Codex version text to the managed semantic version string.
+
+.DESCRIPTION
+Extracts a Codex semantic version from raw command or package version text and
+returns only the normalized version component when one is present.
+
+.PARAMETER VersionText
+Raw version text reported by Codex or stored in package metadata.
+
+.EXAMPLE
+ConvertTo-CodexVersion -VersionText 'codex 1.2.3'
+
+.NOTES
+Returns $null when no supported semantic version can be detected.
+#>
     [CmdletBinding()]
     param(
         [string]$VersionText
@@ -23,6 +40,23 @@ function ConvertTo-CodexVersion {
 }
 
 function ConvertTo-CodexVersionObject {
+<#
+.SYNOPSIS
+Converts Codex version text into a PowerShell version object.
+
+.DESCRIPTION
+Normalizes raw Codex version text and returns the comparable semantic version
+portion as a System.Version instance for sorting and selection logic.
+
+.PARAMETER VersionText
+Raw version text reported by Codex or stored in package metadata.
+
+.EXAMPLE
+ConvertTo-CodexVersionObject -VersionText 'v1.2.3'
+
+.NOTES
+Returns $null when the version cannot be normalized to a comparable value.
+#>
     [CmdletBinding()]
     param(
         [string]$VersionText
@@ -42,6 +76,20 @@ function ConvertTo-CodexVersionObject {
 }
 
 function Get-CodexRuntimePackageJsonPath {
+<#
+.SYNOPSIS
+Builds the package manifest path for a managed Codex runtime.
+
+.DESCRIPTION
+Returns the expected package.json path under a managed Codex runtime home so
+callers can inspect the installed package metadata.
+
+.PARAMETER RuntimeHome
+Managed Codex runtime directory to inspect.
+
+.EXAMPLE
+Get-CodexRuntimePackageJsonPath -RuntimeHome 'C:\manifested\tools\codex\1.2.3'
+#>
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true)]
@@ -52,6 +100,23 @@ function Get-CodexRuntimePackageJsonPath {
 }
 
 function Get-CodexRuntimePackageVersion {
+<#
+.SYNOPSIS
+Reads the installed Codex package version from package metadata.
+
+.DESCRIPTION
+Loads the package.json document for a managed Codex runtime and returns the
+normalized package version when it can be read successfully.
+
+.PARAMETER PackageJsonPath
+Path to the Codex package.json file.
+
+.EXAMPLE
+Get-CodexRuntimePackageVersion -PackageJsonPath 'C:\manifested\tools\codex\1.2.3\node_modules\@openai\codex\package.json'
+
+.NOTES
+Returns $null when the package metadata is missing or unreadable.
+#>
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true)]
@@ -72,6 +137,21 @@ function Get-CodexRuntimePackageVersion {
 }
 
 function Test-CodexRuntime {
+<#
+.SYNOPSIS
+Validates a Codex runtime home.
+
+.DESCRIPTION
+Checks that the Codex executable and package metadata exist, compares the
+reported command version to the installed package version, and returns a
+normalized readiness result for the runtime directory.
+
+.PARAMETER RuntimeHome
+Runtime directory to validate.
+
+.EXAMPLE
+Test-CodexRuntime -RuntimeHome 'C:\manifested\tools\codex\1.2.3'
+#>
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true)]
@@ -125,6 +205,20 @@ function Test-CodexRuntime {
 }
 
 function Get-InstalledCodexRuntime {
+<#
+.SYNOPSIS
+Enumerates managed Codex runtimes in the sandbox.
+
+.DESCRIPTION
+Scans the managed Codex tools root, validates discovered runtime directories,
+and returns the current ready runtime together with valid and invalid entries.
+
+.PARAMETER LocalRoot
+Overrides the manifested sandbox local root to inspect.
+
+.EXAMPLE
+Get-InstalledCodexRuntime
+#>
     [CmdletBinding()]
     param(
         [string]$LocalRoot = (Get-ManifestedLocalRoot)
@@ -165,6 +259,24 @@ function Get-InstalledCodexRuntime {
 }
 
 function Get-ManifestedCodexRuntimeFromCandidatePath {
+<#
+.SYNOPSIS
+Builds Codex runtime metadata from a discovered executable path.
+
+.DESCRIPTION
+Resolves an external Codex executable candidate, validates the surrounding
+runtime layout, and returns normalized runtime metadata when the candidate is
+usable.
+
+.PARAMETER CandidatePath
+Potential path to a Codex executable discovered from the command environment.
+
+.EXAMPLE
+Get-ManifestedCodexRuntimeFromCandidatePath -CandidatePath 'C:\tools\codex\codex.cmd'
+
+.NOTES
+Returns $null when the candidate does not resolve to a ready Codex runtime.
+#>
     [CmdletBinding()]
     param(
         [string]$CandidatePath
@@ -199,6 +311,20 @@ function Get-ManifestedCodexRuntimeFromCandidatePath {
 }
 
 function Get-SystemCodexRuntime {
+<#
+.SYNOPSIS
+Finds a usable external Codex runtime on the system path.
+
+.DESCRIPTION
+Searches for Codex executables outside the managed tools root and returns the
+first validated external runtime that can be used by the sandbox.
+
+.PARAMETER LocalRoot
+Overrides the manifested sandbox local root so managed paths can be excluded.
+
+.EXAMPLE
+Get-SystemCodexRuntime
+#>
     [CmdletBinding()]
     param(
         [string]$LocalRoot = (Get-ManifestedLocalRoot)
@@ -315,6 +441,27 @@ Returns a Blocked state on non-Windows hosts.
 }
 
 function Repair-CodexRuntime {
+<#
+.SYNOPSIS
+Removes partial or invalid Codex runtime artifacts.
+
+.DESCRIPTION
+Collects partial stage directories, invalid managed runtime homes, and
+optionally supplied corrupt runtime paths, then removes them to clear the way
+for a clean reinstall.
+
+.PARAMETER State
+Existing Codex runtime state to repair. When omitted, the state is discovered.
+
+.PARAMETER CorruptRuntimeHomes
+Additional runtime paths to remove during repair.
+
+.PARAMETER LocalRoot
+Overrides the manifested sandbox local root used for state discovery.
+
+.EXAMPLE
+Repair-CodexRuntime -State (Get-CodexRuntimeState)
+#>
     [CmdletBinding()]
     param(
         [pscustomobject]$State,

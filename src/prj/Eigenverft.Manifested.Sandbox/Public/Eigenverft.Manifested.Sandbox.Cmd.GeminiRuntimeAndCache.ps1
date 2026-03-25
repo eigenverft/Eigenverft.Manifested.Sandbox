@@ -445,6 +445,27 @@ function Install-GeminiRuntime {
 }
 
 function Initialize-GeminiRuntime {
+<#
+.SYNOPSIS
+Ensures the Gemini runtime is available and ready for command-line use.
+
+.DESCRIPTION
+Evaluates the current Gemini runtime state, repairs partial or invalid installs,
+ensures required Node.js dependencies are present, installs the managed runtime
+when needed, and synchronizes the command-line environment metadata.
+
+.PARAMETER RefreshGemini
+Forces the managed Gemini runtime to be reinstalled even when one is already ready.
+
+.EXAMPLE
+Initialize-GeminiRuntime
+
+.EXAMPLE
+Initialize-GeminiRuntime -RefreshGemini
+
+.NOTES
+Supports WhatIf and may trigger dependent runtime initialization steps.
+#>
     [CmdletBinding(SupportsShouldProcess = $true)]
     param(
         [switch]$RefreshGemini
