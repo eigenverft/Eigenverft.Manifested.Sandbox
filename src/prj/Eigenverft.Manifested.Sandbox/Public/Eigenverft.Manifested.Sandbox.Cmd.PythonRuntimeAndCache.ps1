@@ -3,6 +3,27 @@
 #>
 
 function ConvertTo-PythonVersion {
+<#
+.SYNOPSIS
+Normalizes Python version text into a comparable version object.
+
+.DESCRIPTION
+Extracts the first `major.minor.patch` fragment from arbitrary Python version
+text and converts it into a `[version]` instance so runtime release checks can
+compare versions consistently.
+
+.PARAMETER VersionText
+Raw version text emitted by Python tooling or release metadata.
+
+.EXAMPLE
+ConvertTo-PythonVersion -VersionText 'Python 3.13.2'
+
+.EXAMPLE
+ConvertTo-PythonVersion -VersionText '3.13.2rc1'
+
+.NOTES
+Returns `$null` when no semantic version fragment can be found.
+#>
     [CmdletBinding()]
     param(
         [string]$VersionText
