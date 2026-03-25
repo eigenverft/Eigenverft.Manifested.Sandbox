@@ -26,15 +26,17 @@ Describe 'Eigenverft.Manifested.Sandbox module' {
             throw "Could not find module manifest at '$moduleManifestPath'. Run the test from the repository root or update the test path."
         }
 
-        Import-Module $moduleManifestPath -Force
+        $script:SandboxModule = Import-Module $moduleManifestPath -Force -PassThru
     }
 
     AfterAll {
-        Remove-Module Eigenverft.Manifested.Sandbox -Force -ErrorAction SilentlyContinue
+        if ($script:SandboxModule) {
+            Remove-Module $script:SandboxModule.Name -Force -ErrorAction SilentlyContinue
+        }
     }
 
     It 'returns the loaded module version from Get-SandboxVersion' {
-        $versionText = Get-SandboxVersion
+        $versionText = & $script:SandboxModule { Get-SandboxVersion }
 
         $versionText | Should -Match '^Eigenverft\.Manifested\.Sandbox \d+\.\d+\.\d+'
     }

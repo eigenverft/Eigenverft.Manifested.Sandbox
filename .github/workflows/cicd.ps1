@@ -118,6 +118,46 @@ Update-ManifestPrerelease -ManifestPath "$($manifestFile.DirectoryName)" -NewPre
 Write-Host "===> Testing module manifest at: $($manifestFile.FullName)" -ForegroundColor Cyan
 Test-ModuleManifest -Path $($manifestFile.FullName)
 
+Write-Host "===> Verifying exported function contract" -ForegroundColor Cyan
+$manifestData = Import-PowerShellDataFile -Path $manifestFile.FullName
+$moduleForExportCheck = Import-Module $manifestFile.FullName -Force -PassThru
+try
+{
+    $expectedExports = @($manifestData.FunctionsToExport | Sort-Object)
+    $actualExports = @($moduleForExportCheck.ExportedCommands.Keys | Sort-Object)
+    $exportDrift = Compare-Object -ReferenceObject $expectedExports -DifferenceObject $actualExports
+    if (@($exportDrift).Count -gt 0)
+    {
+        throw ("Export drift detected between manifest and loaded module: {0}" -f (($exportDrift | ForEach-Object { $_.InputObject }) -join ', '))
+    }
+}
+finally
+{
+    Remove-Module $moduleForExportCheck.Name -Force -ErrorAction SilentlyContinue
+}
+
+Write-Host "===> Running Pester contract tests" -ForegroundColor Cyan
+$pesterCommand = Get-Command -Name Invoke-Pester -ErrorAction SilentlyContinue
+if ($null -eq $pesterCommand)
+{
+    throw 'Invoke-Pester is required for CI validation but was not found.'
+}
+
+$testProjectPath = Join-Path $gitTopLevelDirectory 'src\prj\Eigenverft.Manifested.Sandbox.Test'
+if ($pesterCommand.Parameters.ContainsKey('Path'))
+{
+    $pesterResult = Invoke-Pester -Path $testProjectPath -PassThru
+}
+else
+{
+    $pesterResult = Invoke-Pester -Script $testProjectPath -PassThru
+}
+
+if ($pesterResult.FailedCount -gt 0)
+{
+    throw ("Pester reported {0} failing test(s)." -f $pesterResult.FailedCount)
+}
+
 
 
 $pushToLocalSource = $true
