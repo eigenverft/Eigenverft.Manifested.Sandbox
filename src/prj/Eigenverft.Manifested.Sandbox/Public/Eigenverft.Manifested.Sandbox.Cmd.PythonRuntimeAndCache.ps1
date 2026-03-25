@@ -435,7 +435,7 @@ function Get-PythonReportedVersionProbe {
         }
     }
 
-    $commandResult = Invoke-ManifestedPythonCommand -PythonExe $PythonExe -Arguments @('-c', 'import sys; print(".".join(map(str, sys.version_info[:3])))') -LocalRoot $LocalRoot
+    $commandResult = Invoke-ManifestedPythonCommand -PythonExe $PythonExe -Arguments @('-c', 'import sys; print(*sys.version_info[:3], sep=chr(46))') -LocalRoot $LocalRoot
     $reportedVersion = $null
     if ($commandResult.ExitCode -eq 0) {
         $versionLine = @($commandResult.OutputLines | Select-Object -First 1)
