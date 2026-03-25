@@ -21,6 +21,25 @@ function Get-ManifestedRuntimeRegistry {
             InitializeCommandName   = 'Initialize-PythonRuntime'
             DisplayName             = 'Python'
             DependencyCommandNames  = @()
+            ToolsRootPropertyName   = 'PythonToolsRoot'
+            CacheRootPropertyName   = 'PythonCacheRoot'
+            RefreshParameterName    = 'RefreshPython'
+            SavePackageFunctionName = 'Save-PythonRuntimePackage'
+            TestPackageFunctionName = 'Test-PythonRuntimePackage'
+            InstallFunctionName     = 'Install-PythonRuntime'
+            RepairFunctionName      = 'Repair-PythonRuntime'
+            RuntimeTestFunctionName = 'Test-PythonRuntimeFromState'
+            RuntimeTestParameterResolver = {
+                param([pscustomobject]$RuntimeState)
+
+                @{
+                    State     = $RuntimeState
+                    LocalRoot = if ($RuntimeState -and $RuntimeState.PSObject.Properties['LocalRoot']) { $RuntimeState.LocalRoot } else { (Get-ManifestedLocalRoot) }
+                }
+            }
+            ManagedFinalizerStatusFunctionName = 'Get-ManifestedPythonManagedFinalizerStatus'
+            ManagedFinalizerFunctionName       = 'Invoke-ManifestedPythonManagedFinalization'
+            PersistedDetailsFunctionName       = 'Get-ManifestedPythonPersistedDetails'
             ResolveCommandEnvironment = {
                 param([pscustomobject]$RuntimeState)
 
@@ -72,6 +91,24 @@ function Get-ManifestedRuntimeRegistry {
             InitializeCommandName   = 'Initialize-NodeRuntime'
             DisplayName             = 'Node'
             DependencyCommandNames  = @()
+            ToolsRootPropertyName   = 'NodeToolsRoot'
+            CacheRootPropertyName   = 'NodeCacheRoot'
+            RefreshParameterName    = 'RefreshNode'
+            SavePackageFunctionName = 'Save-NodeRuntimePackage'
+            TestPackageFunctionName = 'Test-NodeRuntimePackage'
+            InstallFunctionName     = 'Install-NodeRuntime'
+            RepairFunctionName      = 'Repair-NodeRuntime'
+            RuntimeTestFunctionName = 'Test-NodeRuntime'
+            RuntimeTestParameterResolver = {
+                param([pscustomobject]$RuntimeState)
+
+                @{
+                    NodeHome = if ($RuntimeState -and $RuntimeState.PSObject.Properties['RuntimeHome']) { $RuntimeState.RuntimeHome } else { $null }
+                }
+            }
+            ManagedFinalizerStatusFunctionName = 'Get-ManifestedNodeManagedFinalizerStatus'
+            ManagedFinalizerFunctionName       = 'Invoke-ManifestedNodeManagedFinalization'
+            PersistedDetailsFunctionName       = 'Get-ManifestedNodePersistedDetails'
             ResolveCommandEnvironment = {
                 param([pscustomobject]$RuntimeState)
 
@@ -489,6 +526,22 @@ function Get-ManifestedRuntimeRegistry {
             InitializeCommandName   = 'Initialize-VCRuntime'
             DisplayName             = 'VC Runtime'
             DependencyCommandNames  = @()
+            CacheRootPropertyName   = 'VCRuntimeCacheRoot'
+            RefreshParameterName    = 'RefreshVCRuntime'
+            SavePackageFunctionName = 'Save-VCRuntimeInstaller'
+            TestPackageFunctionName = 'Test-VCRuntimeInstaller'
+            InstallFunctionName     = 'Install-VCRuntime'
+            RepairFunctionName      = 'Repair-VCRuntime'
+            RuntimeTestFunctionName = 'Test-VCRuntime'
+            RuntimeTestParameterResolver = {
+                param([pscustomobject]$RuntimeState)
+
+                @{
+                    InstalledRuntime = if ($RuntimeState -and $RuntimeState.PSObject.Properties['InstalledRuntime']) { $RuntimeState.InstalledRuntime } else { $null }
+                }
+            }
+            PersistedDetailsFunctionName = 'Get-ManifestedMachinePrerequisitePersistedDetails'
+            InstallTimeoutParameterName  = 'InstallTimeoutSec'
             ResolveCommandEnvironment = {
                 param([pscustomobject]$RuntimeState)
                 [pscustomobject]@{

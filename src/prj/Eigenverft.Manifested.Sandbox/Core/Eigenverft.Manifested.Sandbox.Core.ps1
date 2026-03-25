@@ -19,6 +19,9 @@
 
 # Private logic
 . "$PSScriptRoot\..\Private\Logic\Eigenverft.Manifested.Sandbox.RuntimeRegistry.ps1"
+. "$PSScriptRoot\..\Private\Logic\Eigenverft.Manifested.Sandbox.RuntimePack.Node.ps1"
+. "$PSScriptRoot\..\Private\Logic\Eigenverft.Manifested.Sandbox.RuntimePack.Python.ps1"
+. "$PSScriptRoot\..\Private\Logic\Eigenverft.Manifested.Sandbox.RuntimePack.MachinePrerequisite.ps1"
 . "$PSScriptRoot\..\Private\Logic\Eigenverft.Manifested.Sandbox.RuntimePack.NpmCli.ps1"
 . "$PSScriptRoot\..\Private\Logic\Eigenverft.Manifested.Sandbox.RuntimePack.GitHubPortable.ps1"
 . "$PSScriptRoot\..\Private\Logic\Eigenverft.Manifested.Sandbox.Shared.CommandEnvironment.ps1"
