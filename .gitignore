@@ -369,3 +369,4 @@ FodyWeavers.xsd
 /reports/**/*
 AGENTS.md
 .agents/**/*
+.gemini/**/*
