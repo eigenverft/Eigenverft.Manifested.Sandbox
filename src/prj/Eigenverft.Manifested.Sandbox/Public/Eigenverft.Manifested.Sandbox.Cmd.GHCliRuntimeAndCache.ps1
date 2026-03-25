@@ -761,6 +761,8 @@ function Initialize-GHCliRuntime {
         [switch]$RefreshGHCli
     )
 
+    return (Invoke-ManifestedGitHubPortableRuntimeInitialization -CommandName 'Initialize-GHCliRuntime' -Refresh:$RefreshGHCli)
+
     $LocalRoot = (Get-ManifestedLayout).LocalRoot
     $selfElevationContext = Get-ManifestedSelfElevationContext
 

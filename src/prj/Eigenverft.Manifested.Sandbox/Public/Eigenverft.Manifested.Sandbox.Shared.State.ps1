@@ -63,35 +63,23 @@ function Get-ManifestedRuntimeSnapshots {
     )
 
     $layout = Get-ManifestedLayout -LocalRoot $LocalRoot
-    $definitions = @(
-        @{ Name = 'PythonRuntime'; FunctionName = 'Get-PythonRuntimeState'; PathProperty = 'RuntimeHome' },
-        @{ Name = 'NodeRuntime'; FunctionName = 'Get-NodeRuntimeState'; PathProperty = 'RuntimeHome' },
-        @{ Name = 'OpenCodeRuntime'; FunctionName = 'Get-OpenCodeRuntimeState'; PathProperty = 'RuntimeHome' },
-        @{ Name = 'GeminiRuntime'; FunctionName = 'Get-GeminiRuntimeState'; PathProperty = 'RuntimeHome' },
-        @{ Name = 'QwenRuntime'; FunctionName = 'Get-QwenRuntimeState'; PathProperty = 'RuntimeHome' },
-        @{ Name = 'CodexRuntime'; FunctionName = 'Get-CodexRuntimeState'; PathProperty = 'RuntimeHome' },
-        @{ Name = 'GHCliRuntime'; FunctionName = 'Get-GHCliRuntimeState'; PathProperty = 'RuntimeHome' },
-        @{ Name = 'Ps7Runtime'; FunctionName = 'Get-Ps7RuntimeState'; PathProperty = 'RuntimeHome' },
-        @{ Name = 'GitRuntime'; FunctionName = 'Get-GitRuntimeState'; PathProperty = 'RuntimeHome' },
-        @{ Name = 'VSCodeRuntime'; FunctionName = 'Get-VSCodeRuntimeState'; PathProperty = 'RuntimeHome' },
-        @{ Name = 'VCRuntime'; FunctionName = 'Get-VCRuntimeState'; PathProperty = 'InstallerPath' }
-    )
+    $definitions = @(Get-ManifestedRuntimeSnapshotDescriptors)
 
     $items = @()
     foreach ($definition in $definitions) {
-        if (-not (Get-Command -Name $definition.FunctionName -CommandType Function -ErrorAction SilentlyContinue)) {
+        if (-not (Get-Command -Name $definition.StateFunctionName -CommandType Function -ErrorAction SilentlyContinue)) {
             continue
         }
 
         try {
-            $state = & $definition.FunctionName -LocalRoot $layout.LocalRoot
+            $state = & $definition.StateFunctionName -LocalRoot $layout.LocalRoot
             $resourcePath = $null
-            if ($state -and $state.PSObject.Properties[$definition.PathProperty]) {
-                $resourcePath = $state.($definition.PathProperty)
+            if ($state -and $state.PSObject.Properties[$definition.SnapshotPathProperty]) {
+                $resourcePath = $state.($definition.SnapshotPathProperty)
             }
 
             $items += [pscustomobject]@{
-                Name           = $definition.Name
+                Name           = $definition.SnapshotName
                 Status         = if ($state -and $state.PSObject.Properties['Status']) { $state.Status } else { $null }
                 RuntimeSource  = if ($state -and $state.PSObject.Properties['RuntimeSource']) { $state.RuntimeSource } else { $null }
                 CurrentVersion = if ($state -and $state.PSObject.Properties['CurrentVersion']) { $state.CurrentVersion } else { $null }
@@ -102,7 +90,7 @@ function Get-ManifestedRuntimeSnapshots {
         }
         catch {
             $items += [pscustomobject]@{
-                Name           = $definition.Name
+                Name           = $definition.SnapshotName
                 Status         = 'Error'
                 RuntimeSource  = $null
                 CurrentVersion = $null

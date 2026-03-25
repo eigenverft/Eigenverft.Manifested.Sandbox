@@ -209,169 +209,23 @@ function Get-ManifestedCommandEnvironmentSpec {
         [pscustomobject]$RuntimeState
     )
 
-    $runtimeHome = if ($RuntimeState -and $RuntimeState.PSObject.Properties['RuntimeHome']) { $RuntimeState.RuntimeHome } else { $null }
+    $descriptor = Get-ManifestedRuntimeDescriptor -CommandName $CommandName
     $executablePath = if ($RuntimeState -and $RuntimeState.PSObject.Properties['ExecutablePath']) { $RuntimeState.ExecutablePath } else { $null }
-    $cliCommandPath = if ($RuntimeState -and $RuntimeState.PSObject.Properties['CliCommandPath']) { $RuntimeState.CliCommandPath } else { $null }
     $runtimeSource = if ($RuntimeState -and $RuntimeState.PSObject.Properties['RuntimeSource']) { $RuntimeState.RuntimeSource } else { $null }
 
     $desiredCommandDirectory = $null
     $expectedCommandPaths = [ordered]@{}
 
-    switch ($CommandName) {
-        'Initialize-PythonRuntime' {
-            if (-not [string]::IsNullOrWhiteSpace($runtimeHome)) {
-                $desiredCommandDirectory = $runtimeHome
+    if ($descriptor -and $descriptor.PSObject.Properties['ResolveCommandEnvironment'] -and $descriptor.ResolveCommandEnvironment) {
+        $resolvedSpecification = & $descriptor.ResolveCommandEnvironment $RuntimeState
+        if ($resolvedSpecification) {
+            if ($resolvedSpecification.PSObject.Properties['DesiredCommandDirectory']) {
+                $desiredCommandDirectory = $resolvedSpecification.DesiredCommandDirectory
             }
-            elseif (-not [string]::IsNullOrWhiteSpace($executablePath)) {
-                $desiredCommandDirectory = Split-Path -Parent $executablePath
-            }
-
-            $pythonCommandPath = $null
-            if (-not [string]::IsNullOrWhiteSpace($executablePath)) {
-                $pythonCommandPath = (Get-ManifestedFullPath -Path $executablePath)
-            }
-            elseif (-not [string]::IsNullOrWhiteSpace($runtimeHome)) {
-                $pythonCommandPath = (Get-ManifestedFullPath -Path (Join-Path $runtimeHome 'python.exe'))
-            }
-
-            if (-not [string]::IsNullOrWhiteSpace($pythonCommandPath)) {
-                $expectedCommandPaths['python'] = $pythonCommandPath
-                $expectedCommandPaths['python.exe'] = $pythonCommandPath
-            }
-
-            if ($runtimeSource -eq 'Managed' -and -not [string]::IsNullOrWhiteSpace($runtimeHome)) {
-                $expectedCommandPaths['pip.cmd'] = (Get-ManifestedFullPath -Path (Join-Path $runtimeHome 'pip.cmd'))
-                $expectedCommandPaths['pip3.cmd'] = (Get-ManifestedFullPath -Path (Join-Path $runtimeHome 'pip3.cmd'))
-            }
-        }
-        'Initialize-NodeRuntime' {
-            if (-not [string]::IsNullOrWhiteSpace($runtimeHome)) {
-                $desiredCommandDirectory = $runtimeHome
-            }
-            elseif (-not [string]::IsNullOrWhiteSpace($executablePath)) {
-                $desiredCommandDirectory = Split-Path -Parent $executablePath
-            }
-
-            if (-not [string]::IsNullOrWhiteSpace($executablePath)) {
-                $expectedCommandPaths['node.exe'] = (Get-ManifestedFullPath -Path $executablePath)
-            }
-            if (-not [string]::IsNullOrWhiteSpace($runtimeHome)) {
-                $expectedCommandPaths['npm.cmd'] = (Get-ManifestedFullPath -Path (Join-Path $runtimeHome 'npm.cmd'))
-            }
-        }
-        'Initialize-OpenCodeRuntime' {
-            if (-not [string]::IsNullOrWhiteSpace($runtimeHome)) {
-                $desiredCommandDirectory = $runtimeHome
-            }
-            elseif (-not [string]::IsNullOrWhiteSpace($executablePath)) {
-                $desiredCommandDirectory = Split-Path -Parent $executablePath
-            }
-
-            $openCodeCommandPath = $null
-            if (-not [string]::IsNullOrWhiteSpace($executablePath)) {
-                $openCodeCommandPath = (Get-ManifestedFullPath -Path $executablePath)
-            }
-            elseif (-not [string]::IsNullOrWhiteSpace($runtimeHome)) {
-                $openCodeCommandPath = (Get-ManifestedFullPath -Path (Join-Path $runtimeHome 'opencode.cmd'))
-            }
-
-            if (-not [string]::IsNullOrWhiteSpace($openCodeCommandPath)) {
-                $expectedCommandPaths['opencode'] = $openCodeCommandPath
-                $expectedCommandPaths['opencode.cmd'] = $openCodeCommandPath
-            }
-        }
-        'Initialize-CodexRuntime' {
-            if (-not [string]::IsNullOrWhiteSpace($runtimeHome)) {
-                $desiredCommandDirectory = $runtimeHome
-            }
-            elseif (-not [string]::IsNullOrWhiteSpace($executablePath)) {
-                $desiredCommandDirectory = Split-Path -Parent $executablePath
-            }
-
-            $codexCommandPath = $null
-            if (-not [string]::IsNullOrWhiteSpace($executablePath)) {
-                $codexCommandPath = (Get-ManifestedFullPath -Path $executablePath)
-            }
-            elseif (-not [string]::IsNullOrWhiteSpace($runtimeHome)) {
-                $codexCommandPath = (Get-ManifestedFullPath -Path (Join-Path $runtimeHome 'codex.cmd'))
-            }
-
-            if (-not [string]::IsNullOrWhiteSpace($codexCommandPath)) {
-                $expectedCommandPaths['codex'] = $codexCommandPath
-                $expectedCommandPaths['codex.cmd'] = $codexCommandPath
-            }
-        }
-        'Initialize-GeminiRuntime' {
-            if (-not [string]::IsNullOrWhiteSpace($runtimeHome)) {
-                $desiredCommandDirectory = $runtimeHome
-            }
-            elseif (-not [string]::IsNullOrWhiteSpace($executablePath)) {
-                $desiredCommandDirectory = Split-Path -Parent $executablePath
-            }
-
-            $geminiCommandPath = $null
-            if (-not [string]::IsNullOrWhiteSpace($executablePath)) {
-                $geminiCommandPath = (Get-ManifestedFullPath -Path $executablePath)
-            }
-            elseif (-not [string]::IsNullOrWhiteSpace($runtimeHome)) {
-                $geminiCommandPath = (Get-ManifestedFullPath -Path (Join-Path $runtimeHome 'gemini.cmd'))
-            }
-
-            if (-not [string]::IsNullOrWhiteSpace($geminiCommandPath)) {
-                $expectedCommandPaths['gemini'] = $geminiCommandPath
-                $expectedCommandPaths['gemini.cmd'] = $geminiCommandPath
-            }
-        }
-        'Initialize-QwenRuntime' {
-            if (-not [string]::IsNullOrWhiteSpace($runtimeHome)) {
-                $desiredCommandDirectory = $runtimeHome
-            }
-            elseif (-not [string]::IsNullOrWhiteSpace($executablePath)) {
-                $desiredCommandDirectory = Split-Path -Parent $executablePath
-            }
-
-            $qwenCommandPath = $null
-            if (-not [string]::IsNullOrWhiteSpace($executablePath)) {
-                $qwenCommandPath = (Get-ManifestedFullPath -Path $executablePath)
-            }
-            elseif (-not [string]::IsNullOrWhiteSpace($runtimeHome)) {
-                $qwenCommandPath = (Get-ManifestedFullPath -Path (Join-Path $runtimeHome 'qwen.cmd'))
-            }
-
-            if (-not [string]::IsNullOrWhiteSpace($qwenCommandPath)) {
-                $expectedCommandPaths['qwen'] = $qwenCommandPath
-                $expectedCommandPaths['qwen.cmd'] = $qwenCommandPath
-            }
-        }
-        'Initialize-GHCliRuntime' {
-            if (-not [string]::IsNullOrWhiteSpace($executablePath)) {
-                $desiredCommandDirectory = Split-Path -Parent $executablePath
-                $expectedCommandPaths['gh'] = (Get-ManifestedFullPath -Path $executablePath)
-                $expectedCommandPaths['gh.exe'] = (Get-ManifestedFullPath -Path $executablePath)
-            }
-        }
-        'Initialize-Ps7Runtime' {
-            if (-not [string]::IsNullOrWhiteSpace($executablePath)) {
-                $desiredCommandDirectory = Split-Path -Parent $executablePath
-                $expectedCommandPaths['pwsh.exe'] = (Get-ManifestedFullPath -Path $executablePath)
-            }
-        }
-        'Initialize-GitRuntime' {
-            if (-not [string]::IsNullOrWhiteSpace($executablePath)) {
-                $desiredCommandDirectory = Split-Path -Parent $executablePath
-                $expectedCommandPaths['git.exe'] = (Get-ManifestedFullPath -Path $executablePath)
-            }
-        }
-        'Initialize-VSCodeRuntime' {
-            if (-not [string]::IsNullOrWhiteSpace($cliCommandPath)) {
-                $desiredCommandDirectory = Split-Path -Parent $cliCommandPath
-                $expectedCommandPaths['code'] = (Get-ManifestedFullPath -Path $cliCommandPath)
-                $expectedCommandPaths['code.cmd'] = (Get-ManifestedFullPath -Path $cliCommandPath)
-            }
-            elseif (-not [string]::IsNullOrWhiteSpace($runtimeHome)) {
-                $desiredCommandDirectory = Join-Path $runtimeHome 'bin'
-                $expectedCommandPaths['code'] = (Get-ManifestedFullPath -Path (Join-Path $desiredCommandDirectory 'code.cmd'))
-                $expectedCommandPaths['code.cmd'] = (Get-ManifestedFullPath -Path (Join-Path $desiredCommandDirectory 'code.cmd'))
+            if ($resolvedSpecification.PSObject.Properties['ExpectedCommandPaths'] -and $resolvedSpecification.ExpectedCommandPaths) {
+                foreach ($commandPathEntry in $resolvedSpecification.ExpectedCommandPaths.GetEnumerator()) {
+                    $expectedCommandPaths[$commandPathEntry.Key] = $commandPathEntry.Value
+                }
             }
         }
     }

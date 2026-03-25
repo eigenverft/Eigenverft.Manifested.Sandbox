@@ -877,6 +877,8 @@ function Initialize-VSCodeRuntime {
         [switch]$RefreshVSCode
     )
 
+    return (Invoke-ManifestedGitHubPortableRuntimeInitialization -CommandName 'Initialize-VSCodeRuntime' -Refresh:$RefreshVSCode)
+
     $LocalRoot = (Get-ManifestedLayout).LocalRoot
     $selfElevationContext = Get-ManifestedSelfElevationContext
 

@@ -701,6 +701,8 @@ function Initialize-GitRuntime {
         [switch]$RefreshGit
     )
 
+    return (Invoke-ManifestedGitHubPortableRuntimeInitialization -CommandName 'Initialize-GitRuntime' -Refresh:$RefreshGit)
+
     $LocalRoot = (Get-ManifestedLayout).LocalRoot
     $selfElevationContext = Get-ManifestedSelfElevationContext
 
