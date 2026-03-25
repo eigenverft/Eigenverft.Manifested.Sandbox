@@ -3,6 +3,23 @@
 #>
 
 function Get-ManagedPythonPipConfigPath {
+<#
+.SYNOPSIS
+Returns the managed pip configuration file path for a Python home.
+
+.DESCRIPTION
+Builds the runtime-local `pip.ini` path that the sandbox-managed Python
+wrappers and pip helpers use for persisted pip settings.
+
+.PARAMETER PythonHome
+The root directory that contains the managed Python executable.
+
+.EXAMPLE
+Get-ManagedPythonPipConfigPath -PythonHome 'C:\Sandbox\tools\python\3.13.12\amd64'
+
+.NOTES
+This helper only composes the path and does not create the file.
+#>
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true)]
@@ -13,6 +30,23 @@ function Get-ManagedPythonPipConfigPath {
 }
 
 function Get-ManagedPythonPipCacheRoot {
+<#
+.SYNOPSIS
+Returns the managed pip cache directory.
+
+.DESCRIPTION
+Resolves the sandbox-owned pip cache root beneath the manifested Python cache
+layout for the supplied or default local root.
+
+.PARAMETER LocalRoot
+The sandbox local root used to calculate the managed cache layout.
+
+.EXAMPLE
+Get-ManagedPythonPipCacheRoot
+
+.NOTES
+The returned path is used for `PIP_CACHE_DIR` in managed runtimes.
+#>
     [CmdletBinding()]
     param(
         [string]$LocalRoot = (Get-ManifestedLocalRoot)
@@ -23,6 +57,26 @@ function Get-ManagedPythonPipCacheRoot {
 }
 
 function Test-ManifestedManagedPythonCommand {
+<#
+.SYNOPSIS
+Determines whether a Python executable belongs to the managed sandbox layout.
+
+.DESCRIPTION
+Checks whether the supplied Python executable path resolves underneath the
+manifested Python tools root for the selected sandbox local root.
+
+.PARAMETER PythonExe
+The Python executable path to evaluate.
+
+.PARAMETER LocalRoot
+The sandbox local root used to resolve the managed tools directory.
+
+.EXAMPLE
+Test-ManifestedManagedPythonCommand -PythonExe 'C:\Sandbox\tools\python\3.13.12\amd64\python.exe'
+
+.NOTES
+This guard is used to avoid applying managed pip settings to external runtimes.
+#>
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true)]
@@ -93,6 +147,20 @@ External Python runtimes return an empty environment-variable map.
 }
 
 function Get-ManifestedPipIndexUri {
+<#
+.SYNOPSIS
+Returns the canonical pip package-index URI.
+
+.DESCRIPTION
+Provides the package-index endpoint used when evaluating direct versus proxied
+network routes for pip traffic.
+
+.EXAMPLE
+Get-ManifestedPipIndexUri
+
+.NOTES
+The current implementation targets the public PyPI simple index.
+#>
     [CmdletBinding()]
     param()
 
@@ -100,6 +168,24 @@ function Get-ManifestedPipIndexUri {
 }
 
 function Resolve-ManifestedPipProxyRoute {
+<#
+.SYNOPSIS
+Determines whether pip traffic should use a system proxy.
+
+.DESCRIPTION
+Consults the system web proxy for the requested package index URI and reports
+whether the route is direct or proxied, including the effective proxy URI when
+one is required.
+
+.PARAMETER IndexUri
+The package index URI whose network route should be evaluated.
+
+.EXAMPLE
+Resolve-ManifestedPipProxyRoute -IndexUri (Get-ManifestedPipIndexUri)
+
+.NOTES
+Proxy discovery failures are treated as direct access to keep the helper safe.
+#>
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true)]
@@ -135,6 +221,23 @@ function Resolve-ManifestedPipProxyRoute {
 }
 
 function Get-ManifestedPipConfigDocument {
+<#
+.SYNOPSIS
+Reads a pip configuration file into an in-memory document.
+
+.DESCRIPTION
+Parses a `pip.ini`-style configuration file into nested ordered hashtables,
+preserving section and key ordering for later read and write operations.
+
+.PARAMETER ConfigPath
+The configuration file to parse.
+
+.EXAMPLE
+Get-ManifestedPipConfigDocument -ConfigPath 'C:\Sandbox\tools\python\3.13.12\amd64\pip.ini'
+
+.NOTES
+Missing files return an empty ordered hashtable.
+#>
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true)]
@@ -176,6 +279,29 @@ function Get-ManifestedPipConfigDocument {
 }
 
 function Get-ManifestedPipConfigValue {
+<#
+.SYNOPSIS
+Reads a single value from a pip configuration document.
+
+.DESCRIPTION
+Loads the pip configuration file and returns the requested key from the named
+section when it exists; otherwise returns `$null`.
+
+.PARAMETER ConfigPath
+The configuration file to inspect.
+
+.PARAMETER Section
+The section name that should contain the key.
+
+.PARAMETER Key
+The key to read from the selected section.
+
+.EXAMPLE
+Get-ManifestedPipConfigValue -ConfigPath $pipIni -Section 'global' -Key 'proxy'
+
+.NOTES
+This helper does not create missing sections or keys.
+#>
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true)]
@@ -200,6 +326,32 @@ function Get-ManifestedPipConfigValue {
 }
 
 function Set-ManifestedPipConfigValue {
+<#
+.SYNOPSIS
+Writes a single value into a pip configuration file.
+
+.DESCRIPTION
+Ensures the requested section exists, updates the selected key, and rewrites
+the runtime-local pip configuration file in a stable ordered format.
+
+.PARAMETER ConfigPath
+The configuration file to update.
+
+.PARAMETER Section
+The section that should contain the key.
+
+.PARAMETER Key
+The key name to write.
+
+.PARAMETER Value
+The value to assign to the selected key.
+
+.EXAMPLE
+Set-ManifestedPipConfigValue -ConfigPath $pipIni -Section 'global' -Key 'proxy' -Value 'http://proxy:8080'
+
+.NOTES
+The file is written with ASCII encoding to match the surrounding module style.
+#>
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true)]
@@ -242,6 +394,28 @@ function Set-ManifestedPipConfigValue {
 }
 
 function Get-ManifestedPipProxyConfigurationStatus {
+<#
+.SYNOPSIS
+Summarizes the current pip proxy configuration state for a Python runtime.
+
+.DESCRIPTION
+Combines the managed-runtime test, effective network route, and any existing
+pip proxy setting to describe what action, if any, is needed before running
+pip-related commands.
+
+.PARAMETER PythonExe
+The Python executable whose pip configuration should be evaluated.
+
+.PARAMETER LocalRoot
+The sandbox local root used to resolve managed layout paths.
+
+.EXAMPLE
+Get-ManifestedPipProxyConfigurationStatus -PythonExe $pythonExe
+
+.NOTES
+The returned object is designed to be reusable by
+`Sync-ManifestedPipProxyConfiguration`.
+#>
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true)]
@@ -357,6 +531,26 @@ External Python runtimes are left unchanged.
 }
 
 function Set-ManifestedManagedPipWrappers {
+<#
+.SYNOPSIS
+Creates pip wrapper commands for a managed Python runtime.
+
+.DESCRIPTION
+Writes `pip.cmd` and `pip3.cmd` wrappers that pin the managed `pip.ini` file
+and pip cache directory before delegating to `python.exe -m pip`.
+
+.PARAMETER PythonHome
+The root directory of the managed Python runtime that should receive wrappers.
+
+.PARAMETER LocalRoot
+The sandbox local root used to resolve the shared pip cache directory.
+
+.EXAMPLE
+Set-ManifestedManagedPipWrappers -PythonHome 'C:\Sandbox\tools\python\3.13.12\amd64'
+
+.NOTES
+This helper is intended for managed runtimes only.
+#>
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true)]
@@ -392,6 +586,161 @@ function Set-ManifestedManagedPipWrappers {
         PipConfigPath = $pipConfigPath
         PipCacheRoot  = $pipCacheRoot
         WrapperPaths  = @($wrapperPaths)
+    }
+}
+
+function Get-ManagedPythonSanitizedEnvironmentVariableNames {
+<#
+.SYNOPSIS
+Returns Python environment variables that should be cleared for managed runtimes.
+
+.DESCRIPTION
+Lists session-level Python environment variables that can interfere with the
+isolated embeddable runtime layout when a sandbox-managed Python executable is
+launched from a host shell that already has Python-specific configuration.
+
+.EXAMPLE
+Get-ManagedPythonSanitizedEnvironmentVariableNames
+
+.NOTES
+These variables are only cleared for sandbox-managed runtimes.
+#>
+    [CmdletBinding()]
+    param()
+
+    return @(
+        'PYTHONHOME',
+        'PYTHONPATH'
+    )
+}
+
+function Invoke-ManifestedPythonCommand {
+<#
+.SYNOPSIS
+Invokes Python with managed sandbox environment adjustments when applicable.
+
+.DESCRIPTION
+Runs a Python command, temporarily applying the runtime-local pip config and
+cache variables for managed runtimes when requested and clearing conflicting
+Python host variables such as `PYTHONHOME` and `PYTHONPATH`. The previous
+process environment is restored even when the Python process fails to start.
+
+.PARAMETER PythonExe
+The Python executable to run.
+
+.PARAMETER Arguments
+The argument vector passed to the Python process.
+
+.PARAMETER IncludeManagedPipEnvironment
+Adds managed `PIP_CONFIG_FILE` and `PIP_CACHE_DIR` variables when the Python
+executable belongs to the sandbox-managed runtime layout.
+
+.PARAMETER LocalRoot
+The pinned sandbox root used to derive managed pip settings.
+
+.EXAMPLE
+Invoke-ManifestedPythonCommand -PythonExe $pythonExe -Arguments @('-V')
+
+.EXAMPLE
+Invoke-ManifestedPythonCommand -PythonExe $pythonExe -Arguments @('-m', 'pip', '--version') -IncludeManagedPipEnvironment
+
+.NOTES
+External Python runtimes are executed without managed environment sanitization.
+#>
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$PythonExe,
+
+        [Parameter(Mandatory = $true)]
+        [string[]]$Arguments,
+
+        [switch]$IncludeManagedPipEnvironment,
+
+        [string]$LocalRoot = (Get-ManifestedLocalRoot)
+    )
+
+    $configuration = Get-ManifestedPythonPipConfiguration -PythonExe $PythonExe -LocalRoot $LocalRoot
+    $environmentVariables = [ordered]@{}
+    $previousValues = @{}
+    $sanitizedVariables = @()
+    $output = @()
+    $exitCode = $null
+    $exceptionMessage = $null
+
+    if ($configuration.IsManagedPython) {
+        foreach ($variableName in @(Get-ManagedPythonSanitizedEnvironmentVariableNames)) {
+            $environmentVariables[$variableName] = $null
+        }
+
+        $sanitizedVariables = @($environmentVariables.Keys)
+
+        if ($IncludeManagedPipEnvironment) {
+            foreach ($variableName in @($configuration.EnvironmentVariables.Keys)) {
+                $environmentVariables[$variableName] = $configuration.EnvironmentVariables[$variableName]
+            }
+        }
+    }
+
+    try {
+        foreach ($variableName in @($environmentVariables.Keys)) {
+            $previousValues[$variableName] = [System.Environment]::GetEnvironmentVariable($variableName, 'Process')
+            $targetValue = $environmentVariables[$variableName]
+            [System.Environment]::SetEnvironmentVariable($variableName, $targetValue, 'Process')
+            if ($null -eq $targetValue) {
+                Remove-Item -Path ('Env:' + $variableName) -ErrorAction SilentlyContinue
+            }
+            else {
+                Set-Item -Path ('Env:' + $variableName) -Value $targetValue
+            }
+        }
+
+        $output = @(& $PythonExe @Arguments 2>&1)
+        $exitCode = if ($null -ne $LASTEXITCODE) { [int]$LASTEXITCODE } else { 0 }
+    }
+    catch {
+        $exceptionMessage = $_.Exception.Message
+        $output += $_
+        if ($null -eq $exitCode -and $null -ne $LASTEXITCODE) {
+            $exitCode = [int]$LASTEXITCODE
+        }
+    }
+    finally {
+        foreach ($variableName in @($environmentVariables.Keys)) {
+            $previousValue = $previousValues[$variableName]
+            [System.Environment]::SetEnvironmentVariable($variableName, $previousValue, 'Process')
+            if ($null -eq $previousValue) {
+                Remove-Item -Path ('Env:' + $variableName) -ErrorAction SilentlyContinue
+            }
+            else {
+                Set-Item -Path ('Env:' + $variableName) -Value $previousValue
+            }
+        }
+    }
+
+    $outputLines = @(
+        $output |
+            ForEach-Object {
+                if ($null -eq $_) {
+                    return $null
+                }
+
+                $_.ToString().Trim()
+            } |
+            Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
+    )
+
+    [pscustomobject]@{
+        Output                    = @($output)
+        OutputLines               = @($outputLines)
+        OutputText                = ($outputLines -join [Environment]::NewLine)
+        ExitCode                  = $exitCode
+        ExceptionMessage          = $exceptionMessage
+        Succeeded                 = ($null -ne $exitCode -and $exitCode -eq 0 -and [string]::IsNullOrWhiteSpace($exceptionMessage))
+        Configuration             = $configuration
+        IsManagedPython           = $configuration.IsManagedPython
+        AppliedEnvironmentVariables = $environmentVariables
+        SanitizedVariables        = @($sanitizedVariables)
     }
 }
 
@@ -436,37 +785,5 @@ inspection calls.
         [string]$LocalRoot = (Get-ManifestedLocalRoot)
     )
 
-    $configuration = Get-ManifestedPythonPipConfiguration -PythonExe $PythonExe -LocalRoot $LocalRoot
-    $previousValues = @{}
-    $output = @()
-    $exitCode = 0
-
-    try {
-        foreach ($variableName in @($configuration.EnvironmentVariables.Keys)) {
-            $previousValues[$variableName] = [System.Environment]::GetEnvironmentVariable($variableName, 'Process')
-            [System.Environment]::SetEnvironmentVariable($variableName, $configuration.EnvironmentVariables[$variableName], 'Process')
-            Set-Item -Path ('Env:' + $variableName) -Value $configuration.EnvironmentVariables[$variableName]
-        }
-
-        $output = @(& $PythonExe @Arguments 2>&1)
-        $exitCode = $LASTEXITCODE
-    }
-    finally {
-        foreach ($variableName in @($configuration.EnvironmentVariables.Keys)) {
-            $previousValue = $previousValues[$variableName]
-            [System.Environment]::SetEnvironmentVariable($variableName, $previousValue, 'Process')
-            if ($null -eq $previousValue) {
-                Remove-Item -Path ('Env:' + $variableName) -ErrorAction SilentlyContinue
-            }
-            else {
-                Set-Item -Path ('Env:' + $variableName) -Value $previousValue
-            }
-        }
-    }
-
-    [pscustomobject]@{
-        Output        = @($output)
-        ExitCode      = $exitCode
-        Configuration = $configuration
-    }
+    return (Invoke-ManifestedPythonCommand -PythonExe $PythonExe -Arguments $Arguments -IncludeManagedPipEnvironment -LocalRoot $LocalRoot)
 }

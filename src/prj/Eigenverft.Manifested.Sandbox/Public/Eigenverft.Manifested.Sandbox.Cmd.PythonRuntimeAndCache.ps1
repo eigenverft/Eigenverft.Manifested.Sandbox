@@ -410,24 +410,44 @@ function Get-PythonReportedVersion {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true)]
-        [string]$PythonExe
+        [string]$PythonExe,
+
+        [string]$LocalRoot = (Get-ManifestedLocalRoot)
+    )
+
+    $probe = Get-PythonReportedVersionProbe -PythonExe $PythonExe -LocalRoot $LocalRoot
+    return $probe.ReportedVersion
+}
+
+function Get-PythonReportedVersionProbe {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$PythonExe,
+
+        [string]$LocalRoot = (Get-ManifestedLocalRoot)
     )
 
     if (-not (Test-Path -LiteralPath $PythonExe)) {
-        return $null
-    }
-
-    try {
-        $reportedVersion = (& $PythonExe -c 'import sys; print("{0}.{1}.{2}".format(*sys.version_info[:3]))' 2>$null | Select-Object -First 1)
-        if ($reportedVersion) {
-            return $reportedVersion.ToString().Trim()
+        return [pscustomobject]@{
+            ReportedVersion = $null
+            CommandResult   = $null
         }
     }
-    catch {
-        return $null
+
+    $commandResult = Invoke-ManifestedPythonCommand -PythonExe $PythonExe -Arguments @('-c', 'import sys; print("{0}.{1}.{2}".format(*sys.version_info[:3]))') -LocalRoot $LocalRoot
+    $reportedVersion = $null
+    if ($commandResult.ExitCode -eq 0) {
+        $versionLine = @($commandResult.OutputLines | Select-Object -First 1)
+        if ($versionLine) {
+            $reportedVersion = $versionLine[0].ToString().Trim()
+        }
     }
 
-    return $null
+    return [pscustomobject]@{
+        ReportedVersion = $reportedVersion
+        CommandResult   = $commandResult
+    }
 }
 
 function Get-PythonPipVersion {
@@ -439,21 +459,162 @@ function Get-PythonPipVersion {
         [string]$LocalRoot = (Get-ManifestedLocalRoot)
     )
 
+    $probe = Get-PythonPipVersionProbe -PythonExe $PythonExe -LocalRoot $LocalRoot
+    return $probe.PipVersion
+}
+
+function Get-PythonPipVersionProbe {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$PythonExe,
+
+        [string]$LocalRoot = (Get-ManifestedLocalRoot)
+    )
+
     if (-not (Test-Path -LiteralPath $PythonExe)) {
-        return $null
+        return [pscustomobject]@{
+            PipVersion    = $null
+            CommandResult = $null
+        }
     }
 
     $commandResult = Invoke-ManifestedPipAwarePythonCommand -PythonExe $PythonExe -Arguments @('-m', 'pip', '--version') -LocalRoot $LocalRoot
-    if ($commandResult.ExitCode -ne 0) {
+    $pipVersion = $null
+    if ($commandResult.ExitCode -eq 0) {
+        $versionLine = @($commandResult.OutputLines | Select-Object -First 1)
+        if ($versionLine) {
+            $pipVersion = $versionLine[0].ToString().Trim()
+        }
+    }
+
+    return [pscustomobject]@{
+        PipVersion    = $pipVersion
+        CommandResult = $commandResult
+    }
+}
+
+function Test-PythonRuntimePackageHasTrustedHash {
+    [CmdletBinding()]
+    param(
+        [pscustomobject]$PackageInfo
+    )
+
+    return ($PackageInfo -and -not [string]::IsNullOrWhiteSpace($PackageInfo.Sha256))
+}
+
+function Get-PythonCommandFailureHint {
+    [CmdletBinding()]
+    param(
+        [pscustomobject]$CommandResult,
+
+        [string]$LocalRoot = (Get-ManifestedLocalRoot)
+    )
+
+    if (-not $CommandResult) {
         return $null
     }
 
-    $versionLine = @($commandResult.Output | Select-Object -First 1)
-    if (-not $versionLine) {
-        return $null
+    $combinedText = @(
+        $CommandResult.ExceptionMessage
+        $CommandResult.OutputText
+    ) -join [Environment]::NewLine
+
+    if ($combinedText -match 'No module named encodings|init_fs_encoding') {
+        return 'The Python process started with an invalid import-path configuration. The managed runtime now clears PYTHONHOME and PYTHONPATH automatically; if this persists, repair the managed runtime cache and retry.'
     }
 
-    return $versionLine[0].ToString().Trim()
+    return $null
+}
+
+function New-PythonRuntimePackageTrustFailureMessage {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [pscustomobject]$PackageInfo,
+
+        [string]$MetadataRefreshError
+    )
+
+    $lines = New-Object System.Collections.Generic.List[string]
+    $lines.Add(("Python runtime package verification could not establish a trusted SHA256 for cached package '{0}'." -f $PackageInfo.FileName)) | Out-Null
+    $lines.Add(("Cached path: {0}" -f $PackageInfo.Path)) | Out-Null
+
+    if ($PackageInfo.PSObject.Properties['Version'] -and -not [string]::IsNullOrWhiteSpace($PackageInfo.Version)) {
+        $lines.Add(("Cached version: {0}" -f $PackageInfo.Version)) | Out-Null
+    }
+    if ($PackageInfo.PSObject.Properties['Flavor'] -and -not [string]::IsNullOrWhiteSpace($PackageInfo.Flavor)) {
+        $lines.Add(("Cached flavor: {0}" -f $PackageInfo.Flavor)) | Out-Null
+    }
+    if ($PackageInfo.PSObject.Properties['Source'] -and -not [string]::IsNullOrWhiteSpace($PackageInfo.Source)) {
+        $lines.Add(("Package source: {0}" -f $PackageInfo.Source)) | Out-Null
+    }
+
+    $lines.Add('The cached ZIP is present, but this run does not have trusted release metadata attached to verify it.') | Out-Null
+    $lines.Add('This usually happens when an earlier Python bootstrap downloaded the ZIP but failed before package metadata was persisted.') | Out-Null
+
+    if (-not [string]::IsNullOrWhiteSpace($MetadataRefreshError)) {
+        $lines.Add(("Metadata refresh attempt failed: {0}" -f $MetadataRefreshError)) | Out-Null
+    }
+    else {
+        $lines.Add('A metadata refresh attempt did not produce a trusted checksum for the cached ZIP.') | Out-Null
+    }
+
+    $lines.Add('Retry with normal network access so python.org release metadata can be resolved, or use Initialize-PythonRuntime -RefreshPython to reacquire the package.') | Out-Null
+    return (@($lines) -join [Environment]::NewLine)
+}
+
+function New-PythonRuntimeValidationFailureMessage {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Operation,
+
+        [Parameter(Mandatory = $true)]
+        [string]$PythonHome,
+
+        [string]$ExpectedVersion,
+
+        [string]$ReportedVersion,
+
+        [pscustomobject]$CommandResult,
+
+        [pscustomobject]$SiteImportsState,
+
+        [string]$LocalRoot = (Get-ManifestedLocalRoot)
+    )
+
+    $lines = New-Object System.Collections.Generic.List[string]
+    $lines.Add(("Python runtime validation failed during {0} at {1}." -f $Operation, $PythonHome)) | Out-Null
+
+    if (-not [string]::IsNullOrWhiteSpace($ExpectedVersion)) {
+        $lines.Add(("Expected version: {0}." -f $ExpectedVersion)) | Out-Null
+    }
+    if (-not [string]::IsNullOrWhiteSpace($ReportedVersion)) {
+        $lines.Add(("Reported version: {0}." -f $ReportedVersion)) | Out-Null
+    }
+    if ($CommandResult -and $null -ne $CommandResult.ExitCode) {
+        $lines.Add(("python.exe exit code: {0}." -f $CommandResult.ExitCode)) | Out-Null
+    }
+    if ($CommandResult -and -not [string]::IsNullOrWhiteSpace($CommandResult.ExceptionMessage)) {
+        $lines.Add(("Startup error: {0}" -f $CommandResult.ExceptionMessage)) | Out-Null
+    }
+    if ($CommandResult -and -not [string]::IsNullOrWhiteSpace($CommandResult.OutputText)) {
+        $lines.Add(("python.exe output:{0}{1}" -f [Environment]::NewLine, $CommandResult.OutputText)) | Out-Null
+    }
+    if ($SiteImportsState) {
+        $lines.Add(("Site imports: import site={0}; Lib\\site-packages listed={1}; pth={2}." -f $SiteImportsState.ImportSiteEnabled, $SiteImportsState.SitePackagesPathListed, $SiteImportsState.PthPath)) | Out-Null
+    }
+    if ($CommandResult -and $CommandResult.IsManagedPython -and @($CommandResult.SanitizedVariables).Count -gt 0) {
+        $lines.Add(("Managed runtime startup cleared: {0}." -f (@($CommandResult.SanitizedVariables) -join ', '))) | Out-Null
+    }
+
+    $hint = Get-PythonCommandFailureHint -CommandResult $CommandResult -LocalRoot $LocalRoot
+    if (-not [string]::IsNullOrWhiteSpace($hint)) {
+        $lines.Add($hint) | Out-Null
+    }
+
+    return (@($lines) -join [Environment]::NewLine)
 }
 
 function Test-PythonRuntime {
@@ -469,6 +630,8 @@ function Test-PythonRuntime {
     $pipCmd = Join-Path $PythonHome 'pip.cmd'
     $pip3Cmd = Join-Path $PythonHome 'pip3.cmd'
     $siteState = Test-PythonSiteImportsEnabled -PythonHome $PythonHome
+    $versionCommandResult = $null
+    $pipCommandResult = $null
 
     if (-not (Test-Path -LiteralPath $PythonHome)) {
         $status = 'Missing'
@@ -479,11 +642,17 @@ function Test-PythonRuntime {
         $status = 'NeedsRepair'
         $reportedVersion = $null
         $pipVersion = $null
+        $versionCommandResult = $null
+        $pipCommandResult = $null
     }
     else {
-        $reportedVersion = Get-PythonReportedVersion -PythonExe $pythonExe
+        $versionProbe = Get-PythonReportedVersionProbe -PythonExe $pythonExe -LocalRoot $LocalRoot
+        $reportedVersion = $versionProbe.ReportedVersion
+        $versionCommandResult = $versionProbe.CommandResult
         $versionObject = ConvertTo-PythonVersion -VersionText $reportedVersion
-        $pipVersion = if ($siteState.ImportSiteEnabled) { Get-PythonPipVersion -PythonExe $pythonExe -LocalRoot $LocalRoot } else { $null }
+        $pipProbe = if ($siteState.ImportSiteEnabled) { Get-PythonPipVersionProbe -PythonExe $pythonExe -LocalRoot $LocalRoot } else { $null }
+        $pipVersion = if ($pipProbe) { $pipProbe.PipVersion } else { $null }
+        $pipCommandResult = if ($pipProbe) { $pipProbe.CommandResult } else { $null }
         $hasWrappers = (Test-Path -LiteralPath $pipCmd) -and (Test-Path -LiteralPath $pip3Cmd)
         $status = if ($versionObject -and $siteState.IsReady -and $hasWrappers -and -not [string]::IsNullOrWhiteSpace($pipVersion)) { 'Ready' } else { 'NeedsRepair' }
     }
@@ -499,6 +668,20 @@ function Test-PythonRuntime {
         PipVersion        = $pipVersion
         PthPath           = $siteState.PthPath
         SiteImports       = $siteState
+        VersionCommandResult = $versionCommandResult
+        PipCommandResult  = $pipCommandResult
+        ValidationHint    = if (-not [string]::IsNullOrWhiteSpace($reportedVersion) -and -not [string]::IsNullOrWhiteSpace($pipVersion)) {
+            $null
+        }
+        elseif ($versionCommandResult -and [string]::IsNullOrWhiteSpace($reportedVersion)) {
+            Get-PythonCommandFailureHint -CommandResult $versionCommandResult -LocalRoot $LocalRoot
+        }
+        elseif ($pipCommandResult -and [string]::IsNullOrWhiteSpace($pipVersion)) {
+            Get-PythonCommandFailureHint -CommandResult $pipCommandResult -LocalRoot $LocalRoot
+        }
+        else {
+            $null
+        }
     }
 }
 
@@ -621,9 +804,11 @@ function Test-ExternalPythonRuntime {
         [string]$LocalRoot = (Get-ManifestedLocalRoot)
     )
 
-    $reportedVersion = Get-PythonReportedVersion -PythonExe $PythonExe
+    $versionProbe = Get-PythonReportedVersionProbe -PythonExe $PythonExe -LocalRoot $LocalRoot
+    $reportedVersion = $versionProbe.ReportedVersion
     $versionObject = ConvertTo-PythonVersion -VersionText $reportedVersion
-    $pipVersion = if ($versionObject -and (Test-PythonExternalRuntimeVersion -Version $versionObject)) { Get-PythonPipVersion -PythonExe $PythonExe -LocalRoot $LocalRoot } else { $null }
+    $pipProbe = if ($versionObject -and (Test-PythonExternalRuntimeVersion -Version $versionObject)) { Get-PythonPipVersionProbe -PythonExe $PythonExe -LocalRoot $LocalRoot } else { $null }
+    $pipVersion = if ($pipProbe) { $pipProbe.PipVersion } else { $null }
     $isReady = ($versionObject -and (Test-PythonExternalRuntimeVersion -Version $versionObject) -and -not [string]::IsNullOrWhiteSpace($pipVersion))
 
     [pscustomobject]@{
@@ -633,6 +818,8 @@ function Test-ExternalPythonRuntime {
         PythonExe       = $PythonExe
         ReportedVersion = if ($versionObject) { $versionObject.ToString() } else { $reportedVersion }
         PipVersion      = $pipVersion
+        VersionCommandResult = $versionProbe.CommandResult
+        PipCommandResult = if ($pipProbe) { $pipProbe.CommandResult } else { $null }
     }
 }
 
@@ -954,6 +1141,60 @@ function Save-PythonRuntimePackage {
     }
 }
 
+function Resolve-PythonRuntimeTrustedPackageInfo {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [pscustomobject]$PackageInfo,
+
+        [string]$Flavor,
+        [string]$LocalRoot = (Get-ManifestedLocalRoot)
+    )
+
+    if (Test-PythonRuntimePackageHasTrustedHash -PackageInfo $PackageInfo) {
+        return [pscustomobject]@{
+            PackageInfo           = $PackageInfo
+            MetadataRefreshError  = $null
+            MetadataRefreshTried  = $false
+            UsedTrustedPackage    = $true
+        }
+    }
+
+    if ([string]::IsNullOrWhiteSpace($Flavor)) {
+        $Flavor = if ($PackageInfo.PSObject.Properties['Flavor'] -and $PackageInfo.Flavor) { $PackageInfo.Flavor } else { Get-PythonFlavor }
+    }
+
+    $refreshedPackage = $null
+    $metadataRefreshError = $null
+    try {
+        $refreshedPackage = Save-PythonRuntimePackage -RefreshPython:$false -Flavor $Flavor -LocalRoot $LocalRoot
+    }
+    catch {
+        $metadataRefreshError = $_.Exception.Message
+    }
+
+    if ($refreshedPackage -and (Test-Path -LiteralPath $PackageInfo.Path) -and (Test-PythonRuntimePackageHasTrustedHash -PackageInfo $refreshedPackage)) {
+        $samePackagePath = ((Get-ManifestedFullPath -Path $refreshedPackage.Path) -eq (Get-ManifestedFullPath -Path $PackageInfo.Path))
+        $samePackageName = ($refreshedPackage.FileName -eq $PackageInfo.FileName)
+
+        if ($samePackagePath -or $samePackageName) {
+            return [pscustomobject]@{
+                PackageInfo           = $refreshedPackage
+                MetadataRefreshError  = $metadataRefreshError
+                MetadataRefreshTried  = $true
+                UsedTrustedPackage    = $true
+            }
+        }
+    }
+
+    return [pscustomobject]@{
+        PackageInfo           = $PackageInfo
+        MetadataRefreshError  = $metadataRefreshError
+        MetadataRefreshTried  = $true
+        UsedTrustedPackage    = (Test-PythonRuntimePackageHasTrustedHash -PackageInfo $PackageInfo)
+    }
+}
+
 function Save-PythonGetPipScript {
     [CmdletBinding()]
     param(
@@ -1011,7 +1252,8 @@ function Ensure-PythonPip {
         $pipProxyConfiguration = Sync-ManifestedPipProxyConfiguration -PythonExe $PythonExe -Status $pipProxyConfiguration -LocalRoot $LocalRoot
     }
 
-    $existingPipVersion = Get-PythonPipVersion -PythonExe $PythonExe -LocalRoot $LocalRoot
+    $existingPipProbe = Get-PythonPipVersionProbe -PythonExe $PythonExe -LocalRoot $LocalRoot
+    $existingPipVersion = $existingPipProbe.PipVersion
     if (-not [string]::IsNullOrWhiteSpace($existingPipVersion)) {
         $wrapperInfo = Set-ManifestedManagedPipWrappers -PythonHome $PythonHome -LocalRoot $LocalRoot
         return [pscustomobject]@{
@@ -1021,6 +1263,7 @@ function Ensure-PythonPip {
             GetPipScript          = $null
             WrapperInfo           = $wrapperInfo
             PipProxyConfiguration = $pipProxyConfiguration
+            ExistingPipProbe      = $existingPipProbe
         }
     }
 
@@ -1034,15 +1277,15 @@ function Ensure-PythonPip {
         $getPipScript = Save-PythonGetPipScript -LocalRoot $LocalRoot
         $getPipResult = Invoke-ManifestedPipAwarePythonCommand -PythonExe $PythonExe -Arguments @($getPipScript.Path) -LocalRoot $LocalRoot
         if ($getPipResult.ExitCode -ne 0) {
-            $outputText = @($getPipResult.Output) -join [Environment]::NewLine
-            throw ("get-pip.py bootstrap failed for {0}. {1}" -f $PythonExe, $outputText.Trim())
+            throw (New-PythonRuntimeValidationFailureMessage -Operation 'get-pip bootstrap' -PythonHome $PythonHome -CommandResult $getPipResult -LocalRoot $LocalRoot)
         }
 
         $pipVersion = Get-PythonPipVersion -PythonExe $PythonExe -LocalRoot $LocalRoot
     }
 
     if ([string]::IsNullOrWhiteSpace($pipVersion)) {
-        throw "pip bootstrap failed for managed Python at $PythonHome."
+        $bootstrapCommandResult = if ($bootstrap -eq 'EnsurePip') { $ensurePipResult } else { $getPipResult }
+        throw (New-PythonRuntimeValidationFailureMessage -Operation 'pip bootstrap' -PythonHome $PythonHome -CommandResult $bootstrapCommandResult -LocalRoot $LocalRoot)
     }
 
     $wrapperInfo = Set-ManifestedManagedPipWrappers -PythonHome $PythonHome -LocalRoot $LocalRoot
@@ -1107,17 +1350,28 @@ function Install-PythonRuntime {
     }
 
     $pythonExe = Join-Path $pythonHome 'python.exe'
-    $reportedVersion = Get-PythonReportedVersion -PythonExe $pythonExe
+    $versionProbe = Get-PythonReportedVersionProbe -PythonExe $pythonExe -LocalRoot $LocalRoot
+    $reportedVersion = $versionProbe.ReportedVersion
     $reportedVersionObject = ConvertTo-PythonVersion -VersionText $reportedVersion
     $expectedVersionObject = ConvertTo-PythonVersion -VersionText $PackageInfo.Version
     if (-not $reportedVersionObject -or -not $expectedVersionObject -or $reportedVersionObject -ne $expectedVersionObject) {
-        throw "Python runtime validation failed after install at $pythonHome."
+        throw (New-PythonRuntimeValidationFailureMessage -Operation 'post-install version check' -PythonHome $pythonHome -ExpectedVersion $PackageInfo.Version -ReportedVersion $reportedVersion -CommandResult $versionProbe.CommandResult -SiteImportsState $siteState -LocalRoot $LocalRoot)
     }
 
     $pipResult = Ensure-PythonPip -PythonExe $pythonExe -PythonHome $pythonHome -LocalRoot $LocalRoot
     $validation = Test-PythonRuntime -PythonHome $pythonHome -LocalRoot $LocalRoot
     if ($validation.Status -ne 'Ready') {
-        throw "Python runtime validation failed after pip bootstrap at $pythonHome."
+        $validationCommandResult = if ([string]::IsNullOrWhiteSpace($validation.ReportedVersion)) {
+            $validation.VersionCommandResult
+        }
+        elseif ([string]::IsNullOrWhiteSpace($validation.PipVersion)) {
+            $validation.PipCommandResult
+        }
+        else {
+            $validation.VersionCommandResult
+        }
+
+        throw (New-PythonRuntimeValidationFailureMessage -Operation 'post-pip validation' -PythonHome $pythonHome -ExpectedVersion $PackageInfo.Version -ReportedVersion $validation.ReportedVersion -CommandResult $validationCommandResult -SiteImportsState $validation.SiteImports -LocalRoot $LocalRoot)
     }
 
     [pscustomobject]@{
@@ -1238,7 +1492,7 @@ synchronization conventions for public runtime commands.
 
     $needsRepair = $state.Status -in @('Partial', 'NeedsRepair')
     $needsInstall = $RefreshPython -or -not $state.RuntimeHome
-    $needsAcquire = $RefreshPython -or (-not $state.PackagePath)
+    $needsAcquire = $RefreshPython -or (-not $state.PackagePath) -or (-not (Test-PythonRuntimePackageHasTrustedHash -PackageInfo $state.Package))
 
     if ($needsRepair) {
         $plannedActions.Add('Repair-PythonRuntime') | Out-Null
@@ -1312,7 +1566,7 @@ synchronization conventions for public runtime commands.
     }
 
     $needsInstall = $RefreshPython -or -not $state.RuntimeHome
-    $needsAcquire = $RefreshPython -or (-not $state.PackagePath)
+    $needsAcquire = $RefreshPython -or (-not $state.PackagePath) -or (-not (Test-PythonRuntimePackageHasTrustedHash -PackageInfo $state.Package))
 
     if ($needsInstall) {
         if ($needsAcquire) {
@@ -1327,7 +1581,13 @@ synchronization conventions for public runtime commands.
 
         $packageTest = Test-PythonRuntimePackage -PackageInfo $packageInfo
         if ($packageTest.Status -eq 'UnverifiedCache') {
-            throw "Python runtime package validation failed because no trusted checksum could be resolved for $($packageInfo.FileName)."
+            $trustedPackageResolution = Resolve-PythonRuntimeTrustedPackageInfo -PackageInfo $packageInfo -Flavor $state.Flavor -LocalRoot $state.LocalRoot
+            $packageInfo = $trustedPackageResolution.PackageInfo
+            $packageTest = Test-PythonRuntimePackage -PackageInfo $packageInfo
+
+            if ($packageTest.Status -eq 'UnverifiedCache') {
+                throw (New-PythonRuntimePackageTrustFailureMessage -PackageInfo $packageInfo -MetadataRefreshError $trustedPackageResolution.MetadataRefreshError)
+            }
         }
 
         if ($packageTest.Status -eq 'CorruptCache') {
