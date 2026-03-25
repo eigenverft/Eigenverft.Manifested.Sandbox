@@ -24,8 +24,6 @@
 #### Tooling
 - Add a managed .NET bootstrap path so the sandbox has the baseline local tooling needed for Codex-assisted build and repo tasks.
   Still open: the current repo surface and `README.md` do not yet expose a managed .NET bootstrap command or documented .NET bootstrap path.
-- Add a managed Python bootstrap and cache flow so the sandbox has a common scripting baseline for Codex-assisted build and repo tasks.
-  Still open: the current repo surface and `README.md` do not yet expose a managed Python bootstrap or cache flow.
 #### Visual polish
 
 ### [P4] Low
@@ -36,9 +34,9 @@
 
 ## Review / Questions
 - Decide which .NET version should be pinned for the Codex-oriented sandbox baseline.
-- Decide which Python version should be pinned for the Codex-oriented sandbox baseline.
 
 ## Closed
+- [P3] Tooling - 2026-03-25: Added managed Python bootstrap and cache flow, including pip bootstrap, sandbox-owned pip config/cache, runtime wrappers, persisted state, and README/requirements documentation updates.
 - [P2] Bootstrap - 2026-03-17: Added low-overhead first-bootstrap-request proxy handling for the published GitHub `iwr ... | iex` entrypoints by explicitly using the discovered system proxy with default credentials when the URL is not bypassed. Updated `README.md` and both `iwr` bootstrapper script comments.
 - [P3] Visual polish - 2026-03-13: Added a README screenshot that shows the Windows Sandbox result and expected terminal output for first-time visitors.
 - [P2] Release - 2026-03-13: Created the first proper GitHub Release so the project now has a stable public release target for sharing and discovery.

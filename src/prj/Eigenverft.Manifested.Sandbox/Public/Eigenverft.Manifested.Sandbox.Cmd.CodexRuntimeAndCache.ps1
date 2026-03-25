@@ -228,6 +228,26 @@ function Get-SystemCodexRuntime {
 }
 
 function Get-CodexRuntimeState {
+<#
+.SYNOPSIS
+Gets the current Codex runtime state for the manifested sandbox.
+
+.DESCRIPTION
+Inspects managed and externally discovered Codex installations, staged directories,
+and repair indicators to build the normalized runtime state used by bootstrap flows.
+
+.PARAMETER LocalRoot
+Overrides the manifested sandbox local root to inspect.
+
+.EXAMPLE
+Get-CodexRuntimeState
+
+.EXAMPLE
+Get-CodexRuntimeState -LocalRoot 'C:\manifested'
+
+.NOTES
+Returns a Blocked state on non-Windows hosts.
+#>
     [CmdletBinding()]
     param(
         [string]$LocalRoot = (Get-ManifestedLocalRoot)
@@ -339,6 +359,30 @@ function Repair-CodexRuntime {
 }
 
 function Install-CodexRuntime {
+<#
+.SYNOPSIS
+Installs the managed Codex runtime into the manifested sandbox.
+
+.DESCRIPTION
+Creates the cache and tools directories, performs a staged npm-based installation
+of the Codex CLI, validates the staged runtime, and promotes it into the managed
+tools root as a versioned runtime directory.
+
+.PARAMETER NpmCmd
+Path to the npm executable used to install the Codex package.
+
+.PARAMETER LocalRoot
+Overrides the manifested sandbox local root that receives the managed runtime.
+
+.EXAMPLE
+Install-CodexRuntime -NpmCmd 'C:\tools\node\npm.cmd'
+
+.EXAMPLE
+Install-CodexRuntime -NpmCmd 'C:\tools\node\npm.cmd' -LocalRoot 'C:\manifested'
+
+.NOTES
+This function expects Node.js prerequisites to already be available.
+#>
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true)]
@@ -398,6 +442,27 @@ function Install-CodexRuntime {
 }
 
 function Initialize-CodexRuntime {
+<#
+.SYNOPSIS
+Ensures the Codex runtime is available and ready for command-line use.
+
+.DESCRIPTION
+Evaluates the current Codex runtime state, repairs partial or invalid installs,
+ensures required dependencies are present, installs the managed runtime when
+needed, and synchronizes the command-line environment metadata.
+
+.PARAMETER RefreshCodex
+Forces the managed Codex runtime to be reinstalled even when one is already ready.
+
+.EXAMPLE
+Initialize-CodexRuntime
+
+.EXAMPLE
+Initialize-CodexRuntime -RefreshCodex
+
+.NOTES
+Supports WhatIf and may trigger dependent runtime initialization steps.
+#>
     [CmdletBinding(SupportsShouldProcess = $true)]
     param(
         [switch]$RefreshCodex

@@ -31,7 +31,7 @@ CompanyName = 'Eigenverft'
 Copyright = 'Copyright (c) 2026 Eigenverft'
 
 # Description of the functionality provided by this module
-Description = 'Windows-focused PowerShell module for repeatable Windows Sandbox and fresh-machine bootstrap with managed runtimes, proxy-aware npm support, and state tracking.'
+Description = 'Windows-focused PowerShell module for repeatable Windows Sandbox and fresh-machine bootstrap with managed Python, PowerShell, Node.js, and tooling runtimes, plus proxy-aware package bootstraps and state tracking.'
 
 # Minimum version of the PowerShell engine required by this module
 PowerShellVersion = '5.1'
@@ -80,6 +80,7 @@ FunctionsToExport = @(
     'Initialize-GHCliRuntime',
     'Initialize-GitRuntime',
     'Initialize-NodeRuntime',
+    'Initialize-PythonRuntime',
     'Initialize-Ps7Runtime',
     'Initialize-VSCodeRuntime',
     'Initialize-VCRuntime'
@@ -102,9 +103,10 @@ AliasesToExport = @()
 
 # List of all files packaged with this module
 FileList = @(
-    'Public\Eigenverft.Manifested.Sandbox.ps1',
+    'Eigenverft.Manifested.Sandbox.ps1',
     'Private\Common\Eigenverft.Manifested.Sandbox.Shared.Paths.ps1',
     'Private\Common\Eigenverft.Manifested.Sandbox.Shared.Npm.ps1',
+    'Private\Common\Eigenverft.Manifested.Sandbox.Shared.Pip.ps1',
     'Private\Common\Eigenverft.Manifested.Sandbox.Shared.Cache.ps1',
     'Private\Common\Eigenverft.Manifested.Sandbox.Shared.Extraction.ps1',
     'Public\Eigenverft.Manifested.Sandbox.Shared.State.ps1',
@@ -112,6 +114,7 @@ FileList = @(
     'Private\Infra\Eigenverft.Manifested.Sandbox.Shared.GitHubReleases.ps1',
     'Private\Logic\Eigenverft.Manifested.Sandbox.Shared.CommandEnvironment.ps1',
     'Public\Eigenverft.Manifested.Sandbox.Cmd.Ps7RuntimeAndCache.ps1',
+    'Public\Eigenverft.Manifested.Sandbox.Cmd.PythonRuntimeAndCache.ps1',
     'Public\Eigenverft.Manifested.Sandbox.Cmd.NodeRuntimeAndCache.ps1',
     'Public\Eigenverft.Manifested.Sandbox.Cmd.OpenCodeRuntimeAndCache.ps1',
     'Public\Eigenverft.Manifested.Sandbox.Cmd.GeminiRuntimeAndCache.ps1',
@@ -133,7 +136,7 @@ PrivateData = @{
     PSData = @{
 
         # Tags applied to this module. These help with module discovery in online galleries.
-        Tags = @('Eigenverft', 'Manifested', 'Sandbox', 'WindowsSandbox', 'PowerShell', 'Bootstrap', 'Node.js', 'Git', 'GitHubCLI', 'VSCode', 'Codex', 'OpenCode', 'Gemini', 'Qwen', 'Windows')
+        Tags = @('Eigenverft', 'Manifested', 'Sandbox', 'WindowsSandbox', 'PowerShell', 'Bootstrap', 'Python', 'Node.js', 'Git', 'GitHubCLI', 'VSCode', 'Codex', 'OpenCode', 'Gemini', 'Qwen', 'Windows')
 
         # A URL to the license for this module.
         LicenseUri = 'https://github.com/eigenverft/Eigenverft.Manifested.Sandbox/blob/main/LICENSE'
@@ -145,7 +148,7 @@ PrivateData = @{
         IconUri = 'https://raw.githubusercontent.com/eigenverft/Eigenverft.Manifested.Sandbox/main/resources/evt-logo_on_light_border_128x128.png'
 
         # ReleaseNotes of this module
-        ReleaseNotes = 'Added sandbox-managed OpenCode runtime initialization, managed npm proxy ownership for npm-based runtimes, and refreshed state-aware bootstrap documentation.'
+        ReleaseNotes = 'Added sandbox-managed Python runtime initialization with pip bootstrap and proxy-aware pip config ownership, plus refreshed runtime state and bootstrap documentation.'
 
         # Prerelease string of this module
         Prerelease = ''

@@ -69,6 +69,29 @@ function Get-Ps7PersistedPackageDetails {
 }
 
 function Get-Ps7Release {
+<#
+.SYNOPSIS
+Resolves the latest stable PowerShell 7 package for the current Windows flavor.
+
+.DESCRIPTION
+Queries the PowerShell GitHub releases feed, skips draft and prerelease entries,
+and returns the expected ZIP asset together with a trusted SHA256 checksum. If
+the full release payload cannot be resolved, it falls back to tag-only metadata
+and reconstructs the asset URL.
+
+.PARAMETER Flavor
+Runtime package flavor such as `win-x64` or `win-arm64`. When omitted, the
+current host flavor is detected automatically.
+
+.EXAMPLE
+Get-Ps7Release
+
+.EXAMPLE
+Get-Ps7Release -Flavor 'win-x64'
+
+.NOTES
+This helper is used by the managed PowerShell runtime bootstrap flow.
+#>
     [CmdletBinding()]
     param(
         [string]$Flavor
@@ -421,6 +444,31 @@ function Test-Ps7RuntimePackage {
 }
 
 function Get-Ps7RuntimeState {
+<#
+.SYNOPSIS
+Builds the current managed PowerShell 7 runtime state snapshot.
+
+.DESCRIPTION
+Collects the effective runtime flavor, cache state, installed managed runtimes,
+external runtime fallback, and any partial or invalid paths that may require
+repair before `Initialize-Ps7Runtime` can complete successfully.
+
+.PARAMETER Flavor
+Runtime package flavor such as `win-x64` or `win-arm64`. When omitted, the
+current host flavor is detected automatically.
+
+.PARAMETER LocalRoot
+Local sandbox state root used for cache, tool, and persisted command metadata.
+
+.EXAMPLE
+Get-Ps7RuntimeState
+
+.EXAMPLE
+Get-Ps7RuntimeState -Flavor 'win-x64' -LocalRoot 'C:\SandboxState'
+
+.NOTES
+Returns a custom object that downstream install and repair helpers consume.
+#>
     [CmdletBinding()]
     param(
         [string]$Flavor,
@@ -693,6 +741,28 @@ function Install-Ps7Runtime {
 }
 
 function Initialize-Ps7Runtime {
+<#
+.SYNOPSIS
+Ensures the managed PowerShell 7 runtime is available for the sandbox toolchain.
+
+.DESCRIPTION
+Repairs partial state when needed, acquires or reuses a trusted PowerShell ZIP,
+installs the managed runtime, and synchronizes the command-line environment so
+the runtime is ready for follow-up tooling commands.
+
+.PARAMETER RefreshPs7
+Forces the bootstrap flow to reacquire the latest package and reinstall the
+managed runtime instead of reusing the current cached or installed copy.
+
+.EXAMPLE
+Initialize-Ps7Runtime
+
+.EXAMPLE
+Initialize-Ps7Runtime -RefreshPs7
+
+.NOTES
+Supports `-WhatIf` and follows the module's self-elevation plan when required.
+#>
     [CmdletBinding(SupportsShouldProcess = $true)]
     param(
         [switch]$RefreshPs7

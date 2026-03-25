@@ -3,6 +3,27 @@
 #>
 
 function Get-ManifestedPathEntryKey {
+<#
+.SYNOPSIS
+Normalizes a PATH entry into a stable comparison key.
+
+.DESCRIPTION
+Trims surrounding whitespace and quotes, resolves the entry to a full path when
+possible, removes a trailing backslash for non-root paths, and lowercases the
+result so PATH comparisons stay case-insensitive on Windows.
+
+.PARAMETER Path
+The PATH entry to normalize.
+
+.EXAMPLE
+Get-ManifestedPathEntryKey -Path ' "C:\Tools\Node\" '
+
+.EXAMPLE
+Get-ManifestedPathEntryKey -Path $env:ProgramFiles
+
+.NOTES
+Returns $null when the input is empty or only whitespace.
+#>
     [CmdletBinding()]
     param(
         [string]$Path
@@ -197,6 +218,32 @@ function Get-ManifestedCommandEnvironmentSpec {
     $expectedCommandPaths = [ordered]@{}
 
     switch ($CommandName) {
+        'Initialize-PythonRuntime' {
+            if (-not [string]::IsNullOrWhiteSpace($runtimeHome)) {
+                $desiredCommandDirectory = $runtimeHome
+            }
+            elseif (-not [string]::IsNullOrWhiteSpace($executablePath)) {
+                $desiredCommandDirectory = Split-Path -Parent $executablePath
+            }
+
+            $pythonCommandPath = $null
+            if (-not [string]::IsNullOrWhiteSpace($executablePath)) {
+                $pythonCommandPath = (Get-ManifestedFullPath -Path $executablePath)
+            }
+            elseif (-not [string]::IsNullOrWhiteSpace($runtimeHome)) {
+                $pythonCommandPath = (Get-ManifestedFullPath -Path (Join-Path $runtimeHome 'python.exe'))
+            }
+
+            if (-not [string]::IsNullOrWhiteSpace($pythonCommandPath)) {
+                $expectedCommandPaths['python'] = $pythonCommandPath
+                $expectedCommandPaths['python.exe'] = $pythonCommandPath
+            }
+
+            if ($runtimeSource -eq 'Managed' -and -not [string]::IsNullOrWhiteSpace($runtimeHome)) {
+                $expectedCommandPaths['pip.cmd'] = (Get-ManifestedFullPath -Path (Join-Path $runtimeHome 'pip.cmd'))
+                $expectedCommandPaths['pip3.cmd'] = (Get-ManifestedFullPath -Path (Join-Path $runtimeHome 'pip3.cmd'))
+            }
+        }
         'Initialize-NodeRuntime' {
             if (-not [string]::IsNullOrWhiteSpace($runtimeHome)) {
                 $desiredCommandDirectory = $runtimeHome

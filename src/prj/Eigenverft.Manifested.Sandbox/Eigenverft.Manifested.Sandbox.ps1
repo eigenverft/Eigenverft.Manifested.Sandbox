@@ -26,4 +26,3 @@ function Get-SandboxVersion {
 
     return ('{0} {1}' -f $moduleName, $moduleInfo[0].Version.ToString())
 }
-

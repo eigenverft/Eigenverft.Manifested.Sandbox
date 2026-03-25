@@ -64,6 +64,7 @@ function Get-ManifestedRuntimeSnapshots {
 
     $layout = Get-ManifestedLayout -LocalRoot $LocalRoot
     $definitions = @(
+        @{ Name = 'PythonRuntime'; FunctionName = 'Get-PythonRuntimeState'; PathProperty = 'RuntimeHome' },
         @{ Name = 'NodeRuntime'; FunctionName = 'Get-NodeRuntimeState'; PathProperty = 'RuntimeHome' },
         @{ Name = 'OpenCodeRuntime'; FunctionName = 'Get-OpenCodeRuntimeState'; PathProperty = 'RuntimeHome' },
         @{ Name = 'GeminiRuntime'; FunctionName = 'Get-GeminiRuntimeState'; PathProperty = 'RuntimeHome' },
@@ -224,6 +225,7 @@ function Save-ManifestedInvokeState {
                 LocalRoot          = $layout.LocalRoot
                 CacheRoot          = $layout.CacheRoot
                 Ps7CacheRoot       = $layout.Ps7CacheRoot
+                PythonCacheRoot    = $layout.PythonCacheRoot
                 NodeCacheRoot      = $layout.NodeCacheRoot
                 OpenCodeCacheRoot  = $layout.OpenCodeCacheRoot
                 GeminiCacheRoot    = $layout.GeminiCacheRoot
@@ -235,6 +237,7 @@ function Save-ManifestedInvokeState {
                 VCRuntimeCacheRoot = $layout.VCRuntimeCacheRoot
                 ToolsRoot          = $layout.ToolsRoot
                 Ps7ToolsRoot       = $layout.Ps7ToolsRoot
+                PythonToolsRoot    = $layout.PythonToolsRoot
                 NodeToolsRoot      = $layout.NodeToolsRoot
                 OpenCodeToolsRoot  = $layout.OpenCodeToolsRoot
                 GeminiToolsRoot    = $layout.GeminiToolsRoot

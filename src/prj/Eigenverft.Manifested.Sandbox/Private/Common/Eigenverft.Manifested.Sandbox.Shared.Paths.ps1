@@ -141,6 +141,7 @@ function Get-ManifestedLayout {
         LocalRoot          = $resolvedRoot
         CacheRoot          = $cacheRoot
         Ps7CacheRoot       = (Join-Path $cacheRoot 'powershell')
+        PythonCacheRoot    = (Join-Path $cacheRoot 'python')
         NodeCacheRoot      = (Join-Path $cacheRoot 'node')
         OpenCodeCacheRoot  = (Join-Path $cacheRoot 'opencode')
         GeminiCacheRoot    = (Join-Path $cacheRoot 'gemini')
@@ -152,6 +153,7 @@ function Get-ManifestedLayout {
         VCRuntimeCacheRoot = (Join-Path $cacheRoot 'vc-runtime')
         ToolsRoot          = $toolsRoot
         Ps7ToolsRoot       = (Join-Path $toolsRoot 'powershell')
+        PythonToolsRoot    = (Join-Path $toolsRoot 'python')
         NodeToolsRoot      = (Join-Path $toolsRoot 'node')
         OpenCodeToolsRoot  = (Join-Path $toolsRoot 'opencode')
         GeminiToolsRoot    = (Join-Path $toolsRoot 'gemini')

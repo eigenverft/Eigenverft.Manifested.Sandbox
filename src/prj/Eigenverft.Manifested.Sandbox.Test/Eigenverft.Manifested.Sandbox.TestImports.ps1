@@ -6,7 +6,7 @@
 $moduleProjectRoot = Join-Path (Split-Path -Parent $PSScriptRoot) 'Eigenverft.Manifested.Sandbox'
 
 # Public entrypoints
-. "$moduleProjectRoot\Public\Eigenverft.Manifested.Sandbox.ps1"
+. "$moduleProjectRoot\Eigenverft.Manifested.Sandbox.ps1"
 
 # Private infrastructure
 . "$moduleProjectRoot\Private\Infra\Eigenverft.Manifested.Sandbox.Base.Invoke-WebRequestEx.ps1"
@@ -18,6 +18,7 @@ $moduleProjectRoot = Join-Path (Split-Path -Parent $PSScriptRoot) 'Eigenverft.Ma
 . "$moduleProjectRoot\Private\Common\Eigenverft.Manifested.Sandbox.Shared.Cache.ps1"
 . "$moduleProjectRoot\Private\Common\Eigenverft.Manifested.Sandbox.Shared.Extraction.ps1"
 . "$moduleProjectRoot\Private\Common\Eigenverft.Manifested.Sandbox.Shared.Npm.ps1"
+. "$moduleProjectRoot\Private\Common\Eigenverft.Manifested.Sandbox.Shared.Pip.ps1"
 
 # Private logic
 . "$moduleProjectRoot\Private\Logic\Eigenverft.Manifested.Sandbox.Shared.CommandEnvironment.ps1"
@@ -27,6 +28,7 @@ $moduleProjectRoot = Join-Path (Split-Path -Parent $PSScriptRoot) 'Eigenverft.Ma
 
 # Public runtime commands
 . "$moduleProjectRoot\Public\Eigenverft.Manifested.Sandbox.Cmd.Ps7RuntimeAndCache.ps1"
+. "$moduleProjectRoot\Public\Eigenverft.Manifested.Sandbox.Cmd.PythonRuntimeAndCache.ps1"
 . "$moduleProjectRoot\Public\Eigenverft.Manifested.Sandbox.Cmd.NodeRuntimeAndCache.ps1"
 . "$moduleProjectRoot\Public\Eigenverft.Manifested.Sandbox.Cmd.OpenCodeRuntimeAndCache.ps1"
 . "$moduleProjectRoot\Public\Eigenverft.Manifested.Sandbox.Cmd.GeminiRuntimeAndCache.ps1"

@@ -14,6 +14,7 @@ The important part is not a specific public command name. The important part is 
 
 This currently applies to these exported init commands:
 
+- `Initialize-PythonRuntime`
 - `Initialize-Ps7Runtime`
 - `Initialize-GitRuntime`
 - `Initialize-VSCodeRuntime`
@@ -37,13 +38,13 @@ Required rules:
 
 - Public commands should not expose root-selection or self-elevation plumbing such as `-LocalRoot`, `-SkipSelfElevation`, or `-WasSelfElevated`.
 - The sandbox root should resolve from the default per-user `LocalAppData` location and be pinned internally before meaningful work starts.
-- Portable runtime commands may expose focused refresh switches such as `-RefreshPs7`, `-RefreshGit`, `-RefreshVSCode`, and `-RefreshNode`.
+- Portable runtime commands may expose focused refresh switches such as `-RefreshPython`, `-RefreshPs7`, `-RefreshGit`, `-RefreshVSCode`, and `-RefreshNode`.
 - `Initialize-VCRuntime` may expose install-specific tuning, but it should still hide the same internal root and elevation plumbing.
 - `SupportsShouldProcess` and `-WhatIf` behavior are part of the public contract.
 
 ## Current Command Families
 
-- `Initialize-Ps7Runtime`, `Initialize-GitRuntime`, `Initialize-VSCodeRuntime`, `Initialize-NodeRuntime`, `Initialize-OpenCodeRuntime`, `Initialize-GeminiRuntime`, `Initialize-QwenRuntime`, `Initialize-CodexRuntime`, and `Initialize-GHCliRuntime` manage portable user-scoped runtimes under the sandbox root.
+- `Initialize-PythonRuntime`, `Initialize-Ps7Runtime`, `Initialize-GitRuntime`, `Initialize-VSCodeRuntime`, `Initialize-NodeRuntime`, `Initialize-OpenCodeRuntime`, `Initialize-GeminiRuntime`, `Initialize-QwenRuntime`, `Initialize-CodexRuntime`, and `Initialize-GHCliRuntime` manage portable user-scoped runtimes under the sandbox root.
 - `Initialize-VCRuntime` manages a machine/runtime prerequisite and evaluates the real installed machine state.
 - `Get-SandboxState` is the read-only inspection surface for the persisted command state document plus live runtime snapshots.
 
@@ -100,10 +101,10 @@ The portable runtime commands now share command-line environment synchronization
 
 Required rules:
 
-- `Initialize-Ps7Runtime`, `Initialize-GitRuntime`, `Initialize-NodeRuntime`, `Initialize-OpenCodeRuntime`, `Initialize-GeminiRuntime`, `Initialize-QwenRuntime`, `Initialize-CodexRuntime`, `Initialize-GHCliRuntime`, and `Initialize-VSCodeRuntime` should derive a desired command directory from the final runtime state.
+- `Initialize-PythonRuntime`, `Initialize-Ps7Runtime`, `Initialize-GitRuntime`, `Initialize-NodeRuntime`, `Initialize-OpenCodeRuntime`, `Initialize-GeminiRuntime`, `Initialize-QwenRuntime`, `Initialize-CodexRuntime`, `Initialize-GHCliRuntime`, and `Initialize-VSCodeRuntime` should derive a desired command directory from the final runtime state.
 - They should update both the process `PATH` and the user `PATH` so the desired directory is present and preferred.
 - Synchronization must validate actual command resolution after the update. It must not assume a `PATH` write succeeded just because the environment variable changed.
-- The expected command set is currently `pwsh.exe` for PowerShell 7, `git.exe` for Git, `node.exe` and `npm.cmd` for Node.js, `opencode` plus `opencode.cmd` for OpenCode CLI, `gemini` plus `gemini.cmd` for Gemini CLI, `qwen` plus `qwen.cmd` for Qwen CLI, `codex` plus `codex.cmd` for Codex CLI, `gh` plus `gh.exe` for GitHub CLI, and `code` plus `code.cmd` for VS Code.
+- The expected command set is currently `python` and `python.exe` for Python, plus `pip.cmd` and `pip3.cmd` when the Python runtime source is managed; `pwsh.exe` for PowerShell 7; `git.exe` for Git; `node.exe` and `npm.cmd` for Node.js; `opencode` plus `opencode.cmd` for OpenCode CLI; `gemini` plus `gemini.cmd` for Gemini CLI; `qwen` plus `qwen.cmd` for Qwen CLI; `codex` plus `codex.cmd` for Codex CLI; `gh` plus `gh.exe` for GitHub CLI; and `code` plus `code.cmd` for VS Code.
 - The command result and persisted invoke state should surface `CommandEnvironment` for these portable runtime commands.
 - `Initialize-VCRuntime` does not participate in command-line environment sync.
 
@@ -128,6 +129,7 @@ At minimum, the following must stay stable across normal and elevated execution:
 - `LocalRoot`
 - `CacheRoot`
 - `Ps7CacheRoot`
+- `PythonCacheRoot`
 - `NodeCacheRoot`
 - `GeminiCacheRoot`
 - `CodexCacheRoot`
@@ -137,6 +139,7 @@ At minimum, the following must stay stable across normal and elevated execution:
 - `VCRuntimeCacheRoot`
 - `ToolsRoot`
 - `Ps7ToolsRoot`
+- `PythonToolsRoot`
 - `NodeToolsRoot`
 - `GeminiToolsRoot`
 - `CodexToolsRoot`
@@ -159,7 +162,7 @@ Required rules:
 - `Save-ManifestedInvokeState` is the baseline persistence path for init commands.
 - Persisted command entries should capture `ActionTaken`, `Status`, `RestartRequired`, layout paths, `Elevation`, and command-specific `Details`.
 - Portable runtime command entries should also persist `CommandEnvironment`.
-- `Get-SandboxState` should continue to expose both the persisted command document and runtime snapshots for `NodeRuntime`, `OpenCodeRuntime`, `GeminiRuntime`, `QwenRuntime`, `CodexRuntime`, `GHCliRuntime`, `Ps7Runtime`, `GitRuntime`, `VSCodeRuntime`, and `VCRuntime`.
+- `Get-SandboxState` should continue to expose both the persisted command document and runtime snapshots for `PythonRuntime`, `NodeRuntime`, `OpenCodeRuntime`, `GeminiRuntime`, `QwenRuntime`, `CodexRuntime`, `GHCliRuntime`, `Ps7Runtime`, `GitRuntime`, `VSCodeRuntime`, and `VCRuntime`.
 - `PersistedStatePath` should be `$null` in `-WhatIf` results.
 
 ## Elevation Requirement
@@ -204,6 +207,7 @@ Portable runtime commands should also include:
 - `RuntimeTest`
 - `RepairResult`
 - `InstallResult`
+- `PipSetupResult` when the command owns a managed pip bootstrap or proxy/config layer
 - `CommandEnvironment`
 
 `Initialize-VCRuntime` should return the installer-oriented equivalents:
@@ -231,6 +235,7 @@ Required rules:
 
 Use these files as the current baseline references:
 
+- `src/prj/Eigenverft.Manifested.Sandbox/Public/Eigenverft.Manifested.Sandbox.Cmd.PythonRuntimeAndCache.ps1`
 - `src/prj/Eigenverft.Manifested.Sandbox/Public/Eigenverft.Manifested.Sandbox.Cmd.Ps7RuntimeAndCache.ps1`
 - `src/prj/Eigenverft.Manifested.Sandbox/Public/Eigenverft.Manifested.Sandbox.Cmd.NodeRuntimeAndCache.ps1`
 - `src/prj/Eigenverft.Manifested.Sandbox/Public/Eigenverft.Manifested.Sandbox.Cmd.GeminiRuntimeAndCache.ps1`
@@ -244,6 +249,7 @@ Use these files as the current baseline references:
 - `src/prj/Eigenverft.Manifested.Sandbox/Private/Logic/Eigenverft.Manifested.Sandbox.Shared.CommandEnvironment.ps1`
 - `src/prj/Eigenverft.Manifested.Sandbox/Private/Infra/Eigenverft.Manifested.Sandbox.Shared.Elevation.ps1`
 - `src/prj/Eigenverft.Manifested.Sandbox/Private/Common/Eigenverft.Manifested.Sandbox.Shared.Paths.ps1`
+- `src/prj/Eigenverft.Manifested.Sandbox/Private/Common/Eigenverft.Manifested.Sandbox.Shared.Pip.ps1`
 - `src/prj/Eigenverft.Manifested.Sandbox/Public/Eigenverft.Manifested.Sandbox.Shared.State.ps1`
 
 The future combined command does not need to copy the current code literally, but it should preserve the same orchestration discipline and current feature guarantees.
