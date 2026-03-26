@@ -439,7 +439,8 @@ Invoke-ManifestedGitHubPortableRuntimeInitialization -CommandName 'Initialize-VS
         ))
     }
 
-    $result = New-ManifestedRuntimeResult -LocalRoot $finalState.LocalRoot -Layout $finalState.Layout -InitialState $initialState -FinalState $finalState -ActionTaken (if ($actionsTaken.Count -gt 0) { @($actionsTaken) } else { @('None') }) -PlannedActions @($plannedActions) -RestartRequired:$false -AdditionalProperties ([ordered]@{
+    $actionTaken = if ($actionsTaken.Count -gt 0) { @($actionsTaken) } else { @('None') }
+    $result = New-ManifestedRuntimeResult -LocalRoot $finalState.LocalRoot -Layout $finalState.Layout -InitialState $initialState -FinalState $finalState -ActionTaken $actionTaken -PlannedActions @($plannedActions) -RestartRequired:$false -AdditionalProperties ([ordered]@{
         Package            = $packageInfo
         PackageTest        = $packageTest
         RuntimeTest        = $runtimeTest

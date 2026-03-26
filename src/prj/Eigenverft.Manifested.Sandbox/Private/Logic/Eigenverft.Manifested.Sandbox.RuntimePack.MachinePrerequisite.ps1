@@ -247,7 +247,9 @@ function Invoke-ManifestedMachinePrerequisiteRuntimeInitialization {
     }
     $runtimeTest = & $descriptor.RuntimeTestFunctionName @runtimeTestParameters
 
-    $result = New-ManifestedRuntimeResult -LocalRoot $finalState.LocalRoot -Layout $finalState.Layout -InitialState $initialState -FinalState $finalState -ActionTaken (if ($actionsTaken.Count -gt 0) { @($actionsTaken) } else { @('None') }) -PlannedActions @($plannedActions) -RestartRequired:(if ($installResult) { [bool]$installResult.RestartRequired } else { $false }) -AdditionalProperties ([ordered]@{
+    $actionTaken = if ($actionsTaken.Count -gt 0) { @($actionsTaken) } else { @('None') }
+    $restartRequired = if ($installResult) { [bool]$installResult.RestartRequired } else { $false }
+    $result = New-ManifestedRuntimeResult -LocalRoot $finalState.LocalRoot -Layout $finalState.Layout -InitialState $initialState -FinalState $finalState -ActionTaken $actionTaken -PlannedActions @($plannedActions) -RestartRequired:$restartRequired -AdditionalProperties ([ordered]@{
         Installer     = $installerInfo
         InstallerTest = $installerTest
         RuntimeTest   = $runtimeTest

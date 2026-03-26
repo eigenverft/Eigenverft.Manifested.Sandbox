@@ -58,6 +58,68 @@ Describe 'Eigenverft.Manifested.Sandbox runtime contracts' {
         $registryNames | Should -Contain 'VCRuntime'
     }
 
+    It 'assembles hotspot runtime descriptors through dedicated registry providers' {
+        $descriptors = @(& $script:SandboxModule {
+            @(
+                Get-ManifestedRuntimeDescriptor -CommandName 'Initialize-PythonRuntime'
+                Get-ManifestedRuntimeDescriptor -CommandName 'Initialize-NodeRuntime'
+                Get-ManifestedRuntimeDescriptor -CommandName 'Initialize-OpenCodeRuntime'
+                Get-ManifestedRuntimeDescriptor -CommandName 'Initialize-GeminiRuntime'
+                Get-ManifestedRuntimeDescriptor -CommandName 'Initialize-QwenRuntime'
+                Get-ManifestedRuntimeDescriptor -CommandName 'Initialize-CodexRuntime'
+                Get-ManifestedRuntimeDescriptor -CommandName 'Initialize-GHCliRuntime'
+                Get-ManifestedRuntimeDescriptor -CommandName 'Initialize-GitRuntime'
+                Get-ManifestedRuntimeDescriptor -CommandName 'Initialize-VSCodeRuntime'
+            )
+        })
+
+        $pythonDescriptor = $descriptors | Where-Object Name -eq 'PythonRuntime'
+        $nodeDescriptor = $descriptors | Where-Object Name -eq 'NodeRuntime'
+        $openCodeDescriptor = $descriptors | Where-Object Name -eq 'OpenCodeRuntime'
+        $geminiDescriptor = $descriptors | Where-Object Name -eq 'GeminiRuntime'
+        $qwenDescriptor = $descriptors | Where-Object Name -eq 'QwenRuntime'
+        $codexDescriptor = $descriptors | Where-Object Name -eq 'CodexRuntime'
+        $ghCliDescriptor = $descriptors | Where-Object Name -eq 'GHCliRuntime'
+        $gitDescriptor = $descriptors | Where-Object Name -eq 'GitRuntime'
+        $vsCodeDescriptor = $descriptors | Where-Object Name -eq 'VSCodeRuntime'
+
+        $pythonDescriptor.SnapshotName | Should -Be 'PythonRuntime'
+        $pythonDescriptor.InitializeCommandName | Should -Be 'Initialize-PythonRuntime'
+        $pythonDescriptor.CacheRootPropertyName | Should -Be 'PythonCacheRoot'
+
+        $nodeDescriptor.SnapshotName | Should -Be 'NodeRuntime'
+        $nodeDescriptor.InitializeCommandName | Should -Be 'Initialize-NodeRuntime'
+        $nodeDescriptor.CacheRootPropertyName | Should -Be 'NodeCacheRoot'
+
+        $openCodeDescriptor.RuntimePack | Should -Be 'NpmCli'
+        $openCodeDescriptor.DependencyCommandNames | Should -Be @('Initialize-NodeRuntime')
+        $openCodeDescriptor.PackageJsonPropertyName | Should -Be 'PackageJsonPath'
+
+        $geminiDescriptor.RuntimePack | Should -Be 'NpmCli'
+        $geminiDescriptor.DependencyCommandNames | Should -Be @('Initialize-NodeRuntime')
+        $geminiDescriptor.NodeDependency.MinimumVersion | Should -Be ([version]'20.0.0')
+
+        $qwenDescriptor.RuntimePack | Should -Be 'NpmCli'
+        $qwenDescriptor.DependencyCommandNames | Should -Be @('Initialize-NodeRuntime')
+        $qwenDescriptor.NodeDependency.MinimumVersion | Should -Be ([version]'20.0.0')
+
+        $codexDescriptor.RuntimePack | Should -Be 'NpmCli'
+        $codexDescriptor.DependencyCommandNames | Should -Be @('Initialize-VCRuntime', 'Initialize-NodeRuntime')
+        $codexDescriptor.PackageJsonPropertyName | Should -Be 'PackageJsonPath'
+
+        $ghCliDescriptor.RuntimePack | Should -Be 'GitHubPortable'
+        $ghCliDescriptor.CacheRootPropertyName | Should -Be 'GHCliCacheRoot'
+        $ghCliDescriptor.RefreshParameterName | Should -Be 'RefreshGHCli'
+
+        $gitDescriptor.RuntimePack | Should -Be 'GitHubPortable'
+        $gitDescriptor.CacheRootPropertyName | Should -Be 'GitCacheRoot'
+        $gitDescriptor.RefreshParameterName | Should -Be 'RefreshGit'
+
+        $vsCodeDescriptor.RuntimePack | Should -Be 'GitHubPortable'
+        $vsCodeDescriptor.CacheRootPropertyName | Should -Be 'VsCodeCacheRoot'
+        $vsCodeDescriptor.PersistedExtraStateProperties | Should -Contain 'PortableMode'
+    }
+
     It 'derives runtime snapshot metadata directly from registry descriptors' {
         $expectedNames = @(& $script:SandboxModule {
             Get-ManifestedRuntimeRegistry |
@@ -292,6 +354,44 @@ Describe 'Eigenverft.Manifested.Sandbox runtime contracts' {
                 $privateIndex | Should -BeGreaterThan -1
                 $publicIndex | Should -BeGreaterThan -1
                 $privateIndex | Should -BeLessThan $publicIndex
+            }
+        }
+    }
+
+    It 'keeps hotspot runtime root files as capability shims' {
+        $shimChecks = @(
+            @{
+                Path      = Join-Path $script:ModuleProjectRoot 'Private\Logic\Eigenverft.Manifested.Sandbox.Runtime.Python.ps1'
+                Fragments = @('Runtime.Python.Discovery.ps1', 'Runtime.Python.Package.ps1', 'Runtime.Python.Validation.ps1', 'Runtime.Python.Pip.ps1', 'Runtime.Python.Install.ps1')
+            }
+            @{
+                Path      = Join-Path $script:ModuleProjectRoot 'Private\Logic\Eigenverft.Manifested.Sandbox.Runtime.Node.ps1'
+                Fragments = @('Runtime.Node.Discovery.ps1', 'Runtime.Node.Package.ps1', 'Runtime.Node.Validation.ps1', 'Runtime.Node.Install.ps1')
+            }
+            @{
+                Path      = Join-Path $script:ModuleProjectRoot 'Private\Logic\Eigenverft.Manifested.Sandbox.Runtime.Git.ps1'
+                Fragments = @('Runtime.Git.Discovery.ps1', 'Runtime.Git.Package.ps1', 'Runtime.Git.Validation.ps1', 'Runtime.Git.Install.ps1')
+            }
+            @{
+                Path      = Join-Path $script:ModuleProjectRoot 'Private\Logic\Eigenverft.Manifested.Sandbox.Runtime.GHCli.ps1'
+                Fragments = @('Runtime.GHCli.Discovery.ps1', 'Runtime.GHCli.Package.ps1', 'Runtime.GHCli.Validation.ps1', 'Runtime.GHCli.Install.ps1')
+            }
+            @{
+                Path      = Join-Path $script:ModuleProjectRoot 'Private\Logic\Eigenverft.Manifested.Sandbox.Runtime.VsCode.ps1'
+                Fragments = @('Runtime.VsCode.Discovery.ps1', 'Runtime.VsCode.Package.ps1', 'Runtime.VsCode.Validation.ps1', 'Runtime.VsCode.Install.ps1')
+            }
+            @{
+                Path      = Join-Path $script:ModuleProjectRoot 'Private\Logic\Eigenverft.Manifested.Sandbox.Runtime.Codex.ps1'
+                Fragments = @('Runtime.Codex.Discovery.ps1', 'Runtime.Codex.Package.ps1', 'Runtime.Codex.Validation.ps1', 'Runtime.Codex.Install.ps1')
+            }
+        )
+
+        foreach ($shimCheck in $shimChecks) {
+            $content = Get-Content -LiteralPath $shimCheck.Path -Raw
+
+            $content | Should -Not -Match '(?m)^function\s+'
+            foreach ($fragment in $shimCheck.Fragments) {
+                $content | Should -Match ([regex]::Escape($fragment))
             }
         }
     }
@@ -837,6 +937,186 @@ Describe 'Eigenverft.Manifested.Sandbox runtime contracts' {
         )
         $result.PersistedStatePath | Should -Be $null
         $result.RestartRequired | Should -BeFalse
+    }
+
+    It 'returns a non-WhatIf result shape for the VC runtime facade success path' {
+        $result = & $script:SandboxModule {
+            $script:FakeVCRuntimeInstalled = $false
+
+            function Get-ManifestedLayout {
+                [pscustomobject]@{
+                    LocalRoot          = 'C:\Sandbox'
+                    VCRuntimeCacheRoot = 'C:\Sandbox\cache\vc'
+                }
+            }
+
+            function Get-ManifestedSelfElevationContext {
+                [pscustomobject]@{
+                    SkipSelfElevation = $true
+                    WasSelfElevated   = $false
+                }
+            }
+
+            function Get-ManifestedCommandElevationPlan {
+                param(
+                    [string]$CommandName,
+                    [object[]]$PlannedActions,
+                    [hashtable]$Context,
+                    [string]$LocalRoot,
+                    [bool]$SkipSelfElevation,
+                    [bool]$WasSelfElevated,
+                    [bool]$WhatIfMode
+                )
+
+                [pscustomobject]@{
+                    CommandName       = $CommandName
+                    PlannedActions    = @($PlannedActions)
+                    RequiresElevation = $false
+                    WhatIfMode        = $WhatIfMode
+                }
+            }
+
+            function Invoke-ManifestedElevatedCommand {
+                param(
+                    [pscustomobject]$ElevationPlan,
+                    [string]$CommandName,
+                    [hashtable]$CommandParameters
+                )
+
+                return $null
+            }
+
+            function Save-ManifestedInvokeState {
+                param(
+                    [string]$CommandName,
+                    [pscustomobject]$Result,
+                    [hashtable]$Details,
+                    [string]$LocalRoot
+                )
+
+                return 'C:\Sandbox\state.json'
+            }
+
+            function Get-VCRuntimeState {
+                param([string]$LocalRoot)
+
+                $layout = [pscustomobject]@{
+                    LocalRoot          = 'C:\Sandbox'
+                    VCRuntimeCacheRoot = 'C:\Sandbox\cache\vc'
+                }
+
+                if (-not $script:FakeVCRuntimeInstalled) {
+                    return [pscustomobject]@{
+                        Status           = 'Missing'
+                        LocalRoot        = 'C:\Sandbox'
+                        Layout           = $layout
+                        CurrentVersion   = $null
+                        InstalledRuntime = [pscustomobject]@{
+                            Installed = $false
+                        }
+                        Runtime          = [pscustomobject]@{
+                            Status    = 'Missing'
+                            Installed = $false
+                        }
+                        Installer        = $null
+                        InstallerPath    = $null
+                        PartialPaths     = @()
+                        BlockedReason    = $null
+                    }
+                }
+
+                return [pscustomobject]@{
+                    Status           = 'Ready'
+                    LocalRoot        = 'C:\Sandbox'
+                    Layout           = $layout
+                    CurrentVersion   = '14.42.34433.0'
+                    InstalledRuntime = [pscustomobject]@{
+                        Installed = $true
+                    }
+                    Runtime          = [pscustomobject]@{
+                        Status    = 'Ready'
+                        Installed = $true
+                    }
+                    Installer        = [pscustomobject]@{
+                        Path = 'C:\Sandbox\cache\vc\vc_redist.x64.exe'
+                    }
+                    InstallerPath    = 'C:\Sandbox\cache\vc\vc_redist.x64.exe'
+                    PartialPaths     = @()
+                    BlockedReason    = $null
+                }
+            }
+
+            function Save-VCRuntimeInstaller {
+                param(
+                    [switch]$RefreshVCRuntime,
+                    [string]$LocalRoot
+                )
+
+                [pscustomobject]@{
+                    Action = 'Downloaded'
+                    Path   = 'C:\Sandbox\cache\vc\vc_redist.x64.exe'
+                }
+            }
+
+            function Test-VCRuntimeInstaller {
+                param([pscustomobject]$InstallerInfo)
+
+                [pscustomobject]@{
+                    Status = 'Ready'
+                    Path   = $InstallerInfo.Path
+                }
+            }
+
+            function Install-VCRuntime {
+                param(
+                    [pscustomobject]$InstallerInfo,
+                    [int]$InstallTimeoutSec,
+                    [string]$LocalRoot
+                )
+
+                $script:FakeVCRuntimeInstalled = $true
+                [pscustomobject]@{
+                    Action          = 'Installed'
+                    RestartRequired = $true
+                }
+            }
+
+            function Test-VCRuntime {
+                param([pscustomobject]$InstalledRuntime)
+
+                [pscustomobject]@{
+                    Status    = 'Ready'
+                    Installed = $true
+                }
+            }
+
+            Initialize-VCRuntime
+        }
+
+        $result.ActionTaken | Should -Contain 'Save-VCRuntimeInstaller'
+        $result.ActionTaken | Should -Contain 'Install-VCRuntime'
+        $result.PersistedStatePath | Should -Be 'C:\Sandbox\state.json'
+        $result.RestartRequired | Should -BeTrue
+    }
+
+    It 'keeps shared runtime family helpers free of inline if argument expressions' {
+        $helperPaths = @(
+            'Private\Common\Eigenverft.Manifested.Sandbox.Shared.ProxyRouting.ps1'
+            'Private\Logic\Eigenverft.Manifested.Sandbox.Runtime.Archive.Shared.ps1'
+            'Private\Logic\Eigenverft.Manifested.Sandbox.Runtime.NpmCli.Shared.ps1'
+            'Private\Logic\Eigenverft.Manifested.Sandbox.RuntimePack.Python.ps1'
+            'Private\Logic\Eigenverft.Manifested.Sandbox.RuntimePack.Node.ps1'
+            'Private\Logic\Eigenverft.Manifested.Sandbox.RuntimePack.NpmCli.ps1'
+            'Private\Logic\Eigenverft.Manifested.Sandbox.RuntimePack.GitHubPortable.ps1'
+            'Private\Logic\Eigenverft.Manifested.Sandbox.RuntimePack.MachinePrerequisite.ps1'
+        )
+
+        foreach ($helperPath in $helperPaths) {
+            $content = Get-Content -LiteralPath (Join-Path $script:ModuleProjectRoot $helperPath) -Raw
+
+            $content | Should -Not -Match '-ActionTaken\s+\(if\s*\('
+            $content | Should -Not -Match '-RestartRequired:\(if\s*\('
+        }
     }
 
     It 'keeps exported commands aligned with the manifest contract' {

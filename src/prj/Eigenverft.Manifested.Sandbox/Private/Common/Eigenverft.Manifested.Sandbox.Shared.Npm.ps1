@@ -103,31 +103,14 @@ function Resolve-ManifestedNpmProxyRoute {
         [uri]$RegistryUri
     )
 
-    $proxyUri = $null
-
-    try {
-        $systemProxy = [System.Net.WebRequest]::GetSystemWebProxy()
-        if ($null -ne $systemProxy) {
-            $systemProxy.Credentials = [System.Net.CredentialCache]::DefaultCredentials
-
-            if (-not $systemProxy.IsBypassed($RegistryUri)) {
-                $candidateProxyUri = $systemProxy.GetProxy($RegistryUri)
-                if ($null -ne $candidateProxyUri -and $candidateProxyUri.AbsoluteUri -ne $RegistryUri.AbsoluteUri) {
-                    $proxyUri = $candidateProxyUri
-                }
-            }
-        }
-    }
-    catch {
-        $proxyUri = $null
-    }
+    $proxyRoute = Resolve-ManifestedProxyRoute -TargetUri $RegistryUri
 
     [pscustomobject]@{
-        RegistryUri   = $RegistryUri.AbsoluteUri
-        RegistryHost  = $RegistryUri.Host
-        ProxyUri      = if ($proxyUri) { $proxyUri.AbsoluteUri } else { $null }
-        ProxyRequired = ($null -ne $proxyUri)
-        Route         = if ($proxyUri) { 'Proxy' } else { 'Direct' }
+        RegistryUri   = $proxyRoute.TargetUri
+        RegistryHost  = $proxyRoute.TargetHost
+        ProxyUri      = $proxyRoute.ProxyUri
+        ProxyRequired = $proxyRoute.ProxyRequired
+        Route         = $proxyRoute.Route
     }
 }
 
@@ -186,18 +169,7 @@ function Get-ManifestedNpmProxyConfigurationStatus {
         $currentHttpsProxy = Get-ManifestedNpmConfigValue -NpmCmd $NpmCmd -Key 'https-proxy' -GlobalConfigPath $globalConfigPath
     }
 
-    if ([string]::IsNullOrWhiteSpace($globalConfigPath)) {
-        $action = 'SkippedExternalNpm'
-    }
-    elseif ($proxyRoute.Route -eq 'Direct') {
-        $action = 'DirectNoChange'
-    }
-    elseif ($currentProxy -eq $proxyRoute.ProxyUri -and $currentHttpsProxy -eq $proxyRoute.ProxyUri) {
-        $action = 'ReusedManagedGlobalProxy'
-    }
-    else {
-        $action = 'NeedsManagedGlobalProxy'
-    }
+    $action = Get-ManifestedManagedProxyAction -IsManagedTarget:(-not [string]::IsNullOrWhiteSpace($globalConfigPath)) -Route $proxyRoute.Route -DesiredProxyUri $proxyRoute.ProxyUri -CurrentValues @($currentProxy, $currentHttpsProxy) -ExternalAction 'SkippedExternalNpm' -DirectAction 'DirectNoChange' -ReusedAction 'ReusedManagedGlobalProxy' -NeedsAction 'NeedsManagedGlobalProxy'
 
     [pscustomobject]@{
         NpmCmd          = $NpmCmd

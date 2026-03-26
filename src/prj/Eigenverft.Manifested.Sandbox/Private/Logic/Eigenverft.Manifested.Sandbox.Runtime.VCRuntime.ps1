@@ -3,6 +3,20 @@
 #>
 
 function ConvertTo-VCRuntimeVersion {
+<#
+.SYNOPSIS
+Normalizes VC runtime version text into a comparable version object.
+
+.DESCRIPTION
+Extracts a semantic VC runtime version from installer metadata or registry text
+and returns it as a System.Version when the input can be parsed.
+
+.PARAMETER VersionText
+Raw version text reported by the VC runtime installer or registry.
+
+.EXAMPLE
+ConvertTo-VCRuntimeVersion -VersionText '14.40.33810.0'
+#>
     [CmdletBinding()]
     param(
         [string]$VersionText
@@ -21,6 +35,20 @@ function ConvertTo-VCRuntimeVersion {
 }
 
 function Format-VCRuntimeProcessArgument {
+<#
+.SYNOPSIS
+Formats a VC runtime installer argument for Start-Process.
+
+.DESCRIPTION
+Quotes installer argument values when they contain whitespace or quotes so the
+silent installer receives the expected log-path argument.
+
+.PARAMETER Value
+Argument value that may need quoting before process invocation.
+
+.EXAMPLE
+Format-VCRuntimeProcessArgument -Value 'C:\temp\vc runtime.log'
+#>
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true)]
@@ -35,6 +63,20 @@ function Format-VCRuntimeProcessArgument {
 }
 
 function Get-VCRuntimeInstallerInfo {
+<#
+.SYNOPSIS
+Builds the managed VC runtime installer metadata.
+
+.DESCRIPTION
+Returns the static download URL, cache path, and architecture metadata used by
+the sandbox when acquiring the VC++ redistributable bootstrapper.
+
+.PARAMETER LocalRoot
+Sandbox local root used to resolve the managed cache layout.
+
+.EXAMPLE
+Get-VCRuntimeInstallerInfo
+#>
     [CmdletBinding()]
     param(
         [string]$LocalRoot = (Get-ManifestedLocalRoot)
@@ -51,6 +93,20 @@ function Get-VCRuntimeInstallerInfo {
 }
 
 function Get-CachedVCRuntimeInstaller {
+<#
+.SYNOPSIS
+Returns the currently cached VC runtime installer, if present.
+
+.DESCRIPTION
+Inspects the managed VC runtime cache location, reads file-version metadata
+from the cached bootstrapper, and returns normalized cache details.
+
+.PARAMETER LocalRoot
+Sandbox local root used to resolve the managed installer cache.
+
+.EXAMPLE
+Get-CachedVCRuntimeInstaller
+#>
     [CmdletBinding()]
     param(
         [string]$LocalRoot = (Get-ManifestedLocalRoot)
@@ -78,6 +134,17 @@ function Get-CachedVCRuntimeInstaller {
 }
 
 function Get-InstalledVCRuntime {
+<#
+.SYNOPSIS
+Detects the installed Microsoft VC runtime from the registry.
+
+.DESCRIPTION
+Checks the 32-bit and 64-bit Visual C++ runtime registry keys and returns a
+normalized installation record for the x64 redistributable.
+
+.EXAMPLE
+Get-InstalledVCRuntime
+#>
     [CmdletBinding()]
     param()
 
@@ -146,6 +213,20 @@ function Get-InstalledVCRuntime {
 }
 
 function Test-VCRuntime {
+<#
+.SYNOPSIS
+Normalizes installed VC runtime information into a readiness result.
+
+.DESCRIPTION
+Converts the raw installed-runtime record into the status object used by the
+bootstrap flow so callers can reason about Ready versus Missing state.
+
+.PARAMETER InstalledRuntime
+Registry-based installation record returned by Get-InstalledVCRuntime.
+
+.EXAMPLE
+Test-VCRuntime -InstalledRuntime (Get-InstalledVCRuntime)
+#>
     [CmdletBinding()]
     param(
         [pscustomobject]$InstalledRuntime = (Get-InstalledVCRuntime)
@@ -165,6 +246,21 @@ function Test-VCRuntime {
 }
 
 function Get-VCRuntimeState {
+<#
+.SYNOPSIS
+Builds the current VC runtime state for the manifested sandbox.
+
+.DESCRIPTION
+Combines the cached installer state, installed redistributable state, and any
+partial download artifacts into the normalized runtime snapshot used by
+Initialize-VCRuntime.
+
+.PARAMETER LocalRoot
+Sandbox local root used to resolve installer cache paths.
+
+.EXAMPLE
+Get-VCRuntimeState
+#>
     [CmdletBinding()]
     param(
         [string]$LocalRoot = (Get-ManifestedLocalRoot)
@@ -225,6 +321,26 @@ function Get-VCRuntimeState {
 }
 
 function Repair-VCRuntime {
+<#
+.SYNOPSIS
+Removes partial or corrupt VC runtime installer artifacts.
+
+.DESCRIPTION
+Collects staged download remnants and any explicitly supplied corrupt installer
+paths, removes them, and returns a repair summary for the runtime flow.
+
+.PARAMETER State
+Existing VC runtime state to repair. When omitted, the current state is loaded.
+
+.PARAMETER CorruptInstallerPaths
+Additional installer paths to remove during the repair pass.
+
+.PARAMETER LocalRoot
+Sandbox local root used when state must be rediscovered.
+
+.EXAMPLE
+Repair-VCRuntime -State (Get-VCRuntimeState)
+#>
     [CmdletBinding()]
     param(
         [pscustomobject]$State,
@@ -264,6 +380,27 @@ function Repair-VCRuntime {
 }
 
 function Save-VCRuntimeInstaller {
+<#
+.SYNOPSIS
+Ensures the VC runtime bootstrapper is available in the managed cache.
+
+.DESCRIPTION
+Downloads the Microsoft VC++ redistributable bootstrapper when needed, falls
+back to the cached copy on refresh failures, and returns normalized installer
+metadata for the selected cache entry.
+
+.PARAMETER RefreshVCRuntime
+Forces the installer to be re-downloaded instead of reusing the cached copy.
+
+.PARAMETER LocalRoot
+Sandbox local root used to resolve cache locations.
+
+.EXAMPLE
+Save-VCRuntimeInstaller
+
+.EXAMPLE
+Save-VCRuntimeInstaller -RefreshVCRuntime
+#>
     [CmdletBinding()]
     param(
         [switch]$RefreshVCRuntime,
@@ -318,6 +455,22 @@ function Save-VCRuntimeInstaller {
 }
 
 function Test-VCRuntimeInstaller {
+<#
+.SYNOPSIS
+Validates a cached VC runtime installer.
+
+.DESCRIPTION
+Verifies that the cached installer exists and is authenticode-signed by
+Microsoft so the runtime flow can distinguish ready cache entries from corrupt
+ones.
+
+.PARAMETER InstallerInfo
+Installer metadata returned by Save-VCRuntimeInstaller or
+Get-CachedVCRuntimeInstaller.
+
+.EXAMPLE
+Test-VCRuntimeInstaller -InstallerInfo (Save-VCRuntimeInstaller)
+#>
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true)]
@@ -358,6 +511,27 @@ function Test-VCRuntimeInstaller {
 }
 
 function Invoke-VCRuntimeInstaller {
+<#
+.SYNOPSIS
+Runs the VC runtime bootstrapper in quiet mode.
+
+.DESCRIPTION
+Starts the redistributable installer with silent arguments, waits for it to
+finish, captures the generated log path, and enforces a caller-supplied
+timeout.
+
+.PARAMETER InstallerPath
+Path to the VC runtime bootstrapper executable to launch.
+
+.PARAMETER TimeoutSec
+Maximum number of seconds to wait before terminating the installer.
+
+.PARAMETER LocalRoot
+Sandbox local root used to place the installer log file.
+
+.EXAMPLE
+Invoke-VCRuntimeInstaller -InstallerPath $installer.Path
+#>
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true)]
@@ -401,6 +575,27 @@ function Invoke-VCRuntimeInstaller {
 }
 
 function Install-VCRuntime {
+<#
+.SYNOPSIS
+Installs the VC runtime when the current machine is missing or behind.
+
+.DESCRIPTION
+Compares the installed VC++ redistributable with the cached installer version,
+skips installation when the machine is already up to date, and otherwise runs
+the installer and validates the result.
+
+.PARAMETER InstallerInfo
+Validated installer metadata for the VC runtime bootstrapper.
+
+.PARAMETER InstallTimeoutSec
+Maximum number of seconds to wait for the installer process.
+
+.PARAMETER LocalRoot
+Sandbox local root used for installer logging and cache resolution.
+
+.EXAMPLE
+Install-VCRuntime -InstallerInfo (Save-VCRuntimeInstaller)
+#>
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true)]

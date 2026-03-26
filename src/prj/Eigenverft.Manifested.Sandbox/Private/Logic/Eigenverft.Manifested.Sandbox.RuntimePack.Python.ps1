@@ -360,7 +360,8 @@ function Invoke-ManifestedPythonRuntimeInitialization {
     $commandEnvironment = $commandEnvironmentSync.CommandEnvironment
 
     $effectivePackageInfo = if ($packageInfo) { $packageInfo } elseif ($finalState.Package) { $finalState.Package } else { $null }
-    $result = New-ManifestedRuntimeResult -LocalRoot $finalState.LocalRoot -Layout $finalState.Layout -InitialState $initialState -FinalState $finalState -ActionTaken (if ($actionsTaken.Count -gt 0) { @($actionsTaken) } else { @('None') }) -PlannedActions @($plannedActions) -RestartRequired:$false -AdditionalProperties ([ordered]@{
+    $actionTaken = if ($actionsTaken.Count -gt 0) { @($actionsTaken) } else { @('None') }
+    $result = New-ManifestedRuntimeResult -LocalRoot $finalState.LocalRoot -Layout $finalState.Layout -InitialState $initialState -FinalState $finalState -ActionTaken $actionTaken -PlannedActions @($plannedActions) -RestartRequired:$false -AdditionalProperties ([ordered]@{
         Package               = $effectivePackageInfo
         PackageTest           = $packageTest
         RuntimeTest           = $runtimeTest

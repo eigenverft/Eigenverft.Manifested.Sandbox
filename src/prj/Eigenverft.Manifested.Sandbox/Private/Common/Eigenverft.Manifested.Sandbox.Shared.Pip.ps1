@@ -192,31 +192,14 @@ Proxy discovery failures are treated as direct access to keep the helper safe.
         [uri]$IndexUri
     )
 
-    $proxyUri = $null
-
-    try {
-        $systemProxy = [System.Net.WebRequest]::GetSystemWebProxy()
-        if ($null -ne $systemProxy) {
-            $systemProxy.Credentials = [System.Net.CredentialCache]::DefaultCredentials
-
-            if (-not $systemProxy.IsBypassed($IndexUri)) {
-                $candidateProxyUri = $systemProxy.GetProxy($IndexUri)
-                if ($null -ne $candidateProxyUri -and $candidateProxyUri.AbsoluteUri -ne $IndexUri.AbsoluteUri) {
-                    $proxyUri = $candidateProxyUri
-                }
-            }
-        }
-    }
-    catch {
-        $proxyUri = $null
-    }
+    $proxyRoute = Resolve-ManifestedProxyRoute -TargetUri $IndexUri
 
     [pscustomobject]@{
-        IndexUri      = $IndexUri.AbsoluteUri
-        IndexHost     = $IndexUri.Host
-        ProxyUri      = if ($proxyUri) { $proxyUri.AbsoluteUri } else { $null }
-        ProxyRequired = ($null -ne $proxyUri)
-        Route         = if ($proxyUri) { 'Proxy' } else { 'Direct' }
+        IndexUri      = $proxyRoute.TargetUri
+        IndexHost     = $proxyRoute.TargetHost
+        ProxyUri      = $proxyRoute.ProxyUri
+        ProxyRequired = $proxyRoute.ProxyRequired
+        Route         = $proxyRoute.Route
     }
 }
 
@@ -433,18 +416,7 @@ The returned object is designed to be reusable by
         $currentProxy = Get-ManifestedPipConfigValue -ConfigPath $pipConfiguration.PipConfigPath -Section 'global' -Key 'proxy'
     }
 
-    if (-not $pipConfiguration.IsManagedPython) {
-        $action = 'SkippedExternalPip'
-    }
-    elseif ($proxyRoute.Route -eq 'Direct') {
-        $action = 'DirectNoChange'
-    }
-    elseif ($currentProxy -eq $proxyRoute.ProxyUri) {
-        $action = 'ReusedManagedProxy'
-    }
-    else {
-        $action = 'NeedsManagedProxy'
-    }
+    $action = Get-ManifestedManagedProxyAction -IsManagedTarget:$pipConfiguration.IsManagedPython -Route $proxyRoute.Route -DesiredProxyUri $proxyRoute.ProxyUri -CurrentValues @($currentProxy) -ExternalAction 'SkippedExternalPip' -DirectAction 'DirectNoChange' -ReusedAction 'ReusedManagedProxy' -NeedsAction 'NeedsManagedProxy'
 
     [pscustomobject]@{
         PythonExe      = $pipConfiguration.PythonExe
