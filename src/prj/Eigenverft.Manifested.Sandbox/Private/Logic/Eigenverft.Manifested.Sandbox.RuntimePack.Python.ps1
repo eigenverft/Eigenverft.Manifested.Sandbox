@@ -156,14 +156,7 @@ function Invoke-ManifestedPythonRuntimeInitialization {
 
     if ($state.Status -eq 'Blocked') {
         $commandEnvironment = Get-ManifestedCommandEnvironmentResult -CommandName $descriptor.InitializeCommandName -RuntimeState $state
-        $result = [pscustomobject]@{
-            LocalRoot             = $state.LocalRoot
-            Layout                = $state.Layout
-            InitialState          = $initialState
-            FinalState            = $state
-            ActionTaken           = @('None')
-            PlannedActions        = @()
-            RestartRequired       = $false
+        $result = New-ManifestedRuntimeResult -LocalRoot $state.LocalRoot -Layout $state.Layout -InitialState $initialState -FinalState $state -ActionTaken @('None') -PlannedActions @() -RestartRequired:$false -AdditionalProperties ([ordered]@{
             Package               = $null
             PackageTest           = $null
             RuntimeTest           = $null
@@ -173,16 +166,9 @@ function Invoke-ManifestedPythonRuntimeInitialization {
             PipProxyConfiguration = $null
             CommandEnvironment    = $commandEnvironment
             Elevation             = $elevationPlan
-        }
+        })
 
-        if ($WhatIfPreference) {
-            Add-Member -InputObject $result -NotePropertyName PersistedStatePath -NotePropertyValue $null -Force
-            return $result
-        }
-
-        $statePath = Save-ManifestedInvokeState -CommandName $descriptor.InitializeCommandName -Result $result -LocalRoot $LocalRoot -Details @{}
-        Add-Member -InputObject $result -NotePropertyName PersistedStatePath -NotePropertyValue $statePath -Force
-        return $result
+        return (Complete-ManifestedRuntimeResult -CommandName $descriptor.InitializeCommandName -Result $result -LocalRoot $LocalRoot -Details @{} -PersistState:(-not $WhatIfPreference))
     }
 
     $needsRepair = $state.Status -in @('Partial', 'NeedsRepair')
@@ -192,37 +178,8 @@ function Invoke-ManifestedPythonRuntimeInitialization {
     $elevationPlan = Get-ManifestedCommandElevationPlan -CommandName $descriptor.InitializeCommandName -PlannedActions @($plannedActions) -LocalRoot $LocalRoot -SkipSelfElevation:$selfElevationContext.SkipSelfElevation -WasSelfElevated:$selfElevationContext.WasSelfElevated -WhatIfMode:$WhatIfPreference
 
     if ($WhatIfPreference) {
-        return [pscustomobject]@{
-            LocalRoot             = $state.LocalRoot
-            Layout                = $state.Layout
-            InitialState          = $initialState
-            FinalState            = $state
-            ActionTaken           = @('WhatIf')
-            PlannedActions        = @($plannedActions)
-            RestartRequired       = $false
-            Package               = $state.Package
-            PackageTest           = $null
-            RuntimeTest           = $state.Runtime
-            RepairResult          = $null
-            InstallResult         = $null
-            PipSetupResult        = $null
-            PipProxyConfiguration = $null
-            CommandEnvironment    = (Get-ManifestedCommandEnvironmentResult -CommandName $descriptor.InitializeCommandName -RuntimeState $state)
-            PersistedStatePath    = $null
-            Elevation             = $elevationPlan
-        }
-    }
-
-    if ($needsRepair) {
-        if (-not $PSCmdlet.ShouldProcess($state.Layout.($descriptor.ToolsRootPropertyName), ('Repair {0} runtime state' -f $descriptor.DisplayName))) {
-            return [pscustomobject]@{
-                LocalRoot             = $state.LocalRoot
-                Layout                = $state.Layout
-                InitialState          = $initialState
-                FinalState            = $state
-                ActionTaken           = @('Cancelled')
-                PlannedActions        = @($plannedActions)
-                RestartRequired       = $false
+        return (Complete-ManifestedRuntimeResult -CommandName $descriptor.InitializeCommandName -LocalRoot $LocalRoot -PersistState:$false -Result (
+            New-ManifestedRuntimeResult -LocalRoot $state.LocalRoot -Layout $state.Layout -InitialState $initialState -FinalState $state -ActionTaken @('WhatIf') -PlannedActions @($plannedActions) -RestartRequired:$false -AdditionalProperties ([ordered]@{
                 Package               = $state.Package
                 PackageTest           = $null
                 RuntimeTest           = $state.Runtime
@@ -231,9 +188,26 @@ function Invoke-ManifestedPythonRuntimeInitialization {
                 PipSetupResult        = $null
                 PipProxyConfiguration = $null
                 CommandEnvironment    = (Get-ManifestedCommandEnvironmentResult -CommandName $descriptor.InitializeCommandName -RuntimeState $state)
-                PersistedStatePath    = $null
                 Elevation             = $elevationPlan
-            }
+            })
+        ))
+    }
+
+    if ($needsRepair) {
+        if (-not $PSCmdlet.ShouldProcess($state.Layout.($descriptor.ToolsRootPropertyName), ('Repair {0} runtime state' -f $descriptor.DisplayName))) {
+            return (Complete-ManifestedRuntimeResult -CommandName $descriptor.InitializeCommandName -LocalRoot $LocalRoot -PersistState:$false -Result (
+                New-ManifestedRuntimeResult -LocalRoot $state.LocalRoot -Layout $state.Layout -InitialState $initialState -FinalState $state -ActionTaken @('Cancelled') -PlannedActions @($plannedActions) -RestartRequired:$false -AdditionalProperties ([ordered]@{
+                    Package               = $state.Package
+                    PackageTest           = $null
+                    RuntimeTest           = $state.Runtime
+                    RepairResult          = $null
+                    InstallResult         = $null
+                    PipSetupResult        = $null
+                    PipProxyConfiguration = $null
+                    CommandEnvironment    = (Get-ManifestedCommandEnvironmentResult -CommandName $descriptor.InitializeCommandName -RuntimeState $state)
+                    Elevation             = $elevationPlan
+                })
+            ))
         }
 
         $repairResult = & $descriptor.RepairFunctionName -State $state -Flavor $state.Flavor -LocalRoot $state.LocalRoot
@@ -276,25 +250,19 @@ function Invoke-ManifestedPythonRuntimeInitialization {
 
         if ($packageTest.Status -eq 'CorruptCache') {
             if (-not $PSCmdlet.ShouldProcess($packageInfo.Path, ('Repair corrupt {0} runtime package' -f $descriptor.DisplayName))) {
-                return [pscustomobject]@{
-                    LocalRoot             = $state.LocalRoot
-                    Layout                = $state.Layout
-                    InitialState          = $initialState
-                    FinalState            = $state
-                    ActionTaken           = @('Cancelled')
-                    PlannedActions        = @($plannedActions)
-                    RestartRequired       = $false
-                    Package               = $packageInfo
-                    PackageTest           = $packageTest
-                    RuntimeTest           = $state.Runtime
-                    RepairResult          = $repairResult
-                    InstallResult         = $null
-                    PipSetupResult        = $null
-                    PipProxyConfiguration = $null
-                    CommandEnvironment    = (Get-ManifestedCommandEnvironmentResult -CommandName $descriptor.InitializeCommandName -RuntimeState $state)
-                    PersistedStatePath    = $null
-                    Elevation             = $elevationPlan
-                }
+                return (Complete-ManifestedRuntimeResult -CommandName $descriptor.InitializeCommandName -LocalRoot $LocalRoot -PersistState:$false -Result (
+                    New-ManifestedRuntimeResult -LocalRoot $state.LocalRoot -Layout $state.Layout -InitialState $initialState -FinalState $state -ActionTaken @('Cancelled') -PlannedActions @($plannedActions) -RestartRequired:$false -AdditionalProperties ([ordered]@{
+                        Package               = $packageInfo
+                        PackageTest           = $packageTest
+                        RuntimeTest           = $state.Runtime
+                        RepairResult          = $repairResult
+                        InstallResult         = $null
+                        PipSetupResult        = $null
+                        PipProxyConfiguration = $null
+                        CommandEnvironment    = (Get-ManifestedCommandEnvironmentResult -CommandName $descriptor.InitializeCommandName -RuntimeState $state)
+                        Elevation             = $elevationPlan
+                    })
+                ))
             }
 
             $repairResult = & $descriptor.RepairFunctionName -State $state -CorruptPackagePaths @($packageInfo.Path) -Flavor $state.Flavor -LocalRoot $state.LocalRoot
@@ -333,25 +301,19 @@ function Invoke-ManifestedPythonRuntimeInitialization {
         }
 
         if (-not $PSCmdlet.ShouldProcess($state.Layout.($descriptor.ToolsRootPropertyName), ('Install {0} runtime' -f $descriptor.DisplayName))) {
-            return [pscustomobject]@{
-                LocalRoot             = $state.LocalRoot
-                Layout                = $state.Layout
-                InitialState          = $initialState
-                FinalState            = $state
-                ActionTaken           = @('Cancelled')
-                PlannedActions        = @($plannedActions)
-                RestartRequired       = $false
-                Package               = $packageInfo
-                PackageTest           = $packageTest
-                RuntimeTest           = $state.Runtime
-                RepairResult          = $repairResult
-                InstallResult         = $null
-                PipSetupResult        = $null
-                PipProxyConfiguration = $null
-                CommandEnvironment    = (Get-ManifestedCommandEnvironmentResult -CommandName $descriptor.InitializeCommandName -RuntimeState $state)
-                PersistedStatePath    = $null
-                Elevation             = $elevationPlan
-            }
+            return (Complete-ManifestedRuntimeResult -CommandName $descriptor.InitializeCommandName -LocalRoot $LocalRoot -PersistState:$false -Result (
+                New-ManifestedRuntimeResult -LocalRoot $state.LocalRoot -Layout $state.Layout -InitialState $initialState -FinalState $state -ActionTaken @('Cancelled') -PlannedActions @($plannedActions) -RestartRequired:$false -AdditionalProperties ([ordered]@{
+                    Package               = $packageInfo
+                    PackageTest           = $packageTest
+                    RuntimeTest           = $state.Runtime
+                    RepairResult          = $repairResult
+                    InstallResult         = $null
+                    PipSetupResult        = $null
+                    PipProxyConfiguration = $null
+                    CommandEnvironment    = (Get-ManifestedCommandEnvironmentResult -CommandName $descriptor.InitializeCommandName -RuntimeState $state)
+                    Elevation             = $elevationPlan
+                })
+            ))
         }
 
         $installResult = & $descriptor.InstallFunctionName -PackageInfo $packageInfo -Flavor $state.Flavor -LocalRoot $state.LocalRoot -ForceInstall:$Refresh
@@ -394,23 +356,11 @@ function Invoke-ManifestedPythonRuntimeInitialization {
         $runtimeTest = & $descriptor.RuntimeTestFunctionName @runtimeTestParameters
     }
 
-    $commandEnvironment = Get-ManifestedCommandEnvironmentResult -CommandName $descriptor.InitializeCommandName -RuntimeState $finalState
-    if ($commandEnvironment.Applicable -and $commandEnvironment.Status -eq 'NeedsSync') {
-        $commandEnvironment = Sync-ManifestedCommandLineEnvironment -Specification (Get-ManifestedCommandEnvironmentSpec -CommandName $descriptor.InitializeCommandName -RuntimeState $finalState)
-        if ($commandEnvironment.Status -eq 'Updated') {
-            $actionsTaken.Add('Sync-ManifestedCommandLineEnvironment') | Out-Null
-        }
-    }
+    $commandEnvironmentSync = Invoke-ManifestedRuntimeCommandEnvironmentSync -Cmdlet $PSCmdlet -CommandName $descriptor.InitializeCommandName -DisplayName $descriptor.DisplayName -RuntimeState $finalState -ActionsTaken $actionsTaken -UseShouldProcess:$false -RequireNeedsSync:$true
+    $commandEnvironment = $commandEnvironmentSync.CommandEnvironment
 
     $effectivePackageInfo = if ($packageInfo) { $packageInfo } elseif ($finalState.Package) { $finalState.Package } else { $null }
-    $result = [pscustomobject]@{
-        LocalRoot             = $finalState.LocalRoot
-        Layout                = $finalState.Layout
-        InitialState          = $initialState
-        FinalState            = $finalState
-        ActionTaken           = if ($actionsTaken.Count -gt 0) { @($actionsTaken) } else { @('None') }
-        PlannedActions        = @($plannedActions)
-        RestartRequired       = $false
+    $result = New-ManifestedRuntimeResult -LocalRoot $finalState.LocalRoot -Layout $finalState.Layout -InitialState $initialState -FinalState $finalState -ActionTaken (if ($actionsTaken.Count -gt 0) { @($actionsTaken) } else { @('None') }) -PlannedActions @($plannedActions) -RestartRequired:$false -AdditionalProperties ([ordered]@{
         Package               = $effectivePackageInfo
         PackageTest           = $packageTest
         RuntimeTest           = $runtimeTest
@@ -419,11 +369,8 @@ function Invoke-ManifestedPythonRuntimeInitialization {
         PipSetupResult        = $pipSetupResult
         PipProxyConfiguration = if ($pipSetupResult) { $pipSetupResult.PipProxyConfiguration } else { $null }
         CommandEnvironment    = $commandEnvironment
-        PersistedStatePath    = $null
         Elevation             = $elevationPlan
-    }
+    })
 
-    $statePath = Save-ManifestedInvokeState -CommandName $descriptor.InitializeCommandName -Result $result -LocalRoot $LocalRoot -Details (& $descriptor.PersistedDetailsFunctionName -Descriptor $descriptor -FinalState $finalState -PackageInfo $effectivePackageInfo -RuntimeTest $runtimeTest -PipSetupResult $pipSetupResult)
-    Add-Member -InputObject $result -NotePropertyName PersistedStatePath -NotePropertyValue $statePath -Force
-    return $result
+    return (Complete-ManifestedRuntimeResult -CommandName $descriptor.InitializeCommandName -Result $result -LocalRoot $LocalRoot -Details (& $descriptor.PersistedDetailsFunctionName -Descriptor $descriptor -FinalState $finalState -PackageInfo $effectivePackageInfo -RuntimeTest $runtimeTest -PipSetupResult $pipSetupResult))
 }

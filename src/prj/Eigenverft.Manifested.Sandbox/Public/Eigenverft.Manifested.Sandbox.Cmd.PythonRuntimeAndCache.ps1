@@ -27,6 +27,7 @@ Initialize-PythonRuntime -RefreshPython
 Supports `-WhatIf` and follows the module's shared state and environment
 synchronization conventions for public runtime commands.
 #>
+    [Diagnostics.CodeAnalysis.SuppressMessage('PSShouldProcess', '', Justification = 'Thin facade delegates ShouldProcess handling to the shared Python runtime helper.')]
     [CmdletBinding(SupportsShouldProcess = $true)]
     param(
         [switch]$RefreshPython

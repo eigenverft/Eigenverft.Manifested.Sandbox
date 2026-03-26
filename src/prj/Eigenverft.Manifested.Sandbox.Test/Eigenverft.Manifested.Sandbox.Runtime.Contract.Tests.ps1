@@ -12,12 +12,15 @@ Describe 'Eigenverft.Manifested.Sandbox runtime contracts' {
         }
 
         $moduleProjectRoot = Join-Path (Split-Path -Parent $testProjectRoot) 'Eigenverft.Manifested.Sandbox'
+        $script:ModuleProjectRoot = $moduleProjectRoot
         $script:ModuleManifestPath = Join-Path $moduleProjectRoot 'Eigenverft.Manifested.Sandbox.psd1'
         $script:ManifestData = Import-PowerShellDataFile -Path $script:ModuleManifestPath
+        $script:SandboxModule = $null
 
         function Reset-SandboxModule {
-            if ($script:SandboxModule) {
-                Remove-Module $script:SandboxModule.Name -Force -ErrorAction SilentlyContinue
+            $existingSandboxModule = Get-Variable -Name SandboxModule -Scope Script -ErrorAction SilentlyContinue
+            if ($existingSandboxModule -and $existingSandboxModule.Value) {
+                Remove-Module $existingSandboxModule.Value.Name -Force -ErrorAction SilentlyContinue
             }
 
             $script:SandboxModule = Import-Module $script:ModuleManifestPath -Force -PassThru
@@ -31,8 +34,9 @@ Describe 'Eigenverft.Manifested.Sandbox runtime contracts' {
     }
 
     AfterAll {
-        if ($script:SandboxModule) {
-            Remove-Module $script:SandboxModule.Name -Force -ErrorAction SilentlyContinue
+        $existingSandboxModule = Get-Variable -Name SandboxModule -Scope Script -ErrorAction SilentlyContinue
+        if ($existingSandboxModule -and $existingSandboxModule.Value) {
+            Remove-Module $existingSandboxModule.Value.Name -Force -ErrorAction SilentlyContinue
         }
     }
 
@@ -115,6 +119,39 @@ Describe 'Eigenverft.Manifested.Sandbox runtime contracts' {
         $definitions.VC | Should -Not -Match 'Get-VCRuntimeState'
     }
 
+    It 'keeps every exported runtime initializer as a thin facade over the correct family helper' {
+        $facadeChecks = @(& $script:SandboxModule {
+            $commandToHelper = [ordered]@{
+                'Initialize-NodeRuntime'     = 'Invoke-ManifestedNodeRuntimeInitialization'
+                'Initialize-PythonRuntime'   = 'Invoke-ManifestedPythonRuntimeInitialization'
+                'Initialize-VCRuntime'       = 'Invoke-ManifestedMachinePrerequisiteRuntimeInitialization'
+                'Initialize-Ps7Runtime'      = 'Invoke-ManifestedGitHubPortableRuntimeInitialization'
+                'Initialize-GitRuntime'      = 'Invoke-ManifestedGitHubPortableRuntimeInitialization'
+                'Initialize-GHCliRuntime'    = 'Invoke-ManifestedGitHubPortableRuntimeInitialization'
+                'Initialize-VSCodeRuntime'   = 'Invoke-ManifestedGitHubPortableRuntimeInitialization'
+                'Initialize-OpenCodeRuntime' = 'Invoke-ManifestedNpmCliRuntimeInitialization'
+                'Initialize-GeminiRuntime'   = 'Invoke-ManifestedNpmCliRuntimeInitialization'
+                'Initialize-QwenRuntime'     = 'Invoke-ManifestedNpmCliRuntimeInitialization'
+                'Initialize-CodexRuntime'    = 'Invoke-ManifestedNpmCliRuntimeInitialization'
+            }
+
+            foreach ($entry in $commandToHelper.GetEnumerator()) {
+                $descriptor = Get-ManifestedRuntimeDescriptor -CommandName $entry.Key
+                [pscustomobject]@{
+                    CommandName      = $entry.Key
+                    ExpectedHelper   = $entry.Value
+                    StateFunction    = $descriptor.StateFunctionName
+                    Definition       = (Get-Command $entry.Key).ScriptBlock.ToString()
+                }
+            }
+        })
+
+        foreach ($facadeCheck in $facadeChecks) {
+            $facadeCheck.Definition | Should -Match $facadeCheck.ExpectedHelper
+            $facadeCheck.Definition | Should -Not -Match [regex]::Escape($facadeCheck.StateFunction)
+        }
+    }
+
     It 'routes VS Code command-environment expectations through descriptor metadata' {
         $state = [pscustomobject]@{
             RuntimeHome    = 'C:\Tools\VSCode'
@@ -171,6 +208,92 @@ Describe 'Eigenverft.Manifested.Sandbox runtime contracts' {
 
         $definitions.VSCode | Should -Match 'Invoke-ManifestedGitHubPortableRuntimeInitialization'
         $definitions.VSCode | Should -Not -Match 'Get-VSCodeRuntimeState'
+    }
+
+    It 'loads private implementation files before public facades in every runtime pack loader' {
+        $loaderChecks = @(
+            @{
+                Path = Join-Path $script:ModuleProjectRoot 'RuntimePacks\Node\Eigenverft.Manifested.Sandbox.RuntimePack.Node.ps1'
+                Pairs = @(
+                    @{
+                        PrivatePath = 'Private\Logic\Eigenverft.Manifested.Sandbox.Runtime.Node.ps1'
+                        PublicPath  = 'Public\Eigenverft.Manifested.Sandbox.Cmd.NodeRuntimeAndCache.ps1'
+                    }
+                )
+            }
+            @{
+                Path = Join-Path $script:ModuleProjectRoot 'RuntimePacks\Python\Eigenverft.Manifested.Sandbox.RuntimePack.Python.ps1'
+                Pairs = @(
+                    @{
+                        PrivatePath = 'Private\Logic\Eigenverft.Manifested.Sandbox.Runtime.Python.ps1'
+                        PublicPath  = 'Public\Eigenverft.Manifested.Sandbox.Cmd.PythonRuntimeAndCache.ps1'
+                    }
+                )
+            }
+            @{
+                Path = Join-Path $script:ModuleProjectRoot 'RuntimePacks\GitHubPortable\Eigenverft.Manifested.Sandbox.RuntimePack.GitHubPortable.ps1'
+                Pairs = @(
+                    @{
+                        PrivatePath = 'Private\Logic\Eigenverft.Manifested.Sandbox.Runtime.Ps7.ps1'
+                        PublicPath  = 'Public\Eigenverft.Manifested.Sandbox.Cmd.Ps7RuntimeAndCache.ps1'
+                    }
+                    @{
+                        PrivatePath = 'Private\Logic\Eigenverft.Manifested.Sandbox.Runtime.GHCli.ps1'
+                        PublicPath  = 'Public\Eigenverft.Manifested.Sandbox.Cmd.GHCliRuntimeAndCache.ps1'
+                    }
+                    @{
+                        PrivatePath = 'Private\Logic\Eigenverft.Manifested.Sandbox.Runtime.Git.ps1'
+                        PublicPath  = 'Public\Eigenverft.Manifested.Sandbox.Cmd.GitRuntimeAndCache.ps1'
+                    }
+                    @{
+                        PrivatePath = 'Private\Logic\Eigenverft.Manifested.Sandbox.Runtime.VsCode.ps1'
+                        PublicPath  = 'Public\Eigenverft.Manifested.Sandbox.Cmd.VsCodeRuntimeAndCache.ps1'
+                    }
+                )
+            }
+            @{
+                Path = Join-Path $script:ModuleProjectRoot 'RuntimePacks\NpmCli\Eigenverft.Manifested.Sandbox.RuntimePack.NpmCli.ps1'
+                Pairs = @(
+                    @{
+                        PrivatePath = 'Private\Logic\Eigenverft.Manifested.Sandbox.Runtime.OpenCode.ps1'
+                        PublicPath  = 'Public\Eigenverft.Manifested.Sandbox.Cmd.OpenCodeRuntimeAndCache.ps1'
+                    }
+                    @{
+                        PrivatePath = 'Private\Logic\Eigenverft.Manifested.Sandbox.Runtime.Gemini.ps1'
+                        PublicPath  = 'Public\Eigenverft.Manifested.Sandbox.Cmd.GeminiRuntimeAndCache.ps1'
+                    }
+                    @{
+                        PrivatePath = 'Private\Logic\Eigenverft.Manifested.Sandbox.Runtime.Qwen.ps1'
+                        PublicPath  = 'Public\Eigenverft.Manifested.Sandbox.Cmd.QwenRuntimeAndCache.ps1'
+                    }
+                    @{
+                        PrivatePath = 'Private\Logic\Eigenverft.Manifested.Sandbox.Runtime.Codex.ps1'
+                        PublicPath  = 'Public\Eigenverft.Manifested.Sandbox.Cmd.CodexRuntimeAndCache.ps1'
+                    }
+                )
+            }
+            @{
+                Path = Join-Path $script:ModuleProjectRoot 'RuntimePacks\VCRuntime\Eigenverft.Manifested.Sandbox.RuntimePack.VCRuntime.ps1'
+                Pairs = @(
+                    @{
+                        PrivatePath = 'Private\Logic\Eigenverft.Manifested.Sandbox.Runtime.VCRuntime.ps1'
+                        PublicPath  = 'Public\Eigenverft.Manifested.Sandbox.Cmd.VCRuntimeAndCache.ps1'
+                    }
+                )
+            }
+        )
+
+        foreach ($loaderCheck in $loaderChecks) {
+            $content = Get-Content -LiteralPath $loaderCheck.Path -Raw
+            foreach ($pair in $loaderCheck.Pairs) {
+                $privateIndex = $content.IndexOf($pair.PrivatePath, [System.StringComparison]::OrdinalIgnoreCase)
+                $publicIndex = $content.IndexOf($pair.PublicPath, [System.StringComparison]::OrdinalIgnoreCase)
+
+                $privateIndex | Should -BeGreaterThan -1
+                $publicIndex | Should -BeGreaterThan -1
+                $privateIndex | Should -BeLessThan $publicIndex
+            }
+        }
     }
 
     It 'plans Node runtime follow-up actions through family metadata' {
@@ -326,6 +449,147 @@ Describe 'Eigenverft.Manifested.Sandbox runtime contracts' {
 
         $details.Version | Should -Be '14.42.34433.0'
         $details.InstallerPath | Should -Be 'C:\Cache\vc_redist.x64.exe'
+    }
+
+    It 'constructs lifecycle results with shared and family-specific properties intact' {
+        $result = & $script:SandboxModule {
+            New-ManifestedRuntimeResult -LocalRoot 'C:\Sandbox' -Layout ([pscustomobject]@{ LocalRoot = 'C:\Sandbox' }) -InitialState ([pscustomobject]@{ Status = 'Missing' }) -FinalState ([pscustomobject]@{ Status = 'Blocked' }) -ActionTaken @('None') -PlannedActions @('Repair-NodeRuntime') -RestartRequired:$false -AdditionalProperties ([ordered]@{
+                Package               = $null
+                PackageTest           = $null
+                RuntimeTest           = $null
+                RepairResult          = $null
+                InstallResult         = $null
+                NpmProxyConfiguration = [pscustomobject]@{ Action = 'Reused' }
+                CommandEnvironment    = [pscustomobject]@{ Applicable = $false; Status = 'NotApplicable' }
+                Elevation             = [pscustomobject]@{ RequiresElevation = $false }
+            })
+        }
+
+        $result.LocalRoot | Should -Be 'C:\Sandbox'
+        $result.PlannedActions | Should -Be @('Repair-NodeRuntime')
+        $result.NpmProxyConfiguration.Action | Should -Be 'Reused'
+        $result.CommandEnvironment.Status | Should -Be 'NotApplicable'
+        $result.Elevation.RequiresElevation | Should -BeFalse
+    }
+
+    It 'completes WhatIf lifecycle results without persisting state' {
+        $result = & $script:SandboxModule {
+            function Save-ManifestedInvokeState {
+                throw 'Save-ManifestedInvokeState should not be called for non-persisted lifecycle results.'
+            }
+
+            $runtimeResult = New-ManifestedRuntimeResult -LocalRoot 'C:\Sandbox' -Layout ([pscustomobject]@{ LocalRoot = 'C:\Sandbox' }) -InitialState $null -FinalState ([pscustomobject]@{ Status = 'Missing' }) -ActionTaken @('WhatIf') -PlannedActions @('Save-NodeRuntimePackage') -RestartRequired:$false -AdditionalProperties ([ordered]@{
+                Package            = $null
+                PackageTest        = $null
+                RuntimeTest        = $null
+                RepairResult       = $null
+                InstallResult      = $null
+                CommandEnvironment = [pscustomobject]@{ Applicable = $false; Status = 'NotApplicable' }
+                Elevation          = [pscustomobject]@{ RequiresElevation = $false }
+            })
+
+            Complete-ManifestedRuntimeResult -CommandName 'Initialize-NodeRuntime' -Result $runtimeResult -LocalRoot 'C:\Sandbox' -PersistState:$false
+        }
+
+        $result.ActionTaken | Should -Be @('WhatIf')
+        $result.PersistedStatePath | Should -Be $null
+    }
+
+    It 'skips runtime command-environment synchronization cleanly when not applicable' {
+        $syncResult = & $script:SandboxModule {
+            function Invoke-TestCommandEnvironmentSync {
+                [CmdletBinding(SupportsShouldProcess = $true)]
+                param()
+
+                function Get-ManifestedCommandEnvironmentResult {
+                    param(
+                        [string]$CommandName,
+                        [pscustomobject]$RuntimeState
+                    )
+
+                    [pscustomobject]@{
+                        Applicable = $false
+                        Status     = 'NotApplicable'
+                    }
+                }
+
+                $actionsTaken = New-Object System.Collections.Generic.List[string]
+                $result = Invoke-ManifestedRuntimeCommandEnvironmentSync -Cmdlet $PSCmdlet -CommandName 'Initialize-NodeRuntime' -DisplayName 'Node' -RuntimeState ([pscustomobject]@{ RuntimeHome = 'C:\Sandbox\tools\node' }) -ActionsTaken $actionsTaken -UseShouldProcess:$true
+
+                [pscustomobject]@{
+                    Result      = $result
+                    ActionsTaken = @($actionsTaken)
+                }
+            }
+
+            Invoke-TestCommandEnvironmentSync
+        }
+
+        $syncResult.Result.StopProcessing | Should -BeFalse
+        $syncResult.Result.CommandEnvironment.Status | Should -Be 'NotApplicable'
+        $syncResult.ActionsTaken | Should -Be @()
+    }
+
+    It 'tracks command-environment sync updates through the lifecycle helper' {
+        $syncResult = & $script:SandboxModule {
+            function Invoke-TestCommandEnvironmentSync {
+                [CmdletBinding(SupportsShouldProcess = $true)]
+                param()
+
+                function Get-ManifestedCommandEnvironmentResult {
+                    param(
+                        [string]$CommandName,
+                        [pscustomobject]$RuntimeState
+                    )
+
+                    [pscustomobject]@{
+                        Applicable              = $true
+                        Status                  = 'NeedsSync'
+                        DesiredCommandDirectory = 'C:\Sandbox\tools\node'
+                    }
+                }
+
+                function Get-ManifestedCommandEnvironmentSpec {
+                    param(
+                        [string]$CommandName,
+                        [pscustomobject]$RuntimeState
+                    )
+
+                    [pscustomobject]@{
+                        Applicable              = $true
+                        DesiredCommandDirectory = 'C:\Sandbox\tools\node'
+                        CommandNames            = @('node.exe')
+                        ExpectedCommandPaths    = [ordered]@{
+                            'node.exe' = 'C:\Sandbox\tools\node\node.exe'
+                        }
+                    }
+                }
+
+                function Sync-ManifestedCommandLineEnvironment {
+                    param([pscustomobject]$Specification)
+
+                    [pscustomobject]@{
+                        Applicable              = $true
+                        Status                  = 'Updated'
+                        DesiredCommandDirectory = $Specification.DesiredCommandDirectory
+                    }
+                }
+
+                $actionsTaken = New-Object System.Collections.Generic.List[string]
+                $result = Invoke-ManifestedRuntimeCommandEnvironmentSync -Cmdlet $PSCmdlet -CommandName 'Initialize-NodeRuntime' -DisplayName 'Node' -RuntimeState ([pscustomobject]@{ RuntimeHome = 'C:\Sandbox\tools\node' }) -ActionsTaken $actionsTaken -UseShouldProcess:$false -RequireNeedsSync:$true
+
+                [pscustomobject]@{
+                    Result      = $result
+                    ActionsTaken = @($actionsTaken)
+                }
+            }
+
+            Invoke-TestCommandEnvironmentSync
+        }
+
+        $syncResult.Result.StopProcessing | Should -BeFalse
+        $syncResult.Result.CommandEnvironment.Status | Should -Be 'Updated'
+        $syncResult.ActionsTaken | Should -Contain 'Sync-ManifestedCommandLineEnvironment'
     }
 
     It 'returns a WhatIf result shape for the Node facade without persisting state' {

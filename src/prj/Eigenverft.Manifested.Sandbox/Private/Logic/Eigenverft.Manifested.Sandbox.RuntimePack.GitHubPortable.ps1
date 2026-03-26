@@ -265,14 +265,7 @@ Invoke-ManifestedGitHubPortableRuntimeInitialization -CommandName 'Initialize-VS
 
     if ($state.Status -eq 'Blocked') {
         $commandEnvironment = Get-ManifestedCommandEnvironmentResult -CommandName $descriptor.InitializeCommandName -RuntimeState $state
-        $result = [pscustomobject]@{
-            LocalRoot          = $state.LocalRoot
-            Layout             = $state.Layout
-            InitialState       = $initialState
-            FinalState         = $state
-            ActionTaken        = @('None')
-            PlannedActions     = @()
-            RestartRequired    = $false
+        $result = New-ManifestedRuntimeResult -LocalRoot $state.LocalRoot -Layout $state.Layout -InitialState $initialState -FinalState $state -ActionTaken @('None') -PlannedActions @() -RestartRequired:$false -AdditionalProperties ([ordered]@{
             Package            = $null
             PackageTest        = $null
             RuntimeTest        = $null
@@ -280,16 +273,9 @@ Invoke-ManifestedGitHubPortableRuntimeInitialization -CommandName 'Initialize-VS
             InstallResult      = $null
             CommandEnvironment = $commandEnvironment
             Elevation          = $elevationPlan
-        }
+        })
 
-        if ($WhatIfPreference) {
-            Add-Member -InputObject $result -NotePropertyName PersistedStatePath -NotePropertyValue $null -Force
-            return $result
-        }
-
-        $statePath = Save-ManifestedInvokeState -CommandName $descriptor.InitializeCommandName -Result $result -LocalRoot $LocalRoot -Details (Get-ManifestedGitHubPortablePersistedDetails -Descriptor $descriptor -FinalState $state -PackageInfo $null)
-        Add-Member -InputObject $result -NotePropertyName PersistedStatePath -NotePropertyValue $statePath -Force
-        return $result
+        return (Complete-ManifestedRuntimeResult -CommandName $descriptor.InitializeCommandName -Result $result -LocalRoot $LocalRoot -Details (Get-ManifestedGitHubPortablePersistedDetails -Descriptor $descriptor -FinalState $state -PackageInfo $null) -PersistState:(-not $WhatIfPreference))
     }
 
     $needsRepair = $state.Status -in @('Partial', 'NeedsRepair')
@@ -301,23 +287,17 @@ Invoke-ManifestedGitHubPortableRuntimeInitialization -CommandName 'Initialize-VS
     if ($needsRepair) {
         $repairTarget = if ($state.Layout -and $descriptor.ToolsRootPropertyName -and $state.Layout.PSObject.Properties[$descriptor.ToolsRootPropertyName]) { $state.Layout.($descriptor.ToolsRootPropertyName) } else { $state.LocalRoot }
         if (-not $PSCmdlet.ShouldProcess($repairTarget, ('Repair {0} runtime state' -f $descriptor.DisplayName))) {
-            return [pscustomobject]@{
-                LocalRoot          = $state.LocalRoot
-                Layout             = $state.Layout
-                InitialState       = $initialState
-                FinalState         = $state
-                ActionTaken        = @('WhatIf')
-                PlannedActions     = @($plannedActions)
-                RestartRequired    = $false
-                Package            = $null
-                PackageTest        = $null
-                RuntimeTest        = $state.Runtime
-                RepairResult       = $null
-                InstallResult      = $null
-                CommandEnvironment = (Get-ManifestedCommandEnvironmentResult -CommandName $descriptor.InitializeCommandName -RuntimeState $state)
-                PersistedStatePath = $null
-                Elevation          = $elevationPlan
-            }
+            return (Complete-ManifestedRuntimeResult -CommandName $descriptor.InitializeCommandName -LocalRoot $LocalRoot -PersistState:$false -Result (
+                New-ManifestedRuntimeResult -LocalRoot $state.LocalRoot -Layout $state.Layout -InitialState $initialState -FinalState $state -ActionTaken @('WhatIf') -PlannedActions @($plannedActions) -RestartRequired:$false -AdditionalProperties ([ordered]@{
+                    Package            = $null
+                    PackageTest        = $null
+                    RuntimeTest        = $state.Runtime
+                    RepairResult       = $null
+                    InstallResult      = $null
+                    CommandEnvironment = (Get-ManifestedCommandEnvironmentResult -CommandName $descriptor.InitializeCommandName -RuntimeState $state)
+                    Elevation          = $elevationPlan
+                })
+            ))
         }
 
         $repairParameters = Get-ManifestedGitHubPortableRepairParameters -Descriptor $descriptor -RuntimeState $state -LocalRoot $state.LocalRoot
@@ -336,23 +316,17 @@ Invoke-ManifestedGitHubPortableRuntimeInitialization -CommandName 'Initialize-VS
         if ($needsAcquire) {
             $acquireTarget = if ($state.Layout -and $descriptor.CacheRootPropertyName -and $state.Layout.PSObject.Properties[$descriptor.CacheRootPropertyName]) { $state.Layout.($descriptor.CacheRootPropertyName) } else { $state.LocalRoot }
             if (-not $PSCmdlet.ShouldProcess($acquireTarget, ('Acquire {0} runtime package' -f $descriptor.DisplayName))) {
-                return [pscustomobject]@{
-                    LocalRoot          = $state.LocalRoot
-                    Layout             = $state.Layout
-                    InitialState       = $initialState
-                    FinalState         = $state
-                    ActionTaken        = @('WhatIf')
-                    PlannedActions     = @($plannedActions)
-                    RestartRequired    = $false
-                    Package            = $null
-                    PackageTest        = $null
-                    RuntimeTest        = $state.Runtime
-                    RepairResult       = $repairResult
-                    InstallResult      = $null
-                    CommandEnvironment = (Get-ManifestedCommandEnvironmentResult -CommandName $descriptor.InitializeCommandName -RuntimeState $state)
-                    PersistedStatePath = $null
-                    Elevation          = $elevationPlan
-                }
+                return (Complete-ManifestedRuntimeResult -CommandName $descriptor.InitializeCommandName -LocalRoot $LocalRoot -PersistState:$false -Result (
+                    New-ManifestedRuntimeResult -LocalRoot $state.LocalRoot -Layout $state.Layout -InitialState $initialState -FinalState $state -ActionTaken @('WhatIf') -PlannedActions @($plannedActions) -RestartRequired:$false -AdditionalProperties ([ordered]@{
+                        Package            = $null
+                        PackageTest        = $null
+                        RuntimeTest        = $state.Runtime
+                        RepairResult       = $repairResult
+                        InstallResult      = $null
+                        CommandEnvironment = (Get-ManifestedCommandEnvironmentResult -CommandName $descriptor.InitializeCommandName -RuntimeState $state)
+                        Elevation          = $elevationPlan
+                    })
+                ))
             }
 
             $savePackageParameters = Get-ManifestedGitHubPortableSavePackageParameters -Descriptor $descriptor -Refresh:[bool]$Refresh -RuntimeState $state -LocalRoot $state.LocalRoot
@@ -368,23 +342,17 @@ Invoke-ManifestedGitHubPortableRuntimeInitialization -CommandName 'Initialize-VS
         $packageTest = & $descriptor.TestPackageFunctionName -PackageInfo $packageInfo
         if ($packageTest.Status -eq 'CorruptCache') {
             if (-not $PSCmdlet.ShouldProcess($packageInfo.Path, ('Repair corrupt {0} runtime package' -f $descriptor.DisplayName))) {
-                return [pscustomobject]@{
-                    LocalRoot          = $state.LocalRoot
-                    Layout             = $state.Layout
-                    InitialState       = $initialState
-                    FinalState         = $state
-                    ActionTaken        = @('WhatIf')
-                    PlannedActions     = @($plannedActions)
-                    RestartRequired    = $false
-                    Package            = $packageInfo
-                    PackageTest        = $packageTest
-                    RuntimeTest        = $state.Runtime
-                    RepairResult       = $repairResult
-                    InstallResult      = $null
-                    CommandEnvironment = (Get-ManifestedCommandEnvironmentResult -CommandName $descriptor.InitializeCommandName -RuntimeState $state)
-                    PersistedStatePath = $null
-                    Elevation          = $elevationPlan
-                }
+                return (Complete-ManifestedRuntimeResult -CommandName $descriptor.InitializeCommandName -LocalRoot $LocalRoot -PersistState:$false -Result (
+                    New-ManifestedRuntimeResult -LocalRoot $state.LocalRoot -Layout $state.Layout -InitialState $initialState -FinalState $state -ActionTaken @('WhatIf') -PlannedActions @($plannedActions) -RestartRequired:$false -AdditionalProperties ([ordered]@{
+                        Package            = $packageInfo
+                        PackageTest        = $packageTest
+                        RuntimeTest        = $state.Runtime
+                        RepairResult       = $repairResult
+                        InstallResult      = $null
+                        CommandEnvironment = (Get-ManifestedCommandEnvironmentResult -CommandName $descriptor.InitializeCommandName -RuntimeState $state)
+                        Elevation          = $elevationPlan
+                    })
+                ))
             }
 
             $repairParameters = Get-ManifestedGitHubPortableRepairParameters -Descriptor $descriptor -RuntimeState $state -CorruptPackagePaths @($packageInfo.Path) -LocalRoot $state.LocalRoot
@@ -425,23 +393,17 @@ Invoke-ManifestedGitHubPortableRuntimeInitialization -CommandName 'Initialize-VS
 
         $installTarget = if ($state.Layout -and $descriptor.ToolsRootPropertyName -and $state.Layout.PSObject.Properties[$descriptor.ToolsRootPropertyName]) { $state.Layout.($descriptor.ToolsRootPropertyName) } else { $state.LocalRoot }
         if (-not $PSCmdlet.ShouldProcess($installTarget, ('Install {0} runtime' -f $descriptor.DisplayName))) {
-            return [pscustomobject]@{
-                LocalRoot          = $state.LocalRoot
-                Layout             = $state.Layout
-                InitialState       = $initialState
-                FinalState         = $state
-                ActionTaken        = @('WhatIf')
-                PlannedActions     = @($plannedActions)
-                RestartRequired    = $false
-                Package            = $packageInfo
-                PackageTest        = $packageTest
-                RuntimeTest        = $state.Runtime
-                RepairResult       = $repairResult
-                InstallResult      = $null
-                CommandEnvironment = (Get-ManifestedCommandEnvironmentResult -CommandName $descriptor.InitializeCommandName -RuntimeState $state)
-                PersistedStatePath = $null
-                Elevation          = $elevationPlan
-            }
+            return (Complete-ManifestedRuntimeResult -CommandName $descriptor.InitializeCommandName -LocalRoot $LocalRoot -PersistState:$false -Result (
+                New-ManifestedRuntimeResult -LocalRoot $state.LocalRoot -Layout $state.Layout -InitialState $initialState -FinalState $state -ActionTaken @('WhatIf') -PlannedActions @($plannedActions) -RestartRequired:$false -AdditionalProperties ([ordered]@{
+                    Package            = $packageInfo
+                    PackageTest        = $packageTest
+                    RuntimeTest        = $state.Runtime
+                    RepairResult       = $repairResult
+                    InstallResult      = $null
+                    CommandEnvironment = (Get-ManifestedCommandEnvironmentResult -CommandName $descriptor.InitializeCommandName -RuntimeState $state)
+                    Elevation          = $elevationPlan
+                })
+            ))
         }
 
         $installParameters = Get-ManifestedGitHubPortableInstallParameters -Descriptor $descriptor -PackageInfo $packageInfo -RuntimeState $state -LocalRoot $state.LocalRoot
@@ -461,42 +423,23 @@ Invoke-ManifestedGitHubPortableRuntimeInitialization -CommandName 'Initialize-VS
         $null
     }
 
-    $commandEnvironment = Get-ManifestedCommandEnvironmentResult -CommandName $descriptor.InitializeCommandName -RuntimeState $finalState
-    if ($commandEnvironment.Applicable) {
-        if (-not $PSCmdlet.ShouldProcess($commandEnvironment.DesiredCommandDirectory, ('Synchronize {0} command-line environment' -f $descriptor.DisplayName))) {
-            return [pscustomobject]@{
-                LocalRoot          = $finalState.LocalRoot
-                Layout             = $finalState.Layout
-                InitialState       = $initialState
-                FinalState         = $finalState
-                ActionTaken        = @('WhatIf')
-                PlannedActions     = @($plannedActions)
-                RestartRequired    = $false
+    $commandEnvironmentSync = Invoke-ManifestedRuntimeCommandEnvironmentSync -Cmdlet $PSCmdlet -CommandName $descriptor.InitializeCommandName -DisplayName $descriptor.DisplayName -RuntimeState $finalState -ActionsTaken $actionsTaken -UseShouldProcess:$true
+    $commandEnvironment = $commandEnvironmentSync.CommandEnvironment
+    if ($commandEnvironmentSync.StopProcessing) {
+        return (Complete-ManifestedRuntimeResult -CommandName $descriptor.InitializeCommandName -LocalRoot $LocalRoot -PersistState:$false -Result (
+            New-ManifestedRuntimeResult -LocalRoot $finalState.LocalRoot -Layout $finalState.Layout -InitialState $initialState -FinalState $finalState -ActionTaken @('WhatIf') -PlannedActions @($plannedActions) -RestartRequired:$false -AdditionalProperties ([ordered]@{
                 Package            = $packageInfo
                 PackageTest        = $packageTest
                 RuntimeTest        = $runtimeTest
                 RepairResult       = $repairResult
                 InstallResult      = $installResult
                 CommandEnvironment = $commandEnvironment
-                PersistedStatePath = $null
                 Elevation          = $elevationPlan
-            }
-        }
-
-        $commandEnvironment = Sync-ManifestedCommandLineEnvironment -Specification (Get-ManifestedCommandEnvironmentSpec -CommandName $descriptor.InitializeCommandName -RuntimeState $finalState)
-        if ($commandEnvironment.Status -eq 'Updated') {
-            $actionsTaken.Add('Sync-ManifestedCommandLineEnvironment') | Out-Null
-        }
+            })
+        ))
     }
 
-    $result = [pscustomobject]@{
-        LocalRoot          = $finalState.LocalRoot
-        Layout             = $finalState.Layout
-        InitialState       = $initialState
-        FinalState         = $finalState
-        ActionTaken        = if ($actionsTaken.Count -gt 0) { @($actionsTaken) } else { @('None') }
-        PlannedActions     = @($plannedActions)
-        RestartRequired    = $false
+    $result = New-ManifestedRuntimeResult -LocalRoot $finalState.LocalRoot -Layout $finalState.Layout -InitialState $initialState -FinalState $finalState -ActionTaken (if ($actionsTaken.Count -gt 0) { @($actionsTaken) } else { @('None') }) -PlannedActions @($plannedActions) -RestartRequired:$false -AdditionalProperties ([ordered]@{
         Package            = $packageInfo
         PackageTest        = $packageTest
         RuntimeTest        = $runtimeTest
@@ -504,15 +447,7 @@ Invoke-ManifestedGitHubPortableRuntimeInitialization -CommandName 'Initialize-VS
         InstallResult      = $installResult
         CommandEnvironment = $commandEnvironment
         Elevation          = $elevationPlan
-    }
+    })
 
-    if ($WhatIfPreference) {
-        Add-Member -InputObject $result -NotePropertyName PersistedStatePath -NotePropertyValue $null -Force
-        return $result
-    }
-
-    $statePath = Save-ManifestedInvokeState -CommandName $descriptor.InitializeCommandName -Result $result -LocalRoot $LocalRoot -Details (Get-ManifestedGitHubPortablePersistedDetails -Descriptor $descriptor -FinalState $finalState -PackageInfo $packageInfo)
-    Add-Member -InputObject $result -NotePropertyName PersistedStatePath -NotePropertyValue $statePath -Force
-
-    return $result
+    return (Complete-ManifestedRuntimeResult -CommandName $descriptor.InitializeCommandName -Result $result -LocalRoot $LocalRoot -Details (Get-ManifestedGitHubPortablePersistedDetails -Descriptor $descriptor -FinalState $finalState -PackageInfo $packageInfo) -PersistState:(-not $WhatIfPreference))
 }

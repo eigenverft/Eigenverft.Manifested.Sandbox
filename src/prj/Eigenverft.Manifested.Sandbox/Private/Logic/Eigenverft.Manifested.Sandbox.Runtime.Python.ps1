@@ -123,11 +123,11 @@ function Get-PythonReleaseCandidates {
     param()
 
     $response = Invoke-WebRequestEx -Uri 'https://www.python.org/downloads/windows/' -Headers @{ 'User-Agent' = 'Eigenverft.Manifested.Sandbox' } -UseBasicParsing
-    $matches = [regex]::Matches($response.Content, '(?is)<a href="/downloads/release/python-(?<slug>313\d+)/">Python (?<version>3\.13\.\d+) - (?<releaseDate>[^<]+)</a>')
+    $releaseMatches = [regex]::Matches($response.Content, '(?is)<a href="/downloads/release/python-(?<slug>313\d+)/">Python (?<version>3\.13\.\d+) - (?<releaseDate>[^<]+)</a>')
     $items = New-Object System.Collections.Generic.List[object]
     $seenVersions = @{}
 
-    foreach ($match in $matches) {
+    foreach ($match in $releaseMatches) {
         $versionText = $match.Groups['version'].Value.Trim()
         if ([string]::IsNullOrWhiteSpace($versionText) -or $seenVersions.ContainsKey($versionText)) {
             continue
@@ -1257,6 +1257,7 @@ function Save-PythonGetPipScript {
 }
 
 function Ensure-PythonPip {
+    [Diagnostics.CodeAnalysis.SuppressMessage('PSUseApprovedVerbs', '', Justification = 'Retains the established helper name used by runtime descriptors and orchestration code.')]
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true)]

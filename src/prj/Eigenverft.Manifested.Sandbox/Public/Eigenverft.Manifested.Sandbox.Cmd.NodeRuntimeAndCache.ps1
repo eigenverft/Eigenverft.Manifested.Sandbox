@@ -27,6 +27,7 @@ Initialize-NodeRuntime -RefreshNode
 Supports `-WhatIf` and preserves the module's shared runtime state and
 environment synchronization behavior.
 #>
+    [Diagnostics.CodeAnalysis.SuppressMessage('PSShouldProcess', '', Justification = 'Thin facade delegates ShouldProcess handling to the shared Node runtime helper.')]
     [CmdletBinding(SupportsShouldProcess = $true)]
     param(
         [switch]$RefreshNode

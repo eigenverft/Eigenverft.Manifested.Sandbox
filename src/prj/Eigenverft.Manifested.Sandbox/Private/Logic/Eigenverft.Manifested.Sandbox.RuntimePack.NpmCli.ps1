@@ -191,55 +191,35 @@ function Invoke-ManifestedNpmCliRuntimeInitialization {
 
     if ($state.Status -eq 'Blocked') {
         $commandEnvironment = Get-ManifestedCommandEnvironmentResult -CommandName $descriptor.InitializeCommandName -RuntimeState $state
-        $result = [pscustomobject]@{
-            LocalRoot          = $state.LocalRoot
-            Layout             = $state.Layout
-            InitialState       = $initialState
-            FinalState         = $state
-            ActionTaken        = @('None')
-            PlannedActions     = @()
-            RestartRequired    = $false
+        $result = New-ManifestedRuntimeResult -LocalRoot $state.LocalRoot -Layout $state.Layout -InitialState $initialState -FinalState $state -ActionTaken @('None') -PlannedActions @() -RestartRequired:$false -AdditionalProperties ([ordered]@{
             RuntimeTest        = $null
             RepairResult       = $null
             InstallResult      = $null
             CommandEnvironment = $commandEnvironment
             Elevation          = $elevationPlan
-        }
+        })
 
-        if ($WhatIfPreference) {
-            Add-Member -InputObject $result -NotePropertyName PersistedStatePath -NotePropertyValue $null -Force
-            return $result
-        }
-
-        $statePath = Save-ManifestedInvokeState -CommandName $descriptor.InitializeCommandName -Result $result -LocalRoot $LocalRoot -Details @{
+        return (Complete-ManifestedRuntimeResult -CommandName $descriptor.InitializeCommandName -Result $result -LocalRoot $LocalRoot -Details @{
             Version         = $state.CurrentVersion
             RuntimeHome     = $state.RuntimeHome
             RuntimeSource   = $state.RuntimeSource
             ExecutablePath  = $state.ExecutablePath
             PackageJsonPath = if ($state.PSObject.Properties[$descriptor.PackageJsonPropertyName]) { $state.($descriptor.PackageJsonPropertyName) } else { $null }
-        }
-        Add-Member -InputObject $result -NotePropertyName PersistedStatePath -NotePropertyValue $statePath -Force
-        return $result
+        } -PersistState:(-not $WhatIfPreference))
     }
 
     if ($needsRepair) {
         $repairTarget = if ($state.Layout -and $descriptor.ToolsRootPropertyName -and $state.Layout.PSObject.Properties[$descriptor.ToolsRootPropertyName]) { $state.Layout.($descriptor.ToolsRootPropertyName) } else { $state.LocalRoot }
         if (-not $PSCmdlet.ShouldProcess($repairTarget, ('Repair {0} runtime state' -f $descriptor.DisplayName))) {
-            return [pscustomobject]@{
-                LocalRoot          = $state.LocalRoot
-                Layout             = $state.Layout
-                InitialState       = $initialState
-                FinalState         = $state
-                ActionTaken        = @('WhatIf')
-                PlannedActions     = @($plannedActions)
-                RestartRequired    = $false
-                RuntimeTest        = $state.Runtime
-                RepairResult       = $null
-                InstallResult      = $null
-                CommandEnvironment = (Get-ManifestedCommandEnvironmentResult -CommandName $descriptor.InitializeCommandName -RuntimeState $state)
-                PersistedStatePath = $null
-                Elevation          = $elevationPlan
-            }
+            return (Complete-ManifestedRuntimeResult -CommandName $descriptor.InitializeCommandName -LocalRoot $LocalRoot -PersistState:$false -Result (
+                New-ManifestedRuntimeResult -LocalRoot $state.LocalRoot -Layout $state.Layout -InitialState $initialState -FinalState $state -ActionTaken @('WhatIf') -PlannedActions @($plannedActions) -RestartRequired:$false -AdditionalProperties ([ordered]@{
+                    RuntimeTest        = $state.Runtime
+                    RepairResult       = $null
+                    InstallResult      = $null
+                    CommandEnvironment = (Get-ManifestedCommandEnvironmentResult -CommandName $descriptor.InitializeCommandName -RuntimeState $state)
+                    Elevation          = $elevationPlan
+                })
+            ))
         }
 
         $repairResult = & $descriptor.RepairFunctionName -State $state -LocalRoot $state.LocalRoot
@@ -254,21 +234,15 @@ function Invoke-ManifestedNpmCliRuntimeInitialization {
     if ($needsInstall) {
         $installTarget = if ($state.Layout -and $descriptor.ToolsRootPropertyName -and $state.Layout.PSObject.Properties[$descriptor.ToolsRootPropertyName]) { $state.Layout.($descriptor.ToolsRootPropertyName) } else { $state.LocalRoot }
         if (-not $PSCmdlet.ShouldProcess($installTarget, ('Ensure {0} runtime dependencies and install {0} runtime' -f $descriptor.DisplayName))) {
-            return [pscustomobject]@{
-                LocalRoot          = $state.LocalRoot
-                Layout             = $state.Layout
-                InitialState       = $initialState
-                FinalState         = $state
-                ActionTaken        = @('WhatIf')
-                PlannedActions     = @($plannedActions)
-                RestartRequired    = $false
-                RuntimeTest        = $state.Runtime
-                RepairResult       = $repairResult
-                InstallResult      = $null
-                CommandEnvironment = (Get-ManifestedCommandEnvironmentResult -CommandName $descriptor.InitializeCommandName -RuntimeState $state)
-                PersistedStatePath = $null
-                Elevation          = $elevationPlan
-            }
+            return (Complete-ManifestedRuntimeResult -CommandName $descriptor.InitializeCommandName -LocalRoot $LocalRoot -PersistState:$false -Result (
+                New-ManifestedRuntimeResult -LocalRoot $state.LocalRoot -Layout $state.Layout -InitialState $initialState -FinalState $state -ActionTaken @('WhatIf') -PlannedActions @($plannedActions) -RestartRequired:$false -AdditionalProperties ([ordered]@{
+                    RuntimeTest        = $state.Runtime
+                    RepairResult       = $repairResult
+                    InstallResult      = $null
+                    CommandEnvironment = (Get-ManifestedCommandEnvironmentResult -CommandName $descriptor.InitializeCommandName -RuntimeState $state)
+                    Elevation          = $elevationPlan
+                })
+            ))
         }
 
         $dependencyResolution = Get-ManifestedNpmCliDependencyResolution -Descriptor $descriptor -LocalRoot $LocalRoot
@@ -297,60 +271,33 @@ function Invoke-ManifestedNpmCliRuntimeInitialization {
         }
     }
 
-    $commandEnvironment = Get-ManifestedCommandEnvironmentResult -CommandName $descriptor.InitializeCommandName -RuntimeState $finalState
-    if ($commandEnvironment.Applicable) {
-        if (-not $PSCmdlet.ShouldProcess($commandEnvironment.DesiredCommandDirectory, ('Synchronize {0} command-line environment' -f $descriptor.DisplayName))) {
-            return [pscustomobject]@{
-                LocalRoot          = $finalState.LocalRoot
-                Layout             = $finalState.Layout
-                InitialState       = $initialState
-                FinalState         = $finalState
-                ActionTaken        = @('WhatIf')
-                PlannedActions     = @($plannedActions)
-                RestartRequired    = $false
+    $commandEnvironmentSync = Invoke-ManifestedRuntimeCommandEnvironmentSync -Cmdlet $PSCmdlet -CommandName $descriptor.InitializeCommandName -DisplayName $descriptor.DisplayName -RuntimeState $finalState -ActionsTaken $actionsTaken -UseShouldProcess:$true
+    $commandEnvironment = $commandEnvironmentSync.CommandEnvironment
+    if ($commandEnvironmentSync.StopProcessing) {
+        return (Complete-ManifestedRuntimeResult -CommandName $descriptor.InitializeCommandName -LocalRoot $LocalRoot -PersistState:$false -Result (
+            New-ManifestedRuntimeResult -LocalRoot $finalState.LocalRoot -Layout $finalState.Layout -InitialState $initialState -FinalState $finalState -ActionTaken @('WhatIf') -PlannedActions @($plannedActions) -RestartRequired:$false -AdditionalProperties ([ordered]@{
                 RuntimeTest        = $runtimeTest
                 RepairResult       = $repairResult
                 InstallResult      = $installResult
                 CommandEnvironment = $commandEnvironment
-                PersistedStatePath = $null
                 Elevation          = $elevationPlan
-            }
-        }
-
-        $commandEnvironment = Sync-ManifestedCommandLineEnvironment -Specification (Get-ManifestedCommandEnvironmentSpec -CommandName $descriptor.InitializeCommandName -RuntimeState $finalState)
-        if ($commandEnvironment.Status -eq 'Updated') {
-            $actionsTaken.Add('Sync-ManifestedCommandLineEnvironment') | Out-Null
-        }
+            })
+        ))
     }
 
-    $result = [pscustomobject]@{
-        LocalRoot          = $finalState.LocalRoot
-        Layout             = $finalState.Layout
-        InitialState       = $initialState
-        FinalState         = $finalState
-        ActionTaken        = if ($actionsTaken.Count -gt 0) { @($actionsTaken) } else { @('None') }
-        PlannedActions     = @($plannedActions)
-        RestartRequired    = $false
+    $result = New-ManifestedRuntimeResult -LocalRoot $finalState.LocalRoot -Layout $finalState.Layout -InitialState $initialState -FinalState $finalState -ActionTaken (if ($actionsTaken.Count -gt 0) { @($actionsTaken) } else { @('None') }) -PlannedActions @($plannedActions) -RestartRequired:$false -AdditionalProperties ([ordered]@{
         RuntimeTest        = $runtimeTest
         RepairResult       = $repairResult
         InstallResult      = $installResult
         CommandEnvironment = $commandEnvironment
         Elevation          = $elevationPlan
-    }
+    })
 
-    if ($WhatIfPreference) {
-        Add-Member -InputObject $result -NotePropertyName PersistedStatePath -NotePropertyValue $null -Force
-        return $result
-    }
-
-    $statePath = Save-ManifestedInvokeState -CommandName $descriptor.InitializeCommandName -Result $result -LocalRoot $LocalRoot -Details @{
+    return (Complete-ManifestedRuntimeResult -CommandName $descriptor.InitializeCommandName -Result $result -LocalRoot $LocalRoot -Details @{
         Version         = $finalState.CurrentVersion
         RuntimeHome     = $finalState.RuntimeHome
         RuntimeSource   = $finalState.RuntimeSource
         ExecutablePath  = $finalState.ExecutablePath
         PackageJsonPath = if ($finalState.PSObject.Properties[$descriptor.PackageJsonPropertyName]) { $finalState.($descriptor.PackageJsonPropertyName) } else { $null }
-    }
-    Add-Member -InputObject $result -NotePropertyName PersistedStatePath -NotePropertyValue $statePath -Force
-
-    return $result
+    } -PersistState:(-not $WhatIfPreference))
 }

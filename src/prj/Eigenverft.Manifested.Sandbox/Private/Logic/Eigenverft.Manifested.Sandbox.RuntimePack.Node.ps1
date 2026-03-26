@@ -174,14 +174,7 @@ function Invoke-ManifestedNodeRuntimeInitialization {
 
     if ($state.Status -eq 'Blocked') {
         $commandEnvironment = Get-ManifestedCommandEnvironmentResult -CommandName $descriptor.InitializeCommandName -RuntimeState $state
-        $result = [pscustomobject]@{
-            LocalRoot             = $state.LocalRoot
-            Layout                = $state.Layout
-            InitialState          = $initialState
-            FinalState            = $state
-            ActionTaken           = @('None')
-            PlannedActions        = @()
-            RestartRequired       = $false
+        $result = New-ManifestedRuntimeResult -LocalRoot $state.LocalRoot -Layout $state.Layout -InitialState $initialState -FinalState $state -ActionTaken @('None') -PlannedActions @() -RestartRequired:$false -AdditionalProperties ([ordered]@{
             Package               = $null
             PackageTest           = $null
             RuntimeTest           = $null
@@ -190,16 +183,9 @@ function Invoke-ManifestedNodeRuntimeInitialization {
             NpmProxyConfiguration = $null
             CommandEnvironment    = $commandEnvironment
             Elevation             = $elevationPlan
-        }
+        })
 
-        if ($WhatIfPreference) {
-            Add-Member -InputObject $result -NotePropertyName PersistedStatePath -NotePropertyValue $null -Force
-            return $result
-        }
-
-        $statePath = Save-ManifestedInvokeState -CommandName $descriptor.InitializeCommandName -Result $result -LocalRoot $LocalRoot -Details (& $descriptor.PersistedDetailsFunctionName -Descriptor $descriptor -FinalState $state)
-        Add-Member -InputObject $result -NotePropertyName PersistedStatePath -NotePropertyValue $statePath -Force
-        return $result
+        return (Complete-ManifestedRuntimeResult -CommandName $descriptor.InitializeCommandName -Result $result -LocalRoot $LocalRoot -Details (& $descriptor.PersistedDetailsFunctionName -Descriptor $descriptor -FinalState $state) -PersistState:(-not $WhatIfPreference))
     }
 
     $needsRepair = $state.Status -in @('Partial', 'NeedsRepair')
@@ -210,24 +196,18 @@ function Invoke-ManifestedNodeRuntimeInitialization {
 
     if ($needsRepair) {
         if (-not $PSCmdlet.ShouldProcess($state.Layout.($descriptor.ToolsRootPropertyName), ('Repair {0} runtime state' -f $descriptor.DisplayName))) {
-            return [pscustomobject]@{
-                LocalRoot             = $state.LocalRoot
-                Layout                = $state.Layout
-                InitialState          = $initialState
-                FinalState            = $state
-                ActionTaken           = @('WhatIf')
-                PlannedActions        = @($plannedActions)
-                RestartRequired       = $false
-                Package               = $null
-                PackageTest           = $null
-                RuntimeTest           = $state.Runtime
-                RepairResult          = $null
-                InstallResult         = $null
-                NpmProxyConfiguration = $null
-                CommandEnvironment    = (Get-ManifestedCommandEnvironmentResult -CommandName $descriptor.InitializeCommandName -RuntimeState $state)
-                PersistedStatePath    = $null
-                Elevation             = $elevationPlan
-            }
+            return (Complete-ManifestedRuntimeResult -CommandName $descriptor.InitializeCommandName -LocalRoot $LocalRoot -PersistState:$false -Result (
+                New-ManifestedRuntimeResult -LocalRoot $state.LocalRoot -Layout $state.Layout -InitialState $initialState -FinalState $state -ActionTaken @('WhatIf') -PlannedActions @($plannedActions) -RestartRequired:$false -AdditionalProperties ([ordered]@{
+                    Package               = $null
+                    PackageTest           = $null
+                    RuntimeTest           = $state.Runtime
+                    RepairResult          = $null
+                    InstallResult         = $null
+                    NpmProxyConfiguration = $null
+                    CommandEnvironment    = (Get-ManifestedCommandEnvironmentResult -CommandName $descriptor.InitializeCommandName -RuntimeState $state)
+                    Elevation             = $elevationPlan
+                })
+            ))
         }
 
         $repairResult = & $descriptor.RepairFunctionName -State $state -Flavor $state.Flavor -LocalRoot $state.LocalRoot
@@ -243,24 +223,18 @@ function Invoke-ManifestedNodeRuntimeInitialization {
     if ($needsInstall) {
         if ($needsAcquire) {
             if (-not $PSCmdlet.ShouldProcess($state.Layout.($descriptor.CacheRootPropertyName), ('Acquire {0} runtime package' -f $descriptor.DisplayName))) {
-                return [pscustomobject]@{
-                    LocalRoot             = $state.LocalRoot
-                    Layout                = $state.Layout
-                    InitialState          = $initialState
-                    FinalState            = $state
-                    ActionTaken           = @('WhatIf')
-                    PlannedActions        = @($plannedActions)
-                    RestartRequired       = $false
-                    Package               = $null
-                    PackageTest           = $null
-                    RuntimeTest           = $state.Runtime
-                    RepairResult          = $repairResult
-                    InstallResult         = $null
-                    NpmProxyConfiguration = $null
-                    CommandEnvironment    = (Get-ManifestedCommandEnvironmentResult -CommandName $descriptor.InitializeCommandName -RuntimeState $state)
-                    PersistedStatePath    = $null
-                    Elevation             = $elevationPlan
-                }
+                return (Complete-ManifestedRuntimeResult -CommandName $descriptor.InitializeCommandName -LocalRoot $LocalRoot -PersistState:$false -Result (
+                    New-ManifestedRuntimeResult -LocalRoot $state.LocalRoot -Layout $state.Layout -InitialState $initialState -FinalState $state -ActionTaken @('WhatIf') -PlannedActions @($plannedActions) -RestartRequired:$false -AdditionalProperties ([ordered]@{
+                        Package               = $null
+                        PackageTest           = $null
+                        RuntimeTest           = $state.Runtime
+                        RepairResult          = $repairResult
+                        InstallResult         = $null
+                        NpmProxyConfiguration = $null
+                        CommandEnvironment    = (Get-ManifestedCommandEnvironmentResult -CommandName $descriptor.InitializeCommandName -RuntimeState $state)
+                        Elevation             = $elevationPlan
+                    })
+                ))
             }
 
             $saveParameters = @{
@@ -280,24 +254,18 @@ function Invoke-ManifestedNodeRuntimeInitialization {
         $packageTest = & $descriptor.TestPackageFunctionName -PackageInfo $packageInfo
         if ($packageTest.Status -eq 'CorruptCache') {
             if (-not $PSCmdlet.ShouldProcess($packageInfo.Path, ('Repair corrupt {0} runtime package' -f $descriptor.DisplayName))) {
-                return [pscustomobject]@{
-                    LocalRoot             = $state.LocalRoot
-                    Layout                = $state.Layout
-                    InitialState          = $initialState
-                    FinalState            = $state
-                    ActionTaken           = @('WhatIf')
-                    PlannedActions        = @($plannedActions)
-                    RestartRequired       = $false
-                    Package               = $packageInfo
-                    PackageTest           = $packageTest
-                    RuntimeTest           = $state.Runtime
-                    RepairResult          = $repairResult
-                    InstallResult         = $null
-                    NpmProxyConfiguration = $null
-                    CommandEnvironment    = (Get-ManifestedCommandEnvironmentResult -CommandName $descriptor.InitializeCommandName -RuntimeState $state)
-                    PersistedStatePath    = $null
-                    Elevation             = $elevationPlan
-                }
+                return (Complete-ManifestedRuntimeResult -CommandName $descriptor.InitializeCommandName -LocalRoot $LocalRoot -PersistState:$false -Result (
+                    New-ManifestedRuntimeResult -LocalRoot $state.LocalRoot -Layout $state.Layout -InitialState $initialState -FinalState $state -ActionTaken @('WhatIf') -PlannedActions @($plannedActions) -RestartRequired:$false -AdditionalProperties ([ordered]@{
+                        Package               = $packageInfo
+                        PackageTest           = $packageTest
+                        RuntimeTest           = $state.Runtime
+                        RepairResult          = $repairResult
+                        InstallResult         = $null
+                        NpmProxyConfiguration = $null
+                        CommandEnvironment    = (Get-ManifestedCommandEnvironmentResult -CommandName $descriptor.InitializeCommandName -RuntimeState $state)
+                        Elevation             = $elevationPlan
+                    })
+                ))
             }
 
             $repairResult = & $descriptor.RepairFunctionName -State $state -CorruptPackagePaths @($packageInfo.Path) -Flavor $state.Flavor -LocalRoot $state.LocalRoot
@@ -336,24 +304,18 @@ function Invoke-ManifestedNodeRuntimeInitialization {
         }
 
         if (-not $PSCmdlet.ShouldProcess($state.Layout.($descriptor.ToolsRootPropertyName), ('Install {0} runtime' -f $descriptor.DisplayName))) {
-            return [pscustomobject]@{
-                LocalRoot             = $state.LocalRoot
-                Layout                = $state.Layout
-                InitialState          = $initialState
-                FinalState            = $state
-                ActionTaken           = @('WhatIf')
-                PlannedActions        = @($plannedActions)
-                RestartRequired       = $false
-                Package               = $packageInfo
-                PackageTest           = $packageTest
-                RuntimeTest           = $state.Runtime
-                RepairResult          = $repairResult
-                InstallResult         = $null
-                NpmProxyConfiguration = $null
-                CommandEnvironment    = (Get-ManifestedCommandEnvironmentResult -CommandName $descriptor.InitializeCommandName -RuntimeState $state)
-                PersistedStatePath    = $null
-                Elevation             = $elevationPlan
-            }
+            return (Complete-ManifestedRuntimeResult -CommandName $descriptor.InitializeCommandName -LocalRoot $LocalRoot -PersistState:$false -Result (
+                New-ManifestedRuntimeResult -LocalRoot $state.LocalRoot -Layout $state.Layout -InitialState $initialState -FinalState $state -ActionTaken @('WhatIf') -PlannedActions @($plannedActions) -RestartRequired:$false -AdditionalProperties ([ordered]@{
+                    Package               = $packageInfo
+                    PackageTest           = $packageTest
+                    RuntimeTest           = $state.Runtime
+                    RepairResult          = $repairResult
+                    InstallResult         = $null
+                    NpmProxyConfiguration = $null
+                    CommandEnvironment    = (Get-ManifestedCommandEnvironmentResult -CommandName $descriptor.InitializeCommandName -RuntimeState $state)
+                    Elevation             = $elevationPlan
+                })
+            ))
         }
 
         $installResult = & $descriptor.InstallFunctionName -PackageInfo $packageInfo -Flavor $state.Flavor -LocalRoot $state.LocalRoot
@@ -388,24 +350,18 @@ function Invoke-ManifestedNodeRuntimeInitialization {
 
     if ($nodeManagedFinalizerStatus.Applicable -and $nodeManagedFinalizerStatus.Status -and $nodeManagedFinalizerStatus.Status.PSObject.Properties['Action'] -and ($nodeManagedFinalizerStatus.Status.Action -eq 'NeedsManagedGlobalProxy')) {
         if (-not $PSCmdlet.ShouldProcess($nodeManagedFinalizerStatus.Target, 'Configure managed npm proxy settings')) {
-            return [pscustomobject]@{
-                LocalRoot             = $finalState.LocalRoot
-                Layout                = $finalState.Layout
-                InitialState          = $initialState
-                FinalState            = $finalState
-                ActionTaken           = @('WhatIf')
-                PlannedActions        = @($plannedActions)
-                RestartRequired       = $false
-                Package               = $packageInfo
-                PackageTest           = $packageTest
-                RuntimeTest           = $runtimeTest
-                RepairResult          = $repairResult
-                InstallResult         = $installResult
-                NpmProxyConfiguration = $npmProxyConfiguration
-                CommandEnvironment    = (Get-ManifestedCommandEnvironmentResult -CommandName $descriptor.InitializeCommandName -RuntimeState $finalState)
-                PersistedStatePath    = $null
-                Elevation             = $elevationPlan
-            }
+            return (Complete-ManifestedRuntimeResult -CommandName $descriptor.InitializeCommandName -LocalRoot $LocalRoot -PersistState:$false -Result (
+                New-ManifestedRuntimeResult -LocalRoot $finalState.LocalRoot -Layout $finalState.Layout -InitialState $initialState -FinalState $finalState -ActionTaken @('WhatIf') -PlannedActions @($plannedActions) -RestartRequired:$false -AdditionalProperties ([ordered]@{
+                    Package               = $packageInfo
+                    PackageTest           = $packageTest
+                    RuntimeTest           = $runtimeTest
+                    RepairResult          = $repairResult
+                    InstallResult         = $installResult
+                    NpmProxyConfiguration = $npmProxyConfiguration
+                    CommandEnvironment    = (Get-ManifestedCommandEnvironmentResult -CommandName $descriptor.InitializeCommandName -RuntimeState $finalState)
+                    Elevation             = $elevationPlan
+                })
+            ))
         }
 
         $npmProxyConfiguration = & $descriptor.ManagedFinalizerFunctionName -Status $nodeManagedFinalizerStatus -RuntimeState $finalState -RuntimeTest $runtimeTest
@@ -414,17 +370,11 @@ function Invoke-ManifestedNodeRuntimeInitialization {
         }
     }
 
-    $commandEnvironment = Get-ManifestedCommandEnvironmentResult -CommandName $descriptor.InitializeCommandName -RuntimeState $finalState
-    if ($commandEnvironment.Applicable) {
-        if (-not $PSCmdlet.ShouldProcess($commandEnvironment.DesiredCommandDirectory, ('Synchronize {0} command-line environment' -f $descriptor.DisplayName))) {
-            return [pscustomobject]@{
-                LocalRoot             = $finalState.LocalRoot
-                Layout                = $finalState.Layout
-                InitialState          = $initialState
-                FinalState            = $finalState
-                ActionTaken           = @('WhatIf')
-                PlannedActions        = @($plannedActions)
-                RestartRequired       = $false
+    $commandEnvironmentSync = Invoke-ManifestedRuntimeCommandEnvironmentSync -Cmdlet $PSCmdlet -CommandName $descriptor.InitializeCommandName -DisplayName $descriptor.DisplayName -RuntimeState $finalState -ActionsTaken $actionsTaken -UseShouldProcess:$true
+    $commandEnvironment = $commandEnvironmentSync.CommandEnvironment
+    if ($commandEnvironmentSync.StopProcessing) {
+        return (Complete-ManifestedRuntimeResult -CommandName $descriptor.InitializeCommandName -LocalRoot $LocalRoot -PersistState:$false -Result (
+            New-ManifestedRuntimeResult -LocalRoot $finalState.LocalRoot -Layout $finalState.Layout -InitialState $initialState -FinalState $finalState -ActionTaken @('WhatIf') -PlannedActions @($plannedActions) -RestartRequired:$false -AdditionalProperties ([ordered]@{
                 Package               = $packageInfo
                 PackageTest           = $packageTest
                 RuntimeTest           = $runtimeTest
@@ -432,25 +382,12 @@ function Invoke-ManifestedNodeRuntimeInitialization {
                 InstallResult         = $installResult
                 NpmProxyConfiguration = $npmProxyConfiguration
                 CommandEnvironment    = $commandEnvironment
-                PersistedStatePath    = $null
                 Elevation             = $elevationPlan
-            }
-        }
-
-        $commandEnvironment = Sync-ManifestedCommandLineEnvironment -Specification (Get-ManifestedCommandEnvironmentSpec -CommandName $descriptor.InitializeCommandName -RuntimeState $finalState)
-        if ($commandEnvironment.Status -eq 'Updated') {
-            $actionsTaken.Add('Sync-ManifestedCommandLineEnvironment') | Out-Null
-        }
+            })
+        ))
     }
 
-    $result = [pscustomobject]@{
-        LocalRoot             = $finalState.LocalRoot
-        Layout                = $finalState.Layout
-        InitialState          = $initialState
-        FinalState            = $finalState
-        ActionTaken           = if ($actionsTaken.Count -gt 0) { @($actionsTaken) } else { @('None') }
-        PlannedActions        = @($plannedActions)
-        RestartRequired       = $false
+    $result = New-ManifestedRuntimeResult -LocalRoot $finalState.LocalRoot -Layout $finalState.Layout -InitialState $initialState -FinalState $finalState -ActionTaken (if ($actionsTaken.Count -gt 0) { @($actionsTaken) } else { @('None') }) -PlannedActions @($plannedActions) -RestartRequired:$false -AdditionalProperties ([ordered]@{
         Package               = $packageInfo
         PackageTest           = $packageTest
         RuntimeTest           = $runtimeTest
@@ -459,15 +396,7 @@ function Invoke-ManifestedNodeRuntimeInitialization {
         NpmProxyConfiguration = $npmProxyConfiguration
         CommandEnvironment    = $commandEnvironment
         Elevation             = $elevationPlan
-    }
+    })
 
-    if ($WhatIfPreference) {
-        Add-Member -InputObject $result -NotePropertyName PersistedStatePath -NotePropertyValue $null -Force
-        return $result
-    }
-
-    $statePath = Save-ManifestedInvokeState -CommandName $descriptor.InitializeCommandName -Result $result -LocalRoot $LocalRoot -Details (& $descriptor.PersistedDetailsFunctionName -Descriptor $descriptor -FinalState $finalState)
-    Add-Member -InputObject $result -NotePropertyName PersistedStatePath -NotePropertyValue $statePath -Force
-
-    return $result
+    return (Complete-ManifestedRuntimeResult -CommandName $descriptor.InitializeCommandName -Result $result -LocalRoot $LocalRoot -Details (& $descriptor.PersistedDetailsFunctionName -Descriptor $descriptor -FinalState $finalState) -PersistState:(-not $WhatIfPreference))
 }

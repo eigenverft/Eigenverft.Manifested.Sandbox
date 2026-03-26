@@ -93,30 +93,16 @@ function Invoke-ManifestedMachinePrerequisiteRuntimeInitialization {
     $elevationPlan = Get-ManifestedCommandElevationPlan -CommandName $descriptor.InitializeCommandName -LocalRoot $LocalRoot -SkipSelfElevation:$selfElevationContext.SkipSelfElevation -WasSelfElevated:$selfElevationContext.WasSelfElevated -WhatIfMode:$WhatIfPreference
 
     if ($state.Status -eq 'Blocked') {
-        $result = [pscustomobject]@{
-            LocalRoot       = $state.LocalRoot
-            Layout          = $state.Layout
-            InitialState    = $initialState
-            FinalState      = $state
-            ActionTaken     = @('None')
-            PlannedActions  = @()
-            RestartRequired = $false
-            Installer       = $null
-            InstallerTest   = $null
-            RuntimeTest     = $null
-            RepairResult    = $null
-            InstallResult   = $null
-            Elevation       = $elevationPlan
-        }
+        $result = New-ManifestedRuntimeResult -LocalRoot $state.LocalRoot -Layout $state.Layout -InitialState $initialState -FinalState $state -ActionTaken @('None') -PlannedActions @() -RestartRequired:$false -AdditionalProperties ([ordered]@{
+            Installer     = $null
+            InstallerTest = $null
+            RuntimeTest   = $null
+            RepairResult  = $null
+            InstallResult = $null
+            Elevation     = $elevationPlan
+        })
 
-        if ($WhatIfPreference) {
-            Add-Member -InputObject $result -NotePropertyName PersistedStatePath -NotePropertyValue $null -Force
-            return $result
-        }
-
-        $statePath = Save-ManifestedInvokeState -CommandName $descriptor.InitializeCommandName -Result $result -LocalRoot $LocalRoot -Details (& $descriptor.PersistedDetailsFunctionName -Descriptor $descriptor -FinalState $state)
-        Add-Member -InputObject $result -NotePropertyName PersistedStatePath -NotePropertyValue $statePath -Force
-        return $result
+        return (Complete-ManifestedRuntimeResult -CommandName $descriptor.InitializeCommandName -Result $result -LocalRoot $LocalRoot -Details (& $descriptor.PersistedDetailsFunctionName -Descriptor $descriptor -FinalState $state) -PersistState:(-not $WhatIfPreference))
     }
 
     $needsRepair = $state.Status -in @('Partial', 'NeedsRepair')
@@ -127,22 +113,16 @@ function Invoke-ManifestedMachinePrerequisiteRuntimeInitialization {
 
     if ($needsRepair) {
         if (-not $PSCmdlet.ShouldProcess($state.InstallerPath, ('Repair {0} runtime state' -f $descriptor.DisplayName))) {
-            return [pscustomobject]@{
-                LocalRoot          = $state.LocalRoot
-                Layout             = $state.Layout
-                InitialState       = $initialState
-                FinalState         = $state
-                ActionTaken        = @('WhatIf')
-                PlannedActions     = @($plannedActions)
-                RestartRequired    = $false
-                Installer          = $null
-                InstallerTest      = $null
-                RuntimeTest        = $state.Runtime
-                RepairResult       = $null
-                InstallResult      = $null
-                PersistedStatePath = $null
-                Elevation          = $elevationPlan
-            }
+            return (Complete-ManifestedRuntimeResult -CommandName $descriptor.InitializeCommandName -LocalRoot $LocalRoot -PersistState:$false -Result (
+                New-ManifestedRuntimeResult -LocalRoot $state.LocalRoot -Layout $state.Layout -InitialState $initialState -FinalState $state -ActionTaken @('WhatIf') -PlannedActions @($plannedActions) -RestartRequired:$false -AdditionalProperties ([ordered]@{
+                    Installer     = $null
+                    InstallerTest = $null
+                    RuntimeTest   = $state.Runtime
+                    RepairResult  = $null
+                    InstallResult = $null
+                    Elevation     = $elevationPlan
+                })
+            ))
         }
 
         $repairResult = & $descriptor.RepairFunctionName -State $state -LocalRoot $state.LocalRoot
@@ -158,22 +138,16 @@ function Invoke-ManifestedMachinePrerequisiteRuntimeInitialization {
     if ($needsInstall) {
         if ($needsAcquire) {
             if (-not $PSCmdlet.ShouldProcess($state.Layout.($descriptor.CacheRootPropertyName), ('Acquire {0} installer' -f $descriptor.DisplayName))) {
-                return [pscustomobject]@{
-                    LocalRoot          = $state.LocalRoot
-                    Layout             = $state.Layout
-                    InitialState       = $initialState
-                    FinalState         = $state
-                    ActionTaken        = @('WhatIf')
-                    PlannedActions     = @($plannedActions)
-                    RestartRequired    = $false
-                    Installer          = $null
-                    InstallerTest      = $null
-                    RuntimeTest        = $state.Runtime
-                    RepairResult       = $repairResult
-                    InstallResult      = $null
-                    PersistedStatePath = $null
-                    Elevation          = $elevationPlan
-                }
+                return (Complete-ManifestedRuntimeResult -CommandName $descriptor.InitializeCommandName -LocalRoot $LocalRoot -PersistState:$false -Result (
+                    New-ManifestedRuntimeResult -LocalRoot $state.LocalRoot -Layout $state.Layout -InitialState $initialState -FinalState $state -ActionTaken @('WhatIf') -PlannedActions @($plannedActions) -RestartRequired:$false -AdditionalProperties ([ordered]@{
+                        Installer     = $null
+                        InstallerTest = $null
+                        RuntimeTest   = $state.Runtime
+                        RepairResult  = $repairResult
+                        InstallResult = $null
+                        Elevation     = $elevationPlan
+                    })
+                ))
             }
 
             $saveParameters = @{
@@ -192,22 +166,16 @@ function Invoke-ManifestedMachinePrerequisiteRuntimeInitialization {
         $installerTest = & $descriptor.TestPackageFunctionName -InstallerInfo $installerInfo
         if ($installerTest.Status -eq 'CorruptCache') {
             if (-not $PSCmdlet.ShouldProcess($installerInfo.Path, ('Repair corrupt {0} installer' -f $descriptor.DisplayName))) {
-                return [pscustomobject]@{
-                    LocalRoot          = $state.LocalRoot
-                    Layout             = $state.Layout
-                    InitialState       = $initialState
-                    FinalState         = $state
-                    ActionTaken        = @('WhatIf')
-                    PlannedActions     = @($plannedActions)
-                    RestartRequired    = $false
-                    Installer          = $installerInfo
-                    InstallerTest      = $installerTest
-                    RuntimeTest        = $state.Runtime
-                    RepairResult       = $repairResult
-                    InstallResult      = $null
-                    PersistedStatePath = $null
-                    Elevation          = $elevationPlan
-                }
+                return (Complete-ManifestedRuntimeResult -CommandName $descriptor.InitializeCommandName -LocalRoot $LocalRoot -PersistState:$false -Result (
+                    New-ManifestedRuntimeResult -LocalRoot $state.LocalRoot -Layout $state.Layout -InitialState $initialState -FinalState $state -ActionTaken @('WhatIf') -PlannedActions @($plannedActions) -RestartRequired:$false -AdditionalProperties ([ordered]@{
+                        Installer     = $installerInfo
+                        InstallerTest = $installerTest
+                        RuntimeTest   = $state.Runtime
+                        RepairResult  = $repairResult
+                        InstallResult = $null
+                        Elevation     = $elevationPlan
+                    })
+                ))
             }
 
             $repairResult = & $descriptor.RepairFunctionName -State $state -CorruptInstallerPaths @($installerInfo.Path) -LocalRoot $state.LocalRoot
@@ -252,22 +220,16 @@ function Invoke-ManifestedMachinePrerequisiteRuntimeInitialization {
         }
 
         if (-not $PSCmdlet.ShouldProcess('Microsoft Visual C++ Redistributable (x64)', ('Install {0}' -f $descriptor.DisplayName))) {
-            return [pscustomobject]@{
-                LocalRoot          = $state.LocalRoot
-                Layout             = $state.Layout
-                InitialState       = $initialState
-                FinalState         = $state
-                ActionTaken        = @('WhatIf')
-                PlannedActions     = @($plannedActions)
-                RestartRequired    = $false
-                Installer          = $installerInfo
-                InstallerTest      = $installerTest
-                RuntimeTest        = $state.Runtime
-                RepairResult       = $repairResult
-                InstallResult      = $null
-                PersistedStatePath = $null
-                Elevation          = $elevationPlan
-            }
+            return (Complete-ManifestedRuntimeResult -CommandName $descriptor.InitializeCommandName -LocalRoot $LocalRoot -PersistState:$false -Result (
+                New-ManifestedRuntimeResult -LocalRoot $state.LocalRoot -Layout $state.Layout -InitialState $initialState -FinalState $state -ActionTaken @('WhatIf') -PlannedActions @($plannedActions) -RestartRequired:$false -AdditionalProperties ([ordered]@{
+                    Installer     = $installerInfo
+                    InstallerTest = $installerTest
+                    RuntimeTest   = $state.Runtime
+                    RepairResult  = $repairResult
+                    InstallResult = $null
+                    Elevation     = $elevationPlan
+                })
+            ))
         }
 
         $installResult = & $descriptor.InstallFunctionName -InstallerInfo $installerInfo -InstallTimeoutSec $InstallTimeoutSec -LocalRoot $state.LocalRoot
@@ -285,29 +247,14 @@ function Invoke-ManifestedMachinePrerequisiteRuntimeInitialization {
     }
     $runtimeTest = & $descriptor.RuntimeTestFunctionName @runtimeTestParameters
 
-    $result = [pscustomobject]@{
-        LocalRoot       = $finalState.LocalRoot
-        Layout          = $finalState.Layout
-        InitialState    = $initialState
-        FinalState      = $finalState
-        ActionTaken     = if ($actionsTaken.Count -gt 0) { @($actionsTaken) } else { @('None') }
-        PlannedActions  = @($plannedActions)
-        RestartRequired = if ($installResult) { [bool]$installResult.RestartRequired } else { $false }
-        Installer       = $installerInfo
-        InstallerTest   = $installerTest
-        RuntimeTest     = $runtimeTest
-        RepairResult    = $repairResult
-        InstallResult   = $installResult
-        Elevation       = $elevationPlan
-    }
+    $result = New-ManifestedRuntimeResult -LocalRoot $finalState.LocalRoot -Layout $finalState.Layout -InitialState $initialState -FinalState $finalState -ActionTaken (if ($actionsTaken.Count -gt 0) { @($actionsTaken) } else { @('None') }) -PlannedActions @($plannedActions) -RestartRequired:(if ($installResult) { [bool]$installResult.RestartRequired } else { $false }) -AdditionalProperties ([ordered]@{
+        Installer     = $installerInfo
+        InstallerTest = $installerTest
+        RuntimeTest   = $runtimeTest
+        RepairResult  = $repairResult
+        InstallResult = $installResult
+        Elevation     = $elevationPlan
+    })
 
-    if ($WhatIfPreference) {
-        Add-Member -InputObject $result -NotePropertyName PersistedStatePath -NotePropertyValue $null -Force
-        return $result
-    }
-
-    $statePath = Save-ManifestedInvokeState -CommandName $descriptor.InitializeCommandName -Result $result -LocalRoot $LocalRoot -Details (& $descriptor.PersistedDetailsFunctionName -Descriptor $descriptor -FinalState $finalState)
-    Add-Member -InputObject $result -NotePropertyName PersistedStatePath -NotePropertyValue $statePath -Force
-
-    return $result
+    return (Complete-ManifestedRuntimeResult -CommandName $descriptor.InitializeCommandName -Result $result -LocalRoot $LocalRoot -Details (& $descriptor.PersistedDetailsFunctionName -Descriptor $descriptor -FinalState $finalState) -PersistState:(-not $WhatIfPreference))
 }
