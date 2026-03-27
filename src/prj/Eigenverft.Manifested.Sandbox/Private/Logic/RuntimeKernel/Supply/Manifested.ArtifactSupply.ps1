@@ -70,6 +70,7 @@ function Save-ManifestedArtifactMetadataFromPackage {
     if ($PackageInfo.PSObject.Properties['ShaSource'] -and -not [string]::IsNullOrWhiteSpace($PackageInfo.ShaSource)) { $metadata['ShaSource'] = $PackageInfo.ShaSource }
     if ($PackageInfo.PSObject.Properties['ReleaseUrl'] -and -not [string]::IsNullOrWhiteSpace($PackageInfo.ReleaseUrl)) { $metadata['ReleaseUrl'] = $PackageInfo.ReleaseUrl }
     if ($PackageInfo.PSObject.Properties['ReleaseId'] -and -not [string]::IsNullOrWhiteSpace($PackageInfo.ReleaseId)) { $metadata['ReleaseId'] = $PackageInfo.ReleaseId }
+    if ($PackageInfo.PSObject.Properties['ReleaseDate'] -and -not [string]::IsNullOrWhiteSpace($PackageInfo.ReleaseDate)) { $metadata['ReleaseDate'] = $PackageInfo.ReleaseDate }
     if ($PackageInfo.PSObject.Properties['Channel'] -and -not [string]::IsNullOrWhiteSpace($PackageInfo.Channel)) { $metadata['Channel'] = $PackageInfo.Channel }
     if ($PackageInfo.PSObject.Properties['ShasumsUrl'] -and -not [string]::IsNullOrWhiteSpace($PackageInfo.ShasumsUrl)) { $metadata['ShasumsUrl'] = $PackageInfo.ShasumsUrl }
     if ($PackageInfo.PSObject.Properties['NpmVersion'] -and -not [string]::IsNullOrWhiteSpace($PackageInfo.NpmVersion)) { $metadata['NpmVersion'] = $PackageInfo.NpmVersion }
@@ -112,8 +113,10 @@ function Get-ManifestedCachedZipArtifactsFromDefinition {
             $metadata = Get-ManifestedArtifactMetadata -ArtifactPath $_.FullName
             [pscustomobject]@{
                 TagName     = if ($metadata -and $metadata.PSObject.Properties['Tag']) { $metadata.Tag } else { $null }
+                ReleaseId   = if ($metadata -and $metadata.PSObject.Properties['ReleaseId']) { $metadata.ReleaseId } else { $null }
                 Version     = if ($metadata -and $metadata.PSObject.Properties['Version']) { $metadata.Version } elseif ($matches.Count -gt 1) { $matches[1] } else { $null }
                 Flavor      = $Flavor
+                Channel     = if ($metadata -and $metadata.PSObject.Properties['Channel']) { $metadata.Channel } else { $null }
                 FileName    = $_.Name
                 Path        = $_.FullName
                 Source      = 'cache'
@@ -122,6 +125,7 @@ function Get-ManifestedCachedZipArtifactsFromDefinition {
                 Sha256      = if ($metadata -and $metadata.PSObject.Properties['Sha256']) { $metadata.Sha256 } else { $null }
                 ShaSource   = if ($metadata -and $metadata.PSObject.Properties['ShaSource']) { $metadata.ShaSource } else { $null }
                 ReleaseUrl  = if ($metadata -and $metadata.PSObject.Properties['ReleaseUrl']) { $metadata.ReleaseUrl } else { $null }
+                ReleaseDate = if ($metadata -and $metadata.PSObject.Properties['ReleaseDate']) { $metadata.ReleaseDate } else { $null }
                 ShasumsUrl  = if ($metadata -and $metadata.PSObject.Properties['ShasumsUrl']) { $metadata.ShasumsUrl } else { $null }
                 NpmVersion  = if ($metadata -and $metadata.PSObject.Properties['NpmVersion']) { $metadata.NpmVersion } else { $null }
                 SignatureStatus = if ($metadata -and $metadata.PSObject.Properties['SignatureStatus']) { $metadata.SignatureStatus } else { $null }
@@ -426,9 +430,9 @@ function Get-ManifestedOnlinePythonEmbedArtifactFromDefinition {
         return $null
     }
 
-    foreach ($candidate in @(Get-PythonReleaseCandidates)) {
+    foreach ($candidate in @(Get-ManifestedPythonReleaseCandidates -Definition $Definition -VersionSpec $versionSpec)) {
         try {
-            $assetDetails = Get-PythonReleaseAssetDetails -ReleaseUrl $candidate.ReleaseUrl -Flavor $Flavor
+            $assetDetails = Get-ManifestedPythonReleaseAssetDetails -ReleaseUrl $candidate.ReleaseUrl -Flavor $Flavor -Definition $Definition
             return [pscustomobject]@{
                 ReleaseId   = $candidate.ReleaseId
                 Version     = $(ConvertTo-ManifestedVersionTextFromRule -VersionText $candidate.Version -Rule $versionSpec.ReleaseVersionRule)

@@ -127,6 +127,7 @@ function Get-ManifestedSuppliedArtifactFromDefinition {
             Sha256      = if ($onlineArtifact.PSObject.Properties['Sha256']) { $onlineArtifact.Sha256 } else { $null }
             ShaSource   = if ($onlineArtifact.PSObject.Properties['ShaSource']) { $onlineArtifact.ShaSource } else { $null }
             ReleaseUrl  = if ($onlineArtifact.PSObject.Properties['ReleaseUrl']) { $onlineArtifact.ReleaseUrl } else { $null }
+            ReleaseDate = if ($onlineArtifact.PSObject.Properties['ReleaseDate']) { $onlineArtifact.ReleaseDate } else { $null }
             ShasumsUrl  = if ($onlineArtifact.PSObject.Properties['ShasumsUrl']) { $onlineArtifact.ShasumsUrl } else { $null }
             NpmVersion  = if ($onlineArtifact.PSObject.Properties['NpmVersion']) { $onlineArtifact.NpmVersion } else { $null }
             ReleaseId   = if ($onlineArtifact.PSObject.Properties['ReleaseId']) { $onlineArtifact.ReleaseId } else { $null }

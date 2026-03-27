@@ -1,3 +1,248 @@
+function ConvertTo-ManifestedFlexibleVersionObject {
+    [CmdletBinding()]
+    param(
+        [string]$VersionText
+    )
+
+    if ([string]::IsNullOrWhiteSpace($VersionText)) {
+        return $null
+    }
+
+    $match = [regex]::Match($VersionText, '(\d+(?:\.\d+){1,3})')
+    if (-not $match.Success) {
+        return $null
+    }
+
+    return [version]$match.Groups[1].Value
+}
+
+function Get-ManifestedMachineInstallerCachePathFromDefinition {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [pscustomobject]$Definition,
+
+        [string]$LocalRoot = (Get-ManifestedLocalRoot)
+    )
+
+    $layout = Get-ManifestedLayout -LocalRoot $LocalRoot
+    $cacheRoot = Get-ManifestedArtifactCacheRootFromDefinition -Definition $Definition -Layout $layout
+    if ([string]::IsNullOrWhiteSpace($cacheRoot)) {
+        return $null
+    }
+
+    $supplyBlock = Get-ManifestedDefinitionBlock -Definition $Definition -SectionName 'supply' -BlockName 'directDownload'
+    if (-not $supplyBlock -or -not $supplyBlock.PSObject.Properties.Match('fileName').Count -or [string]::IsNullOrWhiteSpace($supplyBlock.fileName)) {
+        return $null
+    }
+
+    return (Join-Path $cacheRoot ([string]$supplyBlock.fileName))
+}
+
+function Get-ManifestedMachineInstallerInfoFromDefinition {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [pscustomobject]$Definition,
+
+        [pscustomobject]$Artifact,
+
+        [string]$LocalRoot = (Get-ManifestedLocalRoot)
+    )
+
+    $factsBlock = Get-ManifestedDefinitionBlock -Definition $Definition -SectionName 'facts' -BlockName 'machinePrerequisite'
+    $supplyBlock = Get-ManifestedDefinitionBlock -Definition $Definition -SectionName 'supply' -BlockName 'directDownload'
+    $installerPath = if ($Artifact -and $Artifact.PSObject.Properties['Path'] -and -not [string]::IsNullOrWhiteSpace($Artifact.Path)) {
+        [string]$Artifact.Path
+    }
+    else {
+        Get-ManifestedMachineInstallerCachePathFromDefinition -Definition $Definition -LocalRoot $LocalRoot
+    }
+
+    $version = if ($Artifact -and $Artifact.PSObject.Properties['Version'] -and -not [string]::IsNullOrWhiteSpace($Artifact.Version)) { [string]$Artifact.Version } else { $null }
+    $versionObject = if ($Artifact -and $Artifact.PSObject.Properties['VersionObject'] -and $Artifact.VersionObject) { $Artifact.VersionObject } else { $null }
+    $signatureStatus = if ($Artifact -and $Artifact.PSObject.Properties['SignatureStatus'] -and -not [string]::IsNullOrWhiteSpace($Artifact.SignatureStatus)) { [string]$Artifact.SignatureStatus } else { $null }
+    $signerSubject = if ($Artifact -and $Artifact.PSObject.Properties['SignerSubject'] -and -not [string]::IsNullOrWhiteSpace($Artifact.SignerSubject)) { [string]$Artifact.SignerSubject } else { $null }
+
+    if (-not [string]::IsNullOrWhiteSpace($installerPath) -and (Test-Path -LiteralPath $installerPath)) {
+        try {
+            $item = Get-Item -LiteralPath $installerPath -ErrorAction Stop
+            if ([string]::IsNullOrWhiteSpace($version)) {
+                $version = [string]$item.VersionInfo.FileVersion
+            }
+            if (-not $versionObject) {
+                $versionObject = ConvertTo-ManifestedFlexibleVersionObject -VersionText $version
+            }
+        }
+        catch {
+        }
+
+        if ([string]::IsNullOrWhiteSpace($signatureStatus) -or [string]::IsNullOrWhiteSpace($signerSubject)) {
+            try {
+                $signature = Get-AuthenticodeSignature -FilePath $installerPath
+                $signatureStatus = $signature.Status.ToString()
+                $signerSubject = if ($signature.SignerCertificate) { $signature.SignerCertificate.Subject } else { $null }
+            }
+            catch {
+                $signatureStatus = $null
+                $signerSubject = $null
+            }
+        }
+    }
+
+    return [pscustomobject]@{
+        Architecture    = if ($factsBlock -and $factsBlock.PSObject.Properties.Match('architecture').Count -gt 0) { [string]$factsBlock.architecture } else { $null }
+        FileName        = if ($Artifact -and $Artifact.PSObject.Properties['FileName'] -and -not [string]::IsNullOrWhiteSpace($Artifact.FileName)) { [string]$Artifact.FileName } elseif ($supplyBlock -and $supplyBlock.PSObject.Properties.Match('fileName').Count -gt 0) { [string]$supplyBlock.fileName } elseif (-not [string]::IsNullOrWhiteSpace($installerPath)) { Split-Path -Leaf $installerPath } else { $null }
+        Path            = $installerPath
+        Version         = $version
+        VersionObject   = $versionObject
+        Source          = if ($Artifact -and $Artifact.PSObject.Properties['Source'] -and -not [string]::IsNullOrWhiteSpace($Artifact.Source)) { [string]$Artifact.Source } elseif (-not [string]::IsNullOrWhiteSpace($installerPath) -and (Test-Path -LiteralPath $installerPath)) { 'cache' } else { $null }
+        Action          = if ($Artifact -and $Artifact.PSObject.Properties['Action'] -and -not [string]::IsNullOrWhiteSpace($Artifact.Action)) { [string]$Artifact.Action } elseif (-not [string]::IsNullOrWhiteSpace($installerPath) -and (Test-Path -LiteralPath $installerPath)) { 'SelectedCache' } else { $null }
+        DownloadUrl     = if ($Artifact -and $Artifact.PSObject.Properties['DownloadUrl'] -and -not [string]::IsNullOrWhiteSpace($Artifact.DownloadUrl)) { [string]$Artifact.DownloadUrl } elseif ($supplyBlock -and $supplyBlock.PSObject.Properties.Match('downloadUrl').Count -gt 0) { [string]$supplyBlock.downloadUrl } else { $null }
+        SignatureStatus = $signatureStatus
+        SignerSubject   = $signerSubject
+    }
+}
+
+function Get-ManifestedInstalledMachinePrerequisiteRuntime {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [pscustomobject]$Definition
+    )
+
+    $factsBlock = Get-ManifestedDefinitionBlock -Definition $Definition -SectionName 'facts' -BlockName 'machinePrerequisite'
+    $architecture = if ($factsBlock -and $factsBlock.PSObject.Properties.Match('architecture').Count -gt 0 -and -not [string]::IsNullOrWhiteSpace($factsBlock.architecture)) {
+        ([string]$factsBlock.architecture).ToLowerInvariant()
+    }
+    else {
+        'x64'
+    }
+
+    $subKeyPaths = @(
+        ('SOFTWARE\Microsoft\VisualStudio\14.0\VC\Runtimes\' + $architecture),
+        ('SOFTWARE\Wow6432Node\Microsoft\VisualStudio\14.0\VC\Runtimes\' + $architecture)
+    )
+    $views = @([Microsoft.Win32.RegistryView]::Registry64, [Microsoft.Win32.RegistryView]::Registry32) | Select-Object -Unique
+
+    foreach ($view in $views) {
+        $baseKey = [Microsoft.Win32.RegistryKey]::OpenBaseKey([Microsoft.Win32.RegistryHive]::LocalMachine, $view)
+        try {
+            foreach ($subKeyPath in $subKeyPaths) {
+                $subKey = $baseKey.OpenSubKey($subKeyPath)
+                if (-not $subKey) {
+                    continue
+                }
+
+                try {
+                    $installed = [int]$subKey.GetValue('Installed', 0)
+                    $versionText = [string]$subKey.GetValue('Version', '')
+                    $versionObject = ConvertTo-ManifestedFlexibleVersionObject -VersionText $versionText
+
+                    if (-not $versionObject) {
+                        $major = $subKey.GetValue('Major', $null)
+                        $minor = $subKey.GetValue('Minor', $null)
+                        $build = $subKey.GetValue('Bld', $null)
+                        $revision = $subKey.GetValue('Rbld', $null)
+
+                        if ($null -ne $major -and $null -ne $minor -and $null -ne $build -and $null -ne $revision) {
+                            $versionObject = [version]::new([int]$major, [int]$minor, [int]$build, [int]$revision)
+                            $versionText = $versionObject.ToString()
+                        }
+                    }
+
+                    if ($installed -eq 1) {
+                        return [pscustomobject]@{
+                            Installed     = $true
+                            Architecture  = $architecture
+                            Version       = $versionText
+                            VersionObject = $versionObject
+                            KeyPath       = $subKeyPath
+                            RegistryView  = $view.ToString()
+                        }
+                    }
+                }
+                finally {
+                    $subKey.Dispose()
+                }
+            }
+        }
+        finally {
+            $baseKey.Dispose()
+        }
+    }
+
+    return [pscustomobject]@{
+        Installed     = $false
+        Architecture  = $architecture
+        Version       = $null
+        VersionObject = $null
+        KeyPath       = $null
+        RegistryView  = $null
+    }
+}
+
+function Get-ManifestedMachinePrerequisiteFactsFromDefinition {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [pscustomobject]$Definition,
+
+        [string]$LocalRoot = (Get-ManifestedLocalRoot)
+    )
+
+    if ([System.Environment]::OSVersion.Platform -ne [System.PlatformID]::Win32NT) {
+        return (New-ManifestedRuntimeFacts -RuntimeName $Definition.runtimeName -CommandName $Definition.commandName -RuntimeKind 'MachinePrerequisite' -LocalRoot $LocalRoot -Layout $null -PlatformSupported:$false -BlockedReason 'Only Windows hosts are supported by this VC runtime bootstrap.')
+    }
+
+    $layout = Get-ManifestedLayout -LocalRoot $LocalRoot
+    $artifact = Get-ManifestedCachedInstallerArtifactFromDefinition -Definition $Definition -LocalRoot $layout.LocalRoot
+    $installerInfo = Get-ManifestedMachineInstallerInfoFromDefinition -Definition $Definition -Artifact $artifact -LocalRoot $layout.LocalRoot
+    $partialPaths = @()
+    if (-not [string]::IsNullOrWhiteSpace($installerInfo.Path)) {
+        $downloadPath = Get-ManifestedDownloadPath -TargetPath $installerInfo.Path
+        if (Test-Path -LiteralPath $downloadPath) {
+            $partialPaths += $downloadPath
+        }
+    }
+
+    $installedRuntime = Get-ManifestedInstalledMachinePrerequisiteRuntime -Definition $Definition
+    $runtimeValidation = [pscustomobject]@{
+        Exists          = [bool]$installedRuntime.Installed
+        IsInstalled     = [bool]$installedRuntime.Installed
+        RestartRequired = $false
+        FailureReason   = if ($installedRuntime.Installed) { $null } else { 'NotInstalled' }
+        Architecture    = $installedRuntime.Architecture
+        Version         = $installedRuntime.Version
+        VersionObject   = $installedRuntime.VersionObject
+        KeyPath         = $installedRuntime.KeyPath
+        RegistryView    = $installedRuntime.RegistryView
+    }
+    $managedRuntime = if ($installedRuntime.Installed) {
+        [pscustomobject]@{
+            Version       = $installedRuntime.Version
+            VersionObject = $installedRuntime.VersionObject
+            Validation    = $runtimeValidation
+        }
+    }
+    else {
+        $null
+    }
+    $artifactForFacts = if (-not [string]::IsNullOrWhiteSpace($installerInfo.Path) -and (Test-Path -LiteralPath $installerInfo.Path)) {
+        $installerInfo
+    }
+    else {
+        $null
+    }
+
+    return (New-ManifestedRuntimeFacts -RuntimeName $Definition.runtimeName -CommandName $Definition.commandName -RuntimeKind 'MachinePrerequisite' -LocalRoot $layout.LocalRoot -Layout $layout -ManagedRuntime $managedRuntime -Artifact $artifactForFacts -PartialPaths $partialPaths -Version $(if ($installedRuntime.Version) { $installedRuntime.Version } elseif ($installerInfo.Version) { $installerInfo.Version } else { $null }) -RuntimeHome $null -RuntimeSource $(if ($installedRuntime.Installed) { 'Managed' } else { $null }) -ExecutablePath $null -RuntimeValidation $runtimeValidation -AdditionalProperties @{
+            InstalledRuntime = $installedRuntime
+            Runtime          = $runtimeValidation
+            Installer        = $installerInfo
+            InstallerPath    = $installerInfo.Path
+        })
+}
+
 function Test-ManifestedNpmCliRuntimeHome {
     [CmdletBinding()]
     param(

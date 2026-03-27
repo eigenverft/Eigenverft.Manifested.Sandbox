@@ -64,7 +64,7 @@ function Invoke-ManifestedPostInstallSteps {
     if (Test-ManifestedEnabledHookBlock -Hooks $postInstall -HookName 'enablePythonSiteImports') {
         $declaredSteps.Add('EnablePythonSiteImports') | Out-Null
         if ($Facts.RuntimeSource -eq 'Managed' -and -not [string]::IsNullOrWhiteSpace($Facts.RuntimeHome)) {
-            $siteState = Enable-PythonSiteImports -PythonHome $Facts.RuntimeHome
+            $siteState = Enable-ManifestedPythonSiteImports -PythonHome $Facts.RuntimeHome
             Add-ManifestedPostInstallStepResult -StepResults $stepResults -Step 'EnablePythonSiteImports' -Action $(if ($siteState.IsReady) { 'Executed' } else { 'Failed' }) -Result $siteState
         }
         else {
@@ -75,7 +75,7 @@ function Invoke-ManifestedPostInstallSteps {
     if (Test-ManifestedEnabledHookBlock -Hooks $postInstall -HookName 'ensurePythonPip') {
         $declaredSteps.Add('EnsurePythonPip') | Out-Null
         if ($Facts.RuntimeSource -eq 'Managed' -and -not [string]::IsNullOrWhiteSpace($Facts.ExecutablePath) -and -not [string]::IsNullOrWhiteSpace($Facts.RuntimeHome)) {
-            $pipResult = Ensure-PythonPip -PythonExe $Facts.ExecutablePath -PythonHome $Facts.RuntimeHome -LocalRoot $LocalRoot
+            $pipResult = Ensure-ManifestedPythonPip -PythonExe $Facts.ExecutablePath -PythonHome $Facts.RuntimeHome -LocalRoot $LocalRoot
             Add-ManifestedPostInstallStepResult -StepResults $stepResults -Step 'EnsurePythonPip' -Action $(if ($pipResult.Action -eq 'Reused') { 'Reused' } else { 'Executed' }) -Result $pipResult
         }
         else {

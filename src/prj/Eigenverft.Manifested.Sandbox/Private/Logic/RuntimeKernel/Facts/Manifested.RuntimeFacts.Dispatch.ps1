@@ -1,27 +1,3 @@
-function Get-ManifestedPythonEmbeddableRuntimeFactsFromDefinition {
-    [CmdletBinding()]
-    param(
-        [Parameter(Mandatory = $true)]
-        [pscustomobject]$Definition,
-
-        [string]$LocalRoot = (Get-ManifestedLocalRoot)
-    )
-
-    return (Get-PythonRuntimeFacts -LocalRoot $LocalRoot)
-}
-
-function Get-ManifestedMachinePrerequisiteFactsFromDefinition {
-    [CmdletBinding()]
-    param(
-        [Parameter(Mandatory = $true)]
-        [pscustomobject]$Definition,
-
-        [string]$LocalRoot = (Get-ManifestedLocalRoot)
-    )
-
-    return (Get-VCRuntimeFacts -LocalRoot $LocalRoot)
-}
-
 function Get-ManifestedRuntimeFactsFromContext {
     [CmdletBinding()]
     param(

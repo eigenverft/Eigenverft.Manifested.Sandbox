@@ -1,21 +1,3 @@
-function ConvertTo-ManifestedFlexibleVersionObject {
-    [CmdletBinding()]
-    param(
-        [string]$VersionText
-    )
-
-    if ([string]::IsNullOrWhiteSpace($VersionText)) {
-        return $null
-    }
-
-    $match = [regex]::Match($VersionText, '(\d+(?:\.\d+){1,3})')
-    if (-not $match.Success) {
-        return $null
-    }
-
-    return [version]$match.Groups[1].Value
-}
-
 function Expand-ManifestedHostPathPattern {
     [CmdletBinding()]
     param(

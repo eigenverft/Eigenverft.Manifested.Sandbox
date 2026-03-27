@@ -124,7 +124,61 @@ function Invoke-ManifestedPythonEmbeddableInstallFromDefinition {
         throw "The package for '$($Definition.commandName)' was not available for install."
     }
 
-    return (Install-PythonRuntime -PackageInfo $packageInfo -Flavor $Facts.Flavor -LocalRoot $LocalRoot -ForceInstall:$RefreshRequested)
+    return (Install-ManifestedPythonEmbeddableRuntime -Definition $Definition -PackageInfo $packageInfo -Flavor $Facts.Flavor -LocalRoot $LocalRoot -ForceInstall:$RefreshRequested)
+}
+
+function Invoke-ManifestedMachineInstallerProcess {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$InstallerPath,
+
+        [int]$TimeoutSec = 300
+    )
+
+    $logDirectory = Split-Path -Parent $InstallerPath
+    if (-not [string]::IsNullOrWhiteSpace($logDirectory)) {
+        New-ManifestedDirectory -Path $logDirectory | Out-Null
+    }
+
+    $timestamp = Get-Date -Format 'yyyyMMdd-HHmmss'
+    $logPrefix = [System.IO.Path]::GetFileNameWithoutExtension($InstallerPath)
+    if ([string]::IsNullOrWhiteSpace($logPrefix)) {
+        $logPrefix = 'installer'
+    }
+
+    $logPath = Join-Path $logDirectory ($logPrefix + ".install.$timestamp.log")
+    $quotedLogPath = if ($logPath.IndexOfAny([char[]]@(' ', "`t", '"')) -ge 0) {
+        '"' + ($logPath -replace '"', '\"') + '"'
+    }
+    else {
+        $logPath
+    }
+
+    $argumentList = @(
+        '/install',
+        '/quiet',
+        '/norestart',
+        '/log',
+        $quotedLogPath
+    )
+
+    $process = Start-Process -FilePath $InstallerPath -ArgumentList $argumentList -PassThru
+    if (-not $process.WaitForExit($TimeoutSec * 1000)) {
+        try {
+            Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue
+        }
+        catch {
+        }
+
+        throw "Installer execution exceeded the timeout of $TimeoutSec seconds. Check $logPath."
+    }
+
+    return [pscustomobject]@{
+        ExitCode        = $process.ExitCode
+        LogPath         = $logPath
+        RestartRequired = ($process.ExitCode -eq 3010)
+    }
 }
 
 function Invoke-ManifestedMachineInstallerFromDefinition {
@@ -145,13 +199,64 @@ function Invoke-ManifestedMachineInstallerFromDefinition {
     if (-not $installerInfo) {
         throw "The installer for '$($Definition.commandName)' was not available."
     }
+    $installerInfo = Get-ManifestedMachineInstallerInfoFromDefinition -Definition $Definition -Artifact $installerInfo -LocalRoot $LocalRoot
+    if ([string]::IsNullOrWhiteSpace($installerInfo.Path) -or -not (Test-Path -LiteralPath $installerInfo.Path)) {
+        throw "The installer for '$($Definition.commandName)' was not available on disk."
+    }
 
     $timeoutSec = 300
     if ($CommandOptions.ContainsKey('InstallTimeoutSec') -and $CommandOptions['InstallTimeoutSec']) {
         $timeoutSec = [int]$CommandOptions['InstallTimeoutSec']
     }
 
-    return (Install-VCRuntime -InstallerInfo $installerInfo -InstallTimeoutSec $timeoutSec -LocalRoot $LocalRoot)
+    $installed = Get-ManifestedInstalledMachinePrerequisiteRuntime -Definition $Definition
+    if ($installed.Installed) {
+        if (-not $installerInfo.VersionObject -or ($installed.VersionObject -and $installed.VersionObject -ge $installerInfo.VersionObject)) {
+            return [pscustomobject]@{
+                Action           = 'Skipped'
+                Installed        = $true
+                Architecture     = $installed.Architecture
+                Version          = $installed.Version
+                VersionObject    = $installed.VersionObject
+                InstallerVersion = $installerInfo.Version
+                InstallerPath    = $installerInfo.Path
+                InstallerSource  = $installerInfo.Source
+                ExitCode         = 0
+                RestartRequired  = $false
+                LogPath          = $null
+            }
+        }
+    }
+
+    Write-Host ('Installing machine prerequisites for ' + $Definition.runtimeName + '...')
+    $installResult = Invoke-ManifestedMachineInstallerProcess -InstallerPath $installerInfo.Path -TimeoutSec $timeoutSec
+    $refreshed = Get-ManifestedInstalledMachinePrerequisiteRuntime -Definition $Definition
+
+    if (-not $refreshed.Installed) {
+        throw "$($Definition.runtimeName) installation exited with code $($installResult.ExitCode), but the prerequisite was not detected afterwards. Check $($installResult.LogPath)."
+    }
+
+    if ($installerInfo.VersionObject -and $refreshed.VersionObject -and $refreshed.VersionObject -lt $installerInfo.VersionObject) {
+        throw "$($Definition.runtimeName) installation completed, but version $($refreshed.Version) is still older than installer version $($installerInfo.Version). Check $($installResult.LogPath)."
+    }
+
+    if ($installResult.ExitCode -notin @(0, 3010, 1638)) {
+        throw "$($Definition.runtimeName) installation failed with exit code $($installResult.ExitCode). Check $($installResult.LogPath)."
+    }
+
+    return [pscustomobject]@{
+        Action           = 'Installed'
+        Installed        = $true
+        Architecture     = $refreshed.Architecture
+        Version          = $refreshed.Version
+        VersionObject    = $refreshed.VersionObject
+        InstallerVersion = $installerInfo.Version
+        InstallerPath    = $installerInfo.Path
+        InstallerSource  = $installerInfo.Source
+        ExitCode         = $installResult.ExitCode
+        RestartRequired  = $installResult.RestartRequired
+        LogPath          = $installResult.LogPath
+    }
 }
 
 function Install-ManifestedRuntime {

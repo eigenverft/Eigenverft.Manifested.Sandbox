@@ -53,30 +53,6 @@ function ConvertTo-ManifestedSemanticVersionObject {
     return [version]$match.Groups[1].Value
 }
 
-function Resolve-ManifestedCommandDefinitionReference {
-    [CmdletBinding()]
-    param(
-        [string]$CommandName,
-
-        [pscustomobject]$Definition
-    )
-
-    if ($Definition) {
-        return $Definition
-    }
-
-    if ([string]::IsNullOrWhiteSpace($CommandName)) {
-        throw 'A command definition reference requires CommandName or Definition.'
-    }
-
-    $resolvedDefinition = Get-ManifestedCommandDefinition -CommandName $CommandName
-    if (-not $resolvedDefinition) {
-        throw "Could not resolve a packaged command definition for '$CommandName'."
-    }
-
-    return $resolvedDefinition
-}
-
 function Expand-ManifestedDefinitionTemplate {
     [CmdletBinding()]
     param(
@@ -284,18 +260,6 @@ function Get-ManifestedDefinitionFlavor {
     }
 
     return $null
-}
-
-function Get-ManifestedCommandFlavor {
-    [CmdletBinding()]
-    param(
-        [string]$CommandName,
-
-        [pscustomobject]$Definition
-    )
-
-    $Definition = Resolve-ManifestedCommandDefinitionReference -CommandName $CommandName -Definition $Definition
-    return (Get-ManifestedDefinitionFlavor -Definition $Definition)
 }
 
 function Get-ManifestedVersionSpec {
