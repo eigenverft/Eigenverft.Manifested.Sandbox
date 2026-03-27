@@ -135,11 +135,13 @@ function Get-ManifestedLayout {
 
     $resolvedRoot = [System.IO.Path]::GetFullPath($LocalRoot)
     $cacheRoot = Join-Path $resolvedRoot 'cache'
+    $reportsRoot = Join-Path $resolvedRoot 'reports'
     $toolsRoot = Join-Path $resolvedRoot 'tools'
 
     [pscustomobject]@{
         LocalRoot          = $resolvedRoot
         CacheRoot          = $cacheRoot
+        ReportsRoot        = $reportsRoot
         Ps7CacheRoot       = (Join-Path $cacheRoot 'powershell')
         PythonCacheRoot    = (Join-Path $cacheRoot 'python')
         NodeCacheRoot      = (Join-Path $cacheRoot 'node')
@@ -162,7 +164,6 @@ function Get-ManifestedLayout {
         GHCliToolsRoot     = (Join-Path $toolsRoot 'ghcli')
         GitToolsRoot       = (Join-Path $toolsRoot 'git')
         VsCodeToolsRoot    = (Join-Path $toolsRoot 'vscode')
-        StatePath          = (Join-Path $resolvedRoot 'state.json')
     }
 }
 

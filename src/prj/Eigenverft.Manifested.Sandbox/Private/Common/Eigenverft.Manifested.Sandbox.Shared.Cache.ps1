@@ -29,6 +29,56 @@ function Get-ManifestedExpandedArchiveRoot {
     return $StagePath
 }
 
+function Get-ManifestedArtifactMetadataPath {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$ArtifactPath
+    )
+
+    return ($ArtifactPath + '.metadata.json')
+}
+
+function Get-ManifestedArtifactMetadata {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$ArtifactPath
+    )
+
+    $metadataPath = Get-ManifestedArtifactMetadataPath -ArtifactPath $ArtifactPath
+    if (-not (Test-Path -LiteralPath $metadataPath)) {
+        return $null
+    }
+
+    try {
+        return ((Get-Content -LiteralPath $metadataPath -Raw -ErrorAction Stop) | ConvertFrom-Json)
+    }
+    catch {
+        return $null
+    }
+}
+
+function Save-ManifestedArtifactMetadata {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$ArtifactPath,
+
+        [Parameter(Mandatory = $true)]
+        [hashtable]$Metadata
+    )
+
+    $metadataPath = Get-ManifestedArtifactMetadataPath -ArtifactPath $ArtifactPath
+    $metadataDirectory = Split-Path -Parent $metadataPath
+    if (-not [string]::IsNullOrWhiteSpace($metadataDirectory)) {
+        New-ManifestedDirectory -Path $metadataDirectory | Out-Null
+    }
+
+    ([pscustomobject]$Metadata | ConvertTo-Json -Depth 10) | Set-Content -LiteralPath $metadataPath -Encoding UTF8
+    return $metadataPath
+}
+
 function Remove-ManifestedPath {
     [CmdletBinding()]
     param(
@@ -41,5 +91,9 @@ function Remove-ManifestedPath {
     }
 
     Remove-Item -LiteralPath $Path -Recurse -Force -ErrorAction SilentlyContinue
+    $metadataPath = Get-ManifestedArtifactMetadataPath -ArtifactPath $Path
+    if (Test-Path -LiteralPath $metadataPath) {
+        Remove-Item -LiteralPath $metadataPath -Force -ErrorAction SilentlyContinue
+    }
     return $true
 }

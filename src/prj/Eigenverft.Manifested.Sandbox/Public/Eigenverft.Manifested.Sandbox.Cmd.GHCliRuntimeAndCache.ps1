@@ -2,67 +2,17 @@
     Eigenverft.Manifested.Sandbox.Cmd.GHCliRuntimeAndCache
 #>
 
-function ConvertTo-GHCliVersion {
-    [CmdletBinding()]
-    param(
-        [string]$VersionText
-    )
-
-    if ([string]::IsNullOrWhiteSpace($VersionText)) {
-        return $null
-    }
-
-    $match = [regex]::Match($VersionText, 'v?(\d+\.\d+\.\d+)')
-    if (-not $match.Success) {
-        return $null
-    }
-
-    return [version]$match.Groups[1].Value
-}
-
-function Get-GHCliReleaseVersion {
-    [CmdletBinding()]
-    param(
-        [string]$VersionText
-    )
-
-    $versionObject = ConvertTo-GHCliVersion -VersionText $VersionText
-    if (-not $versionObject) {
-        throw "Could not parse the GitHub CLI release version '$VersionText'."
-    }
-
-    return $versionObject.ToString()
-}
-
-function Get-GHCliFlavor {
-    [CmdletBinding()]
-    param()
-
-    if ([System.Environment]::OSVersion.Platform -ne [System.PlatformID]::Win32NT) {
-        throw 'Only Windows hosts are supported by this GitHub CLI runtime bootstrap.'
-    }
-
-    $archHints = @($env:PROCESSOR_ARCHITECTURE, $env:PROCESSOR_ARCHITEW6432) -join ';'
-    if ($archHints -match 'ARM64') {
-        return 'windows_arm64'
-    }
-
-    if ([Environment]::Is64BitOperatingSystem) {
-        return 'windows_amd64'
-    }
-
-    throw 'Only 64-bit Windows targets are supported by this GitHub CLI runtime bootstrap.'
-}
+$script:ManifestedGHCliRuntimeVersionSpec = Get-ManifestedVersionSpec -Definition (Get-ManifestedCommandDefinition -CommandName 'Initialize-GHCliRuntime')
 
 function Get-GHCliPersistedPackageDetails {
     [CmdletBinding()]
     param(
+        [string]$ArtifactPath,
         [string]$LocalRoot = (Get-ManifestedLocalRoot)
     )
 
-    $commandState = Get-ManifestedCommandState -CommandName 'Initialize-GHCliRuntime' -LocalRoot $LocalRoot
-    if ($commandState -and $commandState.PSObject.Properties['Details']) {
-        return $commandState.Details
+    if (-not [string]::IsNullOrWhiteSpace($ArtifactPath)) {
+        return (Get-ManifestedArtifactMetadata -ArtifactPath $ArtifactPath)
     }
 
     return $null
@@ -75,7 +25,7 @@ function Get-GHCliRelease {
     )
 
     if ([string]::IsNullOrWhiteSpace($Flavor)) {
-        $Flavor = Get-GHCliFlavor
+        $Flavor = Get-ManifestedCommandFlavor -CommandName 'Initialize-GHCliRuntime'
     }
 
     $owner = 'cli'
@@ -87,7 +37,7 @@ function Get-GHCliRelease {
             throw 'The latest GitHub CLI release is not a stable release.'
         }
 
-        $version = Get-GHCliReleaseVersion -VersionText $release.TagName
+        $version = ConvertTo-ManifestedVersionTextFromRule -VersionText $release.TagName -Rule $script:ManifestedGHCliRuntimeVersionSpec.ReleaseVersionRule
         $fileName = 'gh_{0}_{1}.zip' -f $version, $Flavor
         $asset = Get-ManifestedGitHubReleaseAsset -Release $release -AssetName $fileName
         if (-not $asset) {
@@ -120,7 +70,7 @@ function Get-GHCliRelease {
             throw 'Unable to determine the latest stable GitHub CLI release.'
         }
 
-        $version = Get-GHCliReleaseVersion -VersionText $tagInfo.TagName
+        $version = ConvertTo-ManifestedVersionTextFromRule -VersionText $tagInfo.TagName -Rule $script:ManifestedGHCliRuntimeVersionSpec.ReleaseVersionRule
         $fileName = 'gh_{0}_{1}.zip' -f $version, $Flavor
         $checksumAssetName = 'gh_{0}_checksums.txt' -f $version
         $checksum = Get-ManifestedGitHubReleaseAssetChecksum -Owner $owner -Repository $repository -TagName $tagInfo.TagName -AssetName $fileName -FallbackSource ChecksumAsset -ChecksumAssetName $checksumAssetName
@@ -152,7 +102,7 @@ function Get-CachedGHCliRuntimePackages {
     )
 
     if ([string]::IsNullOrWhiteSpace($Flavor)) {
-        $Flavor = Get-GHCliFlavor
+        $Flavor = Get-ManifestedCommandFlavor -CommandName 'Initialize-GHCliRuntime'
     }
 
     $layout = Get-ManifestedLayout -LocalRoot $LocalRoot
@@ -160,18 +110,18 @@ function Get-CachedGHCliRuntimePackages {
         return @()
     }
 
-    $persistedDetails = Get-GHCliPersistedPackageDetails -LocalRoot $layout.LocalRoot
     $pattern = '^gh_(\d+\.\d+\.\d+)_' + [regex]::Escape($Flavor) + '\.zip$'
 
     $items = Get-ChildItem -LiteralPath $layout.GHCliCacheRoot -File -Filter '*.zip' -ErrorAction SilentlyContinue |
         Where-Object { $_.Name -match $pattern } |
         ForEach-Object {
+            $persistedDetails = Get-GHCliPersistedPackageDetails -ArtifactPath $_.FullName -LocalRoot $layout.LocalRoot
             $sha256 = $null
             $tagName = $null
             $downloadUrl = $null
             $shaSource = $null
 
-            if ($persistedDetails -and $persistedDetails.PSObject.Properties['AssetName'] -and $persistedDetails.AssetName -eq $_.Name) {
+            if ($persistedDetails) {
                 $sha256 = if ($persistedDetails.PSObject.Properties['Sha256']) { $persistedDetails.Sha256 } else { $null }
                 $tagName = if ($persistedDetails.PSObject.Properties['Tag']) { $persistedDetails.Tag } else { $null }
                 $downloadUrl = if ($persistedDetails.PSObject.Properties['DownloadUrl']) { $persistedDetails.DownloadUrl } else { $null }
@@ -192,7 +142,7 @@ function Get-CachedGHCliRuntimePackages {
                 ReleaseUrl  = $null
             }
         } |
-        Sort-Object -Descending -Property @{ Expression = { ConvertTo-GHCliVersion -VersionText $_.Version } }
+        Sort-Object -Descending -Property @{ Expression = { ConvertTo-ManifestedVersionObjectFromRule -VersionText $_.Version -Rule $script:ManifestedGHCliRuntimeVersionSpec.RuntimeVersionRule } }
 
     return @($items)
 }
@@ -254,7 +204,10 @@ function Test-GHCliRuntime {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true)]
-        [string]$RuntimeHome
+        [string]$RuntimeHome,
+
+        [Parameter(Mandatory = $true)]
+        [pscustomobject]$VersionSpec
     )
 
     $ghCmd = Get-GHCliCommandPathFromRuntimeHome -RuntimeHome $RuntimeHome
@@ -281,7 +234,7 @@ function Test-GHCliRuntime {
             $reportedBanner = $null
         }
 
-        $reportedVersionObject = ConvertTo-GHCliVersion -VersionText $reportedBanner
+        $reportedVersionObject = ConvertTo-ManifestedVersionObjectFromRule -VersionText $reportedBanner -Rule $versionSpec.RuntimeVersionRule
         $reportedVersion = if ($reportedVersionObject) { $reportedVersionObject.ToString() } else { $null }
         $status = if ($reportedVersion) { 'Ready' } else { 'NeedsRepair' }
     }
@@ -304,7 +257,7 @@ function Get-InstalledGHCliRuntime {
     )
 
     if ([string]::IsNullOrWhiteSpace($Flavor)) {
-        $Flavor = Get-GHCliFlavor
+        $Flavor = Get-ManifestedCommandFlavor -CommandName 'Initialize-GHCliRuntime'
     }
 
     $layout = Get-ManifestedLayout -LocalRoot $LocalRoot
@@ -312,7 +265,7 @@ function Get-InstalledGHCliRuntime {
 
     if (Test-Path -LiteralPath $layout.GHCliToolsRoot) {
         $versionRoots = Get-ChildItem -LiteralPath $layout.GHCliToolsRoot -Directory -ErrorAction SilentlyContinue |
-            Sort-Object -Descending -Property @{ Expression = { ConvertTo-GHCliVersion -VersionText $_.Name } }
+            Sort-Object -Descending -Property @{ Expression = { ConvertTo-ManifestedVersionObjectFromRule -VersionText $_.Name -Rule $script:ManifestedGHCliRuntimeVersionSpec.RuntimeVersionRule } }
 
         foreach ($versionRoot in $versionRoots) {
             $runtimeHome = Join-Path $versionRoot.FullName $Flavor
@@ -320,9 +273,9 @@ function Get-InstalledGHCliRuntime {
                 continue
             }
 
-            $validation = Test-GHCliRuntime -RuntimeHome $runtimeHome
-            $expectedVersion = ConvertTo-GHCliVersion -VersionText $versionRoot.Name
-            $reportedVersion = ConvertTo-GHCliVersion -VersionText $validation.ReportedVersion
+            $validation = Test-GHCliRuntime -RuntimeHome $runtimeHome -VersionSpec $script:ManifestedGHCliRuntimeVersionSpec
+            $expectedVersion = ConvertTo-ManifestedVersionObjectFromRule -VersionText $versionRoot.Name -Rule $script:ManifestedGHCliRuntimeVersionSpec.RuntimeVersionRule
+            $reportedVersion = ConvertTo-ManifestedVersionObjectFromRule -VersionText $validation.ReportedVersion -Rule $script:ManifestedGHCliRuntimeVersionSpec.RuntimeVersionRule
             $versionMatches = (-not $reportedVersion) -or (-not $expectedVersion) -or ($reportedVersion -eq $expectedVersion)
 
             $entries += [pscustomobject]@{
@@ -347,7 +300,10 @@ function Get-InstalledGHCliRuntime {
 function Get-ManifestedGHCliRuntimeFromCandidatePath {
     [CmdletBinding()]
     param(
-        [string]$CandidatePath
+        [string]$CandidatePath,
+
+        [Parameter(Mandatory = $true)]
+        [pscustomobject]$VersionSpec
     )
 
     $resolvedCandidatePath = Get-ManifestedFullPath -Path $CandidatePath
@@ -365,12 +321,12 @@ function Get-ManifestedGHCliRuntimeFromCandidatePath {
         $runtimeHome = Split-Path -Parent $runtimeHome
     }
 
-    $validation = Test-GHCliRuntime -RuntimeHome $runtimeHome
+    $validation = Test-GHCliRuntime -RuntimeHome $runtimeHome -VersionSpec $VersionSpec
     if (-not $validation.IsReady) {
         return $null
     }
 
-    $versionObject = ConvertTo-GHCliVersion -VersionText $validation.ReportedVersion
+    $versionObject = ConvertTo-ManifestedVersionObjectFromRule -VersionText $validation.ReportedVersion -Rule $VersionSpec.RuntimeVersionRule
     if (-not $versionObject) {
         return $null
     }
@@ -417,7 +373,7 @@ function Get-SystemGHCliRuntime {
     }
 
     foreach ($candidatePath in @($candidatePaths | Select-Object -Unique)) {
-        $runtime = Get-ManifestedGHCliRuntimeFromCandidatePath -CandidatePath $candidatePath
+        $runtime = Get-ManifestedGHCliRuntimeFromCandidatePath -CandidatePath $candidatePath -VersionSpec $script:ManifestedGHCliRuntimeVersionSpec
         if ($runtime) {
             return $runtime
         }
@@ -492,7 +448,7 @@ function Get-GHCliRuntimeState {
 
     try {
         if ([string]::IsNullOrWhiteSpace($Flavor)) {
-            $Flavor = Get-GHCliFlavor
+            $Flavor = Get-ManifestedCommandFlavor -CommandName 'Initialize-GHCliRuntime'
         }
 
         $layout = Get-ManifestedLayout -LocalRoot $LocalRoot
@@ -622,7 +578,7 @@ function Save-GHCliRuntimePackage {
     )
 
     if ([string]::IsNullOrWhiteSpace($Flavor)) {
-        $Flavor = Get-GHCliFlavor
+        $Flavor = Get-ManifestedCommandFlavor -CommandName 'Initialize-GHCliRuntime'
     }
 
     $layout = Get-ManifestedLayout -LocalRoot $LocalRoot
@@ -662,7 +618,7 @@ function Save-GHCliRuntimePackage {
             }
         }
 
-        return [pscustomobject]@{
+        $packageInfo = [pscustomobject]@{
             TagName     = $release.TagName
             Version     = $release.Version
             Flavor      = $release.Flavor
@@ -675,6 +631,19 @@ function Save-GHCliRuntimePackage {
             ShaSource   = $release.ShaSource
             ReleaseUrl  = $release.ReleaseUrl
         }
+
+        Save-ManifestedArtifactMetadata -ArtifactPath $packagePath -Metadata ([ordered]@{
+            Tag         = $packageInfo.TagName
+            Version     = $packageInfo.Version
+            Flavor      = $packageInfo.Flavor
+            AssetName   = $packageInfo.FileName
+            DownloadUrl = $packageInfo.DownloadUrl
+            Sha256      = $packageInfo.Sha256
+            ShaSource   = $packageInfo.ShaSource
+            ReleaseUrl  = $packageInfo.ReleaseUrl
+        }) | Out-Null
+
+        return $packageInfo
     }
 
     $cachedPackage = Get-LatestCachedGHCliRuntimePackage -Flavor $Flavor -LocalRoot $LocalRoot
@@ -682,7 +651,7 @@ function Save-GHCliRuntimePackage {
         throw 'Could not reach GitHub and no cached GitHub CLI ZIP was found.'
     }
 
-    return [pscustomobject]@{
+    $packageInfo = [pscustomobject]@{
         TagName     = $cachedPackage.TagName
         Version     = $cachedPackage.Version
         Flavor      = $cachedPackage.Flavor
@@ -695,6 +664,21 @@ function Save-GHCliRuntimePackage {
         ShaSource   = $cachedPackage.ShaSource
         ReleaseUrl  = $cachedPackage.ReleaseUrl
     }
+
+    if (-not [string]::IsNullOrWhiteSpace($packageInfo.Path) -and -not [string]::IsNullOrWhiteSpace($packageInfo.Sha256)) {
+        Save-ManifestedArtifactMetadata -ArtifactPath $packageInfo.Path -Metadata ([ordered]@{
+            Tag         = $packageInfo.TagName
+            Version     = $packageInfo.Version
+            Flavor      = $packageInfo.Flavor
+            AssetName   = $packageInfo.FileName
+            DownloadUrl = $packageInfo.DownloadUrl
+            Sha256      = $packageInfo.Sha256
+            ShaSource   = $packageInfo.ShaSource
+            ReleaseUrl  = $packageInfo.ReleaseUrl
+        }) | Out-Null
+    }
+
+    return $packageInfo
 }
 
 function Install-GHCliRuntime {
@@ -708,11 +692,11 @@ function Install-GHCliRuntime {
     )
 
     if ([string]::IsNullOrWhiteSpace($Flavor)) {
-        $Flavor = if ($PackageInfo.Flavor) { $PackageInfo.Flavor } else { Get-GHCliFlavor }
+        $Flavor = if ($PackageInfo.Flavor) { $PackageInfo.Flavor } else { Get-ManifestedCommandFlavor -CommandName 'Initialize-GHCliRuntime' }
     }
 
     $runtimeHome = Get-ManagedGHCliRuntimeHome -Version $PackageInfo.Version -Flavor $Flavor -LocalRoot $LocalRoot
-    $currentValidation = Test-GHCliRuntime -RuntimeHome $runtimeHome
+    $currentValidation = Test-GHCliRuntime -RuntimeHome $runtimeHome -VersionSpec $script:ManifestedGHCliRuntimeVersionSpec
 
     if ($currentValidation.Status -ne 'Ready') {
         New-ManifestedDirectory -Path (Split-Path -Parent $runtimeHome) | Out-Null
@@ -737,7 +721,7 @@ function Install-GHCliRuntime {
         }
     }
 
-    $validation = Test-GHCliRuntime -RuntimeHome $runtimeHome
+    $validation = Test-GHCliRuntime -RuntimeHome $runtimeHome -VersionSpec $script:ManifestedGHCliRuntimeVersionSpec
     if ($validation.Status -ne 'Ready') {
         throw "GitHub CLI runtime validation failed after install at $runtimeHome."
     }
@@ -755,291 +739,84 @@ function Install-GHCliRuntime {
     }
 }
 
+function Get-GHCliRuntimeFacts {
+    [CmdletBinding()]
+    param(
+        [string]$Flavor,
+        [string]$LocalRoot = (Get-ManifestedLocalRoot)
+    )
+
+    $layout = $null
+    try {
+        if ([string]::IsNullOrWhiteSpace($Flavor)) {
+            $Flavor = Get-ManifestedCommandFlavor -CommandName 'Initialize-GHCliRuntime'
+        }
+
+        $layout = Get-ManifestedLayout -LocalRoot $LocalRoot
+    }
+    catch {
+        return (New-ManifestedRuntimeFacts -RuntimeName 'GHCliRuntime' -CommandName 'Initialize-GHCliRuntime' -RuntimeKind 'PortablePackage' -LocalRoot $LocalRoot -Layout $layout -PlatformSupported:$false -BlockedReason $_.Exception.Message -AdditionalProperties @{
+            Flavor              = $Flavor
+            Package             = $null
+            PackagePath         = $null
+            InvalidRuntimeHomes = @()
+        })
+    }
+
+    $partialPaths = @()
+    if (Test-Path -LiteralPath $layout.GHCliCacheRoot) {
+        $partialPaths += @(Get-ChildItem -LiteralPath $layout.GHCliCacheRoot -File -Filter '*.download' -ErrorAction SilentlyContinue | Select-Object -ExpandProperty FullName)
+    }
+    $partialPaths += @(Get-ManifestedStageDirectories -Prefix 'ghcli' -Mode TemporaryShort -LegacyRootPaths @($layout.ToolsRoot) | Select-Object -ExpandProperty FullName)
+
+    $installed = Get-InstalledGHCliRuntime -Flavor $Flavor -LocalRoot $layout.LocalRoot
+    $managedRuntime = $installed.Current
+    $externalRuntime = $null
+    if (-not $managedRuntime) {
+        $externalRuntime = Get-SystemGHCliRuntime -LocalRoot $layout.LocalRoot
+    }
+
+    $currentRuntime = if ($managedRuntime) { $managedRuntime } else { $externalRuntime }
+    $package = Get-LatestCachedGHCliRuntimePackage -Flavor $Flavor -LocalRoot $layout.LocalRoot
+    $invalidRuntimeHomes = @($installed.Invalid | Select-Object -ExpandProperty RuntimeHome)
+
+    $currentVersion = $null
+    if ($currentRuntime) {
+        $currentVersion = $currentRuntime.Version
+    }
+    elseif ($package) {
+        $currentVersion = $package.Version
+    }
+
+    $runtimeHome = $null
+    $runtimeSource = $null
+    $executablePath = $null
+    $runtimeValidation = $null
+    if ($currentRuntime) {
+        $runtimeHome = $currentRuntime.RuntimeHome
+        $executablePath = $currentRuntime.GhCmd
+        $runtimeValidation = $currentRuntime.Validation
+    }
+    if ($managedRuntime) {
+        $runtimeSource = 'Managed'
+    }
+    elseif ($externalRuntime) {
+        $runtimeSource = 'External'
+    }
+
+    return (New-ManifestedRuntimeFacts -RuntimeName 'GHCliRuntime' -CommandName 'Initialize-GHCliRuntime' -RuntimeKind 'PortablePackage' -LocalRoot $layout.LocalRoot -Layout $layout -ManagedRuntime $managedRuntime -ExternalRuntime $externalRuntime -Artifact $package -PartialPaths $partialPaths -InvalidPaths $invalidRuntimeHomes -Version $currentVersion -RuntimeHome $runtimeHome -RuntimeSource $runtimeSource -ExecutablePath $executablePath -RuntimeValidation $runtimeValidation -AdditionalProperties @{
+        Flavor              = $Flavor
+        Package             = $package
+        PackagePath         = if ($package) { $package.Path } else { $null }
+        InvalidRuntimeHomes = $invalidRuntimeHomes
+    })
+}
+
 function Initialize-GHCliRuntime {
     [CmdletBinding(SupportsShouldProcess = $true)]
     param(
         [switch]$RefreshGHCli
     )
 
-    $LocalRoot = (Get-ManifestedLayout).LocalRoot
-    $selfElevationContext = Get-ManifestedSelfElevationContext
-
-    $actionsTaken = New-Object System.Collections.Generic.List[string]
-    $plannedActions = New-Object System.Collections.Generic.List[string]
-    $repairResult = $null
-    $packageInfo = $null
-    $packageTest = $null
-    $installResult = $null
-    $commandEnvironment = $null
-
-    $initialState = Get-GHCliRuntimeState -LocalRoot $LocalRoot
-    $state = $initialState
-    $elevationPlan = Get-ManifestedCommandElevationPlan -CommandName 'Initialize-GHCliRuntime' -LocalRoot $LocalRoot -SkipSelfElevation:$selfElevationContext.SkipSelfElevation -WasSelfElevated:$selfElevationContext.WasSelfElevated -WhatIfMode:$WhatIfPreference
-
-    if ($state.Status -eq 'Blocked') {
-        $commandEnvironment = Get-ManifestedCommandEnvironmentResult -CommandName 'Initialize-GHCliRuntime' -RuntimeState $state
-        $result = [pscustomobject]@{
-            LocalRoot          = $state.LocalRoot
-            Layout             = $state.Layout
-            InitialState       = $initialState
-            FinalState         = $state
-            ActionTaken        = @('None')
-            PlannedActions     = @()
-            RestartRequired    = $false
-            Package            = $null
-            PackageTest        = $null
-            RuntimeTest        = $null
-            RepairResult       = $null
-            InstallResult      = $null
-            CommandEnvironment = $commandEnvironment
-            Elevation          = $elevationPlan
-        }
-
-        if ($WhatIfPreference) {
-            Add-Member -InputObject $result -NotePropertyName PersistedStatePath -NotePropertyValue $null -Force
-            return $result
-        }
-
-        $statePath = Save-ManifestedInvokeState -CommandName 'Initialize-GHCliRuntime' -Result $result -LocalRoot $LocalRoot -Details @{
-            Version        = $state.CurrentVersion
-            Flavor         = $state.Flavor
-            RuntimeHome    = $state.RuntimeHome
-            RuntimeSource  = $state.RuntimeSource
-            ExecutablePath = $state.ExecutablePath
-        }
-        Add-Member -InputObject $result -NotePropertyName PersistedStatePath -NotePropertyValue $statePath -Force
-        return $result
-    }
-
-    $needsRepair = $state.Status -in @('Partial', 'NeedsRepair')
-    $needsInstall = $RefreshGHCli -or -not $state.RuntimeHome
-    $needsAcquire = $RefreshGHCli -or (-not $state.PackagePath)
-
-    if ($needsRepair) {
-        $plannedActions.Add('Repair-GHCliRuntime') | Out-Null
-    }
-    if ($needsInstall -and $needsAcquire) {
-        $plannedActions.Add('Save-GHCliRuntimePackage') | Out-Null
-    }
-    if ($needsInstall) {
-        $plannedActions.Add('Test-GHCliRuntimePackage') | Out-Null
-        $plannedActions.Add('Install-GHCliRuntime') | Out-Null
-    }
-    $plannedActions.Add('Sync-ManifestedCommandLineEnvironment') | Out-Null
-
-    $elevationPlan = Get-ManifestedCommandElevationPlan -CommandName 'Initialize-GHCliRuntime' -PlannedActions @($plannedActions) -LocalRoot $LocalRoot -SkipSelfElevation:$selfElevationContext.SkipSelfElevation -WasSelfElevated:$selfElevationContext.WasSelfElevated -WhatIfMode:$WhatIfPreference
-
-    if ($needsRepair) {
-        if (-not $PSCmdlet.ShouldProcess($state.Layout.GHCliToolsRoot, 'Repair GitHub CLI runtime state')) {
-            return [pscustomobject]@{
-                LocalRoot          = $state.LocalRoot
-                Layout             = $state.Layout
-                InitialState       = $initialState
-                FinalState         = $state
-                ActionTaken        = @('WhatIf')
-                PlannedActions     = @($plannedActions)
-                RestartRequired    = $false
-                Package            = $null
-                PackageTest        = $null
-                RuntimeTest        = $state.Runtime
-                RepairResult       = $null
-                InstallResult      = $null
-                CommandEnvironment = (Get-ManifestedCommandEnvironmentResult -CommandName 'Initialize-GHCliRuntime' -RuntimeState $state)
-                PersistedStatePath = $null
-                Elevation          = $elevationPlan
-            }
-        }
-
-        $repairResult = Repair-GHCliRuntime -State $state -Flavor $state.Flavor -LocalRoot $state.LocalRoot
-        if ($repairResult.Action -eq 'Repaired') {
-            $actionsTaken.Add('Repair-GHCliRuntime') | Out-Null
-        }
-
-        $state = Get-GHCliRuntimeState -Flavor $state.Flavor -LocalRoot $state.LocalRoot
-        $needsInstall = $RefreshGHCli -or -not $state.RuntimeHome
-        $needsAcquire = $RefreshGHCli -or (-not $state.PackagePath)
-    }
-
-    if ($needsInstall) {
-        if ($needsAcquire) {
-            if (-not $PSCmdlet.ShouldProcess($state.Layout.GHCliCacheRoot, 'Acquire GitHub CLI runtime package')) {
-                return [pscustomobject]@{
-                    LocalRoot          = $state.LocalRoot
-                    Layout             = $state.Layout
-                    InitialState       = $initialState
-                    FinalState         = $state
-                    ActionTaken        = @('WhatIf')
-                    PlannedActions     = @($plannedActions)
-                    RestartRequired    = $false
-                    Package            = $null
-                    PackageTest        = $null
-                    RuntimeTest        = $state.Runtime
-                    RepairResult       = $repairResult
-                    InstallResult      = $null
-                    CommandEnvironment = (Get-ManifestedCommandEnvironmentResult -CommandName 'Initialize-GHCliRuntime' -RuntimeState $state)
-                    PersistedStatePath = $null
-                    Elevation          = $elevationPlan
-                }
-            }
-
-            $packageInfo = Save-GHCliRuntimePackage -RefreshGHCli:$RefreshGHCli -Flavor $state.Flavor -LocalRoot $state.LocalRoot
-            if ($packageInfo.Action -eq 'Downloaded') {
-                $actionsTaken.Add('Save-GHCliRuntimePackage') | Out-Null
-            }
-        }
-        else {
-            $packageInfo = $state.Package
-        }
-
-        $packageTest = Test-GHCliRuntimePackage -PackageInfo $packageInfo
-        if ($packageTest.Status -eq 'CorruptCache') {
-            if (-not $PSCmdlet.ShouldProcess($packageInfo.Path, 'Repair corrupt GitHub CLI runtime package')) {
-                return [pscustomobject]@{
-                    LocalRoot          = $state.LocalRoot
-                    Layout             = $state.Layout
-                    InitialState       = $initialState
-                    FinalState         = $state
-                    ActionTaken        = @('WhatIf')
-                    PlannedActions     = @($plannedActions)
-                    RestartRequired    = $false
-                    Package            = $packageInfo
-                    PackageTest        = $packageTest
-                    RuntimeTest        = $state.Runtime
-                    RepairResult       = $repairResult
-                    InstallResult      = $null
-                    CommandEnvironment = (Get-ManifestedCommandEnvironmentResult -CommandName 'Initialize-GHCliRuntime' -RuntimeState $state)
-                    PersistedStatePath = $null
-                    Elevation          = $elevationPlan
-                }
-            }
-
-            $repairResult = Repair-GHCliRuntime -State $state -CorruptPackagePaths @($packageInfo.Path) -Flavor $state.Flavor -LocalRoot $state.LocalRoot
-            if ($repairResult.Action -eq 'Repaired') {
-                $actionsTaken.Add('Repair-GHCliRuntime') | Out-Null
-            }
-
-            $packageInfo = Save-GHCliRuntimePackage -RefreshGHCli:$true -Flavor $state.Flavor -LocalRoot $state.LocalRoot
-            if ($packageInfo.Action -eq 'Downloaded') {
-                $actionsTaken.Add('Save-GHCliRuntimePackage') | Out-Null
-            }
-
-            $packageTest = Test-GHCliRuntimePackage -PackageInfo $packageInfo
-        }
-
-        if ($packageTest.Status -eq 'UnverifiedCache') {
-            throw "GitHub CLI runtime package validation failed because no trusted checksum could be resolved for $($packageInfo.FileName)."
-        }
-
-        if ($packageTest.Status -ne 'Ready') {
-            throw "GitHub CLI runtime package validation failed with status $($packageTest.Status)."
-        }
-
-        $commandParameters = @{}
-        if ($RefreshGHCli) {
-            $commandParameters['RefreshGHCli'] = $true
-        }
-        if ($PSBoundParameters.ContainsKey('WhatIf')) {
-            $commandParameters['WhatIf'] = $true
-        }
-
-        $elevatedResult = Invoke-ManifestedElevatedCommand -ElevationPlan $elevationPlan -CommandName 'Initialize-GHCliRuntime' -CommandParameters $commandParameters
-        if ($null -ne $elevatedResult) {
-            return $elevatedResult
-        }
-
-        if (-not $PSCmdlet.ShouldProcess($state.Layout.GHCliToolsRoot, 'Install GitHub CLI runtime')) {
-            return [pscustomobject]@{
-                LocalRoot          = $state.LocalRoot
-                Layout             = $state.Layout
-                InitialState       = $initialState
-                FinalState         = $state
-                ActionTaken        = @('WhatIf')
-                PlannedActions     = @($plannedActions)
-                RestartRequired    = $false
-                Package            = $packageInfo
-                PackageTest        = $packageTest
-                RuntimeTest        = $state.Runtime
-                RepairResult       = $repairResult
-                InstallResult      = $null
-                CommandEnvironment = (Get-ManifestedCommandEnvironmentResult -CommandName 'Initialize-GHCliRuntime' -RuntimeState $state)
-                PersistedStatePath = $null
-                Elevation          = $elevationPlan
-            }
-        }
-
-        $installResult = Install-GHCliRuntime -PackageInfo $packageInfo -Flavor $state.Flavor -LocalRoot $state.LocalRoot
-        if ($installResult.Action -eq 'Installed') {
-            $actionsTaken.Add('Install-GHCliRuntime') | Out-Null
-        }
-    }
-
-    $finalState = Get-GHCliRuntimeState -Flavor $state.Flavor -LocalRoot $state.LocalRoot
-    $runtimeTest = if ($finalState.RuntimeHome) { Test-GHCliRuntime -RuntimeHome $finalState.RuntimeHome } else { $null }
-
-    $commandEnvironment = Get-ManifestedCommandEnvironmentResult -CommandName 'Initialize-GHCliRuntime' -RuntimeState $finalState
-    if ($commandEnvironment.Applicable) {
-        if (-not $PSCmdlet.ShouldProcess($commandEnvironment.DesiredCommandDirectory, 'Synchronize GitHub CLI command-line environment')) {
-            return [pscustomobject]@{
-                LocalRoot          = $finalState.LocalRoot
-                Layout             = $finalState.Layout
-                InitialState       = $initialState
-                FinalState         = $finalState
-                ActionTaken        = @('WhatIf')
-                PlannedActions     = @($plannedActions)
-                RestartRequired    = $false
-                Package            = $packageInfo
-                PackageTest        = $packageTest
-                RuntimeTest        = $runtimeTest
-                RepairResult       = $repairResult
-                InstallResult      = $installResult
-                CommandEnvironment = $commandEnvironment
-                PersistedStatePath = $null
-                Elevation          = $elevationPlan
-            }
-        }
-
-        $commandEnvironment = Sync-ManifestedCommandLineEnvironment -Specification (Get-ManifestedCommandEnvironmentSpec -CommandName 'Initialize-GHCliRuntime' -RuntimeState $finalState)
-        if ($commandEnvironment.Status -eq 'Updated') {
-            $actionsTaken.Add('Sync-ManifestedCommandLineEnvironment') | Out-Null
-        }
-    }
-
-    $result = [pscustomobject]@{
-        LocalRoot          = $finalState.LocalRoot
-        Layout             = $finalState.Layout
-        InitialState       = $initialState
-        FinalState         = $finalState
-        ActionTaken        = if ($actionsTaken.Count -gt 0) { @($actionsTaken) } else { @('None') }
-        PlannedActions     = @($plannedActions)
-        RestartRequired    = $false
-        Package            = $packageInfo
-        PackageTest        = $packageTest
-        RuntimeTest        = $runtimeTest
-        RepairResult       = $repairResult
-        InstallResult      = $installResult
-        CommandEnvironment = $commandEnvironment
-        Elevation          = $elevationPlan
-    }
-
-    if ($WhatIfPreference) {
-        Add-Member -InputObject $result -NotePropertyName PersistedStatePath -NotePropertyValue $null -Force
-        return $result
-    }
-
-    $statePath = Save-ManifestedInvokeState -CommandName 'Initialize-GHCliRuntime' -Result $result -LocalRoot $LocalRoot -Details @{
-        Tag            = if ($packageInfo) { $packageInfo.TagName } else { $null }
-        Version        = $finalState.CurrentVersion
-        Flavor         = $finalState.Flavor
-        AssetName      = if ($packageInfo) { $packageInfo.FileName } else { $null }
-        PackagePath    = if ($packageInfo) { $packageInfo.Path } else { $finalState.PackagePath }
-        RuntimeHome    = $finalState.RuntimeHome
-        RuntimeSource  = $finalState.RuntimeSource
-        ExecutablePath = $finalState.ExecutablePath
-        DownloadUrl    = if ($packageInfo) { $packageInfo.DownloadUrl } else { $null }
-        Sha256         = if ($packageInfo) { $packageInfo.Sha256 } else { $null }
-        ShaSource      = if ($packageInfo) { $packageInfo.ShaSource } else { $null }
-    }
-    Add-Member -InputObject $result -NotePropertyName PersistedStatePath -NotePropertyValue $statePath -Force
-
-    return $result
+    return (Invoke-ManifestedCommandInitialization -Name 'Initialize-GHCliRuntime' -PSCmdletObject $PSCmdlet -RefreshRequested:$RefreshGHCli -WhatIfMode:$WhatIfPreference)
 }

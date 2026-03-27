@@ -1,0 +1,51 @@
+{
+  "schemaVersion": 2,
+  "commandName": "Initialize-QwenRuntime",
+  "runtimeName": "QwenRuntime",
+  "kind": "npm-cli",
+  "wrapperCommand": "Initialize-QwenRuntime",
+  "refreshSwitchName": "RefreshQwen",
+  "facts": {
+    "npmCli": {
+      "commandFileName": "qwen.cmd",
+      "packageJsonRelativePath": "node_modules\\@qwen-code\\qwen-code\\package.json"
+    }
+  },
+  "supply": null,
+  "artifact": null,
+  "install": {
+    "npmGlobalPackage": {
+      "packageSpec": "@qwen-code/qwen-code@latest",
+      "stagePrefix": "qwen",
+      "cacheRootLayoutProperty": "QwenCacheRoot",
+      "toolsRootLayoutProperty": "QwenToolsRoot"
+    }
+  },
+  "environment": {
+    "commandProjection": {
+      "desiredDirectoryFact": "RuntimeHome",
+      "executableFact": "ExecutablePath",
+      "expectedCommands": [
+        "qwen.cmd"
+      ]
+    }
+  },
+  "dependencies": [
+    {
+      "runtimeName": "NodeRuntime",
+      "minimumVersion": "20.0.0",
+      "satisfactionMode": "managed-or-external",
+      "autoInstall": true,
+      "reason": "Qwen requires a compatible Node.js runtime and npm command."
+    }
+  ],
+  "policies": {
+    "allowExternalSatisfaction": true,
+    "requireTrustedArtifact": false,
+    "supportsEnvironmentSync": true,
+    "installRequiresElevation": false
+  },
+  "hooks": {
+    "postInstall": null
+  }
+}

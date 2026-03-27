@@ -294,6 +294,20 @@ function Get-OpenCodeRuntimeState {
     }
 }
 
+function Get-OpenCodeRuntimeFacts {
+    [CmdletBinding()]
+    param(
+        [string]$LocalRoot = (Get-ManifestedLocalRoot)
+    )
+
+    $definition = Get-ManifestedCommandDefinition -CommandName 'Initialize-OpenCodeRuntime'
+    if (-not $definition) {
+        return (New-ManifestedRuntimeFacts -RuntimeName 'OpenCodeRuntime' -CommandName 'Initialize-OpenCodeRuntime' -RuntimeKind 'NpmCli' -LocalRoot $LocalRoot -Layout $null -PlatformSupported:$false -BlockedReason 'The packaged command definition for OpenCodeRuntime is not available.')
+    }
+
+    return (Get-ManifestedNpmCliFactsFromDefinition -Definition $definition -LocalRoot $LocalRoot)
+}
+
 function Repair-OpenCodeRuntime {
     [CmdletBinding()]
     param(
@@ -403,215 +417,5 @@ function Initialize-OpenCodeRuntime {
         [switch]$RefreshOpenCode
     )
 
-    $LocalRoot = (Get-ManifestedLayout).LocalRoot
-    $selfElevationContext = Get-ManifestedSelfElevationContext
-
-    $actionsTaken = New-Object System.Collections.Generic.List[string]
-    $plannedActions = New-Object System.Collections.Generic.List[string]
-    $repairResult = $null
-    $installResult = $null
-    $commandEnvironment = $null
-
-    $initialState = Get-OpenCodeRuntimeState -LocalRoot $LocalRoot
-    $state = $initialState
-    $elevationPlan = Get-ManifestedCommandElevationPlan -CommandName 'Initialize-OpenCodeRuntime' -LocalRoot $LocalRoot -SkipSelfElevation:$selfElevationContext.SkipSelfElevation -WasSelfElevated:$selfElevationContext.WasSelfElevated -WhatIfMode:$WhatIfPreference
-
-    if ($state.Status -eq 'Blocked') {
-        $commandEnvironment = Get-ManifestedCommandEnvironmentResult -CommandName 'Initialize-OpenCodeRuntime' -RuntimeState $state
-        $result = [pscustomobject]@{
-            LocalRoot          = $state.LocalRoot
-            Layout             = $state.Layout
-            InitialState       = $initialState
-            FinalState         = $state
-            ActionTaken        = @('None')
-            PlannedActions     = @()
-            RestartRequired    = $false
-            RuntimeTest        = $null
-            RepairResult       = $null
-            InstallResult      = $null
-            CommandEnvironment = $commandEnvironment
-            Elevation          = $elevationPlan
-        }
-
-        if ($WhatIfPreference) {
-            Add-Member -InputObject $result -NotePropertyName PersistedStatePath -NotePropertyValue $null -Force
-            return $result
-        }
-
-        $statePath = Save-ManifestedInvokeState -CommandName 'Initialize-OpenCodeRuntime' -Result $result -LocalRoot $LocalRoot -Details @{
-            Version         = $state.CurrentVersion
-            RuntimeHome     = $state.RuntimeHome
-            RuntimeSource   = $state.RuntimeSource
-            ExecutablePath  = $state.ExecutablePath
-            PackageJsonPath = $state.PackageJsonPath
-        }
-        Add-Member -InputObject $result -NotePropertyName PersistedStatePath -NotePropertyValue $statePath -Force
-        return $result
-    }
-
-    $needsRepair = $state.Status -in @('Partial', 'NeedsRepair')
-    $needsInstall = $RefreshOpenCode -or ($state.Status -ne 'Ready')
-
-    if ($needsRepair) {
-        $plannedActions.Add('Repair-OpenCodeRuntime') | Out-Null
-    }
-    if ($needsInstall) {
-        $nodePlanState = Get-NodeRuntimeState -LocalRoot $LocalRoot
-        if ($nodePlanState.Status -ne 'Ready') {
-            $plannedActions.Add('Initialize-NodeRuntime') | Out-Null
-        }
-
-        $plannedActions.Add('Install-OpenCodeRuntime') | Out-Null
-    }
-    $plannedActions.Add('Sync-ManifestedCommandLineEnvironment') | Out-Null
-
-    $elevationPlan = Get-ManifestedCommandElevationPlan -CommandName 'Initialize-OpenCodeRuntime' -PlannedActions @($plannedActions) -LocalRoot $LocalRoot -SkipSelfElevation:$selfElevationContext.SkipSelfElevation -WasSelfElevated:$selfElevationContext.WasSelfElevated -WhatIfMode:$WhatIfPreference
-
-    if ($needsRepair) {
-        if (-not $PSCmdlet.ShouldProcess($state.Layout.OpenCodeToolsRoot, 'Repair OpenCode runtime state')) {
-            return [pscustomobject]@{
-                LocalRoot          = $state.LocalRoot
-                Layout             = $state.Layout
-                InitialState       = $initialState
-                FinalState         = $state
-                ActionTaken        = @('WhatIf')
-                PlannedActions     = @($plannedActions)
-                RestartRequired    = $false
-                RuntimeTest        = $state.Runtime
-                RepairResult       = $null
-                InstallResult      = $null
-                CommandEnvironment = (Get-ManifestedCommandEnvironmentResult -CommandName 'Initialize-OpenCodeRuntime' -RuntimeState $state)
-                PersistedStatePath = $null
-                Elevation          = $elevationPlan
-            }
-        }
-
-        $repairResult = Repair-OpenCodeRuntime -State $state -LocalRoot $state.LocalRoot
-        if ($repairResult.Action -eq 'Repaired') {
-            $actionsTaken.Add('Repair-OpenCodeRuntime') | Out-Null
-        }
-
-        $state = Get-OpenCodeRuntimeState -LocalRoot $state.LocalRoot
-        $needsInstall = $RefreshOpenCode -or ($state.Status -ne 'Ready')
-    }
-
-    if ($needsInstall) {
-        if (-not $PSCmdlet.ShouldProcess($state.Layout.OpenCodeToolsRoot, 'Ensure OpenCode runtime dependencies and install OpenCode runtime')) {
-            return [pscustomobject]@{
-                LocalRoot          = $state.LocalRoot
-                Layout             = $state.Layout
-                InitialState       = $initialState
-                FinalState         = $state
-                ActionTaken        = @('WhatIf')
-                PlannedActions     = @($plannedActions)
-                RestartRequired    = $false
-                RuntimeTest        = $state.Runtime
-                RepairResult       = $repairResult
-                InstallResult      = $null
-                CommandEnvironment = (Get-ManifestedCommandEnvironmentResult -CommandName 'Initialize-OpenCodeRuntime' -RuntimeState $state)
-                PersistedStatePath = $null
-                Elevation          = $elevationPlan
-            }
-        }
-
-        $nodeState = Get-NodeRuntimeState -LocalRoot $LocalRoot
-        if ($nodeState.Status -ne 'Ready') {
-            $nodeResult = Initialize-NodeRuntime
-            if (@(@($nodeResult.ActionTaken) | Where-Object { $_ -and $_ -ne 'None' }).Count -gt 0) {
-                $actionsTaken.Add('Initialize-NodeRuntime') | Out-Null
-            }
-
-            $nodeState = Get-NodeRuntimeState -LocalRoot $LocalRoot
-        }
-
-        $npmCmd = $null
-        if ($nodeState.Runtime -and $nodeState.Runtime.PSObject.Properties['NpmCmd']) {
-            $npmCmd = $nodeState.Runtime.NpmCmd
-        }
-        if ([string]::IsNullOrWhiteSpace($npmCmd) -and -not [string]::IsNullOrWhiteSpace($nodeState.RuntimeHome)) {
-            $npmCmd = Join-Path $nodeState.RuntimeHome 'npm.cmd'
-        }
-
-        if ($nodeState.Status -ne 'Ready' -or [string]::IsNullOrWhiteSpace($npmCmd) -or -not (Test-Path -LiteralPath $npmCmd)) {
-            throw 'A usable npm command was not available after ensuring OpenCode dependencies.'
-        }
-
-        $installResult = Install-OpenCodeRuntime -NpmCmd $npmCmd -LocalRoot $LocalRoot
-        if ($installResult.Action -eq 'Installed') {
-            $actionsTaken.Add('Install-OpenCodeRuntime') | Out-Null
-        }
-    }
-
-    $finalState = Get-OpenCodeRuntimeState -LocalRoot $LocalRoot
-    $runtimeTest = if ($finalState.RuntimeHome) {
-        Test-OpenCodeRuntime -RuntimeHome $finalState.RuntimeHome
-    }
-    else {
-        [pscustomobject]@{
-            Status          = 'Missing'
-            IsReady         = $false
-            RuntimeHome     = $null
-            OpenCodeCmd     = $null
-            PackageJsonPath = $null
-            PackageVersion  = $null
-            ReportedVersion = $null
-        }
-    }
-
-    $commandEnvironment = Get-ManifestedCommandEnvironmentResult -CommandName 'Initialize-OpenCodeRuntime' -RuntimeState $finalState
-    if ($commandEnvironment.Applicable) {
-        if (-not $PSCmdlet.ShouldProcess($commandEnvironment.DesiredCommandDirectory, 'Synchronize OpenCode command-line environment')) {
-            return [pscustomobject]@{
-                LocalRoot          = $finalState.LocalRoot
-                Layout             = $finalState.Layout
-                InitialState       = $initialState
-                FinalState         = $finalState
-                ActionTaken        = @('WhatIf')
-                PlannedActions     = @($plannedActions)
-                RestartRequired    = $false
-                RuntimeTest        = $runtimeTest
-                RepairResult       = $repairResult
-                InstallResult      = $installResult
-                CommandEnvironment = $commandEnvironment
-                PersistedStatePath = $null
-                Elevation          = $elevationPlan
-            }
-        }
-
-        $commandEnvironment = Sync-ManifestedCommandLineEnvironment -Specification (Get-ManifestedCommandEnvironmentSpec -CommandName 'Initialize-OpenCodeRuntime' -RuntimeState $finalState)
-        if ($commandEnvironment.Status -eq 'Updated') {
-            $actionsTaken.Add('Sync-ManifestedCommandLineEnvironment') | Out-Null
-        }
-    }
-
-    $result = [pscustomobject]@{
-        LocalRoot          = $finalState.LocalRoot
-        Layout             = $finalState.Layout
-        InitialState       = $initialState
-        FinalState         = $finalState
-        ActionTaken        = if ($actionsTaken.Count -gt 0) { @($actionsTaken) } else { @('None') }
-        PlannedActions     = @($plannedActions)
-        RestartRequired    = $false
-        RuntimeTest        = $runtimeTest
-        RepairResult       = $repairResult
-        InstallResult      = $installResult
-        CommandEnvironment = $commandEnvironment
-        Elevation          = $elevationPlan
-    }
-
-    if ($WhatIfPreference) {
-        Add-Member -InputObject $result -NotePropertyName PersistedStatePath -NotePropertyValue $null -Force
-        return $result
-    }
-
-    $statePath = Save-ManifestedInvokeState -CommandName 'Initialize-OpenCodeRuntime' -Result $result -LocalRoot $LocalRoot -Details @{
-        Version         = $finalState.CurrentVersion
-        RuntimeHome     = $finalState.RuntimeHome
-        RuntimeSource   = $finalState.RuntimeSource
-        ExecutablePath  = $finalState.ExecutablePath
-        PackageJsonPath = $finalState.PackageJsonPath
-    }
-    Add-Member -InputObject $result -NotePropertyName PersistedStatePath -NotePropertyValue $statePath -Force
-
-    return $result
+    return (Invoke-ManifestedCommandInitialization -Name 'Initialize-OpenCodeRuntime' -PSCmdletObject $PSCmdlet -RefreshRequested:$RefreshOpenCode -WhatIfMode:$WhatIfPreference)
 }

@@ -19,6 +19,9 @@
 
 # Private logic
 . "$PSScriptRoot\Private\Logic\Eigenverft.Manifested.Sandbox.Shared.CommandEnvironment.ps1"
+. "$PSScriptRoot\Private\Logic\Eigenverft.Manifested.Sandbox.Shared.RuntimeKernel.ps1"
+
+Import-ManifestedCommandDefinitions -DefinitionsRoot (Join-Path $PSScriptRoot 'Definitions\Commands') | Out-Null
 
 # Public state surface
 . "$PSScriptRoot\Public\Eigenverft.Manifested.Sandbox.Shared.State.ps1"
@@ -35,5 +38,3 @@
 . "$PSScriptRoot\Public\Eigenverft.Manifested.Sandbox.Cmd.GitRuntimeAndCache.ps1"
 . "$PSScriptRoot\Public\Eigenverft.Manifested.Sandbox.Cmd.VsCodeRuntimeAndCache.ps1"
 . "$PSScriptRoot\Public\Eigenverft.Manifested.Sandbox.Cmd.VCRuntimeAndCache.ps1"
-
-

@@ -440,6 +440,34 @@ Returns a Blocked state on non-Windows hosts.
     }
 }
 
+function Get-CodexRuntimeFacts {
+<#
+.SYNOPSIS
+Gets normalized fact-based Codex runtime information for the sandbox.
+
+.DESCRIPTION
+Resolves the packaged Codex command definition and routes discovery through the
+shared npm CLI fact collector used by the block-driven kernel.
+
+.PARAMETER LocalRoot
+Overrides the manifested sandbox local root to inspect.
+
+.EXAMPLE
+Get-CodexRuntimeFacts
+#>
+    [CmdletBinding()]
+    param(
+        [string]$LocalRoot = (Get-ManifestedLocalRoot)
+    )
+
+    $definition = Get-ManifestedCommandDefinition -CommandName 'Initialize-CodexRuntime'
+    if (-not $definition) {
+        return (New-ManifestedRuntimeFacts -RuntimeName 'CodexRuntime' -CommandName 'Initialize-CodexRuntime' -RuntimeKind 'NpmCli' -LocalRoot $LocalRoot -Layout $null -PlatformSupported:$false -BlockedReason 'The packaged command definition for CodexRuntime is not available.')
+    }
+
+    return (Get-ManifestedNpmCliFactsFromDefinition -Definition $definition -LocalRoot $LocalRoot)
+}
+
 function Repair-CodexRuntime {
 <#
 .SYNOPSIS
@@ -591,245 +619,25 @@ This function expects Node.js prerequisites to already be available.
 function Initialize-CodexRuntime {
 <#
 .SYNOPSIS
-Ensures the Codex runtime is available and ready for command-line use.
+Ensures a managed or reusable Codex runtime is available for the sandbox.
 
 .DESCRIPTION
-Evaluates the current Codex runtime state, repairs partial or invalid installs,
-ensures required dependencies are present, installs the managed runtime when
-needed, and synchronizes the command-line environment metadata.
+Routes Codex runtime initialization through the shared block-driven kernel and
+the packaged command definition for Codex.
 
 .PARAMETER RefreshCodex
-Forces the managed Codex runtime to be reinstalled even when one is already ready.
+Forces reacquisition or reinstall planning for the managed Codex runtime.
 
 .EXAMPLE
 Initialize-CodexRuntime
 
 .EXAMPLE
 Initialize-CodexRuntime -RefreshCodex
-
-.NOTES
-Supports WhatIf and may trigger dependent runtime initialization steps.
 #>
     [CmdletBinding(SupportsShouldProcess = $true)]
     param(
         [switch]$RefreshCodex
     )
 
-    $LocalRoot = (Get-ManifestedLayout).LocalRoot
-    $selfElevationContext = Get-ManifestedSelfElevationContext
-
-    $actionsTaken = New-Object System.Collections.Generic.List[string]
-    $plannedActions = New-Object System.Collections.Generic.List[string]
-    $repairResult = $null
-    $installResult = $null
-    $commandEnvironment = $null
-
-    $initialState = Get-CodexRuntimeState -LocalRoot $LocalRoot
-    $state = $initialState
-    $elevationPlan = Get-ManifestedCommandElevationPlan -CommandName 'Initialize-CodexRuntime' -LocalRoot $LocalRoot -SkipSelfElevation:$selfElevationContext.SkipSelfElevation -WasSelfElevated:$selfElevationContext.WasSelfElevated -WhatIfMode:$WhatIfPreference
-
-    if ($state.Status -eq 'Blocked') {
-        $commandEnvironment = Get-ManifestedCommandEnvironmentResult -CommandName 'Initialize-CodexRuntime' -RuntimeState $state
-        $result = [pscustomobject]@{
-            LocalRoot          = $state.LocalRoot
-            Layout             = $state.Layout
-            InitialState       = $initialState
-            FinalState         = $state
-            ActionTaken        = @('None')
-            PlannedActions     = @()
-            RestartRequired    = $false
-            RuntimeTest        = $null
-            RepairResult       = $null
-            InstallResult      = $null
-            CommandEnvironment = $commandEnvironment
-            Elevation          = $elevationPlan
-        }
-
-        if ($WhatIfPreference) {
-            Add-Member -InputObject $result -NotePropertyName PersistedStatePath -NotePropertyValue $null -Force
-            return $result
-        }
-
-        $statePath = Save-ManifestedInvokeState -CommandName 'Initialize-CodexRuntime' -Result $result -LocalRoot $LocalRoot -Details @{
-            Version         = $state.CurrentVersion
-            RuntimeHome     = $state.RuntimeHome
-            RuntimeSource   = $state.RuntimeSource
-            ExecutablePath  = $state.ExecutablePath
-            PackageJsonPath = $state.PackageJsonPath
-        }
-        Add-Member -InputObject $result -NotePropertyName PersistedStatePath -NotePropertyValue $statePath -Force
-        return $result
-    }
-
-    $needsRepair = $state.Status -in @('Partial', 'NeedsRepair')
-    $needsInstall = $RefreshCodex -or ($state.Status -ne 'Ready')
-
-    if ($needsRepair) {
-        $plannedActions.Add('Repair-CodexRuntime') | Out-Null
-    }
-    if ($needsInstall) {
-        $plannedActions.Add('Initialize-VCRuntime') | Out-Null
-        $nodePlanState = Get-NodeRuntimeState -LocalRoot $LocalRoot
-        if ($nodePlanState.Status -ne 'Ready') {
-            $plannedActions.Add('Initialize-NodeRuntime') | Out-Null
-        }
-
-        $plannedActions.Add('Install-CodexRuntime') | Out-Null
-    }
-    $plannedActions.Add('Sync-ManifestedCommandLineEnvironment') | Out-Null
-
-    $elevationPlan = Get-ManifestedCommandElevationPlan -CommandName 'Initialize-CodexRuntime' -PlannedActions @($plannedActions) -LocalRoot $LocalRoot -SkipSelfElevation:$selfElevationContext.SkipSelfElevation -WasSelfElevated:$selfElevationContext.WasSelfElevated -WhatIfMode:$WhatIfPreference
-
-    if ($needsRepair) {
-        if (-not $PSCmdlet.ShouldProcess($state.Layout.CodexToolsRoot, 'Repair Codex runtime state')) {
-            return [pscustomobject]@{
-                LocalRoot          = $state.LocalRoot
-                Layout             = $state.Layout
-                InitialState       = $initialState
-                FinalState         = $state
-                ActionTaken        = @('WhatIf')
-                PlannedActions     = @($plannedActions)
-                RestartRequired    = $false
-                RuntimeTest        = $state.Runtime
-                RepairResult       = $null
-                InstallResult      = $null
-                CommandEnvironment = (Get-ManifestedCommandEnvironmentResult -CommandName 'Initialize-CodexRuntime' -RuntimeState $state)
-                PersistedStatePath = $null
-                Elevation          = $elevationPlan
-            }
-        }
-
-        $repairResult = Repair-CodexRuntime -State $state -LocalRoot $state.LocalRoot
-        if ($repairResult.Action -eq 'Repaired') {
-            $actionsTaken.Add('Repair-CodexRuntime') | Out-Null
-        }
-
-        $state = Get-CodexRuntimeState -LocalRoot $state.LocalRoot
-        $needsInstall = $RefreshCodex -or ($state.Status -ne 'Ready')
-    }
-
-    if ($needsInstall) {
-        if (-not $PSCmdlet.ShouldProcess($state.Layout.CodexToolsRoot, 'Ensure Codex runtime dependencies and install Codex runtime')) {
-            return [pscustomobject]@{
-                LocalRoot          = $state.LocalRoot
-                Layout             = $state.Layout
-                InitialState       = $initialState
-                FinalState         = $state
-                ActionTaken        = @('WhatIf')
-                PlannedActions     = @($plannedActions)
-                RestartRequired    = $false
-                RuntimeTest        = $state.Runtime
-                RepairResult       = $repairResult
-                InstallResult      = $null
-                CommandEnvironment = (Get-ManifestedCommandEnvironmentResult -CommandName 'Initialize-CodexRuntime' -RuntimeState $state)
-                PersistedStatePath = $null
-                Elevation          = $elevationPlan
-            }
-        }
-
-        $vcResult = Initialize-VCRuntime
-        if (@(@($vcResult.ActionTaken) | Where-Object { $_ -and $_ -ne 'None' }).Count -gt 0) {
-            $actionsTaken.Add('Initialize-VCRuntime') | Out-Null
-        }
-
-        $nodeState = Get-NodeRuntimeState -LocalRoot $LocalRoot
-        if ($nodeState.Status -ne 'Ready') {
-            $nodeResult = Initialize-NodeRuntime
-            if (@(@($nodeResult.ActionTaken) | Where-Object { $_ -and $_ -ne 'None' }).Count -gt 0) {
-                $actionsTaken.Add('Initialize-NodeRuntime') | Out-Null
-            }
-
-            $nodeState = Get-NodeRuntimeState -LocalRoot $LocalRoot
-        }
-
-        $npmCmd = $null
-        if ($nodeState.Runtime -and $nodeState.Runtime.PSObject.Properties['NpmCmd']) {
-            $npmCmd = $nodeState.Runtime.NpmCmd
-        }
-        if ([string]::IsNullOrWhiteSpace($npmCmd) -and -not [string]::IsNullOrWhiteSpace($nodeState.RuntimeHome)) {
-            $npmCmd = Join-Path $nodeState.RuntimeHome 'npm.cmd'
-        }
-
-        if ($nodeState.Status -ne 'Ready' -or [string]::IsNullOrWhiteSpace($npmCmd) -or -not (Test-Path -LiteralPath $npmCmd)) {
-            throw 'A usable npm command was not available after ensuring Codex dependencies.'
-        }
-
-        $installResult = Install-CodexRuntime -NpmCmd $npmCmd -LocalRoot $LocalRoot
-        if ($installResult.Action -eq 'Installed') {
-            $actionsTaken.Add('Install-CodexRuntime') | Out-Null
-        }
-    }
-
-    $finalState = Get-CodexRuntimeState -LocalRoot $LocalRoot
-    $runtimeTest = if ($finalState.RuntimeHome) {
-        Test-CodexRuntime -RuntimeHome $finalState.RuntimeHome
-    }
-    else {
-        [pscustomobject]@{
-            Status          = 'Missing'
-            IsReady         = $false
-            RuntimeHome     = $null
-            CodexCmd        = $null
-            PackageJsonPath = $null
-            PackageVersion  = $null
-            ReportedVersion = $null
-        }
-    }
-
-    $commandEnvironment = Get-ManifestedCommandEnvironmentResult -CommandName 'Initialize-CodexRuntime' -RuntimeState $finalState
-    if ($commandEnvironment.Applicable) {
-        if (-not $PSCmdlet.ShouldProcess($commandEnvironment.DesiredCommandDirectory, 'Synchronize Codex command-line environment')) {
-            return [pscustomobject]@{
-                LocalRoot          = $finalState.LocalRoot
-                Layout             = $finalState.Layout
-                InitialState       = $initialState
-                FinalState         = $finalState
-                ActionTaken        = @('WhatIf')
-                PlannedActions     = @($plannedActions)
-                RestartRequired    = $false
-                RuntimeTest        = $runtimeTest
-                RepairResult       = $repairResult
-                InstallResult      = $installResult
-                CommandEnvironment = $commandEnvironment
-                PersistedStatePath = $null
-                Elevation          = $elevationPlan
-            }
-        }
-
-        $commandEnvironment = Sync-ManifestedCommandLineEnvironment -Specification (Get-ManifestedCommandEnvironmentSpec -CommandName 'Initialize-CodexRuntime' -RuntimeState $finalState)
-        if ($commandEnvironment.Status -eq 'Updated') {
-            $actionsTaken.Add('Sync-ManifestedCommandLineEnvironment') | Out-Null
-        }
-    }
-
-    $result = [pscustomobject]@{
-        LocalRoot          = $finalState.LocalRoot
-        Layout             = $finalState.Layout
-        InitialState       = $initialState
-        FinalState         = $finalState
-        ActionTaken        = if ($actionsTaken.Count -gt 0) { @($actionsTaken) } else { @('None') }
-        PlannedActions     = @($plannedActions)
-        RestartRequired    = $false
-        RuntimeTest        = $runtimeTest
-        RepairResult       = $repairResult
-        InstallResult      = $installResult
-        CommandEnvironment = $commandEnvironment
-        Elevation          = $elevationPlan
-    }
-
-    if ($WhatIfPreference) {
-        Add-Member -InputObject $result -NotePropertyName PersistedStatePath -NotePropertyValue $null -Force
-        return $result
-    }
-
-    $statePath = Save-ManifestedInvokeState -CommandName 'Initialize-CodexRuntime' -Result $result -LocalRoot $LocalRoot -Details @{
-        Version         = $finalState.CurrentVersion
-        RuntimeHome     = $finalState.RuntimeHome
-        RuntimeSource   = $finalState.RuntimeSource
-        ExecutablePath  = $finalState.ExecutablePath
-        PackageJsonPath = $finalState.PackageJsonPath
-    }
-    Add-Member -InputObject $result -NotePropertyName PersistedStatePath -NotePropertyValue $statePath -Force
-
-    return $result
+    return (Invoke-ManifestedCommandInitialization -Name 'Initialize-CodexRuntime' -PSCmdletObject $PSCmdlet -RefreshRequested:$RefreshCodex -WhatIfMode:$WhatIfPreference)
 }

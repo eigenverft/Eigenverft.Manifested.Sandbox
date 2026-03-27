@@ -10,7 +10,7 @@ The primary intent is fast, repeatable setup inside Windows Sandbox. The same bo
 - Fast Windows Sandbox bring-up from a `.wsb` startup command or a manual shell
 - Managed runtime provisioning for `python`, `pip`, `pwsh`, `git`, `gh`, `code`, `node`, `npm`, `opencode`, `gemini`, `qwen`, `codex`, and VC++ prerequisites
 - Runtime discovery that can reuse compatible external installs or refresh to sandbox-owned managed copies
-- Persisted command results plus live runtime snapshots through `Get-SandboxState`
+- Fact-based runtime inspection through `Get-SandboxState`
 - Managed npm ownership under the sandbox Node runtime, including proxy-aware npm configuration when Windows resolves the npm registry through a proxy
 - Reusable `iwr | iex` bootstrap flow for repo-specific or generic PowerShell handoff scenarios
 - PowerShell 5.1-first bootstrap path with normal Windows machine support as a secondary workflow
@@ -33,7 +33,7 @@ The module currently exports these public commands:
 - `Initialize-GHCliRuntime`
 - `Initialize-VCRuntime`
 
-There is not yet a single combined `Initialize-Sandbox` command. The current model is a set of small init commands that each read real state, plan from that state, perform bounded repair or install work, and persist the observed result.
+There is not yet a single combined `Initialize-Sandbox` command. The current model is a set of small init commands that compute live runtime facts, derive bounded execution plans, and perform only the repair or install work that is actually needed.
 
 ---
 
@@ -179,9 +179,9 @@ Get-SandboxState
 ```
 
 - `Get-SandboxVersion` is the quick way to show the highest installed or loaded module version the current PowerShell session can resolve.
-- `Get-SandboxState` exposes both the persisted command document and live runtime snapshots, so it is the easiest way to see what the module believes is managed, external, missing, partial, or blocked right now.
+- `Get-SandboxState` exposes live runtime facts and environment alignment details, so it is the easiest way to see what the module currently detects as managed, external, missing, partial, or blocked.
 - `Initialize-PythonRuntime`, `Initialize-Ps7Runtime`, `Initialize-GitRuntime`, `Initialize-GHCliRuntime`, `Initialize-VSCodeRuntime`, `Initialize-NodeRuntime`, `Initialize-OpenCodeRuntime`, `Initialize-GeminiRuntime`, `Initialize-QwenRuntime`, and `Initialize-CodexRuntime` are intended to run in a normal user session. They prefer sandbox-managed portable runtimes under `LocalAppData`, using python.org for the CPython embeddable ZIP, GitHub as the download source for PowerShell 7, MinGit, and GitHub CLI, the official VS Code Windows ZIP archive with portable `data` mode for VS Code, and npm-based managed installs for OpenCode, Gemini, Qwen, and Codex.
-- Those commands also check for an already-usable `python`, `pwsh`, `git`, `gh`, `code`, `node`, `opencode`, `gemini`, `qwen`, or `codex` that exists outside prior sandbox state. If a compatible runtime is already available on `PATH` or in a common install location, the command can treat it as ready and persist it as an external runtime instead of downloading or installing a new copy. If you explicitly use a refresh switch such as `-RefreshPython`, `-RefreshGit`, `-RefreshGHCli`, `-RefreshPs7`, `-RefreshVSCode`, `-RefreshNode`, `-RefreshOpenCode`, `-RefreshGemini`, `-RefreshQwen`, or `-RefreshCodex`, the command will still acquire and install the sandbox-managed copy.
+- Those commands also check for an already-usable `python`, `pwsh`, `git`, `gh`, `code`, `node`, `opencode`, `gemini`, `qwen`, or `codex` that exists outside the sandbox-managed layout. If a compatible runtime is already available on `PATH` or in a common install location, the command can treat it as ready and report it as an external runtime instead of downloading or installing a new copy. If you explicitly use a refresh switch such as `-RefreshPython`, `-RefreshGit`, `-RefreshGHCli`, `-RefreshPs7`, `-RefreshVSCode`, `-RefreshNode`, `-RefreshOpenCode`, `-RefreshGemini`, `-RefreshQwen`, or `-RefreshCodex`, the command will still acquire and install the sandbox-managed copy.
 - `Initialize-PythonRuntime` installs the official CPython Windows embeddable package into a sandbox-managed tools root, enables `import site`, bootstraps `pip`, and exposes `python`, `python.exe`, `pip.cmd`, and `pip3.cmd` from the managed runtime directory. When Windows resolves the package index through a proxy, it keeps proxy settings in a runtime-local `pip.ini` instead of writing to a machine-wide or user-wide pip config.
 - `Initialize-GHCliRuntime` installs a managed `gh.exe` from the official GitHub CLI Windows ZIP release and validates the package against GitHub's published checksum asset before making that runtime active on `PATH`.
 - `Initialize-NodeRuntime` installs the managed Node.js runtime and owns the sandbox-managed npm configuration. When Windows resolves the active npm registry through a proxy, it writes `proxy` and `https-proxy` into the managed runtime's global `npmrc`; when the route is direct, it leaves npm config unchanged.
@@ -210,7 +210,7 @@ Import-Module Eigenverft.Manifested.Sandbox
 - The npm-based CLIs share the managed Node runtime when needed. If `Initialize-NodeRuntime` detects that the npm registry routes through a system proxy, it persists that proxy into the sandbox-owned npm config; if the route is direct, it makes no npm proxy changes.
 - Replace `main` in the bootstrap URLs to test another branch without changing the overall bootstrap flow.
 - Keep `.wsb` files small and let versioned PowerShell own the real startup logic whenever you want a more maintainable sandbox launch path.
-- Run `Get-SandboxState` after a bootstrap chain when you want the quickest view of managed vs external runtimes and persisted command outcomes.
+- Run `Get-SandboxState` after a bootstrap chain when you want the quickest view of managed vs external runtimes and command-environment alignment.
 - Run `Initialize-VCRuntime` in an elevated PowerShell session if the Microsoft Visual C++ Redistributable needs installation or repair.
 
 ## 📄 License

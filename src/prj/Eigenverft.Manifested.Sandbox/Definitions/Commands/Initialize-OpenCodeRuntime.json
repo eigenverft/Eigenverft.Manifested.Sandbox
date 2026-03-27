@@ -1,0 +1,51 @@
+{
+  "schemaVersion": 2,
+  "commandName": "Initialize-OpenCodeRuntime",
+  "runtimeName": "OpenCodeRuntime",
+  "kind": "npm-cli",
+  "wrapperCommand": "Initialize-OpenCodeRuntime",
+  "refreshSwitchName": "RefreshOpenCode",
+  "facts": {
+    "npmCli": {
+      "commandFileName": "opencode.cmd",
+      "packageJsonRelativePath": "node_modules\\opencode-ai\\package.json"
+    }
+  },
+  "supply": null,
+  "artifact": null,
+  "install": {
+    "npmGlobalPackage": {
+      "packageSpec": "opencode-ai@latest",
+      "stagePrefix": "opencode",
+      "cacheRootLayoutProperty": "OpenCodeCacheRoot",
+      "toolsRootLayoutProperty": "OpenCodeToolsRoot"
+    }
+  },
+  "environment": {
+    "commandProjection": {
+      "desiredDirectoryFact": "RuntimeHome",
+      "executableFact": "ExecutablePath",
+      "expectedCommands": [
+        "opencode.cmd"
+      ]
+    }
+  },
+  "dependencies": [
+    {
+      "runtimeName": "NodeRuntime",
+      "minimumVersion": "20.0.0",
+      "satisfactionMode": "managed-or-external",
+      "autoInstall": true,
+      "reason": "OpenCode requires a compatible Node.js runtime and npm command."
+    }
+  ],
+  "policies": {
+    "allowExternalSatisfaction": true,
+    "requireTrustedArtifact": false,
+    "supportsEnvironmentSync": true,
+    "installRequiresElevation": false
+  },
+  "hooks": {
+    "postInstall": null
+  }
+}

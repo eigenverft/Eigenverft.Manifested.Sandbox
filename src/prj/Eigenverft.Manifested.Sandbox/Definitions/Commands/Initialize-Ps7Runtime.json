@@ -1,0 +1,99 @@
+{
+  "schemaVersion": 2,
+  "commandName": "Initialize-Ps7Runtime",
+  "runtimeName": "Ps7Runtime",
+  "kind": "portable-package",
+  "wrapperCommand": "Initialize-Ps7Runtime",
+  "refreshSwitchName": "RefreshPs7",
+  "facts": {
+    "portableRuntime": {
+      "hostFlavorMap": {
+        "arm64": "win-arm64",
+        "x64": "win-x64"
+      },
+      "unsupportedHostMessage": "Only 64-bit Windows targets are supported by this PowerShell runtime bootstrap.",
+      "toolsRootLayoutProperty": "Ps7ToolsRoot",
+      "stagePrefix": "ps7",
+      "versionFolderTemplate": "{version}",
+      "requiredPathGroups": [
+        [
+          "pwsh.exe"
+        ]
+      ],
+      "versionProbe": {
+        "executableCandidates": [
+          "pwsh.exe"
+        ],
+        "arguments": [
+          "-NoLogo",
+          "-NoProfile",
+          "-Command",
+          "$PSVersionTable.PSVersion.ToString()"
+        ],
+        "regex": "(\\d+(?:\\.\\d+){1,3})"
+      },
+      "versionPolicy": {
+        "managedMinimumVersion": null,
+        "managedVersionFamily": null,
+        "externalMinimumVersion": null
+      },
+      "externalDiscovery": {
+        "commandNames": [
+          "pwsh.exe"
+        ],
+        "additionalPathPatterns": [
+          "{ProgramFiles}\\PowerShell\\*\\pwsh.exe"
+        ],
+        "runtimeHomeTrimLeafNames": []
+      }
+    }
+  },
+  "supply": {
+    "githubRelease": {
+      "repository": "PowerShell/PowerShell",
+      "releaseVersionRule": {
+        "regex": "v?(\\d+(?:\\.\\d+){1,3})"
+      },
+      "assetNamePattern": "PowerShell-{version}-{flavor}.zip",
+      "checksum": {
+        "fallbackSource": "ChecksumAsset",
+        "assetName": "hashes.sha256"
+      },
+      "downloadMessage": "Downloading PowerShell {version} ({flavor})...",
+      "offlineError": "Could not reach GitHub and no cached PowerShell ZIP was found."
+    }
+  },
+  "artifact": {
+    "zipPackage": {
+      "cacheRootLayoutProperty": "Ps7CacheRoot",
+      "fileNamePattern": "^PowerShell-(\\d+\\.\\d+\\.\\d+)-{flavor}\\.zip$"
+    }
+  },
+  "install": {
+    "portableArchive": {
+      "stagePrefix": "ps7",
+      "toolsRootLayoutProperty": "Ps7ToolsRoot",
+      "versionFolderTemplate": "{version}",
+      "createDirectories": []
+    }
+  },
+  "environment": {
+    "commandProjection": {
+      "desiredDirectoryFact": "RuntimeHome",
+      "executableFact": "ExecutablePath",
+      "expectedCommands": [
+        "pwsh.exe"
+      ]
+    }
+  },
+  "dependencies": [],
+  "policies": {
+    "allowExternalSatisfaction": true,
+    "requireTrustedArtifact": true,
+    "supportsEnvironmentSync": true,
+    "installRequiresElevation": false
+  },
+  "hooks": {
+    "postInstall": null
+  }
+}

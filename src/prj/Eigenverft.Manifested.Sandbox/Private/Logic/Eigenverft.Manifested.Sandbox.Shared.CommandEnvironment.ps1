@@ -203,189 +203,77 @@ public static class EigenverftManifestedNativeMethods
 function Get-ManifestedCommandEnvironmentSpec {
     [CmdletBinding()]
     param(
-        [Parameter(Mandatory = $true)]
+        [Parameter(ParameterSetName = 'DescriptorFacts', Mandatory = $true)]
+        [pscustomobject]$Descriptor,
+
+        [Parameter(ParameterSetName = 'DescriptorFacts', Mandatory = $true)]
+        [pscustomobject]$Facts,
+
+        [Parameter(ParameterSetName = 'LegacyCommand', Mandatory = $true)]
         [string]$CommandName,
 
+        [Parameter(ParameterSetName = 'LegacyCommand')]
         [pscustomobject]$RuntimeState
     )
 
-    $runtimeHome = if ($RuntimeState -and $RuntimeState.PSObject.Properties['RuntimeHome']) { $RuntimeState.RuntimeHome } else { $null }
-    $executablePath = if ($RuntimeState -and $RuntimeState.PSObject.Properties['ExecutablePath']) { $RuntimeState.ExecutablePath } else { $null }
-    $cliCommandPath = if ($RuntimeState -and $RuntimeState.PSObject.Properties['CliCommandPath']) { $RuntimeState.CliCommandPath } else { $null }
-    $runtimeSource = if ($RuntimeState -and $RuntimeState.PSObject.Properties['RuntimeSource']) { $RuntimeState.RuntimeSource } else { $null }
-
-    $desiredCommandDirectory = $null
-    $expectedCommandPaths = [ordered]@{}
-
-    switch ($CommandName) {
-        'Initialize-PythonRuntime' {
-            if (-not [string]::IsNullOrWhiteSpace($runtimeHome)) {
-                $desiredCommandDirectory = $runtimeHome
-            }
-            elseif (-not [string]::IsNullOrWhiteSpace($executablePath)) {
-                $desiredCommandDirectory = Split-Path -Parent $executablePath
-            }
-
-            $pythonCommandPath = $null
-            if (-not [string]::IsNullOrWhiteSpace($executablePath)) {
-                $pythonCommandPath = (Get-ManifestedFullPath -Path $executablePath)
-            }
-            elseif (-not [string]::IsNullOrWhiteSpace($runtimeHome)) {
-                $pythonCommandPath = (Get-ManifestedFullPath -Path (Join-Path $runtimeHome 'python.exe'))
-            }
-
-            if (-not [string]::IsNullOrWhiteSpace($pythonCommandPath)) {
-                $expectedCommandPaths['python'] = $pythonCommandPath
-                $expectedCommandPaths['python.exe'] = $pythonCommandPath
-            }
-
-            if ($runtimeSource -eq 'Managed' -and -not [string]::IsNullOrWhiteSpace($runtimeHome)) {
-                $expectedCommandPaths['pip.cmd'] = (Get-ManifestedFullPath -Path (Join-Path $runtimeHome 'pip.cmd'))
-                $expectedCommandPaths['pip3.cmd'] = (Get-ManifestedFullPath -Path (Join-Path $runtimeHome 'pip3.cmd'))
+    if ($PSCmdlet.ParameterSetName -eq 'LegacyCommand') {
+        $Descriptor = Get-ManifestedCommandContext -CommandName $CommandName
+        if (-not $Descriptor) {
+            return [pscustomobject]@{
+                Applicable                 = $false
+                CommandName                = $CommandName
+                CommandNames               = @()
+                DesiredExecutablePath      = $null
+                DesiredCommandDirectory    = $null
+                ExpectedCommandPaths       = [ordered]@{}
             }
         }
-        'Initialize-NodeRuntime' {
-            if (-not [string]::IsNullOrWhiteSpace($runtimeHome)) {
-                $desiredCommandDirectory = $runtimeHome
-            }
-            elseif (-not [string]::IsNullOrWhiteSpace($executablePath)) {
-                $desiredCommandDirectory = Split-Path -Parent $executablePath
-            }
 
-            if (-not [string]::IsNullOrWhiteSpace($executablePath)) {
-                $expectedCommandPaths['node.exe'] = (Get-ManifestedFullPath -Path $executablePath)
-            }
-            if (-not [string]::IsNullOrWhiteSpace($runtimeHome)) {
-                $expectedCommandPaths['npm.cmd'] = (Get-ManifestedFullPath -Path (Join-Path $runtimeHome 'npm.cmd'))
-            }
-        }
-        'Initialize-OpenCodeRuntime' {
-            if (-not [string]::IsNullOrWhiteSpace($runtimeHome)) {
-                $desiredCommandDirectory = $runtimeHome
-            }
-            elseif (-not [string]::IsNullOrWhiteSpace($executablePath)) {
-                $desiredCommandDirectory = Split-Path -Parent $executablePath
-            }
+        $Facts = $RuntimeState
+    }
 
-            $openCodeCommandPath = $null
-            if (-not [string]::IsNullOrWhiteSpace($executablePath)) {
-                $openCodeCommandPath = (Get-ManifestedFullPath -Path $executablePath)
-            }
-            elseif (-not [string]::IsNullOrWhiteSpace($runtimeHome)) {
-                $openCodeCommandPath = (Get-ManifestedFullPath -Path (Join-Path $runtimeHome 'opencode.cmd'))
-            }
+    $definitionProjection = $null
+    if ($Descriptor.PSObject.Properties['Definition'] -and $Descriptor.Definition) {
+        $definitionProjection = Get-ManifestedDefinitionBlock -Definition $Descriptor.Definition -SectionName 'environment' -BlockName 'commandProjection'
+    }
 
-            if (-not [string]::IsNullOrWhiteSpace($openCodeCommandPath)) {
-                $expectedCommandPaths['opencode'] = $openCodeCommandPath
-                $expectedCommandPaths['opencode.cmd'] = $openCodeCommandPath
-            }
-        }
-        'Initialize-CodexRuntime' {
-            if (-not [string]::IsNullOrWhiteSpace($runtimeHome)) {
-                $desiredCommandDirectory = $runtimeHome
-            }
-            elseif (-not [string]::IsNullOrWhiteSpace($executablePath)) {
-                $desiredCommandDirectory = Split-Path -Parent $executablePath
-            }
-
-            $codexCommandPath = $null
-            if (-not [string]::IsNullOrWhiteSpace($executablePath)) {
-                $codexCommandPath = (Get-ManifestedFullPath -Path $executablePath)
-            }
-            elseif (-not [string]::IsNullOrWhiteSpace($runtimeHome)) {
-                $codexCommandPath = (Get-ManifestedFullPath -Path (Join-Path $runtimeHome 'codex.cmd'))
-            }
-
-            if (-not [string]::IsNullOrWhiteSpace($codexCommandPath)) {
-                $expectedCommandPaths['codex'] = $codexCommandPath
-                $expectedCommandPaths['codex.cmd'] = $codexCommandPath
-            }
-        }
-        'Initialize-GeminiRuntime' {
-            if (-not [string]::IsNullOrWhiteSpace($runtimeHome)) {
-                $desiredCommandDirectory = $runtimeHome
-            }
-            elseif (-not [string]::IsNullOrWhiteSpace($executablePath)) {
-                $desiredCommandDirectory = Split-Path -Parent $executablePath
-            }
-
-            $geminiCommandPath = $null
-            if (-not [string]::IsNullOrWhiteSpace($executablePath)) {
-                $geminiCommandPath = (Get-ManifestedFullPath -Path $executablePath)
-            }
-            elseif (-not [string]::IsNullOrWhiteSpace($runtimeHome)) {
-                $geminiCommandPath = (Get-ManifestedFullPath -Path (Join-Path $runtimeHome 'gemini.cmd'))
-            }
-
-            if (-not [string]::IsNullOrWhiteSpace($geminiCommandPath)) {
-                $expectedCommandPaths['gemini'] = $geminiCommandPath
-                $expectedCommandPaths['gemini.cmd'] = $geminiCommandPath
-            }
-        }
-        'Initialize-QwenRuntime' {
-            if (-not [string]::IsNullOrWhiteSpace($runtimeHome)) {
-                $desiredCommandDirectory = $runtimeHome
-            }
-            elseif (-not [string]::IsNullOrWhiteSpace($executablePath)) {
-                $desiredCommandDirectory = Split-Path -Parent $executablePath
-            }
-
-            $qwenCommandPath = $null
-            if (-not [string]::IsNullOrWhiteSpace($executablePath)) {
-                $qwenCommandPath = (Get-ManifestedFullPath -Path $executablePath)
-            }
-            elseif (-not [string]::IsNullOrWhiteSpace($runtimeHome)) {
-                $qwenCommandPath = (Get-ManifestedFullPath -Path (Join-Path $runtimeHome 'qwen.cmd'))
-            }
-
-            if (-not [string]::IsNullOrWhiteSpace($qwenCommandPath)) {
-                $expectedCommandPaths['qwen'] = $qwenCommandPath
-                $expectedCommandPaths['qwen.cmd'] = $qwenCommandPath
-            }
-        }
-        'Initialize-GHCliRuntime' {
-            if (-not [string]::IsNullOrWhiteSpace($executablePath)) {
-                $desiredCommandDirectory = Split-Path -Parent $executablePath
-                $expectedCommandPaths['gh'] = (Get-ManifestedFullPath -Path $executablePath)
-                $expectedCommandPaths['gh.exe'] = (Get-ManifestedFullPath -Path $executablePath)
-            }
-        }
-        'Initialize-Ps7Runtime' {
-            if (-not [string]::IsNullOrWhiteSpace($executablePath)) {
-                $desiredCommandDirectory = Split-Path -Parent $executablePath
-                $expectedCommandPaths['pwsh.exe'] = (Get-ManifestedFullPath -Path $executablePath)
-            }
-        }
-        'Initialize-GitRuntime' {
-            if (-not [string]::IsNullOrWhiteSpace($executablePath)) {
-                $desiredCommandDirectory = Split-Path -Parent $executablePath
-                $expectedCommandPaths['git.exe'] = (Get-ManifestedFullPath -Path $executablePath)
-            }
-        }
-        'Initialize-VSCodeRuntime' {
-            if (-not [string]::IsNullOrWhiteSpace($cliCommandPath)) {
-                $desiredCommandDirectory = Split-Path -Parent $cliCommandPath
-                $expectedCommandPaths['code'] = (Get-ManifestedFullPath -Path $cliCommandPath)
-                $expectedCommandPaths['code.cmd'] = (Get-ManifestedFullPath -Path $cliCommandPath)
-            }
-            elseif (-not [string]::IsNullOrWhiteSpace($runtimeHome)) {
-                $desiredCommandDirectory = Join-Path $runtimeHome 'bin'
-                $expectedCommandPaths['code'] = (Get-ManifestedFullPath -Path (Join-Path $desiredCommandDirectory 'code.cmd'))
-                $expectedCommandPaths['code.cmd'] = (Get-ManifestedFullPath -Path (Join-Path $desiredCommandDirectory 'code.cmd'))
-            }
+    if (-not $definitionProjection) {
+        return [pscustomobject]@{
+            Applicable                 = $false
+            CommandName                = $Descriptor.CommandName
+            RuntimeName                = $Descriptor.RuntimeName
+            CommandNames               = @()
+            DesiredExecutablePath      = $null
+            DesiredCommandDirectory    = $null
+            ExpectedCommandPaths       = [ordered]@{}
         }
     }
 
-    $applicable = (-not [string]::IsNullOrWhiteSpace($desiredCommandDirectory)) -and ($expectedCommandPaths.Count -gt 0)
+    $projection = Get-ManifestedCommandProjectionFromDefinition -Definition $Descriptor.Definition -Facts $Facts
+    if (-not $projection) {
+        return [pscustomobject]@{
+            Applicable                 = $false
+            CommandName                = $Descriptor.CommandName
+            RuntimeName                = $Descriptor.RuntimeName
+            CommandNames               = @()
+            DesiredExecutablePath      = $null
+            DesiredCommandDirectory    = $null
+            ExpectedCommandPaths       = [ordered]@{}
+        }
+    }
 
-    [pscustomobject]@{
-        Applicable              = $applicable
-        CommandName             = $CommandName
-        CommandNames            = @($expectedCommandPaths.Keys)
-        DesiredExecutablePath   = if (-not [string]::IsNullOrWhiteSpace($executablePath)) { Get-ManifestedFullPath -Path $executablePath } else { $null }
-        DesiredCommandDirectory = if (-not [string]::IsNullOrWhiteSpace($desiredCommandDirectory)) { Get-ManifestedFullPath -Path $desiredCommandDirectory } else { $null }
-        ExpectedCommandPaths    = $expectedCommandPaths
-        RuntimeSource           = $runtimeSource
+    $expectedCommandPaths = if ($projection.PSObject.Properties['ExpectedCommandPaths'] -and $projection.ExpectedCommandPaths) { $projection.ExpectedCommandPaths } else { [ordered]@{} }
+    $desiredDirectory = if ($projection.PSObject.Properties['DesiredCommandDirectory']) { $projection.DesiredCommandDirectory } else { $null }
+    $desiredExecutablePath = if ($projection.PSObject.Properties['DesiredExecutablePath']) { $projection.DesiredExecutablePath } else { $null }
+
+    return [pscustomobject]@{
+        Applicable                 = [bool](($projection.PSObject.Properties['Applicable'] -and $projection.Applicable) -and -not [string]::IsNullOrWhiteSpace($desiredDirectory) -and ($expectedCommandPaths.Count -gt 0))
+        CommandName                = $Descriptor.CommandName
+        RuntimeName                = $Descriptor.RuntimeName
+        CommandNames               = @($expectedCommandPaths.Keys)
+        DesiredExecutablePath      = if (-not [string]::IsNullOrWhiteSpace($desiredExecutablePath)) { Get-ManifestedFullPath -Path $desiredExecutablePath } else { $null }
+        DesiredCommandDirectory    = if (-not [string]::IsNullOrWhiteSpace($desiredDirectory)) { Get-ManifestedFullPath -Path $desiredDirectory } else { $null }
+        ExpectedCommandPaths       = $expectedCommandPaths
     }
 }
 
@@ -398,19 +286,21 @@ function Get-ManifestedCommandLineEnvironmentState {
 
     if (-not $Specification.Applicable) {
         return [pscustomobject]@{
-            Applicable              = $false
-            Status                  = 'NotApplicable'
-            ScopeApplied            = @()
-            CommandNames            = if ($Specification.PSObject.Properties['CommandNames']) { @($Specification.CommandNames) } else { @() }
-            DesiredExecutablePath   = if ($Specification.PSObject.Properties['DesiredExecutablePath']) { $Specification.DesiredExecutablePath } else { $null }
-            DesiredCommandDirectory = if ($Specification.PSObject.Properties['DesiredCommandDirectory']) { $Specification.DesiredCommandDirectory } else { $null }
-            ResolvedCommandPaths    = [ordered]@{}
-            ProcessPathUpdated      = $false
-            UserPathUpdated         = $false
+            Applicable                 = $false
+            IsAligned                  = $false
+            NeedsSync                  = $false
+            ScopeApplied               = @()
+            CommandNames               = if ($Specification.PSObject.Properties['CommandNames']) { @($Specification.CommandNames) } else { @() }
+            DesiredExecutablePath      = if ($Specification.PSObject.Properties['DesiredExecutablePath']) { $Specification.DesiredExecutablePath } else { $null }
+            DesiredCommandDirectory    = if ($Specification.PSObject.Properties['DesiredCommandDirectory']) { $Specification.DesiredCommandDirectory } else { $null }
+            ResolvedCommandPaths       = [ordered]@{}
+            ProcessPathUpdated         = $false
+            UserPathUpdated            = $false
             ProcessPathContainsDesired = $false
-            UserPathContainsDesired = $false
-            ProcessPathPrefersDesired = $false
-            UserPathPrefersDesired  = $false
+            UserPathContainsDesired    = $false
+            ProcessPathPrefersDesired  = $false
+            UserPathPrefersDesired     = $false
+            ValidationSucceeded        = $true
         }
     }
 
@@ -450,16 +340,12 @@ function Get-ManifestedCommandLineEnvironmentState {
         }
     }
 
-    $status = if ($allCommandsResolvedAsExpected -and $processPrefersDesired -and $userPrefersDesired) {
-        'Aligned'
-    }
-    else {
-        'NeedsSync'
-    }
+    $isAligned = ($allCommandsResolvedAsExpected -and $processPrefersDesired -and $userPrefersDesired)
 
-    [pscustomobject]@{
+    return [pscustomobject]@{
         Applicable                 = $true
-        Status                     = $status
+        IsAligned                  = $isAligned
+        NeedsSync                  = (-not $isAligned)
         ScopeApplied               = @()
         CommandNames               = @($Specification.CommandNames)
         DesiredExecutablePath      = $Specification.DesiredExecutablePath
@@ -471,28 +357,52 @@ function Get-ManifestedCommandLineEnvironmentState {
         UserPathContainsDesired    = $userContainsDesired
         ProcessPathPrefersDesired  = $processPrefersDesired
         UserPathPrefersDesired     = $userPrefersDesired
+        ValidationSucceeded        = $true
     }
 }
 
 function Get-ManifestedCommandEnvironmentResult {
-    [CmdletBinding()]
+    [CmdletBinding(DefaultParameterSetName = 'DescriptorFacts')]
     param(
-        [Parameter(Mandatory = $true)]
+        [Parameter(ParameterSetName = 'DescriptorFacts', Mandatory = $true)]
+        [pscustomobject]$Descriptor,
+
+        [Parameter(ParameterSetName = 'DescriptorFacts', Mandatory = $true)]
+        [pscustomobject]$Facts,
+
+        [Parameter(ParameterSetName = 'LegacyCommand', Mandatory = $true)]
         [string]$CommandName,
 
+        [Parameter(ParameterSetName = 'LegacyCommand')]
         [pscustomobject]$RuntimeState
     )
 
-    $specification = Get-ManifestedCommandEnvironmentSpec -CommandName $CommandName -RuntimeState $RuntimeState
+    $specification = if ($PSCmdlet.ParameterSetName -eq 'LegacyCommand') {
+        Get-ManifestedCommandEnvironmentSpec -CommandName $CommandName -RuntimeState $RuntimeState
+    }
+    else {
+        Get-ManifestedCommandEnvironmentSpec -Descriptor $Descriptor -Facts $Facts
+    }
+
     return (Get-ManifestedCommandLineEnvironmentState -Specification $specification)
 }
 
 function Sync-ManifestedCommandLineEnvironment {
-    [CmdletBinding()]
+    [CmdletBinding(DefaultParameterSetName = 'DescriptorFacts')]
     param(
-        [Parameter(Mandatory = $true)]
+        [Parameter(ParameterSetName = 'DescriptorFacts', Mandatory = $true)]
+        [pscustomobject]$Descriptor,
+
+        [Parameter(ParameterSetName = 'DescriptorFacts', Mandatory = $true)]
+        [pscustomobject]$Facts,
+
+        [Parameter(ParameterSetName = 'Specification', Mandatory = $true)]
         [pscustomobject]$Specification
     )
+
+    if ($PSCmdlet.ParameterSetName -eq 'DescriptorFacts') {
+        $Specification = Get-ManifestedCommandEnvironmentSpec -Descriptor $Descriptor -Facts $Facts
+    }
 
     $initialState = Get-ManifestedCommandLineEnvironmentState -Specification $Specification
     if (-not $initialState.Applicable) {
@@ -525,16 +435,10 @@ function Sync-ManifestedCommandLineEnvironment {
         $scopeApplied.Add('User') | Out-Null
     }
 
-    $status = if ($finalState.Status -eq 'Aligned') {
-        if ($scopeApplied.Count -gt 0) { 'Updated' } else { 'Aligned' }
-    }
-    else {
-        'ValidationFailed'
-    }
-
     $result = [pscustomobject]@{
         Applicable                 = $true
-        Status                     = $status
+        IsAligned                  = [bool]$finalState.IsAligned
+        NeedsSync                  = [bool]$finalState.NeedsSync
         ScopeApplied               = @($scopeApplied)
         CommandNames               = @($finalState.CommandNames)
         DesiredExecutablePath      = $finalState.DesiredExecutablePath
@@ -546,9 +450,10 @@ function Sync-ManifestedCommandLineEnvironment {
         UserPathContainsDesired    = $finalState.UserPathContainsDesired
         ProcessPathPrefersDesired  = $finalState.ProcessPathPrefersDesired
         UserPathPrefersDesired     = $finalState.UserPathPrefersDesired
+        ValidationSucceeded        = [bool]$finalState.IsAligned
     }
 
-    if ($status -eq 'ValidationFailed') {
+    if (-not $result.ValidationSucceeded) {
         $resolvedPaths = @()
         foreach ($commandName in @($result.CommandNames)) {
             $resolvedPaths += ('{0}={1}' -f $commandName, $result.ResolvedCommandPaths[$commandName])

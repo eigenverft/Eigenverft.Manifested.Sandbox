@@ -1,0 +1,44 @@
+{
+  "schemaVersion": 2,
+  "commandName": "Initialize-VCRuntime",
+  "runtimeName": "VCRuntime",
+  "kind": "machine-prerequisite",
+  "wrapperCommand": "Initialize-VCRuntime",
+  "refreshSwitchName": "RefreshVCRuntime",
+  "facts": {
+    "machinePrerequisite": {
+      "architecture": "x64"
+    }
+  },
+  "supply": {
+    "directDownload": {
+      "fileName": "vc_redist.x64.exe",
+      "downloadUrl": "https://aka.ms/vc14/vc_redist.x64.exe",
+      "downloadMessage": "Downloading Microsoft Visual C++ Redistributable...",
+      "offlineError": "Could not reach the VC++ redistributable download and no cached installer was found."
+    }
+  },
+  "artifact": {
+    "executableInstaller": {
+      "cacheRootLayoutProperty": "VCRuntimeCacheRoot",
+      "fileNamePattern": "^vc_redist\\.x64\\.exe$",
+      "expectedSignerSubjectMatch": "Microsoft Corporation"
+    }
+  },
+  "install": {
+    "machineInstaller": {
+      "architecture": "x64"
+    }
+  },
+  "environment": null,
+  "dependencies": [],
+  "policies": {
+    "allowExternalSatisfaction": false,
+    "requireTrustedArtifact": true,
+    "supportsEnvironmentSync": false,
+    "installRequiresElevation": true
+  },
+  "hooks": {
+    "postInstall": null
+  }
+}

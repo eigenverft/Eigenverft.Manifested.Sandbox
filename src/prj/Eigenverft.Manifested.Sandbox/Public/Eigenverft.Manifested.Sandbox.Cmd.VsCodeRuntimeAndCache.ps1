@@ -2,60 +2,7 @@
     Eigenverft.Manifested.Sandbox.Cmd.VsCodeRuntimeAndCache
 #>
 
-function ConvertTo-VSCodeVersion {
-    [CmdletBinding()]
-    param(
-        [string]$VersionText
-    )
-
-    if ([string]::IsNullOrWhiteSpace($VersionText)) {
-        return $null
-    }
-
-    $match = [regex]::Match($VersionText, '(\d+\.\d+\.\d+)')
-    if (-not $match.Success) {
-        return $null
-    }
-
-    return [version]$match.Groups[1].Value
-}
-
-function Get-VSCodeFlavor {
-    [CmdletBinding()]
-    param()
-
-    if ([System.Environment]::OSVersion.Platform -ne [System.PlatformID]::Win32NT) {
-        throw 'Only Windows hosts are supported by this VS Code runtime bootstrap.'
-    }
-
-    $archHints = @($env:PROCESSOR_ARCHITECTURE, $env:PROCESSOR_ARCHITEW6432) -join ';'
-    if ($archHints -match 'ARM64') {
-        return 'win32-arm64'
-    }
-
-    if ([Environment]::Is64BitOperatingSystem) {
-        return 'win32-x64'
-    }
-
-    throw 'Only 64-bit Windows targets are supported by this VS Code runtime bootstrap.'
-}
-
-function Get-VSCodeUpdateTarget {
-    [CmdletBinding()]
-    param(
-        [string]$Flavor
-    )
-
-    if ([string]::IsNullOrWhiteSpace($Flavor)) {
-        $Flavor = Get-VSCodeFlavor
-    }
-
-    switch ($Flavor) {
-        'win32-x64' { return 'win32-x64-archive' }
-        'win32-arm64' { return 'win32-arm64-archive' }
-        default { throw "Unsupported VS Code flavor '$Flavor'." }
-    }
-}
+$script:ManifestedVSCodeRuntimeVersionSpec = Get-ManifestedVersionSpec -Definition (Get-ManifestedCommandDefinition -CommandName 'Initialize-VSCodeRuntime')
 
 function Get-VSCodePersistedPackageDetails {
     [CmdletBinding()]
@@ -144,11 +91,15 @@ function Get-VSCodeRelease {
     )
 
     if ([string]::IsNullOrWhiteSpace($Flavor)) {
-        $Flavor = Get-VSCodeFlavor
+        $Flavor = Get-ManifestedCommandFlavor -CommandName 'Initialize-VSCodeRuntime'
     }
 
-    $channel = 'stable'
-    $latestUri = 'https://update.code.visualstudio.com/latest/{0}/{1}' -f (Get-VSCodeUpdateTarget -Flavor $Flavor), $channel
+    $definition = Get-ManifestedCommandDefinition -CommandName 'Initialize-VSCodeRuntime'
+    $supplyBlock = Get-ManifestedDefinitionBlock -Definition $definition -SectionName 'supply' -BlockName 'vsCodeUpdate'
+    $channel = if ($supplyBlock -and $supplyBlock.PSObject.Properties['channel'] -and $supplyBlock.channel) { [string]$supplyBlock.channel } else { 'stable' }
+    $updateTarget = Expand-ManifestedDefinitionTemplate -Template ([string]$supplyBlock.updateTargetPattern) -Flavor $Flavor
+    $latestUri = Expand-ManifestedDefinitionTemplate -Template ([string]$supplyBlock.latestUrlPattern) -Flavor $Flavor
+    $latestUri = $latestUri.Replace('{updateTarget}', $updateTarget).Replace('{channel}', $channel)
     $headResult = Invoke-ManifestedVSCodeHeadRequest -Uri $latestUri
 
     if ($headResult.StatusCode -notin @(301, 302, 303, 307, 308)) {
@@ -163,7 +114,7 @@ function Get-VSCodeRelease {
 
     $resolvedUri = [uri]$headResult.Location
     $fileName = Split-Path -Leaf $resolvedUri.AbsolutePath
-    $match = [regex]::Match($fileName, '^(VSCode-(win32-(?:x64|arm64))-(\d+\.\d+\.\d+)\.zip)$')
+    $match = [regex]::Match($fileName, [string]$supplyBlock.fileNamePattern)
     if (-not $match.Success) {
         throw "Could not parse the VS Code archive name '$fileName'."
     }
@@ -195,7 +146,7 @@ function Get-CachedVSCodeRuntimePackages {
     )
 
     if ([string]::IsNullOrWhiteSpace($Flavor)) {
-        $Flavor = Get-VSCodeFlavor
+        $Flavor = Get-ManifestedCommandFlavor -CommandName 'Initialize-VSCodeRuntime'
     }
 
     $layout = Get-ManifestedLayout -LocalRoot $LocalRoot
@@ -238,7 +189,7 @@ function Get-CachedVSCodeRuntimePackages {
                 ReleaseUrl  = $null
             }
         } |
-        Sort-Object -Descending -Property @{ Expression = { ConvertTo-VSCodeVersion -VersionText $_.Version } }
+        Sort-Object -Descending -Property @{ Expression = { ConvertTo-ManifestedVersionObjectFromRule -VersionText $_.Version -Rule $script:ManifestedVSCodeRuntimeVersionSpec.RuntimeVersionRule } }
 
     return @($items)
 }
@@ -280,6 +231,9 @@ function Test-VSCodeRuntime {
     param(
         [Parameter(Mandatory = $true)]
         [string]$RuntimeHome,
+
+        [Parameter(Mandatory = $true)]
+        [pscustomobject]$VersionSpec,
 
         [switch]$RequirePortableMode
     )
@@ -339,7 +293,7 @@ function Test-VSCodeRuntime {
             $reportedVersion = $null
         }
 
-        $versionObject = ConvertTo-VSCodeVersion -VersionText $reportedVersion
+        $versionObject = ConvertTo-ManifestedVersionObjectFromRule -VersionText $reportedVersion -Rule $versionSpec.RuntimeVersionRule
         $isStableProduct = ($productName -eq 'Visual Studio Code') -or ($fileDescription -eq 'Visual Studio Code')
         $portableMode = Test-Path -LiteralPath $dataPath
 
@@ -379,7 +333,7 @@ function Get-InstalledVSCodeRuntime {
     )
 
     if ([string]::IsNullOrWhiteSpace($Flavor)) {
-        $Flavor = Get-VSCodeFlavor
+        $Flavor = Get-ManifestedCommandFlavor -CommandName 'Initialize-VSCodeRuntime'
     }
 
     $layout = Get-ManifestedLayout -LocalRoot $LocalRoot
@@ -387,7 +341,7 @@ function Get-InstalledVSCodeRuntime {
 
     if (Test-Path -LiteralPath $layout.VsCodeToolsRoot) {
         $versionRoots = Get-ChildItem -LiteralPath $layout.VsCodeToolsRoot -Directory -ErrorAction SilentlyContinue |
-            Sort-Object -Descending -Property @{ Expression = { ConvertTo-VSCodeVersion -VersionText $_.Name } }
+            Sort-Object -Descending -Property @{ Expression = { ConvertTo-ManifestedVersionObjectFromRule -VersionText $_.Name -Rule $script:ManifestedVSCodeRuntimeVersionSpec.RuntimeVersionRule } }
 
         foreach ($versionRoot in $versionRoots) {
             $runtimeHome = Join-Path $versionRoot.FullName $Flavor
@@ -395,9 +349,9 @@ function Get-InstalledVSCodeRuntime {
                 continue
             }
 
-            $validation = Test-VSCodeRuntime -RuntimeHome $runtimeHome -RequirePortableMode
-            $expectedVersion = ConvertTo-VSCodeVersion -VersionText $versionRoot.Name
-            $reportedVersion = ConvertTo-VSCodeVersion -VersionText $validation.ReportedVersion
+            $validation = Test-VSCodeRuntime -RuntimeHome $runtimeHome -VersionSpec $script:ManifestedVSCodeRuntimeVersionSpec -RequirePortableMode
+            $expectedVersion = ConvertTo-ManifestedVersionObjectFromRule -VersionText $versionRoot.Name -Rule $script:ManifestedVSCodeRuntimeVersionSpec.RuntimeVersionRule
+            $reportedVersion = ConvertTo-ManifestedVersionObjectFromRule -VersionText $validation.ReportedVersion -Rule $script:ManifestedVSCodeRuntimeVersionSpec.RuntimeVersionRule
             $versionMatches = (-not $reportedVersion) -or (-not $expectedVersion) -or ($reportedVersion -eq $expectedVersion)
 
             $entries += [pscustomobject]@{
@@ -448,7 +402,10 @@ function Get-ManifestedVSCodeExternalPaths {
 function Get-ManifestedVSCodeRuntimeFromCandidatePath {
     [CmdletBinding()]
     param(
-        [string]$CandidatePath
+        [string]$CandidatePath,
+
+        [Parameter(Mandatory = $true)]
+        [pscustomobject]$VersionSpec
     )
 
     $resolvedCandidatePath = Get-ManifestedFullPath -Path $CandidatePath
@@ -468,12 +425,12 @@ function Get-ManifestedVSCodeRuntimeFromCandidatePath {
         return $null
     }
 
-    $validation = Test-VSCodeRuntime -RuntimeHome $runtimeHome
+    $validation = Test-VSCodeRuntime -RuntimeHome $runtimeHome -VersionSpec $VersionSpec
     if (-not $validation.IsReady) {
         return $null
     }
 
-    $versionObject = ConvertTo-VSCodeVersion -VersionText $validation.ReportedVersion
+    $versionObject = ConvertTo-ManifestedVersionObjectFromRule -VersionText $validation.ReportedVersion -Rule $VersionSpec.RuntimeVersionRule
     if (-not $versionObject) {
         return $null
     }
@@ -517,7 +474,7 @@ function Get-SystemVSCodeRuntime {
     }
 
     foreach ($candidatePath in @($candidatePaths | Select-Object -Unique)) {
-        $runtime = Get-ManifestedVSCodeRuntimeFromCandidatePath -CandidatePath $candidatePath
+        $runtime = Get-ManifestedVSCodeRuntimeFromCandidatePath -CandidatePath $candidatePath -VersionSpec $script:ManifestedVSCodeRuntimeVersionSpec
         if ($runtime) {
             return $runtime
         }
@@ -595,7 +552,7 @@ function Get-VSCodeRuntimeState {
 
     try {
         if ([string]::IsNullOrWhiteSpace($Flavor)) {
-            $Flavor = Get-VSCodeFlavor
+            $Flavor = Get-ManifestedCommandFlavor -CommandName 'Initialize-VSCodeRuntime'
         }
 
         $layout = Get-ManifestedLayout -LocalRoot $LocalRoot
@@ -731,7 +688,7 @@ function Save-VSCodeRuntimePackage {
     )
 
     if ([string]::IsNullOrWhiteSpace($Flavor)) {
-        $Flavor = Get-VSCodeFlavor
+        $Flavor = Get-ManifestedCommandFlavor -CommandName 'Initialize-VSCodeRuntime'
     }
 
     $layout = Get-ManifestedLayout -LocalRoot $LocalRoot
@@ -819,11 +776,11 @@ function Install-VSCodeRuntime {
     )
 
     if ([string]::IsNullOrWhiteSpace($Flavor)) {
-        $Flavor = if ($PackageInfo.Flavor) { $PackageInfo.Flavor } else { Get-VSCodeFlavor }
+        $Flavor = if ($PackageInfo.Flavor) { $PackageInfo.Flavor } else { Get-ManifestedCommandFlavor -CommandName 'Initialize-VSCodeRuntime' }
     }
 
     $runtimeHome = Get-ManagedVSCodeRuntimeHome -Version $PackageInfo.Version -Flavor $Flavor -LocalRoot $LocalRoot
-    $currentValidation = Test-VSCodeRuntime -RuntimeHome $runtimeHome -RequirePortableMode
+    $currentValidation = Test-VSCodeRuntime -RuntimeHome $runtimeHome -VersionSpec $script:ManifestedVSCodeRuntimeVersionSpec -RequirePortableMode
 
     if ($currentValidation.Status -ne 'Ready') {
         New-ManifestedDirectory -Path (Split-Path -Parent $runtimeHome) | Out-Null
@@ -850,7 +807,7 @@ function Install-VSCodeRuntime {
         }
     }
 
-    $validation = Test-VSCodeRuntime -RuntimeHome $runtimeHome -RequirePortableMode
+    $validation = Test-VSCodeRuntime -RuntimeHome $runtimeHome -VersionSpec $script:ManifestedVSCodeRuntimeVersionSpec -RequirePortableMode
     if ($validation.Status -ne 'Ready') {
         throw "VS Code runtime validation failed after install at $runtimeHome."
     }
@@ -871,298 +828,71 @@ function Install-VSCodeRuntime {
     }
 }
 
+function Get-VSCodeRuntimeFacts {
+    [CmdletBinding()]
+    param(
+        [string]$Flavor,
+        [string]$LocalRoot = (Get-ManifestedLocalRoot)
+    )
+
+    $layout = $null
+    try {
+        if ([string]::IsNullOrWhiteSpace($Flavor)) {
+            $Flavor = Get-ManifestedCommandFlavor -CommandName 'Initialize-VSCodeRuntime'
+        }
+
+        $layout = Get-ManifestedLayout -LocalRoot $LocalRoot
+    }
+    catch {
+        return (New-ManifestedRuntimeFacts -RuntimeName 'VSCodeRuntime' -CommandName 'Initialize-VSCodeRuntime' -RuntimeKind 'PortablePackage' -LocalRoot $LocalRoot -Layout $layout -PlatformSupported:$false -BlockedReason $_.Exception.Message -AdditionalProperties @{
+                Flavor              = $Flavor
+                Channel             = 'stable'
+                Package             = $null
+                PackagePath         = $null
+                CliCommandPath      = $null
+                CliCommandDirectory = $null
+                PortableMode        = $false
+                InvalidRuntimeHomes = @()
+            })
+    }
+
+    $partialPaths = @()
+    if (Test-Path -LiteralPath $layout.VsCodeCacheRoot) {
+        $partialPaths += @(Get-ChildItem -LiteralPath $layout.VsCodeCacheRoot -File -Filter '*.download' -ErrorAction SilentlyContinue | Select-Object -ExpandProperty FullName)
+    }
+    $partialPaths += @(Get-ManifestedStageDirectories -Prefix 'vscode' -Mode TemporaryShort -LegacyRootPaths @($layout.ToolsRoot) | Select-Object -ExpandProperty FullName)
+
+    $installed = Get-InstalledVSCodeRuntime -Flavor $Flavor -LocalRoot $layout.LocalRoot
+    $managedRuntime = $installed.Current
+    $externalRuntime = $null
+    if (-not $managedRuntime) {
+        $externalRuntime = Get-SystemVSCodeRuntime -LocalRoot $layout.LocalRoot
+    }
+
+    $definition = Get-ManifestedCommandDefinition -CommandName 'Initialize-VSCodeRuntime'
+    $package = if ($definition) { Get-LatestCachedZipArtifactFromDefinition -Definition $definition -Flavor $Flavor -LocalRoot $layout.LocalRoot } else { $null }
+    $currentRuntime = if ($managedRuntime) { $managedRuntime } else { $externalRuntime }
+    $invalidRuntimeHomes = @($installed.Invalid | Select-Object -ExpandProperty RuntimeHome)
+    $executablePath = if ($currentRuntime) { $currentRuntime.CodePath } else { $null }
+    $cliCommandPath = if ($currentRuntime) { $currentRuntime.CodeCmd } else { $null }
+
+    return (New-ManifestedRuntimeFacts -RuntimeName 'VSCodeRuntime' -CommandName 'Initialize-VSCodeRuntime' -RuntimeKind 'PortablePackage' -LocalRoot $layout.LocalRoot -Layout $layout -ManagedRuntime $managedRuntime -ExternalRuntime $externalRuntime -Artifact $package -PartialPaths $partialPaths -InvalidPaths $invalidRuntimeHomes -Version $(if ($currentRuntime) { $currentRuntime.Version } elseif ($package) { $package.Version } else { $null }) -RuntimeHome $(if ($currentRuntime) { $currentRuntime.RuntimeHome } else { $null }) -RuntimeSource $(if ($managedRuntime) { 'Managed' } elseif ($externalRuntime) { 'External' } else { $null }) -ExecutablePath $executablePath -RuntimeValidation $(if ($currentRuntime) { $currentRuntime.Validation } else { $null }) -AdditionalProperties @{
+            Flavor              = $Flavor
+            Channel             = 'stable'
+            Package             = $package
+            PackagePath         = if ($package) { $package.Path } else { $null }
+            CliCommandPath      = $cliCommandPath
+            CliCommandDirectory = if (-not [string]::IsNullOrWhiteSpace($cliCommandPath)) { Split-Path -Parent $cliCommandPath } else { $null }
+            PortableMode        = if ($currentRuntime) { [bool]$currentRuntime.Validation.PortableMode } else { $false }
+            InvalidRuntimeHomes = $invalidRuntimeHomes
+        })
+}
+
 function Initialize-VSCodeRuntime {
     [CmdletBinding(SupportsShouldProcess = $true)]
     param(
         [switch]$RefreshVSCode
     )
 
-    $LocalRoot = (Get-ManifestedLayout).LocalRoot
-    $selfElevationContext = Get-ManifestedSelfElevationContext
-
-    $actionsTaken = New-Object System.Collections.Generic.List[string]
-    $plannedActions = New-Object System.Collections.Generic.List[string]
-    $repairResult = $null
-    $packageInfo = $null
-    $packageTest = $null
-    $installResult = $null
-    $commandEnvironment = $null
-
-    $initialState = Get-VSCodeRuntimeState -LocalRoot $LocalRoot
-    $state = $initialState
-    $elevationPlan = Get-ManifestedCommandElevationPlan -CommandName 'Initialize-VSCodeRuntime' -LocalRoot $LocalRoot -SkipSelfElevation:$selfElevationContext.SkipSelfElevation -WasSelfElevated:$selfElevationContext.WasSelfElevated -WhatIfMode:$WhatIfPreference
-
-    if ($state.Status -eq 'Blocked') {
-        $commandEnvironment = Get-ManifestedCommandEnvironmentResult -CommandName 'Initialize-VSCodeRuntime' -RuntimeState $state
-        $result = [pscustomobject]@{
-            LocalRoot          = $state.LocalRoot
-            Layout             = $state.Layout
-            InitialState       = $initialState
-            FinalState         = $state
-            ActionTaken        = @('None')
-            PlannedActions     = @()
-            RestartRequired    = $false
-            Package            = $null
-            PackageTest        = $null
-            RuntimeTest        = $null
-            RepairResult       = $null
-            InstallResult      = $null
-            CommandEnvironment = $commandEnvironment
-            Elevation          = $elevationPlan
-        }
-
-        if ($WhatIfPreference) {
-            Add-Member -InputObject $result -NotePropertyName PersistedStatePath -NotePropertyValue $null -Force
-            return $result
-        }
-
-        $statePath = Save-ManifestedInvokeState -CommandName 'Initialize-VSCodeRuntime' -Result $result -LocalRoot $LocalRoot -Details @{
-            Version        = $state.CurrentVersion
-            Flavor         = $state.Flavor
-            Channel        = $state.Channel
-            RuntimeHome    = $state.RuntimeHome
-            RuntimeSource  = $state.RuntimeSource
-            ExecutablePath = $state.ExecutablePath
-            CliCommandPath = $state.CliCommandPath
-            PortableMode   = $state.PortableMode
-        }
-        Add-Member -InputObject $result -NotePropertyName PersistedStatePath -NotePropertyValue $statePath -Force
-        return $result
-    }
-
-    $needsRepair = $state.Status -in @('Partial', 'NeedsRepair')
-    $needsInstall = $RefreshVSCode -or -not $state.RuntimeHome
-    $needsAcquire = $RefreshVSCode -or (-not $state.PackagePath)
-
-    if ($needsRepair) {
-        $plannedActions.Add('Repair-VSCodeRuntime') | Out-Null
-    }
-    if ($needsInstall -and $needsAcquire) {
-        $plannedActions.Add('Save-VSCodeRuntimePackage') | Out-Null
-    }
-    if ($needsInstall) {
-        $plannedActions.Add('Test-VSCodeRuntimePackage') | Out-Null
-        $plannedActions.Add('Install-VSCodeRuntime') | Out-Null
-    }
-    $plannedActions.Add('Sync-ManifestedCommandLineEnvironment') | Out-Null
-
-    $elevationPlan = Get-ManifestedCommandElevationPlan -CommandName 'Initialize-VSCodeRuntime' -PlannedActions @($plannedActions) -LocalRoot $LocalRoot -SkipSelfElevation:$selfElevationContext.SkipSelfElevation -WasSelfElevated:$selfElevationContext.WasSelfElevated -WhatIfMode:$WhatIfPreference
-
-    if ($needsRepair) {
-        if (-not $PSCmdlet.ShouldProcess($state.Layout.VsCodeToolsRoot, 'Repair VS Code runtime state')) {
-            return [pscustomobject]@{
-                LocalRoot          = $state.LocalRoot
-                Layout             = $state.Layout
-                InitialState       = $initialState
-                FinalState         = $state
-                ActionTaken        = @('WhatIf')
-                PlannedActions     = @($plannedActions)
-                RestartRequired    = $false
-                Package            = $null
-                PackageTest        = $null
-                RuntimeTest        = $state.Runtime
-                RepairResult       = $null
-                InstallResult      = $null
-                CommandEnvironment = (Get-ManifestedCommandEnvironmentResult -CommandName 'Initialize-VSCodeRuntime' -RuntimeState $state)
-                PersistedStatePath = $null
-                Elevation          = $elevationPlan
-            }
-        }
-
-        $repairResult = Repair-VSCodeRuntime -State $state -Flavor $state.Flavor -LocalRoot $state.LocalRoot
-        if ($repairResult.Action -eq 'Repaired') {
-            $actionsTaken.Add('Repair-VSCodeRuntime') | Out-Null
-        }
-
-        $state = Get-VSCodeRuntimeState -Flavor $state.Flavor -LocalRoot $state.LocalRoot
-        $needsInstall = $RefreshVSCode -or -not $state.RuntimeHome
-        $needsAcquire = $RefreshVSCode -or (-not $state.PackagePath)
-    }
-
-    if ($needsInstall) {
-        if ($needsAcquire) {
-            if (-not $PSCmdlet.ShouldProcess($state.Layout.VsCodeCacheRoot, 'Acquire VS Code runtime package')) {
-                return [pscustomobject]@{
-                    LocalRoot          = $state.LocalRoot
-                    Layout             = $state.Layout
-                    InitialState       = $initialState
-                    FinalState         = $state
-                    ActionTaken        = @('WhatIf')
-                    PlannedActions     = @($plannedActions)
-                    RestartRequired    = $false
-                    Package            = $null
-                    PackageTest        = $null
-                    RuntimeTest        = $state.Runtime
-                    RepairResult       = $repairResult
-                    InstallResult      = $null
-                    CommandEnvironment = (Get-ManifestedCommandEnvironmentResult -CommandName 'Initialize-VSCodeRuntime' -RuntimeState $state)
-                    PersistedStatePath = $null
-                    Elevation          = $elevationPlan
-                }
-            }
-
-            $packageInfo = Save-VSCodeRuntimePackage -RefreshVSCode:$RefreshVSCode -Flavor $state.Flavor -LocalRoot $state.LocalRoot
-            if ($packageInfo.Action -eq 'Downloaded') {
-                $actionsTaken.Add('Save-VSCodeRuntimePackage') | Out-Null
-            }
-        }
-        else {
-            $packageInfo = $state.Package
-        }
-
-        $packageTest = Test-VSCodeRuntimePackage -PackageInfo $packageInfo
-        if ($packageTest.Status -eq 'CorruptCache') {
-            if (-not $PSCmdlet.ShouldProcess($packageInfo.Path, 'Repair corrupt VS Code runtime package')) {
-                return [pscustomobject]@{
-                    LocalRoot          = $state.LocalRoot
-                    Layout             = $state.Layout
-                    InitialState       = $initialState
-                    FinalState         = $state
-                    ActionTaken        = @('WhatIf')
-                    PlannedActions     = @($plannedActions)
-                    RestartRequired    = $false
-                    Package            = $packageInfo
-                    PackageTest        = $packageTest
-                    RuntimeTest        = $state.Runtime
-                    RepairResult       = $repairResult
-                    InstallResult      = $null
-                    CommandEnvironment = (Get-ManifestedCommandEnvironmentResult -CommandName 'Initialize-VSCodeRuntime' -RuntimeState $state)
-                    PersistedStatePath = $null
-                    Elevation          = $elevationPlan
-                }
-            }
-
-            $repairResult = Repair-VSCodeRuntime -State $state -CorruptPackagePaths @($packageInfo.Path) -Flavor $state.Flavor -LocalRoot $state.LocalRoot
-            if ($repairResult.Action -eq 'Repaired') {
-                $actionsTaken.Add('Repair-VSCodeRuntime') | Out-Null
-            }
-
-            $packageInfo = Save-VSCodeRuntimePackage -RefreshVSCode:$true -Flavor $state.Flavor -LocalRoot $state.LocalRoot
-            if ($packageInfo.Action -eq 'Downloaded') {
-                $actionsTaken.Add('Save-VSCodeRuntimePackage') | Out-Null
-            }
-
-            $packageTest = Test-VSCodeRuntimePackage -PackageInfo $packageInfo
-        }
-
-        if ($packageTest.Status -eq 'UnverifiedCache') {
-            throw "VS Code runtime package validation failed because no trusted checksum could be resolved for $($packageInfo.FileName)."
-        }
-
-        if ($packageTest.Status -ne 'Ready') {
-            throw "VS Code runtime package validation failed with status $($packageTest.Status)."
-        }
-
-        $commandParameters = @{}
-        if ($RefreshVSCode) {
-            $commandParameters['RefreshVSCode'] = $true
-        }
-        if ($PSBoundParameters.ContainsKey('WhatIf')) {
-            $commandParameters['WhatIf'] = $true
-        }
-
-        $elevatedResult = Invoke-ManifestedElevatedCommand -ElevationPlan $elevationPlan -CommandName 'Initialize-VSCodeRuntime' -CommandParameters $commandParameters
-        if ($null -ne $elevatedResult) {
-            return $elevatedResult
-        }
-
-        if (-not $PSCmdlet.ShouldProcess($state.Layout.VsCodeToolsRoot, 'Install VS Code runtime')) {
-            return [pscustomobject]@{
-                LocalRoot          = $state.LocalRoot
-                Layout             = $state.Layout
-                InitialState       = $initialState
-                FinalState         = $state
-                ActionTaken        = @('WhatIf')
-                PlannedActions     = @($plannedActions)
-                RestartRequired    = $false
-                Package            = $packageInfo
-                PackageTest        = $packageTest
-                RuntimeTest        = $state.Runtime
-                RepairResult       = $repairResult
-                InstallResult      = $null
-                CommandEnvironment = (Get-ManifestedCommandEnvironmentResult -CommandName 'Initialize-VSCodeRuntime' -RuntimeState $state)
-                PersistedStatePath = $null
-                Elevation          = $elevationPlan
-            }
-        }
-
-        $installResult = Install-VSCodeRuntime -PackageInfo $packageInfo -Flavor $state.Flavor -LocalRoot $state.LocalRoot
-        if ($installResult.Action -eq 'Installed') {
-            $actionsTaken.Add('Install-VSCodeRuntime') | Out-Null
-        }
-    }
-
-    $finalState = Get-VSCodeRuntimeState -Flavor $state.Flavor -LocalRoot $state.LocalRoot
-    $runtimeTest = if ($finalState.RuntimeHome) { Test-VSCodeRuntime -RuntimeHome $finalState.RuntimeHome -RequirePortableMode:($finalState.RuntimeSource -eq 'Managed') } else { $null }
-
-    $commandEnvironment = Get-ManifestedCommandEnvironmentResult -CommandName 'Initialize-VSCodeRuntime' -RuntimeState $finalState
-    if ($commandEnvironment.Applicable) {
-        if (-not $PSCmdlet.ShouldProcess($commandEnvironment.DesiredCommandDirectory, 'Synchronize VS Code command-line environment')) {
-            return [pscustomobject]@{
-                LocalRoot          = $finalState.LocalRoot
-                Layout             = $finalState.Layout
-                InitialState       = $initialState
-                FinalState         = $finalState
-                ActionTaken        = @('WhatIf')
-                PlannedActions     = @($plannedActions)
-                RestartRequired    = $false
-                Package            = $packageInfo
-                PackageTest        = $packageTest
-                RuntimeTest        = $runtimeTest
-                RepairResult       = $repairResult
-                InstallResult      = $installResult
-                CommandEnvironment = $commandEnvironment
-                PersistedStatePath = $null
-                Elevation          = $elevationPlan
-            }
-        }
-
-        $commandEnvironment = Sync-ManifestedCommandLineEnvironment -Specification (Get-ManifestedCommandEnvironmentSpec -CommandName 'Initialize-VSCodeRuntime' -RuntimeState $finalState)
-        if ($commandEnvironment.Status -eq 'Updated') {
-            $actionsTaken.Add('Sync-ManifestedCommandLineEnvironment') | Out-Null
-        }
-    }
-
-    $result = [pscustomobject]@{
-        LocalRoot          = $finalState.LocalRoot
-        Layout             = $finalState.Layout
-        InitialState       = $initialState
-        FinalState         = $finalState
-        ActionTaken        = if ($actionsTaken.Count -gt 0) { @($actionsTaken) } else { @('None') }
-        PlannedActions     = @($plannedActions)
-        RestartRequired    = $false
-        Package            = $packageInfo
-        PackageTest        = $packageTest
-        RuntimeTest        = $runtimeTest
-        RepairResult       = $repairResult
-        InstallResult      = $installResult
-        CommandEnvironment = $commandEnvironment
-        Elevation          = $elevationPlan
-    }
-
-    if ($WhatIfPreference) {
-        Add-Member -InputObject $result -NotePropertyName PersistedStatePath -NotePropertyValue $null -Force
-        return $result
-    }
-
-    $detailsPackage = if ($packageInfo) { $packageInfo } elseif ($finalState.Package) { $finalState.Package } else { $null }
-    $statePath = Save-ManifestedInvokeState -CommandName 'Initialize-VSCodeRuntime' -Result $result -LocalRoot $LocalRoot -Details @{
-        Tag            = if ($detailsPackage) { $detailsPackage.TagName } else { $null }
-        Version        = $finalState.CurrentVersion
-        Flavor         = $finalState.Flavor
-        Channel        = $finalState.Channel
-        AssetName      = if ($detailsPackage) { $detailsPackage.FileName } else { $null }
-        PackagePath    = if ($detailsPackage) { $detailsPackage.Path } else { $finalState.PackagePath }
-        RuntimeHome    = $finalState.RuntimeHome
-        RuntimeSource  = $finalState.RuntimeSource
-        ExecutablePath = $finalState.ExecutablePath
-        CliCommandPath = $finalState.CliCommandPath
-        PortableMode   = $finalState.PortableMode
-        DownloadUrl    = if ($detailsPackage) { $detailsPackage.DownloadUrl } else { $null }
-        Sha256         = if ($detailsPackage) { $detailsPackage.Sha256 } else { $null }
-        ShaSource      = if ($detailsPackage) { $detailsPackage.ShaSource } else { $null }
-    }
-    Add-Member -InputObject $result -NotePropertyName PersistedStatePath -NotePropertyValue $statePath -Force
-
-    return $result
+    return (Invoke-ManifestedCommandInitialization -Name 'Initialize-VSCodeRuntime' -PSCmdletObject $PSCmdlet -RefreshRequested:$RefreshVSCode -WhatIfMode:$WhatIfPreference)
 }

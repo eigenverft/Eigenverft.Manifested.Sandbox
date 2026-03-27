@@ -1,0 +1,51 @@
+{
+  "schemaVersion": 2,
+  "commandName": "Initialize-GeminiRuntime",
+  "runtimeName": "GeminiRuntime",
+  "kind": "npm-cli",
+  "wrapperCommand": "Initialize-GeminiRuntime",
+  "refreshSwitchName": "RefreshGemini",
+  "facts": {
+    "npmCli": {
+      "commandFileName": "gemini.cmd",
+      "packageJsonRelativePath": "node_modules\\@google\\gemini-cli\\package.json"
+    }
+  },
+  "supply": null,
+  "artifact": null,
+  "install": {
+    "npmGlobalPackage": {
+      "packageSpec": "@google/gemini-cli@latest",
+      "stagePrefix": "gemini",
+      "cacheRootLayoutProperty": "GeminiCacheRoot",
+      "toolsRootLayoutProperty": "GeminiToolsRoot"
+    }
+  },
+  "environment": {
+    "commandProjection": {
+      "desiredDirectoryFact": "RuntimeHome",
+      "executableFact": "ExecutablePath",
+      "expectedCommands": [
+        "gemini.cmd"
+      ]
+    }
+  },
+  "dependencies": [
+    {
+      "runtimeName": "NodeRuntime",
+      "minimumVersion": "20.0.0",
+      "satisfactionMode": "managed-or-external",
+      "autoInstall": true,
+      "reason": "Gemini requires a compatible Node.js runtime and npm command."
+    }
+  ],
+  "policies": {
+    "allowExternalSatisfaction": true,
+    "requireTrustedArtifact": false,
+    "supportsEnvironmentSync": true,
+    "installRequiresElevation": false
+  },
+  "hooks": {
+    "postInstall": null
+  }
+}

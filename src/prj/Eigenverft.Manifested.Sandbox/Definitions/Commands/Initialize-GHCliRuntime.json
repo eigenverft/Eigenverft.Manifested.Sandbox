@@ -1,0 +1,104 @@
+{
+  "schemaVersion": 2,
+  "commandName": "Initialize-GHCliRuntime",
+  "runtimeName": "GHCliRuntime",
+  "kind": "portable-package",
+  "wrapperCommand": "Initialize-GHCliRuntime",
+  "refreshSwitchName": "RefreshGHCli",
+  "facts": {
+    "portableRuntime": {
+      "hostFlavorMap": {
+        "arm64": "windows_arm64",
+        "x64": "windows_amd64"
+      },
+      "unsupportedHostMessage": "Only 64-bit Windows targets are supported by this GitHub CLI runtime bootstrap.",
+      "toolsRootLayoutProperty": "GHCliToolsRoot",
+      "stagePrefix": "ghcli",
+      "versionFolderTemplate": "{version}",
+      "requiredPathGroups": [
+        [
+          "bin\\gh.exe",
+          "gh.exe"
+        ]
+      ],
+      "versionProbe": {
+        "executableCandidates": [
+          "bin\\gh.exe",
+          "gh.exe"
+        ],
+        "arguments": [
+          "--version"
+        ],
+        "regex": "v?(\\d+\\.\\d+\\.\\d+)"
+      },
+      "versionPolicy": {
+        "managedMinimumVersion": null,
+        "managedVersionFamily": null,
+        "externalMinimumVersion": null
+      },
+      "externalDiscovery": {
+        "commandNames": [
+          "gh.exe",
+          "gh"
+        ],
+        "additionalPathPatterns": [
+          "{ProgramFiles}\\GitHub CLI\\gh.exe",
+          "{ProgramFiles}\\GitHub CLI\\bin\\gh.exe",
+          "{LocalAppData}\\Programs\\GitHub CLI\\gh.exe",
+          "{LocalAppData}\\Programs\\GitHub CLI\\bin\\gh.exe"
+        ],
+        "runtimeHomeTrimLeafNames": [
+          "bin"
+        ]
+      }
+    }
+  },
+  "supply": {
+    "githubRelease": {
+      "repository": "cli/cli",
+      "releaseVersionRule": {
+        "regex": "v?(\\d+\\.\\d+\\.\\d+)"
+      },
+      "assetNamePattern": "gh_{version}_{flavor}.zip",
+      "checksum": {
+        "fallbackSource": "ChecksumAsset",
+        "assetNamePattern": "gh_{version}_checksums.txt"
+      },
+      "downloadMessage": "Downloading GitHub CLI {version} ({flavor})...",
+      "offlineError": "Could not reach GitHub and no cached GitHub CLI ZIP was found."
+    }
+  },
+  "artifact": {
+    "zipPackage": {
+      "cacheRootLayoutProperty": "GHCliCacheRoot",
+      "fileNamePattern": "^gh_(\\d+\\.\\d+\\.\\d+)_{flavor}\\.zip$"
+    }
+  },
+  "install": {
+    "portableArchive": {
+      "stagePrefix": "ghcli",
+      "toolsRootLayoutProperty": "GHCliToolsRoot",
+      "versionFolderTemplate": "{version}",
+      "createDirectories": []
+    }
+  },
+  "environment": {
+    "commandProjection": {
+      "desiredDirectoryFact": "RuntimeHome",
+      "executableFact": "ExecutablePath",
+      "expectedCommands": [
+        "gh.exe"
+      ]
+    }
+  },
+  "dependencies": [],
+  "policies": {
+    "allowExternalSatisfaction": true,
+    "requireTrustedArtifact": true,
+    "supportsEnvironmentSync": true,
+    "installRequiresElevation": false
+  },
+  "hooks": {
+    "postInstall": null
+  }
+}

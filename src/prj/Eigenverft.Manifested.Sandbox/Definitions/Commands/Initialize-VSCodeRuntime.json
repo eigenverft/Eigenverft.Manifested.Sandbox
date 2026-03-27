@@ -1,0 +1,126 @@
+{
+  "schemaVersion": 2,
+  "commandName": "Initialize-VSCodeRuntime",
+  "runtimeName": "VSCodeRuntime",
+  "kind": "portable-package",
+  "wrapperCommand": "Initialize-VSCodeRuntime",
+  "refreshSwitchName": "RefreshVSCode",
+  "facts": {
+    "portableRuntime": {
+      "hostFlavorMap": {
+        "arm64": "win32-arm64",
+        "x64": "win32-x64"
+      },
+      "unsupportedHostMessage": "Only 64-bit Windows targets are supported by this VS Code runtime bootstrap.",
+      "toolsRootLayoutProperty": "VsCodeToolsRoot",
+      "stagePrefix": "vscode",
+      "versionFolderTemplate": "{version}",
+      "requiredPathGroups": [
+        [
+          "Code.exe"
+        ],
+        [
+          "bin\\code.cmd"
+        ]
+      ],
+      "namedFilePaths": {
+        "CodePath": "Code.exe",
+        "CliCommandPath": "bin\\code.cmd"
+      },
+      "namedDirectoryPaths": {
+        "CliCommandDirectory": "bin"
+      },
+      "requiredDirectories": [
+        "data"
+      ],
+      "signerSubjectMatch": "Microsoft Corporation",
+      "fileInfoAnyOf": {
+        "ProductName": [
+          "Visual Studio Code"
+        ],
+        "FileDescription": [
+          "Visual Studio Code"
+        ]
+      },
+      "versionProbe": {
+        "executableCandidates": [
+          "bin\\code.cmd",
+          "Code.exe"
+        ],
+        "arguments": [
+          "--version"
+        ],
+        "regex": "(\\d+\\.\\d+\\.\\d+)"
+      },
+      "versionPolicy": {
+        "managedMinimumVersion": null,
+        "managedVersionFamily": null,
+        "externalMinimumVersion": null
+      },
+      "externalDiscovery": {
+        "commandNames": [
+          "code.cmd",
+          "code",
+          "Code.exe"
+        ],
+        "additionalPathPatterns": [
+          "{ProgramFiles}\\Microsoft VS Code\\bin\\code.cmd",
+          "{ProgramFiles}\\Microsoft VS Code\\Code.exe",
+          "{LocalAppData}\\Programs\\Microsoft VS Code\\bin\\code.cmd",
+          "{LocalAppData}\\Programs\\Microsoft VS Code\\Code.exe"
+        ],
+        "runtimeHomeTrimLeafNames": [
+          "bin"
+        ]
+      }
+    }
+  },
+  "supply": {
+    "vsCodeUpdate": {
+      "channel": "stable",
+      "releaseVersionRule": {
+        "regex": "(\\d+\\.\\d+\\.\\d+)"
+      },
+      "updateTargetPattern": "{flavor}-archive",
+      "latestUrlPattern": "https://update.code.visualstudio.com/latest/{updateTarget}/{channel}",
+      "fileNamePattern": "^(VSCode-{flavor}-(\\d+\\.\\d+\\.\\d+)\\.zip)$",
+      "downloadMessage": "Downloading Visual Studio Code {channel} ({flavor})...",
+      "offlineError": "Could not reach the VS Code update service and no cached VS Code ZIP was found."
+    }
+  },
+  "artifact": {
+    "zipPackage": {
+      "cacheRootLayoutProperty": "VsCodeCacheRoot",
+      "fileNamePattern": "^VSCode-{flavor}-(\\d+\\.\\d+\\.\\d+)\\.zip$"
+    }
+  },
+  "install": {
+    "portableArchive": {
+      "stagePrefix": "vscode",
+      "toolsRootLayoutProperty": "VsCodeToolsRoot",
+      "versionFolderTemplate": "{version}",
+      "createDirectories": [
+        "data"
+      ]
+    }
+  },
+  "environment": {
+    "commandProjection": {
+      "desiredDirectoryFact": "CliCommandDirectory",
+      "executableFact": "CliCommandPath",
+      "expectedCommands": [
+        "code.cmd"
+      ]
+    }
+  },
+  "dependencies": [],
+  "policies": {
+    "allowExternalSatisfaction": true,
+    "requireTrustedArtifact": true,
+    "supportsEnvironmentSync": true,
+    "installRequiresElevation": false
+  },
+  "hooks": {
+    "postInstall": null
+  }
+}

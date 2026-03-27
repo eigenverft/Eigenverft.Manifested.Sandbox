@@ -22,6 +22,7 @@ $moduleProjectRoot = Join-Path (Split-Path -Parent $PSScriptRoot) 'Eigenverft.Ma
 
 # Private logic
 . "$moduleProjectRoot\Private\Logic\Eigenverft.Manifested.Sandbox.Shared.CommandEnvironment.ps1"
+. "$moduleProjectRoot\Private\Logic\Eigenverft.Manifested.Sandbox.Shared.RuntimeKernel.ps1"
 
 # Public state surface
 . "$moduleProjectRoot\Public\Eigenverft.Manifested.Sandbox.Shared.State.ps1"
@@ -39,3 +40,4 @@ $moduleProjectRoot = Join-Path (Split-Path -Parent $PSScriptRoot) 'Eigenverft.Ma
 . "$moduleProjectRoot\Public\Eigenverft.Manifested.Sandbox.Cmd.VsCodeRuntimeAndCache.ps1"
 . "$moduleProjectRoot\Public\Eigenverft.Manifested.Sandbox.Cmd.VCRuntimeAndCache.ps1"
 
+Import-ManifestedCommandDefinitions -DefinitionsRoot (Join-Path $moduleProjectRoot 'Definitions\Commands') | Out-Null

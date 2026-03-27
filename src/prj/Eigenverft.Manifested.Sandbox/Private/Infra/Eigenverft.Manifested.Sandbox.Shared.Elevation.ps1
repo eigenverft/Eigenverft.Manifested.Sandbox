@@ -72,7 +72,7 @@ function Get-ManifestedCommandElevationPlan {
         [Parameter(Mandatory = $true)]
         [string]$CommandName,
 
-        [string[]]$PlannedActions = @(),
+        [pscustomobject[]]$PlanSteps = @(),
 
         [hashtable]$Context = @{},
 
@@ -84,27 +84,11 @@ function Get-ManifestedCommandElevationPlan {
     )
 
     $layout = Get-ManifestedLayout -LocalRoot $LocalRoot
-    $requiresElevation = $false
+    $requiresElevation = (@($PlanSteps | Where-Object { $_.RequiresElevation }).Count -gt 0)
     $requirementSource = $null
-
-    switch ($CommandName) {
-        'Initialize-VCRuntime' {
-            $installedRuntime = if ($Context.ContainsKey('InstalledRuntime')) { $Context['InstalledRuntime'] } else { $null }
-            $installerInfo = if ($Context.ContainsKey('InstallerInfo')) { $Context['InstallerInfo'] } else { $null }
-
-            if ($installedRuntime -and $installedRuntime.Installed) {
-                if ($installerInfo -and $installerInfo.VersionObject) {
-                    if (-not $installedRuntime.VersionObject -or $installedRuntime.VersionObject -lt $installerInfo.VersionObject) {
-                        $requiresElevation = $true
-                        $requirementSource = 'Install-VCRuntime'
-                    }
-                }
-            }
-            elseif (@($PlannedActions) -contains 'Install-VCRuntime') {
-                $requiresElevation = $true
-                $requirementSource = 'Install-VCRuntime'
-            }
-        }
+    $requiringStep = @($PlanSteps | Where-Object { $_.RequiresElevation } | Select-Object -First 1)
+    if ($requiringStep) {
+        $requirementSource = $requiringStep[0].Name
     }
 
     $processIsElevated = Test-ManifestedProcessElevation
@@ -113,7 +97,7 @@ function Get-ManifestedCommandElevationPlan {
         CommandName        = $CommandName
         LocalRoot          = $layout.LocalRoot
         Layout             = $layout
-        PlannedActions     = @($PlannedActions)
+        PlanSteps          = @($PlanSteps)
         ProcessIsElevated  = $processIsElevated
         RequiresElevation  = $requiresElevation
         RequirementSource  = $requirementSource

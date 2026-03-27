@@ -31,7 +31,7 @@ CompanyName = 'Eigenverft'
 Copyright = 'Copyright (c) 2026 Eigenverft'
 
 # Description of the functionality provided by this module
-Description = 'Windows-focused PowerShell module for repeatable Windows Sandbox and fresh-machine bootstrap with managed Python, PowerShell, Node.js, and tooling runtimes, plus proxy-aware package bootstraps and state tracking.'
+Description = 'Windows-focused PowerShell module for repeatable Windows Sandbox and fresh-machine bootstrap with managed Python, PowerShell, Node.js, and tooling runtimes, plus proxy-aware package bootstraps and fact-based runtime planning.'
 
 # Minimum version of the PowerShell engine required by this module
 PowerShellVersion = '5.1'
@@ -73,6 +73,7 @@ PowerShellVersion = '5.1'
 FunctionsToExport = @(
     'Get-SandboxVersion',
     'Get-SandboxState',
+    'Initialize-SandboxCommand',
     'Initialize-OpenCodeRuntime',
     'Initialize-GeminiRuntime',
     'Initialize-QwenRuntime',
@@ -113,6 +114,23 @@ FileList = @(
     'Private\Infra\Eigenverft.Manifested.Sandbox.Shared.Elevation.ps1',
     'Private\Infra\Eigenverft.Manifested.Sandbox.Shared.GitHubReleases.ps1',
     'Private\Logic\Eigenverft.Manifested.Sandbox.Shared.CommandEnvironment.ps1',
+    'Private\Logic\Eigenverft.Manifested.Sandbox.Shared.RuntimeKernel.ps1',
+    'Private\Logic\RuntimeKernel\Definitions\Manifested.CommandDefinitions.ps1',
+    'Private\Logic\RuntimeKernel\Definitions\Manifested.Versioning.ps1',
+    'Private\Logic\RuntimeKernel\Facts\Manifested.RuntimeFacts.Model.ps1',
+    'Private\Logic\RuntimeKernel\Facts\Manifested.RuntimeFacts.Collectors.ps1',
+    'Private\Logic\RuntimeKernel\Facts\Manifested.RuntimeFacts.Portable.ps1',
+    'Private\Logic\RuntimeKernel\Facts\Manifested.RuntimeFacts.Dispatch.ps1',
+    'Private\Logic\RuntimeKernel\Supply\Manifested.ArtifactSupply.ps1',
+    'Private\Logic\RuntimeKernel\Plan\Manifested.PlanModel.ps1',
+    'Private\Logic\RuntimeKernel\Plan\Manifested.DependencyPlanning.ps1',
+    'Private\Logic\RuntimeKernel\Execute\Manifested.RepairAndArtifact.ps1',
+    'Private\Logic\RuntimeKernel\Execute\Manifested.InstallsAndHooks.ps1',
+    'Private\Logic\RuntimeKernel\Execute\Manifested.Repair.Runtime.ps1',
+    'Private\Logic\RuntimeKernel\Execute\Manifested.Install.Shared.ps1',
+    'Private\Logic\RuntimeKernel\Execute\Manifested.PostInstall.Steps.ps1',
+    'Private\Logic\RuntimeKernel\Execute\Manifested.RuntimeExecution.ps1',
+    'Private\Logic\RuntimeKernel\Compat\Manifested.DescriptorFacade.ps1',
     'Public\Eigenverft.Manifested.Sandbox.Cmd.Ps7RuntimeAndCache.ps1',
     'Public\Eigenverft.Manifested.Sandbox.Cmd.PythonRuntimeAndCache.ps1',
     'Public\Eigenverft.Manifested.Sandbox.Cmd.NodeRuntimeAndCache.ps1',
@@ -125,6 +143,17 @@ FileList = @(
     'Public\Eigenverft.Manifested.Sandbox.Cmd.VsCodeRuntimeAndCache.ps1',
     'Public\Eigenverft.Manifested.Sandbox.Cmd.VCRuntimeAndCache.ps1',
     'Private\Infra\Eigenverft.Manifested.Sandbox.Base.Invoke-WebRequestEx.ps1',
+    'Definitions\Commands\Initialize-CodexRuntime.json',
+    'Definitions\Commands\Initialize-GeminiRuntime.json',
+    'Definitions\Commands\Initialize-GHCliRuntime.json',
+    'Definitions\Commands\Initialize-GitRuntime.json',
+    'Definitions\Commands\Initialize-NodeRuntime.json',
+    'Definitions\Commands\Initialize-OpenCodeRuntime.json',
+    'Definitions\Commands\Initialize-PythonRuntime.json',
+    'Definitions\Commands\Initialize-Ps7Runtime.json',
+    'Definitions\Commands\Initialize-QwenRuntime.json',
+    'Definitions\Commands\Initialize-VCRuntime.json',
+    'Definitions\Commands\Initialize-VSCodeRuntime.json',
     'Eigenverft.Manifested.Sandbox.psm1',
     'Eigenverft.Manifested.Sandbox.psd1',
     'LICENSE.txt'
@@ -148,7 +177,7 @@ PrivateData = @{
         IconUri = 'https://raw.githubusercontent.com/eigenverft/Eigenverft.Manifested.Sandbox/main/resources/evt-logo_on_light_border_128x128.png'
 
         # ReleaseNotes of this module
-        ReleaseNotes = 'Added sandbox-managed Python runtime initialization with pip bootstrap and proxy-aware pip config ownership, plus refreshed runtime state and bootstrap documentation.'
+        ReleaseNotes = 'Split the shared runtime kernel into focused leaf files, expanded packaged JSON command definitions to every exported runtime command, and continued the block-driven facts-plan-execute refactor with thinner compatibility surfaces.'
 
         # Prerelease string of this module
         Prerelease = ''

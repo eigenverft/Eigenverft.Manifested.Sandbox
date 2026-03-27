@@ -1,0 +1,74 @@
+{
+  "schemaVersion": 2,
+  "commandName": "Initialize-PythonRuntime",
+  "runtimeName": "PythonRuntime",
+  "kind": "portable-package",
+  "wrapperCommand": "Initialize-PythonRuntime",
+  "refreshSwitchName": "RefreshPython",
+  "facts": {
+    "pythonEmbeddableRuntime": {
+      "hostFlavorMap": {
+        "arm64": "arm64",
+        "x64": "amd64"
+      },
+      "versionRule": {
+        "regex": "(\\d+\\.\\d+\\.\\d+)"
+      },
+      "versionPolicy": {
+        "managedMinimumVersion": "3.13.0",
+        "managedVersionFamily": "3.13",
+        "externalMinimumVersion": "3.13.0"
+      }
+    }
+  },
+  "supply": {
+    "pythonEmbed": {
+      "releaseCandidatesPattern": "(?is)<a href=\"/downloads/release/python-(?<slug>\\d+)/\">Python (?<version>\\d+\\.\\d+\\.\\d+) - (?<releaseDate>[^<]+)</a>",
+      "releaseVersionRule": {
+        "regex": "(\\d+\\.\\d+\\.\\d+)"
+      },
+      "descriptionPatternByFlavor": {
+        "amd64": "Windows\\s+embeddable\\s+package\\s+\\(64-bit\\)",
+        "arm64": "Windows\\s+embeddable\\s+package\\s+\\(ARM64\\)"
+      },
+      "downloadMessage": "Downloading Python embeddable package ({flavor})...",
+      "offlineError": "Could not reach python.org and no cached Python embeddable ZIP was found."
+    }
+  },
+  "artifact": {
+    "zipPackage": {
+      "cacheRootLayoutProperty": "PythonCacheRoot",
+      "fileNamePattern": "^python-(\\d+\\.\\d+\\.\\d+)-embed-{flavor}\\.zip$"
+    }
+  },
+  "install": {
+    "pythonEmbeddableZip": {
+      "stagePrefix": "python"
+    }
+  },
+  "environment": {
+    "commandProjection": {
+      "desiredDirectoryFact": "RuntimeHome",
+      "executableFact": "ExecutablePath",
+      "expectedCommands": [
+        "python.exe",
+        "pip.exe",
+        "pip3.exe"
+      ]
+    }
+  },
+  "dependencies": [],
+  "policies": {
+    "allowExternalSatisfaction": true,
+    "requireTrustedArtifact": true,
+    "supportsEnvironmentSync": true,
+    "installRequiresElevation": false
+  },
+  "hooks": {
+    "postInstall": {
+      "enablePythonSiteImports": null,
+      "ensurePythonPip": {},
+      "syncPythonPipProxy": null
+    }
+  }
+}

@@ -2,86 +2,8 @@
     Eigenverft.Manifested.Sandbox.Cmd.PythonRuntimeAndCache
 #>
 
-function ConvertTo-PythonVersion {
-    [CmdletBinding()]
-    param(
-        [string]$VersionText
-    )
-
-    if ([string]::IsNullOrWhiteSpace($VersionText)) {
-        return $null
-    }
-
-    $match = [regex]::Match($VersionText, '(\d+\.\d+\.\d+)')
-    if (-not $match.Success) {
-        return $null
-    }
-
-    return [version]$match.Groups[1].Value
-}
-
-function Get-PythonManagedBaselineVersion {
-    [CmdletBinding()]
-    param()
-
-    return [version]'3.13.0'
-}
-
-function Test-PythonManagedReleaseVersion {
-    [CmdletBinding()]
-    param(
-        [Parameter(Mandatory = $true)]
-        [version]$Version
-    )
-
-    $baseline = Get-PythonManagedBaselineVersion
-    return ($Version.Major -eq $baseline.Major) -and ($Version.Minor -eq $baseline.Minor) -and ($Version -ge $baseline)
-}
-
-function Test-PythonExternalRuntimeVersion {
-    [CmdletBinding()]
-    param(
-        [Parameter(Mandatory = $true)]
-        [version]$Version
-    )
-
-    $baseline = Get-PythonManagedBaselineVersion
-    return ($Version.Major -gt $baseline.Major) -or (($Version.Major -eq $baseline.Major) -and ($Version.Minor -ge $baseline.Minor))
-}
-
-function Get-PythonFlavor {
-    [CmdletBinding()]
-    param()
-
-    if ([System.Environment]::OSVersion.Platform -ne [System.PlatformID]::Win32NT) {
-        throw 'Only Windows hosts are supported by this Python runtime bootstrap.'
-    }
-
-    $archHints = @($env:PROCESSOR_ARCHITECTURE, $env:PROCESSOR_ARCHITEW6432) -join ';'
-    if ($archHints -match 'ARM64') {
-        return 'arm64'
-    }
-
-    if ([Environment]::Is64BitOperatingSystem) {
-        return 'amd64'
-    }
-
-    throw 'Only 64-bit Windows targets are supported by this Python runtime bootstrap.'
-}
-
-function Get-PythonReleaseDescriptionForFlavor {
-    [CmdletBinding()]
-    param(
-        [Parameter(Mandatory = $true)]
-        [string]$Flavor
-    )
-
-    switch ($Flavor) {
-        'amd64' { return 'Windows embeddable package (64-bit)' }
-        'arm64' { return 'Windows embeddable package (ARM64)' }
-        default { throw "Unsupported Python flavor '$Flavor'." }
-    }
-}
+$script:ManifestedPythonRuntimeDefinition = Get-ManifestedCommandDefinition -CommandName 'Initialize-PythonRuntime'
+$script:ManifestedPythonRuntimeVersionSpec = Get-ManifestedVersionSpec -Definition $script:ManifestedPythonRuntimeDefinition
 
 function Get-PythonPersistedPackageDetails {
     [CmdletBinding()]
@@ -99,10 +21,19 @@ function Get-PythonPersistedPackageDetails {
 
 function Get-PythonReleaseCandidates {
     [CmdletBinding()]
-    param()
+    param(
+        [Parameter(Mandatory = $true)]
+        [pscustomobject]$Definition,
+
+        [Parameter(Mandatory = $true)]
+        [pscustomobject]$VersionSpec
+    )
+
+    $supplyBlock = Get-ManifestedDefinitionBlock -Definition $Definition -SectionName 'supply' -BlockName 'pythonEmbed'
+    $releaseCandidatesPattern = if ($supplyBlock -and $supplyBlock.PSObject.Properties['releaseCandidatesPattern'] -and $supplyBlock.releaseCandidatesPattern) { [string]$supplyBlock.releaseCandidatesPattern } else { '(?is)<a href="/downloads/release/python-(?<slug>\d+)/">Python (?<version>\d+\.\d+\.\d+) - (?<releaseDate>[^<]+)</a>' }
 
     $response = Invoke-WebRequestEx -Uri 'https://www.python.org/downloads/windows/' -Headers @{ 'User-Agent' = 'Eigenverft.Manifested.Sandbox' } -UseBasicParsing
-    $matches = [regex]::Matches($response.Content, '(?is)<a href="/downloads/release/python-(?<slug>313\d+)/">Python (?<version>3\.13\.\d+) - (?<releaseDate>[^<]+)</a>')
+    $matches = [regex]::Matches($response.Content, $releaseCandidatesPattern)
     $items = New-Object System.Collections.Generic.List[object]
     $seenVersions = @{}
 
@@ -112,8 +43,8 @@ function Get-PythonReleaseCandidates {
             continue
         }
 
-        $versionObject = ConvertTo-PythonVersion -VersionText $versionText
-        if (-not $versionObject -or -not (Test-PythonManagedReleaseVersion -Version $versionObject)) {
+        $versionObject = ConvertTo-ManifestedVersionObjectFromRule -VersionText $versionText -Rule $versionSpec.RuntimeVersionRule
+        if (-not $versionObject -or -not (Test-ManifestedManagedVersion -Version $versionObject -VersionPolicy $versionSpec.VersionPolicy -Rule $versionSpec.RuntimeVersionRule)) {
             continue
         }
 
@@ -126,7 +57,7 @@ function Get-PythonReleaseCandidates {
         }) | Out-Null
     }
 
-    return @($items | Sort-Object -Descending -Property @{ Expression = { ConvertTo-PythonVersion -VersionText $_.Version } })
+    return @($items | Sort-Object -Descending -Property @{ Expression = { ConvertTo-ManifestedVersionObjectFromRule -VersionText $_.Version -Rule $versionSpec.RuntimeVersionRule } })
 }
 
 function Get-PythonReleaseAssetDetails {
@@ -136,13 +67,16 @@ function Get-PythonReleaseAssetDetails {
         [string]$ReleaseUrl,
 
         [Parameter(Mandatory = $true)]
-        [string]$Flavor
+        [string]$Flavor,
+
+        [Parameter(Mandatory = $true)]
+        [pscustomobject]$Definition
     )
 
-    $descriptionPattern = switch ($Flavor) {
-        'amd64' { 'Windows\s+embeddable\s+package\s+\(64-bit\)' }
-        'arm64' { 'Windows\s+embeddable\s+package\s+\(ARM64\)' }
-        default { throw "Unsupported Python flavor '$Flavor'." }
+    $supplyBlock = Get-ManifestedDefinitionBlock -Definition $Definition -SectionName 'supply' -BlockName 'pythonEmbed'
+    $descriptionPattern = Get-ManifestedFlavorMappedValue -Map $supplyBlock.descriptionPatternByFlavor -Flavor $Flavor
+    if ([string]::IsNullOrWhiteSpace($descriptionPattern)) {
+        throw "Unsupported Python flavor '$Flavor'."
     }
 
     $response = Invoke-WebRequestEx -Uri $ReleaseUrl -Headers @{ 'User-Agent' = 'Eigenverft.Manifested.Sandbox' } -UseBasicParsing
@@ -174,12 +108,12 @@ function Get-PythonRelease {
     )
 
     if ([string]::IsNullOrWhiteSpace($Flavor)) {
-        $Flavor = Get-PythonFlavor
+        $Flavor = Get-ManifestedCommandFlavor -CommandName 'Initialize-PythonRuntime'
     }
 
-    foreach ($candidate in @(Get-PythonReleaseCandidates)) {
+    foreach ($candidate in @(Get-PythonReleaseCandidates -Definition $script:ManifestedPythonRuntimeDefinition -VersionSpec $script:ManifestedPythonRuntimeVersionSpec)) {
         try {
-            $assetDetails = Get-PythonReleaseAssetDetails -ReleaseUrl $candidate.ReleaseUrl -Flavor $Flavor
+            $assetDetails = Get-PythonReleaseAssetDetails -ReleaseUrl $candidate.ReleaseUrl -Flavor $Flavor -Definition $script:ManifestedPythonRuntimeDefinition
             return [pscustomobject]@{
                 ReleaseId   = $candidate.ReleaseId
                 Version     = $candidate.Version
@@ -211,7 +145,7 @@ function Get-CachedPythonRuntimePackages {
     )
 
     if ([string]::IsNullOrWhiteSpace($Flavor)) {
-        $Flavor = Get-PythonFlavor
+        $Flavor = Get-ManifestedCommandFlavor -CommandName 'Initialize-PythonRuntime'
     }
 
     $layout = Get-ManifestedLayout -LocalRoot $LocalRoot
@@ -254,7 +188,7 @@ function Get-CachedPythonRuntimePackages {
                 ReleaseDate = $null
             }
         } |
-        Sort-Object -Descending -Property @{ Expression = { ConvertTo-PythonVersion -VersionText $_.Version } }
+        Sort-Object -Descending -Property @{ Expression = { ConvertTo-ManifestedVersionObjectFromRule -VersionText $_.Version -Rule $script:ManifestedPythonRuntimeVersionSpec.RuntimeVersionRule } }
 
     return @($items)
 }
@@ -623,6 +557,9 @@ function Test-PythonRuntime {
         [Parameter(Mandatory = $true)]
         [string]$PythonHome,
 
+        [Parameter(Mandatory = $true)]
+        [pscustomobject]$VersionSpec,
+
         [string]$LocalRoot = (Get-ManifestedLocalRoot)
     )
 
@@ -649,7 +586,7 @@ function Test-PythonRuntime {
         $versionProbe = Get-PythonReportedVersionProbe -PythonExe $pythonExe -LocalRoot $LocalRoot
         $reportedVersion = $versionProbe.ReportedVersion
         $versionCommandResult = $versionProbe.CommandResult
-        $versionObject = ConvertTo-PythonVersion -VersionText $reportedVersion
+        $versionObject = ConvertTo-ManifestedVersionObjectFromRule -VersionText $reportedVersion -Rule $versionSpec.RuntimeVersionRule
         $pipProbe = if ($siteState.ImportSiteEnabled) { Get-PythonPipVersionProbe -PythonExe $pythonExe -LocalRoot $LocalRoot } else { $null }
         $pipVersion = if ($pipProbe) { $pipProbe.PipVersion } else { $null }
         $pipCommandResult = if ($pipProbe) { $pipProbe.CommandResult } else { $null }
@@ -693,7 +630,7 @@ function Get-InstalledPythonRuntime {
     )
 
     if ([string]::IsNullOrWhiteSpace($Flavor)) {
-        $Flavor = Get-PythonFlavor
+        $Flavor = Get-ManifestedCommandFlavor -CommandName 'Initialize-PythonRuntime'
     }
 
     $layout = Get-ManifestedLayout -LocalRoot $LocalRoot
@@ -701,7 +638,7 @@ function Get-InstalledPythonRuntime {
 
     if (Test-Path -LiteralPath $layout.PythonToolsRoot) {
         $versionRoots = Get-ChildItem -LiteralPath $layout.PythonToolsRoot -Directory -ErrorAction SilentlyContinue |
-            Sort-Object -Descending -Property @{ Expression = { ConvertTo-PythonVersion -VersionText $_.Name } }
+            Sort-Object -Descending -Property @{ Expression = { ConvertTo-ManifestedVersionObjectFromRule -VersionText $_.Name -Rule $script:ManifestedPythonRuntimeVersionSpec.RuntimeVersionRule } }
 
         foreach ($versionRoot in $versionRoots) {
             $pythonHome = Join-Path $versionRoot.FullName $Flavor
@@ -709,9 +646,9 @@ function Get-InstalledPythonRuntime {
                 continue
             }
 
-            $validation = Test-PythonRuntime -PythonHome $pythonHome -LocalRoot $layout.LocalRoot
-            $expectedVersion = ConvertTo-PythonVersion -VersionText $versionRoot.Name
-            $reportedVersion = ConvertTo-PythonVersion -VersionText $validation.ReportedVersion
+            $validation = Test-PythonRuntime -PythonHome $pythonHome -VersionSpec $script:ManifestedPythonRuntimeVersionSpec -LocalRoot $layout.LocalRoot
+            $expectedVersion = ConvertTo-ManifestedVersionObjectFromRule -VersionText $versionRoot.Name -Rule $script:ManifestedPythonRuntimeVersionSpec.RuntimeVersionRule
+            $reportedVersion = ConvertTo-ManifestedVersionObjectFromRule -VersionText $validation.ReportedVersion -Rule $script:ManifestedPythonRuntimeVersionSpec.RuntimeVersionRule
             $versionMatches = (-not $reportedVersion) -or (-not $expectedVersion) -or ($reportedVersion -eq $expectedVersion)
 
             $entries += [pscustomobject]@{
@@ -801,15 +738,18 @@ function Test-ExternalPythonRuntime {
         [Parameter(Mandatory = $true)]
         [string]$PythonExe,
 
+        [Parameter(Mandatory = $true)]
+        [pscustomobject]$VersionSpec,
+
         [string]$LocalRoot = (Get-ManifestedLocalRoot)
     )
 
     $versionProbe = Get-PythonReportedVersionProbe -PythonExe $PythonExe -LocalRoot $LocalRoot
     $reportedVersion = $versionProbe.ReportedVersion
-    $versionObject = ConvertTo-PythonVersion -VersionText $reportedVersion
-    $pipProbe = if ($versionObject -and (Test-PythonExternalRuntimeVersion -Version $versionObject)) { Get-PythonPipVersionProbe -PythonExe $PythonExe -LocalRoot $LocalRoot } else { $null }
+    $versionObject = ConvertTo-ManifestedVersionObjectFromRule -VersionText $reportedVersion -Rule $versionSpec.RuntimeVersionRule
+    $pipProbe = if ($versionObject -and (Test-ManifestedExternalVersion -Version $versionObject -VersionPolicy $versionSpec.VersionPolicy -Rule $versionSpec.RuntimeVersionRule)) { Get-PythonPipVersionProbe -PythonExe $PythonExe -LocalRoot $LocalRoot } else { $null }
     $pipVersion = if ($pipProbe) { $pipProbe.PipVersion } else { $null }
-    $isReady = ($versionObject -and (Test-PythonExternalRuntimeVersion -Version $versionObject) -and -not [string]::IsNullOrWhiteSpace($pipVersion))
+    $isReady = ($versionObject -and (Test-ManifestedExternalVersion -Version $versionObject -VersionPolicy $versionSpec.VersionPolicy -Rule $versionSpec.RuntimeVersionRule) -and -not [string]::IsNullOrWhiteSpace($pipVersion))
 
     [pscustomobject]@{
         Status          = if ($isReady) { 'Ready' } else { 'Invalid' }
@@ -829,10 +769,13 @@ function Get-ManifestedPythonRuntimeFromCandidatePath {
         [Parameter(Mandatory = $true)]
         [string]$CandidatePath,
 
+        [Parameter(Mandatory = $true)]
+        [pscustomobject]$VersionSpec,
+
         [string]$LocalRoot = (Get-ManifestedLocalRoot)
     )
 
-    $validation = Test-ExternalPythonRuntime -PythonExe $CandidatePath -LocalRoot $LocalRoot
+    $validation = Test-ExternalPythonRuntime -PythonExe $CandidatePath -VersionSpec $VersionSpec -LocalRoot $LocalRoot
     if (-not $validation.IsReady) {
         return $null
     }
@@ -857,7 +800,7 @@ function Get-SystemPythonRuntime {
     )
 
     foreach ($candidatePath in @(Get-ManifestedPythonExternalPaths -LocalRoot $LocalRoot)) {
-        $runtime = Get-ManifestedPythonRuntimeFromCandidatePath -CandidatePath $candidatePath -LocalRoot $LocalRoot
+        $runtime = Get-ManifestedPythonRuntimeFromCandidatePath -CandidatePath $candidatePath -VersionSpec $script:ManifestedPythonRuntimeVersionSpec -LocalRoot $LocalRoot
         if ($runtime) {
             return $runtime
         }
@@ -932,7 +875,7 @@ function Get-PythonRuntimeState {
 
     try {
         if ([string]::IsNullOrWhiteSpace($Flavor)) {
-            $Flavor = Get-PythonFlavor
+            $Flavor = Get-ManifestedCommandFlavor -CommandName 'Initialize-PythonRuntime'
         }
 
         $layout = Get-ManifestedLayout -LocalRoot $LocalRoot
@@ -1064,7 +1007,7 @@ function Save-PythonRuntimePackage {
     )
 
     if ([string]::IsNullOrWhiteSpace($Flavor)) {
-        $Flavor = Get-PythonFlavor
+        $Flavor = Get-ManifestedCommandFlavor -CommandName 'Initialize-PythonRuntime'
     }
 
     $layout = Get-ManifestedLayout -LocalRoot $LocalRoot
@@ -1161,7 +1104,7 @@ function Resolve-PythonRuntimeTrustedPackageInfo {
     }
 
     if ([string]::IsNullOrWhiteSpace($Flavor)) {
-        $Flavor = if ($PackageInfo.PSObject.Properties['Flavor'] -and $PackageInfo.Flavor) { $PackageInfo.Flavor } else { Get-PythonFlavor }
+        $Flavor = if ($PackageInfo.PSObject.Properties['Flavor'] -and $PackageInfo.Flavor) { $PackageInfo.Flavor } else { Get-ManifestedCommandFlavor -CommandName 'Initialize-PythonRuntime' }
     }
 
     $refreshedPackage = $null
@@ -1312,11 +1255,11 @@ function Install-PythonRuntime {
     )
 
     if ([string]::IsNullOrWhiteSpace($Flavor)) {
-        $Flavor = if ($PackageInfo.Flavor) { $PackageInfo.Flavor } else { Get-PythonFlavor }
+        $Flavor = if ($PackageInfo.Flavor) { $PackageInfo.Flavor } else { Get-ManifestedCommandFlavor -CommandName 'Initialize-PythonRuntime' }
     }
 
     $pythonHome = Get-ManagedPythonRuntimeHome -Version $PackageInfo.Version -Flavor $Flavor -LocalRoot $LocalRoot
-    $currentValidation = Test-PythonRuntime -PythonHome $pythonHome -LocalRoot $LocalRoot
+    $currentValidation = Test-PythonRuntime -PythonHome $pythonHome -VersionSpec $script:ManifestedPythonRuntimeVersionSpec -LocalRoot $LocalRoot
 
     if ($ForceInstall -or $currentValidation.Status -ne 'Ready') {
         New-ManifestedDirectory -Path (Split-Path -Parent $pythonHome) | Out-Null
@@ -1352,14 +1295,14 @@ function Install-PythonRuntime {
     $pythonExe = Join-Path $pythonHome 'python.exe'
     $versionProbe = Get-PythonReportedVersionProbe -PythonExe $pythonExe -LocalRoot $LocalRoot
     $reportedVersion = $versionProbe.ReportedVersion
-    $reportedVersionObject = ConvertTo-PythonVersion -VersionText $reportedVersion
-    $expectedVersionObject = ConvertTo-PythonVersion -VersionText $PackageInfo.Version
+    $reportedVersionObject = ConvertTo-ManifestedVersionObjectFromRule -VersionText $reportedVersion -Rule $script:ManifestedPythonRuntimeVersionSpec.RuntimeVersionRule
+    $expectedVersionObject = ConvertTo-ManifestedVersionObjectFromRule -VersionText $PackageInfo.Version -Rule $script:ManifestedPythonRuntimeVersionSpec.RuntimeVersionRule
     if (-not $reportedVersionObject -or -not $expectedVersionObject -or $reportedVersionObject -ne $expectedVersionObject) {
         throw (New-PythonRuntimeValidationFailureMessage -Operation 'post-install version check' -PythonHome $pythonHome -ExpectedVersion $PackageInfo.Version -ReportedVersion $reportedVersion -CommandResult $versionProbe.CommandResult -SiteImportsState $siteState -LocalRoot $LocalRoot)
     }
 
     $pipResult = Ensure-PythonPip -PythonExe $pythonExe -PythonHome $pythonHome -LocalRoot $LocalRoot
-    $validation = Test-PythonRuntime -PythonHome $pythonHome -LocalRoot $LocalRoot
+    $validation = Test-PythonRuntime -PythonHome $pythonHome -VersionSpec $script:ManifestedPythonRuntimeVersionSpec -LocalRoot $LocalRoot
     if ($validation.Status -ne 'Ready') {
         $validationCommandResult = if ([string]::IsNullOrWhiteSpace($validation.ReportedVersion)) {
             $validation.VersionCommandResult
@@ -1403,14 +1346,71 @@ function Test-PythonRuntimeFromState {
     }
 
     if ($State.RuntimeSource -eq 'Managed' -and $State.RuntimeHome) {
-        return (Test-PythonRuntime -PythonHome $State.RuntimeHome -LocalRoot $LocalRoot)
+        return (Test-PythonRuntime -PythonHome $State.RuntimeHome -VersionSpec $script:ManifestedPythonRuntimeVersionSpec -LocalRoot $LocalRoot)
     }
 
     if ($State.RuntimeSource -eq 'External' -and $State.ExecutablePath) {
-        return (Test-ExternalPythonRuntime -PythonExe $State.ExecutablePath -LocalRoot $LocalRoot)
+        return (Test-ExternalPythonRuntime -PythonExe $State.ExecutablePath -VersionSpec $script:ManifestedPythonRuntimeVersionSpec -LocalRoot $LocalRoot)
     }
 
     return $null
+}
+
+function Get-PythonRuntimeFacts {
+    [CmdletBinding()]
+    param(
+        [string]$Flavor,
+        [string]$LocalRoot = (Get-ManifestedLocalRoot)
+    )
+
+    $layout = $null
+    try {
+        if ([string]::IsNullOrWhiteSpace($Flavor)) {
+            $Flavor = Get-ManifestedCommandFlavor -CommandName 'Initialize-PythonRuntime'
+        }
+
+        $layout = Get-ManifestedLayout -LocalRoot $LocalRoot
+    }
+    catch {
+        return (New-ManifestedRuntimeFacts -RuntimeName 'PythonRuntime' -CommandName 'Initialize-PythonRuntime' -RuntimeKind 'PortablePackage' -LocalRoot $LocalRoot -Layout $layout -PlatformSupported:$false -BlockedReason $_.Exception.Message -AdditionalProperties @{
+                Flavor              = $Flavor
+                Package             = $null
+                PackagePath         = $null
+                PipVersion          = $null
+                PipCmd              = $null
+                Pip3Cmd             = $null
+                InvalidRuntimeHomes = @()
+            })
+    }
+
+    $partialPaths = @()
+    if (Test-Path -LiteralPath $layout.PythonCacheRoot) {
+        $partialPaths += @(Get-ChildItem -LiteralPath $layout.PythonCacheRoot -File -Filter '*.download' -ErrorAction SilentlyContinue | Select-Object -ExpandProperty FullName)
+    }
+    $partialPaths += @(Get-ManifestedStageDirectories -Prefix 'python' -Mode TemporaryShort -LegacyRootPaths @($layout.ToolsRoot) | Select-Object -ExpandProperty FullName)
+
+    $installed = Get-InstalledPythonRuntime -Flavor $Flavor -LocalRoot $layout.LocalRoot
+    $managedRuntime = $installed.Current
+    $externalRuntime = $null
+    if (-not $managedRuntime) {
+        $externalRuntime = Get-SystemPythonRuntime -LocalRoot $layout.LocalRoot
+    }
+
+    $definition = Get-ManifestedCommandDefinition -CommandName 'Initialize-PythonRuntime'
+    $package = if ($definition) { Get-LatestCachedZipArtifactFromDefinition -Definition $definition -Flavor $Flavor -LocalRoot $layout.LocalRoot } else { $null }
+    $currentRuntime = if ($managedRuntime) { $managedRuntime } else { $externalRuntime }
+    $invalidRuntimeHomes = @($installed.Invalid | Select-Object -ExpandProperty PythonHome)
+    $executablePath = if ($currentRuntime) { $currentRuntime.PythonExe } else { $null }
+
+    return (New-ManifestedRuntimeFacts -RuntimeName 'PythonRuntime' -CommandName 'Initialize-PythonRuntime' -RuntimeKind 'PortablePackage' -LocalRoot $layout.LocalRoot -Layout $layout -ManagedRuntime $managedRuntime -ExternalRuntime $externalRuntime -Artifact $package -PartialPaths $partialPaths -InvalidPaths $invalidRuntimeHomes -Version $(if ($currentRuntime) { $currentRuntime.Version } elseif ($package) { $package.Version } else { $null }) -RuntimeHome $(if ($currentRuntime) { $currentRuntime.PythonHome } else { $null }) -RuntimeSource $(if ($managedRuntime) { 'Managed' } elseif ($externalRuntime) { 'External' } else { $null }) -ExecutablePath $executablePath -RuntimeValidation $(if ($currentRuntime) { $currentRuntime.Validation } else { $null }) -AdditionalProperties @{
+            Flavor              = $Flavor
+            Package             = $package
+            PackagePath         = if ($package) { $package.Path } else { $null }
+            PipVersion          = if ($currentRuntime -and $currentRuntime.PSObject.Properties['PipVersion']) { $currentRuntime.PipVersion } else { $null }
+            PipCmd              = if ($currentRuntime -and $currentRuntime.PSObject.Properties['PipCmd']) { $currentRuntime.PipCmd } else { $null }
+            Pip3Cmd             = if ($currentRuntime -and $currentRuntime.PSObject.Properties['Pip3Cmd']) { $currentRuntime.Pip3Cmd } else { $null }
+            InvalidRuntimeHomes = $invalidRuntimeHomes
+        })
 }
 
 function Initialize-PythonRuntime {
@@ -1419,329 +1419,22 @@ function Initialize-PythonRuntime {
 Ensures a managed or reusable Python runtime is available for the sandbox.
 
 .DESCRIPTION
-Discovers existing managed or external Python runtimes, repairs partial or
-broken managed state, acquires a trusted CPython embeddable ZIP when needed,
-installs the managed runtime, bootstraps pip, and synchronizes the command-line
-environment so `python` resolves consistently for follow-up tooling.
+Routes Python runtime initialization through the shared block-driven kernel and
+the packaged command definition for Python.
 
 .PARAMETER RefreshPython
-Forces the managed Python package to be reacquired and reinstalled instead of
-reusing the currently installed or cached copy.
+Forces reacquisition or reinstall planning for the managed Python runtime.
 
 .EXAMPLE
 Initialize-PythonRuntime
 
 .EXAMPLE
 Initialize-PythonRuntime -RefreshPython
-
-.NOTES
-Supports `-WhatIf` and follows the module's shared state and environment
-synchronization conventions for public runtime commands.
 #>
     [CmdletBinding(SupportsShouldProcess = $true)]
     param(
         [switch]$RefreshPython
     )
 
-    $LocalRoot = (Get-ManifestedLayout).LocalRoot
-    $selfElevationContext = Get-ManifestedSelfElevationContext
-
-    $actionsTaken = New-Object System.Collections.Generic.List[string]
-    $plannedActions = New-Object System.Collections.Generic.List[string]
-    $repairResult = $null
-    $packageInfo = $null
-    $packageTest = $null
-    $installResult = $null
-    $pipSetupResult = $null
-    $commandEnvironment = $null
-
-    $initialState = Get-PythonRuntimeState -LocalRoot $LocalRoot
-    $state = $initialState
-    $elevationPlan = Get-ManifestedCommandElevationPlan -CommandName 'Initialize-PythonRuntime' -LocalRoot $LocalRoot -SkipSelfElevation:$selfElevationContext.SkipSelfElevation -WasSelfElevated:$selfElevationContext.WasSelfElevated -WhatIfMode:$WhatIfPreference
-
-    if ($state.Status -eq 'Blocked') {
-        $commandEnvironment = Get-ManifestedCommandEnvironmentResult -CommandName 'Initialize-PythonRuntime' -RuntimeState $state
-        $result = [pscustomobject]@{
-            LocalRoot            = $state.LocalRoot
-            Layout               = $state.Layout
-            InitialState         = $initialState
-            FinalState           = $state
-            ActionTaken          = @('None')
-            PlannedActions       = @()
-            RestartRequired      = $false
-            Package              = $null
-            PackageTest          = $null
-            RuntimeTest          = $null
-            RepairResult         = $null
-            InstallResult        = $null
-            PipSetupResult       = $null
-            PipProxyConfiguration = $null
-            CommandEnvironment   = $commandEnvironment
-            Elevation            = $elevationPlan
-        }
-
-        if ($WhatIfPreference) {
-            Add-Member -InputObject $result -NotePropertyName PersistedStatePath -NotePropertyValue $null -Force
-            return $result
-        }
-
-        $statePath = Save-ManifestedInvokeState -CommandName 'Initialize-PythonRuntime' -Result $result -LocalRoot $LocalRoot -Details @{}
-        Add-Member -InputObject $result -NotePropertyName PersistedStatePath -NotePropertyValue $statePath -Force
-        return $result
-    }
-
-    $needsRepair = $state.Status -in @('Partial', 'NeedsRepair')
-    $needsInstall = $RefreshPython -or -not $state.RuntimeHome
-    $needsAcquire = $RefreshPython -or (-not $state.PackagePath) -or (-not (Test-PythonRuntimePackageHasTrustedHash -PackageInfo $state.Package))
-
-    if ($needsRepair) {
-        $plannedActions.Add('Repair-PythonRuntime') | Out-Null
-    }
-    if ($needsInstall -and $needsAcquire) {
-        $plannedActions.Add('Save-PythonRuntimePackage') | Out-Null
-    }
-    if ($needsInstall) {
-        $plannedActions.Add('Test-PythonRuntimePackage') | Out-Null
-        $plannedActions.Add('Install-PythonRuntime') | Out-Null
-        $plannedActions.Add('Ensure-PythonPip') | Out-Null
-    }
-    elseif ($state.RuntimeSource -eq 'Managed') {
-        $plannedActions.Add('Ensure-PythonPip') | Out-Null
-    }
-    $plannedActions.Add('Sync-ManifestedCommandLineEnvironment') | Out-Null
-
-    $elevationPlan = Get-ManifestedCommandElevationPlan -CommandName 'Initialize-PythonRuntime' -PlannedActions @($plannedActions) -LocalRoot $LocalRoot -SkipSelfElevation:$selfElevationContext.SkipSelfElevation -WasSelfElevated:$selfElevationContext.WasSelfElevated -WhatIfMode:$WhatIfPreference
-
-    if ($WhatIfPreference) {
-        return [pscustomobject]@{
-            LocalRoot             = $state.LocalRoot
-            Layout                = $state.Layout
-            InitialState          = $initialState
-            FinalState            = $state
-            ActionTaken           = @('WhatIf')
-            PlannedActions        = @($plannedActions)
-            RestartRequired       = $false
-            Package               = $state.Package
-            PackageTest           = $null
-            RuntimeTest           = $state.Runtime
-            RepairResult          = $null
-            InstallResult         = $null
-            PipSetupResult        = $null
-            PipProxyConfiguration = $null
-            CommandEnvironment    = (Get-ManifestedCommandEnvironmentResult -CommandName 'Initialize-PythonRuntime' -RuntimeState $state)
-            PersistedStatePath    = $null
-            Elevation             = $elevationPlan
-        }
-    }
-
-    if ($needsRepair) {
-        if (-not $PSCmdlet.ShouldProcess($state.Layout.PythonToolsRoot, 'Repair Python runtime state')) {
-            return [pscustomobject]@{
-                LocalRoot             = $state.LocalRoot
-                Layout                = $state.Layout
-                InitialState          = $initialState
-                FinalState            = $state
-                ActionTaken           = @('Cancelled')
-                PlannedActions        = @($plannedActions)
-                RestartRequired       = $false
-                Package               = $state.Package
-                PackageTest           = $null
-                RuntimeTest           = $state.Runtime
-                RepairResult          = $null
-                InstallResult         = $null
-                PipSetupResult        = $null
-                PipProxyConfiguration = $null
-                CommandEnvironment    = (Get-ManifestedCommandEnvironmentResult -CommandName 'Initialize-PythonRuntime' -RuntimeState $state)
-                PersistedStatePath    = $null
-                Elevation             = $elevationPlan
-            }
-        }
-
-        $repairResult = Repair-PythonRuntime -State $state -Flavor $state.Flavor -LocalRoot $state.LocalRoot
-        if ($repairResult.Action -eq 'Repaired') {
-            $actionsTaken.Add('Repair-PythonRuntime') | Out-Null
-        }
-
-        $state = Get-PythonRuntimeState -Flavor $state.Flavor -LocalRoot $state.LocalRoot
-    }
-
-    $needsInstall = $RefreshPython -or -not $state.RuntimeHome
-    $needsAcquire = $RefreshPython -or (-not $state.PackagePath) -or (-not (Test-PythonRuntimePackageHasTrustedHash -PackageInfo $state.Package))
-
-    if ($needsInstall) {
-        if ($needsAcquire) {
-            $packageInfo = Save-PythonRuntimePackage -RefreshPython:$RefreshPython -Flavor $state.Flavor -LocalRoot $state.LocalRoot
-            if ($packageInfo.Action -eq 'Downloaded') {
-                $actionsTaken.Add('Save-PythonRuntimePackage') | Out-Null
-            }
-        }
-        else {
-            $packageInfo = $state.Package
-        }
-
-        $packageTest = Test-PythonRuntimePackage -PackageInfo $packageInfo
-        if ($packageTest.Status -eq 'UnverifiedCache') {
-            $trustedPackageResolution = Resolve-PythonRuntimeTrustedPackageInfo -PackageInfo $packageInfo -Flavor $state.Flavor -LocalRoot $state.LocalRoot
-            $packageInfo = $trustedPackageResolution.PackageInfo
-            $packageTest = Test-PythonRuntimePackage -PackageInfo $packageInfo
-
-            if ($packageTest.Status -eq 'UnverifiedCache') {
-                throw (New-PythonRuntimePackageTrustFailureMessage -PackageInfo $packageInfo -MetadataRefreshError $trustedPackageResolution.MetadataRefreshError)
-            }
-        }
-
-        if ($packageTest.Status -eq 'CorruptCache') {
-            if (-not $PSCmdlet.ShouldProcess($packageInfo.Path, 'Repair corrupt Python runtime package')) {
-                return [pscustomobject]@{
-                    LocalRoot             = $state.LocalRoot
-                    Layout                = $state.Layout
-                    InitialState          = $initialState
-                    FinalState            = $state
-                    ActionTaken           = @('Cancelled')
-                    PlannedActions        = @($plannedActions)
-                    RestartRequired       = $false
-                    Package               = $packageInfo
-                    PackageTest           = $packageTest
-                    RuntimeTest           = $state.Runtime
-                    RepairResult          = $repairResult
-                    InstallResult         = $null
-                    PipSetupResult        = $null
-                    PipProxyConfiguration = $null
-                    CommandEnvironment    = (Get-ManifestedCommandEnvironmentResult -CommandName 'Initialize-PythonRuntime' -RuntimeState $state)
-                    PersistedStatePath    = $null
-                    Elevation             = $elevationPlan
-                }
-            }
-
-            $repairResult = Repair-PythonRuntime -State $state -CorruptPackagePaths @($packageInfo.Path) -Flavor $state.Flavor -LocalRoot $state.LocalRoot
-            if ($repairResult.Action -eq 'Repaired') {
-                $actionsTaken.Add('Repair-PythonRuntime') | Out-Null
-            }
-
-            $packageInfo = Save-PythonRuntimePackage -RefreshPython:$true -Flavor $state.Flavor -LocalRoot $state.LocalRoot
-            if ($packageInfo.Action -eq 'Downloaded') {
-                $actionsTaken.Add('Save-PythonRuntimePackage') | Out-Null
-            }
-
-            $packageTest = Test-PythonRuntimePackage -PackageInfo $packageInfo
-        }
-
-        if ($packageTest.Status -ne 'Ready') {
-            throw "Python runtime package validation failed with status $($packageTest.Status)."
-        }
-
-        $commandParameters = @{}
-        if ($RefreshPython) {
-            $commandParameters['RefreshPython'] = $true
-        }
-        if ($PSBoundParameters.ContainsKey('WhatIf')) {
-            $commandParameters['WhatIf'] = $true
-        }
-
-        $elevatedResult = Invoke-ManifestedElevatedCommand -ElevationPlan $elevationPlan -CommandName 'Initialize-PythonRuntime' -CommandParameters $commandParameters
-        if ($null -ne $elevatedResult) {
-            return $elevatedResult
-        }
-
-        if (-not $PSCmdlet.ShouldProcess($state.Layout.PythonToolsRoot, 'Install Python runtime')) {
-            return [pscustomobject]@{
-                LocalRoot             = $state.LocalRoot
-                Layout                = $state.Layout
-                InitialState          = $initialState
-                FinalState            = $state
-                ActionTaken           = @('Cancelled')
-                PlannedActions        = @($plannedActions)
-                RestartRequired       = $false
-                Package               = $packageInfo
-                PackageTest           = $packageTest
-                RuntimeTest           = $state.Runtime
-                RepairResult          = $repairResult
-                InstallResult         = $null
-                PipSetupResult        = $null
-                PipProxyConfiguration = $null
-                CommandEnvironment    = (Get-ManifestedCommandEnvironmentResult -CommandName 'Initialize-PythonRuntime' -RuntimeState $state)
-                PersistedStatePath    = $null
-                Elevation             = $elevationPlan
-            }
-        }
-
-        $installResult = Install-PythonRuntime -PackageInfo $packageInfo -Flavor $state.Flavor -LocalRoot $state.LocalRoot -ForceInstall:$RefreshPython
-        if ($installResult.Action -eq 'Installed') {
-            $actionsTaken.Add('Install-PythonRuntime') | Out-Null
-        }
-        if ($installResult.PSObject.Properties['PipResult'] -and $installResult.PipResult) {
-            if ($installResult.PipResult.Action -ne 'Reused') {
-                $actionsTaken.Add('Ensure-PythonPip') | Out-Null
-            }
-            elseif ($installResult.PipResult.PipProxyConfiguration -and $installResult.PipResult.PipProxyConfiguration.Action -eq 'ConfiguredManagedProxy') {
-                $actionsTaken.Add('Sync-ManifestedPipProxyConfiguration') | Out-Null
-            }
-        }
-    }
-
-    $finalState = Get-PythonRuntimeState -Flavor $state.Flavor -LocalRoot $state.LocalRoot
-    $runtimeTest = Test-PythonRuntimeFromState -State $finalState -LocalRoot $finalState.LocalRoot
-    if ($finalState.Status -ne 'Ready' -or -not $runtimeTest -or -not $runtimeTest.IsReady) {
-        throw 'Python runtime validation did not reach the Ready state.'
-    }
-
-    if ($finalState.RuntimeSource -eq 'Managed' -and $finalState.ExecutablePath) {
-        $pipSetupResult = Ensure-PythonPip -PythonExe $finalState.ExecutablePath -PythonHome $finalState.RuntimeHome -LocalRoot $finalState.LocalRoot
-        if ($pipSetupResult.Action -ne 'Reused') {
-            $actionsTaken.Add('Ensure-PythonPip') | Out-Null
-        }
-        elseif ($pipSetupResult.PipProxyConfiguration -and $pipSetupResult.PipProxyConfiguration.Action -eq 'ConfiguredManagedProxy') {
-            $actionsTaken.Add('Sync-ManifestedPipProxyConfiguration') | Out-Null
-        }
-
-        $runtimeTest = Test-PythonRuntimeFromState -State $finalState -LocalRoot $finalState.LocalRoot
-    }
-
-    $commandEnvironment = Get-ManifestedCommandEnvironmentResult -CommandName 'Initialize-PythonRuntime' -RuntimeState $finalState
-    if ($commandEnvironment.Applicable -and $commandEnvironment.Status -eq 'NeedsSync') {
-        $commandEnvironment = Sync-ManifestedCommandLineEnvironment -Specification (Get-ManifestedCommandEnvironmentSpec -CommandName 'Initialize-PythonRuntime' -RuntimeState $finalState)
-        if ($commandEnvironment.Status -eq 'Updated') {
-            $actionsTaken.Add('Sync-ManifestedCommandLineEnvironment') | Out-Null
-        }
-    }
-
-    $effectivePackageInfo = if ($packageInfo) { $packageInfo } elseif ($finalState.Package) { $finalState.Package } else { $null }
-    $result = [pscustomobject]@{
-        LocalRoot             = $finalState.LocalRoot
-        Layout                = $finalState.Layout
-        InitialState          = $initialState
-        FinalState            = $finalState
-        ActionTaken           = if ($actionsTaken.Count -gt 0) { @($actionsTaken) } else { @('None') }
-        PlannedActions        = @($plannedActions)
-        RestartRequired       = $false
-        Package               = $effectivePackageInfo
-        PackageTest           = $packageTest
-        RuntimeTest           = $runtimeTest
-        RepairResult          = $repairResult
-        InstallResult         = $installResult
-        PipSetupResult        = $pipSetupResult
-        PipProxyConfiguration = if ($pipSetupResult) { $pipSetupResult.PipProxyConfiguration } else { $null }
-        CommandEnvironment    = $commandEnvironment
-        PersistedStatePath    = $null
-        Elevation             = $elevationPlan
-    }
-
-    $statePath = Save-ManifestedInvokeState -CommandName 'Initialize-PythonRuntime' -Result $result -LocalRoot $LocalRoot -Details @{
-        Version        = $finalState.CurrentVersion
-        Flavor         = $finalState.Flavor
-        RuntimeHome    = $finalState.RuntimeHome
-        RuntimeSource  = $finalState.RuntimeSource
-        ExecutablePath = $finalState.ExecutablePath
-        PipVersion     = if ($runtimeTest -and $runtimeTest.PSObject.Properties['PipVersion']) { $runtimeTest.PipVersion } else { $null }
-        PipConfigPath  = if ($pipSetupResult -and $pipSetupResult.PipProxyConfiguration) { $pipSetupResult.PipProxyConfiguration.PipConfigPath } else { $null }
-        AssetName      = if ($effectivePackageInfo) { $effectivePackageInfo.FileName } else { $null }
-        Sha256         = if ($effectivePackageInfo) { $effectivePackageInfo.Sha256 } else { $null }
-        ShaSource      = if ($effectivePackageInfo) { $effectivePackageInfo.ShaSource } else { $null }
-        DownloadUrl    = if ($effectivePackageInfo) { $effectivePackageInfo.DownloadUrl } else { $null }
-        ReleaseUrl     = if ($effectivePackageInfo) { $effectivePackageInfo.ReleaseUrl } else { $null }
-        ReleaseId      = if ($effectivePackageInfo) { $effectivePackageInfo.ReleaseId } else { $null }
-    }
-
-    Add-Member -InputObject $result -NotePropertyName PersistedStatePath -NotePropertyValue $statePath -Force
-    return $result
+    return (Invoke-ManifestedCommandInitialization -Name 'Initialize-PythonRuntime' -PSCmdletObject $PSCmdlet -RefreshRequested:$RefreshPython -WhatIfMode:$WhatIfPreference)
 }

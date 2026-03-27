@@ -1,0 +1,105 @@
+{
+  "schemaVersion": 2,
+  "commandName": "Initialize-NodeRuntime",
+  "runtimeName": "NodeRuntime",
+  "kind": "portable-package",
+  "wrapperCommand": "Initialize-NodeRuntime",
+  "refreshSwitchName": "RefreshNode",
+  "facts": {
+    "portableRuntime": {
+      "hostFlavorMap": {
+        "arm64": "win-arm64",
+        "x64": "win-x64"
+      },
+      "unsupportedHostMessage": "Only 64-bit Windows targets are supported by this Node runtime bootstrap.",
+      "toolsRootLayoutProperty": "NodeToolsRoot",
+      "stagePrefix": "node",
+      "versionFolderTemplate": "{versionNoPrefixV}",
+      "expectedVersionTemplate": "v{versionNoPrefixV}",
+      "requiredPathGroups": [
+        [
+          "node.exe"
+        ],
+        [
+          "npm.cmd"
+        ]
+      ],
+      "namedFilePaths": {
+        "NpmCmd": "npm.cmd"
+      },
+      "versionProbe": {
+        "executableCandidates": [
+          "node.exe"
+        ],
+        "arguments": [
+          "--version"
+        ],
+        "regex": "v?(\\d+\\.\\d+\\.\\d+)",
+        "prefix": "v"
+      },
+      "versionPolicy": {
+        "managedMinimumVersion": null,
+        "managedVersionFamily": null,
+        "externalMinimumVersion": null
+      },
+      "externalDiscovery": {
+        "commandNames": [
+          "node.exe"
+        ],
+        "additionalPathPatterns": [
+          "{ProgramFiles}\\nodejs\\node.exe"
+        ],
+        "runtimeHomeTrimLeafNames": []
+      }
+    }
+  },
+  "supply": {
+    "nodeDist": {
+      "indexUrl": "https://nodejs.org/dist/index.json",
+      "releaseChannel": "lts",
+      "releaseVersionRule": {
+        "regex": "v?(\\d+\\.\\d+\\.\\d+)",
+        "prefix": "v"
+      },
+      "baseUrlPattern": "https://nodejs.org/dist/{tagName}",
+      "assetNamePattern": "node-{tagName}-{flavor}.zip",
+      "shasumsAssetName": "SHASUMS256.txt",
+      "downloadMessage": "Downloading Node.js {tagName} ({flavor})...",
+      "offlineError": "Could not reach nodejs.org and no cached Node.js ZIP was found."
+    }
+  },
+  "artifact": {
+    "zipPackage": {
+      "cacheRootLayoutProperty": "NodeCacheRoot",
+      "fileNamePattern": "^node-(v\\d+\\.\\d+\\.\\d+)-{flavor}\\.zip$"
+    }
+  },
+  "install": {
+    "portableArchive": {
+      "stagePrefix": "node",
+      "toolsRootLayoutProperty": "NodeToolsRoot",
+      "versionFolderTemplate": "{versionNoPrefixV}",
+      "createDirectories": []
+    }
+  },
+  "environment": {
+    "commandProjection": {
+      "desiredDirectoryFact": "RuntimeHome",
+      "executableFact": "ExecutablePath",
+      "expectedCommands": [
+        "node.exe",
+        "npm.cmd"
+      ]
+    }
+  },
+  "dependencies": [],
+  "policies": {
+    "allowExternalSatisfaction": true,
+    "requireTrustedArtifact": false,
+    "supportsEnvironmentSync": true,
+    "installRequiresElevation": false
+  },
+  "hooks": {
+    "postInstall": null
+  }
+}

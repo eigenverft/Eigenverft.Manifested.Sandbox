@@ -2,67 +2,17 @@
     Eigenverft.Manifested.Sandbox.Cmd.Ps7RuntimeAndCache
 #>
 
-function ConvertTo-Ps7Version {
-    [CmdletBinding()]
-    param(
-        [string]$VersionText
-    )
-
-    if ([string]::IsNullOrWhiteSpace($VersionText)) {
-        return $null
-    }
-
-    $match = [regex]::Match($VersionText, 'v?(\d+\.\d+\.\d+)')
-    if (-not $match.Success) {
-        return $null
-    }
-
-    return [version]$match.Groups[1].Value
-}
-
-function ConvertTo-Ps7ReleaseVersion {
-    [CmdletBinding()]
-    param(
-        [string]$TagName
-    )
-
-    $versionObject = ConvertTo-Ps7Version -VersionText $TagName
-    if (-not $versionObject) {
-        throw "Could not parse the PowerShell release tag '$TagName'."
-    }
-
-    return $versionObject.ToString()
-}
-
-function Get-Ps7Flavor {
-    [CmdletBinding()]
-    param()
-
-    if ([System.Environment]::OSVersion.Platform -ne [System.PlatformID]::Win32NT) {
-        throw 'Only Windows hosts are supported by this PowerShell 7 runtime bootstrap.'
-    }
-
-    $archHints = @($env:PROCESSOR_ARCHITECTURE, $env:PROCESSOR_ARCHITEW6432) -join ';'
-    if ($archHints -match 'ARM64') {
-        return 'win-arm64'
-    }
-
-    if ([Environment]::Is64BitOperatingSystem) {
-        return 'win-x64'
-    }
-
-    throw 'Only 64-bit Windows targets are supported by this PowerShell 7 runtime bootstrap.'
-}
+$script:ManifestedPs7RuntimeVersionSpec = Get-ManifestedVersionSpec -Definition (Get-ManifestedCommandDefinition -CommandName 'Initialize-Ps7Runtime')
 
 function Get-Ps7PersistedPackageDetails {
     [CmdletBinding()]
     param(
+        [string]$ArtifactPath,
         [string]$LocalRoot = (Get-ManifestedLocalRoot)
     )
 
-    $commandState = Get-ManifestedCommandState -CommandName 'Initialize-Ps7Runtime' -LocalRoot $LocalRoot
-    if ($commandState -and $commandState.PSObject.Properties['Details']) {
-        return $commandState.Details
+    if (-not [string]::IsNullOrWhiteSpace($ArtifactPath)) {
+        return (Get-ManifestedArtifactMetadata -ArtifactPath $ArtifactPath)
     }
 
     return $null
@@ -98,7 +48,7 @@ This helper is used by the managed PowerShell runtime bootstrap flow.
     )
 
     if ([string]::IsNullOrWhiteSpace($Flavor)) {
-        $Flavor = Get-Ps7Flavor
+        $Flavor = Get-ManifestedCommandFlavor -CommandName 'Initialize-Ps7Runtime'
     }
 
     $owner = 'PowerShell'
@@ -110,7 +60,7 @@ This helper is used by the managed PowerShell runtime bootstrap flow.
             throw 'The latest GitHub release is not a stable PowerShell release.'
         }
 
-        $version = ConvertTo-Ps7ReleaseVersion -TagName $release.TagName
+        $version = ConvertTo-ManifestedVersionTextFromRule -VersionText $release.TagName -Rule $script:ManifestedPs7RuntimeVersionSpec.ReleaseVersionRule
         $fileName = 'PowerShell-{0}-{1}.zip' -f $version, $Flavor
         $asset = Get-ManifestedGitHubReleaseAsset -Release $release -AssetName $fileName
         if (-not $asset) {
@@ -142,7 +92,7 @@ This helper is used by the managed PowerShell runtime bootstrap flow.
             throw 'Unable to determine the latest stable PowerShell 7 release.'
         }
 
-        $version = ConvertTo-Ps7ReleaseVersion -TagName $tagInfo.TagName
+        $version = ConvertTo-ManifestedVersionTextFromRule -VersionText $tagInfo.TagName -Rule $script:ManifestedPs7RuntimeVersionSpec.ReleaseVersionRule
         $fileName = 'PowerShell-{0}-{1}.zip' -f $version, $Flavor
         $checksum = Get-ManifestedGitHubReleaseAssetChecksum -Owner $owner -Repository $repository -TagName $tagInfo.TagName -AssetName $fileName -FallbackSource ChecksumAsset -ChecksumAssetName 'hashes.sha256'
         if (-not $checksum) {
@@ -173,7 +123,7 @@ function Get-CachedPs7RuntimePackages {
     )
 
     if ([string]::IsNullOrWhiteSpace($Flavor)) {
-        $Flavor = Get-Ps7Flavor
+        $Flavor = Get-ManifestedCommandFlavor -CommandName 'Initialize-Ps7Runtime'
     }
 
     $layout = Get-ManifestedLayout -LocalRoot $LocalRoot
@@ -181,18 +131,18 @@ function Get-CachedPs7RuntimePackages {
         return @()
     }
 
-    $persistedDetails = Get-Ps7PersistedPackageDetails -LocalRoot $layout.LocalRoot
     $pattern = '^PowerShell-(\d+\.\d+\.\d+)-' + [regex]::Escape($Flavor) + '\.zip$'
 
     $items = Get-ChildItem -LiteralPath $layout.Ps7CacheRoot -File -Filter '*.zip' -ErrorAction SilentlyContinue |
         Where-Object { $_.Name -match $pattern } |
         ForEach-Object {
+            $persistedDetails = Get-Ps7PersistedPackageDetails -ArtifactPath $_.FullName -LocalRoot $layout.LocalRoot
             $sha256 = $null
             $tagName = $null
             $downloadUrl = $null
             $shaSource = $null
 
-            if ($persistedDetails -and $persistedDetails.PSObject.Properties['AssetName'] -and $persistedDetails.AssetName -eq $_.Name) {
+            if ($persistedDetails) {
                 $sha256 = if ($persistedDetails.PSObject.Properties['Sha256']) { $persistedDetails.Sha256 } else { $null }
                 $tagName = if ($persistedDetails.PSObject.Properties['Tag']) { $persistedDetails.Tag } else { $null }
                 $downloadUrl = if ($persistedDetails.PSObject.Properties['DownloadUrl']) { $persistedDetails.DownloadUrl } else { $null }
@@ -213,7 +163,7 @@ function Get-CachedPs7RuntimePackages {
                 ReleaseUrl  = $null
             }
         } |
-        Sort-Object -Descending -Property @{ Expression = { ConvertTo-Ps7Version -VersionText $_.Version } }
+        Sort-Object -Descending -Property @{ Expression = { ConvertTo-ManifestedVersionObjectFromRule -VersionText $_.Version -Rule $script:ManifestedPs7RuntimeVersionSpec.RuntimeVersionRule } }
 
     return @($items)
 }
@@ -299,7 +249,7 @@ function Get-InstalledPs7Runtime {
     )
 
     if ([string]::IsNullOrWhiteSpace($Flavor)) {
-        $Flavor = Get-Ps7Flavor
+        $Flavor = Get-ManifestedCommandFlavor -CommandName 'Initialize-Ps7Runtime'
     }
 
     $layout = Get-ManifestedLayout -LocalRoot $LocalRoot
@@ -307,7 +257,7 @@ function Get-InstalledPs7Runtime {
 
     if (Test-Path -LiteralPath $layout.Ps7ToolsRoot) {
         $versionRoots = Get-ChildItem -LiteralPath $layout.Ps7ToolsRoot -Directory -ErrorAction SilentlyContinue |
-            Sort-Object -Descending -Property @{ Expression = { ConvertTo-Ps7Version -VersionText $_.Name } }
+            Sort-Object -Descending -Property @{ Expression = { ConvertTo-ManifestedVersionObjectFromRule -VersionText $_.Name -Rule $script:ManifestedPs7RuntimeVersionSpec.RuntimeVersionRule } }
 
         foreach ($versionRoot in $versionRoots) {
             $runtimeHome = Join-Path $versionRoot.FullName $Flavor
@@ -316,8 +266,8 @@ function Get-InstalledPs7Runtime {
             }
 
             $validation = Test-Ps7Runtime -RuntimeHome $runtimeHome
-            $expectedVersion = ConvertTo-Ps7Version -VersionText $versionRoot.Name
-            $reportedVersion = ConvertTo-Ps7Version -VersionText $validation.ReportedVersion
+            $expectedVersion = ConvertTo-ManifestedVersionObjectFromRule -VersionText $versionRoot.Name -Rule $script:ManifestedPs7RuntimeVersionSpec.RuntimeVersionRule
+            $reportedVersion = ConvertTo-ManifestedVersionObjectFromRule -VersionText $validation.ReportedVersion -Rule $script:ManifestedPs7RuntimeVersionSpec.RuntimeVersionRule
             $versionMatches = (-not $reportedVersion) -or (-not $expectedVersion) -or ($reportedVersion -eq $expectedVersion)
 
             $entries += [pscustomobject]@{
@@ -352,7 +302,7 @@ function Get-SystemPs7Runtime {
         $programFilesPowerShellRoot = Join-Path $env:ProgramFiles 'PowerShell'
         if (Test-Path -LiteralPath $programFilesPowerShellRoot) {
             foreach ($directory in @(Get-ChildItem -LiteralPath $programFilesPowerShellRoot -Directory -ErrorAction SilentlyContinue |
-                Sort-Object -Descending -Property @{ Expression = { ConvertTo-Ps7Version -VersionText $_.Name } })) {
+                Sort-Object -Descending -Property @{ Expression = { ConvertTo-ManifestedVersionObjectFromRule -VersionText $_.Name -Rule $script:ManifestedPs7RuntimeVersionSpec.RuntimeVersionRule } })) {
                 $additionalPaths.Add((Join-Path $directory.FullName 'pwsh.exe')) | Out-Null
             }
         }
@@ -369,7 +319,7 @@ function Get-SystemPs7Runtime {
         return $null
     }
 
-    $versionObject = ConvertTo-Ps7Version -VersionText $validation.ReportedVersion
+    $versionObject = ConvertTo-ManifestedVersionObjectFromRule -VersionText $validation.ReportedVersion -Rule $script:ManifestedPs7RuntimeVersionSpec.RuntimeVersionRule
     if (-not $versionObject) {
         return $null
     }
@@ -477,7 +427,7 @@ Returns a custom object that downstream install and repair helpers consume.
 
     try {
         if ([string]::IsNullOrWhiteSpace($Flavor)) {
-            $Flavor = Get-Ps7Flavor
+            $Flavor = Get-ManifestedCommandFlavor -CommandName 'Initialize-Ps7Runtime'
         }
 
         $layout = Get-ManifestedLayout -LocalRoot $LocalRoot
@@ -607,7 +557,7 @@ function Save-Ps7RuntimePackage {
     )
 
     if ([string]::IsNullOrWhiteSpace($Flavor)) {
-        $Flavor = Get-Ps7Flavor
+        $Flavor = Get-ManifestedCommandFlavor -CommandName 'Initialize-Ps7Runtime'
     }
 
     $layout = Get-ManifestedLayout -LocalRoot $LocalRoot
@@ -647,7 +597,7 @@ function Save-Ps7RuntimePackage {
             }
         }
 
-        return [pscustomobject]@{
+        $packageInfo = [pscustomobject]@{
             TagName     = $release.TagName
             Version     = $release.Version
             Flavor      = $Flavor
@@ -660,6 +610,19 @@ function Save-Ps7RuntimePackage {
             ShaSource   = $release.ShaSource
             ReleaseUrl  = $release.ReleaseUrl
         }
+
+        Save-ManifestedArtifactMetadata -ArtifactPath $packagePath -Metadata ([ordered]@{
+            Tag         = $packageInfo.TagName
+            Version     = $packageInfo.Version
+            Flavor      = $packageInfo.Flavor
+            AssetName   = $packageInfo.FileName
+            DownloadUrl = $packageInfo.DownloadUrl
+            Sha256      = $packageInfo.Sha256
+            ShaSource   = $packageInfo.ShaSource
+            ReleaseUrl  = $packageInfo.ReleaseUrl
+        }) | Out-Null
+
+        return $packageInfo
     }
 
     $cachedPackage = Get-LatestCachedPs7RuntimePackage -Flavor $Flavor -LocalRoot $LocalRoot
@@ -667,7 +630,7 @@ function Save-Ps7RuntimePackage {
         throw 'Could not reach GitHub and no cached PowerShell ZIP was found.'
     }
 
-    return [pscustomobject]@{
+    $packageInfo = [pscustomobject]@{
         TagName     = $cachedPackage.TagName
         Version     = $cachedPackage.Version
         Flavor      = $cachedPackage.Flavor
@@ -680,6 +643,21 @@ function Save-Ps7RuntimePackage {
         ShaSource   = $cachedPackage.ShaSource
         ReleaseUrl  = $cachedPackage.ReleaseUrl
     }
+
+    if (-not [string]::IsNullOrWhiteSpace($packageInfo.Path) -and -not [string]::IsNullOrWhiteSpace($packageInfo.Sha256)) {
+        Save-ManifestedArtifactMetadata -ArtifactPath $packageInfo.Path -Metadata ([ordered]@{
+            Tag         = $packageInfo.TagName
+            Version     = $packageInfo.Version
+            Flavor      = $packageInfo.Flavor
+            AssetName   = $packageInfo.FileName
+            DownloadUrl = $packageInfo.DownloadUrl
+            Sha256      = $packageInfo.Sha256
+            ShaSource   = $packageInfo.ShaSource
+            ReleaseUrl  = $packageInfo.ReleaseUrl
+        }) | Out-Null
+    }
+
+    return $packageInfo
 }
 
 function Install-Ps7Runtime {
@@ -693,7 +671,7 @@ function Install-Ps7Runtime {
     )
 
     if ([string]::IsNullOrWhiteSpace($Flavor)) {
-        $Flavor = if ($PackageInfo.Flavor) { $PackageInfo.Flavor } else { Get-Ps7Flavor }
+        $Flavor = if ($PackageInfo.Flavor) { $PackageInfo.Flavor } else { Get-ManifestedCommandFlavor -CommandName 'Initialize-Ps7Runtime' }
     }
 
     $runtimeHome = Get-ManagedPs7RuntimeHome -Version $PackageInfo.Version -Flavor $Flavor -LocalRoot $LocalRoot
@@ -740,313 +718,102 @@ function Install-Ps7Runtime {
     }
 }
 
+function Get-Ps7RuntimeFacts {
+    [CmdletBinding()]
+    param(
+        [string]$Flavor,
+        [string]$LocalRoot = (Get-ManifestedLocalRoot)
+    )
+
+    $layout = $null
+    try {
+        if ([string]::IsNullOrWhiteSpace($Flavor)) {
+            $Flavor = Get-ManifestedCommandFlavor -CommandName 'Initialize-Ps7Runtime'
+        }
+
+        $layout = Get-ManifestedLayout -LocalRoot $LocalRoot
+    }
+    catch {
+        return (New-ManifestedRuntimeFacts -RuntimeName 'Ps7Runtime' -CommandName 'Initialize-Ps7Runtime' -RuntimeKind 'PortablePackage' -LocalRoot $LocalRoot -Layout $layout -PlatformSupported:$false -BlockedReason $_.Exception.Message -AdditionalProperties @{
+            Flavor              = $Flavor
+            Package             = $null
+            PackagePath         = $null
+            InvalidRuntimeHomes = @()
+        })
+    }
+
+    $partialPaths = @()
+    if (Test-Path -LiteralPath $layout.Ps7CacheRoot) {
+        $partialPaths += @(Get-ChildItem -LiteralPath $layout.Ps7CacheRoot -File -Filter '*.download' -ErrorAction SilentlyContinue | Select-Object -ExpandProperty FullName)
+    }
+    $partialPaths += @(Get-ManifestedStageDirectories -Prefix 'ps7' -Mode TemporaryShort -LegacyRootPaths @($layout.ToolsRoot) | Select-Object -ExpandProperty FullName)
+
+    $installed = Get-InstalledPs7Runtime -Flavor $Flavor -LocalRoot $layout.LocalRoot
+    $managedRuntime = $installed.Current
+    $externalRuntime = $null
+    if (-not $managedRuntime) {
+        $externalRuntime = Get-SystemPs7Runtime -LocalRoot $layout.LocalRoot
+    }
+
+    $currentRuntime = if ($managedRuntime) { $managedRuntime } else { $externalRuntime }
+    $package = Get-LatestCachedPs7RuntimePackage -Flavor $Flavor -LocalRoot $layout.LocalRoot
+    $invalidRuntimeHomes = @($installed.Invalid | Select-Object -ExpandProperty RuntimeHome)
+
+    $currentVersion = $null
+    if ($currentRuntime) {
+        $currentVersion = $currentRuntime.Version
+    }
+    elseif ($package) {
+        $currentVersion = $package.Version
+    }
+
+    $runtimeHome = $null
+    $runtimeSource = $null
+    $executablePath = $null
+    $runtimeValidation = $null
+    if ($currentRuntime) {
+        $runtimeHome = $currentRuntime.RuntimeHome
+        $executablePath = $currentRuntime.PwshPath
+        $runtimeValidation = $currentRuntime.Validation
+    }
+    if ($managedRuntime) {
+        $runtimeSource = 'Managed'
+    }
+    elseif ($externalRuntime) {
+        $runtimeSource = 'External'
+    }
+
+    return (New-ManifestedRuntimeFacts -RuntimeName 'Ps7Runtime' -CommandName 'Initialize-Ps7Runtime' -RuntimeKind 'PortablePackage' -LocalRoot $layout.LocalRoot -Layout $layout -ManagedRuntime $managedRuntime -ExternalRuntime $externalRuntime -Artifact $package -PartialPaths $partialPaths -InvalidPaths $invalidRuntimeHomes -Version $currentVersion -RuntimeHome $runtimeHome -RuntimeSource $runtimeSource -ExecutablePath $executablePath -RuntimeValidation $runtimeValidation -AdditionalProperties @{
+        Flavor              = $Flavor
+        Package             = $package
+        PackagePath         = if ($package) { $package.Path } else { $null }
+        InvalidRuntimeHomes = $invalidRuntimeHomes
+    })
+}
+
 function Initialize-Ps7Runtime {
 <#
 .SYNOPSIS
 Ensures the managed PowerShell 7 runtime is available for the sandbox toolchain.
 
 .DESCRIPTION
-Repairs partial state when needed, acquires or reuses a trusted PowerShell ZIP,
-installs the managed runtime, and synchronizes the command-line environment so
-the runtime is ready for follow-up tooling commands.
+Uses the shared runtime kernel to collect facts, derive the execution plan,
+perform any required acquisition or install steps, and synchronize command
+resolution for the managed PowerShell runtime.
 
 .PARAMETER RefreshPs7
-Forces the bootstrap flow to reacquire the latest package and reinstall the
-managed runtime instead of reusing the current cached or installed copy.
+Forces package reacquisition and reinstall planning for the managed runtime.
 
 .EXAMPLE
 Initialize-Ps7Runtime
 
 .EXAMPLE
 Initialize-Ps7Runtime -RefreshPs7
-
-.NOTES
-Supports `-WhatIf` and follows the module's self-elevation plan when required.
 #>
     [CmdletBinding(SupportsShouldProcess = $true)]
     param(
         [switch]$RefreshPs7
     )
 
-    $LocalRoot = (Get-ManifestedLayout).LocalRoot
-    $selfElevationContext = Get-ManifestedSelfElevationContext
-
-    $actionsTaken = New-Object System.Collections.Generic.List[string]
-    $plannedActions = New-Object System.Collections.Generic.List[string]
-    $repairResult = $null
-    $packageInfo = $null
-    $packageTest = $null
-    $installResult = $null
-    $commandEnvironment = $null
-
-    $initialState = Get-Ps7RuntimeState -LocalRoot $LocalRoot
-    $state = $initialState
-    $elevationPlan = Get-ManifestedCommandElevationPlan -CommandName 'Initialize-Ps7Runtime' -LocalRoot $LocalRoot -SkipSelfElevation:$selfElevationContext.SkipSelfElevation -WasSelfElevated:$selfElevationContext.WasSelfElevated -WhatIfMode:$WhatIfPreference
-
-    if ($state.Status -eq 'Blocked') {
-        $commandEnvironment = Get-ManifestedCommandEnvironmentResult -CommandName 'Initialize-Ps7Runtime' -RuntimeState $state
-        $result = [pscustomobject]@{
-            LocalRoot       = $state.LocalRoot
-            Layout          = $state.Layout
-            InitialState    = $initialState
-            FinalState      = $state
-            ActionTaken     = @('None')
-            PlannedActions  = @()
-            RestartRequired = $false
-            Package         = $null
-            PackageTest     = $null
-            RuntimeTest     = $null
-            RepairResult    = $null
-            InstallResult   = $null
-            CommandEnvironment = $commandEnvironment
-            Elevation       = $elevationPlan
-        }
-
-        if ($WhatIfPreference) {
-            Add-Member -InputObject $result -NotePropertyName PersistedStatePath -NotePropertyValue $null -Force
-            return $result
-        }
-
-        $statePath = Save-ManifestedInvokeState -CommandName 'Initialize-Ps7Runtime' -Result $result -LocalRoot $LocalRoot -Details @{
-            Version = $state.CurrentVersion
-            Flavor  = $state.Flavor
-            RuntimeHome = $state.RuntimeHome
-            RuntimeSource = $state.RuntimeSource
-            ExecutablePath = $state.ExecutablePath
-        }
-        Add-Member -InputObject $result -NotePropertyName PersistedStatePath -NotePropertyValue $statePath -Force
-        return $result
-    }
-
-    $needsRepair = $state.Status -in @('Partial', 'NeedsRepair')
-    $needsInstall = $RefreshPs7 -or -not $state.RuntimeHome
-    $needsAcquire = $RefreshPs7 -or (-not $state.PackagePath)
-
-    if ($needsRepair) {
-        $plannedActions.Add('Repair-Ps7Runtime') | Out-Null
-    }
-    if ($needsInstall -and $needsAcquire) {
-        $plannedActions.Add('Save-Ps7RuntimePackage') | Out-Null
-    }
-    if ($needsInstall) {
-        $plannedActions.Add('Test-Ps7RuntimePackage') | Out-Null
-        $plannedActions.Add('Install-Ps7Runtime') | Out-Null
-    }
-    $plannedActions.Add('Sync-ManifestedCommandLineEnvironment') | Out-Null
-
-    $elevationPlan = Get-ManifestedCommandElevationPlan -CommandName 'Initialize-Ps7Runtime' -PlannedActions @($plannedActions) -LocalRoot $LocalRoot -SkipSelfElevation:$selfElevationContext.SkipSelfElevation -WasSelfElevated:$selfElevationContext.WasSelfElevated -WhatIfMode:$WhatIfPreference
-
-    if ($needsRepair) {
-        if (-not $PSCmdlet.ShouldProcess($state.Layout.Ps7ToolsRoot, 'Repair PowerShell runtime state')) {
-            return [pscustomobject]@{
-                LocalRoot          = $state.LocalRoot
-                Layout             = $state.Layout
-                InitialState       = $initialState
-                FinalState         = $state
-                ActionTaken        = @('WhatIf')
-                PlannedActions     = @($plannedActions)
-                RestartRequired    = $false
-                Package            = $null
-                PackageTest        = $null
-                RuntimeTest        = $state.Runtime
-                RepairResult       = $null
-                InstallResult      = $null
-                CommandEnvironment = (Get-ManifestedCommandEnvironmentResult -CommandName 'Initialize-Ps7Runtime' -RuntimeState $state)
-                PersistedStatePath = $null
-                Elevation          = $elevationPlan
-            }
-        }
-
-        $repairResult = Repair-Ps7Runtime -State $state -Flavor $state.Flavor -LocalRoot $state.LocalRoot
-        if ($repairResult.Action -eq 'Repaired') {
-            $actionsTaken.Add('Repair-Ps7Runtime') | Out-Null
-        }
-
-        $state = Get-Ps7RuntimeState -Flavor $state.Flavor -LocalRoot $state.LocalRoot
-        $needsInstall = $RefreshPs7 -or -not $state.RuntimeHome
-        $needsAcquire = $RefreshPs7 -or (-not $state.PackagePath)
-    }
-
-    if ($needsInstall) {
-        if ($needsAcquire) {
-            if (-not $PSCmdlet.ShouldProcess($state.Layout.Ps7CacheRoot, 'Acquire PowerShell runtime package')) {
-                return [pscustomobject]@{
-                    LocalRoot          = $state.LocalRoot
-                    Layout             = $state.Layout
-                    InitialState       = $initialState
-                    FinalState         = $state
-                    ActionTaken        = @('WhatIf')
-                    PlannedActions     = @($plannedActions)
-                    RestartRequired    = $false
-                    Package            = $null
-                    PackageTest        = $null
-                    RuntimeTest        = $state.Runtime
-                    RepairResult       = $repairResult
-                    InstallResult      = $null
-                    CommandEnvironment = (Get-ManifestedCommandEnvironmentResult -CommandName 'Initialize-Ps7Runtime' -RuntimeState $state)
-                    PersistedStatePath = $null
-                    Elevation          = $elevationPlan
-                }
-            }
-
-            $packageInfo = Save-Ps7RuntimePackage -RefreshPs7:$RefreshPs7 -Flavor $state.Flavor -LocalRoot $state.LocalRoot
-            if ($packageInfo.Action -eq 'Downloaded') {
-                $actionsTaken.Add('Save-Ps7RuntimePackage') | Out-Null
-            }
-        }
-        else {
-            $packageInfo = $state.Package
-        }
-
-        $packageTest = Test-Ps7RuntimePackage -PackageInfo $packageInfo
-        if ($packageTest.Status -eq 'CorruptCache') {
-            if (-not $PSCmdlet.ShouldProcess($packageInfo.Path, 'Repair corrupt PowerShell runtime package')) {
-                return [pscustomobject]@{
-                    LocalRoot          = $state.LocalRoot
-                    Layout             = $state.Layout
-                    InitialState       = $initialState
-                    FinalState         = $state
-                    ActionTaken        = @('WhatIf')
-                    PlannedActions     = @($plannedActions)
-                    RestartRequired    = $false
-                    Package            = $packageInfo
-                    PackageTest        = $packageTest
-                    RuntimeTest        = $state.Runtime
-                    RepairResult       = $repairResult
-                    InstallResult      = $null
-                    CommandEnvironment = (Get-ManifestedCommandEnvironmentResult -CommandName 'Initialize-Ps7Runtime' -RuntimeState $state)
-                    PersistedStatePath = $null
-                    Elevation          = $elevationPlan
-                }
-            }
-
-            $repairResult = Repair-Ps7Runtime -State $state -CorruptPackagePaths @($packageInfo.Path) -Flavor $state.Flavor -LocalRoot $state.LocalRoot
-            if ($repairResult.Action -eq 'Repaired') {
-                $actionsTaken.Add('Repair-Ps7Runtime') | Out-Null
-            }
-
-            $packageInfo = Save-Ps7RuntimePackage -RefreshPs7:$true -Flavor $state.Flavor -LocalRoot $state.LocalRoot
-            if ($packageInfo.Action -eq 'Downloaded') {
-                $actionsTaken.Add('Save-Ps7RuntimePackage') | Out-Null
-            }
-
-            $packageTest = Test-Ps7RuntimePackage -PackageInfo $packageInfo
-        }
-
-        if ($packageTest.Status -eq 'UnverifiedCache') {
-            throw "PowerShell runtime package validation failed because no trusted checksum could be resolved for $($packageInfo.FileName)."
-        }
-
-        if ($packageTest.Status -ne 'Ready') {
-            throw "PowerShell runtime package validation failed with status $($packageTest.Status)."
-        }
-
-        $commandParameters = @{}
-        if ($RefreshPs7) {
-            $commandParameters['RefreshPs7'] = $true
-        }
-        if ($PSBoundParameters.ContainsKey('WhatIf')) {
-            $commandParameters['WhatIf'] = $true
-        }
-
-        $elevatedResult = Invoke-ManifestedElevatedCommand -ElevationPlan $elevationPlan -CommandName 'Initialize-Ps7Runtime' -CommandParameters $commandParameters
-        if ($null -ne $elevatedResult) {
-            return $elevatedResult
-        }
-
-        if (-not $PSCmdlet.ShouldProcess($state.Layout.Ps7ToolsRoot, 'Install PowerShell runtime')) {
-            return [pscustomobject]@{
-                LocalRoot          = $state.LocalRoot
-                Layout             = $state.Layout
-                InitialState       = $initialState
-                FinalState         = $state
-                ActionTaken        = @('WhatIf')
-                PlannedActions     = @($plannedActions)
-                RestartRequired    = $false
-                Package            = $packageInfo
-                PackageTest        = $packageTest
-                RuntimeTest        = $state.Runtime
-                RepairResult       = $repairResult
-                InstallResult      = $null
-                CommandEnvironment = (Get-ManifestedCommandEnvironmentResult -CommandName 'Initialize-Ps7Runtime' -RuntimeState $state)
-                PersistedStatePath = $null
-                Elevation          = $elevationPlan
-            }
-        }
-
-        $installResult = Install-Ps7Runtime -PackageInfo $packageInfo -Flavor $state.Flavor -LocalRoot $state.LocalRoot
-        if ($installResult.Action -eq 'Installed') {
-            $actionsTaken.Add('Install-Ps7Runtime') | Out-Null
-        }
-    }
-
-    $finalState = Get-Ps7RuntimeState -Flavor $state.Flavor -LocalRoot $state.LocalRoot
-    $runtimeTest = if ($finalState.RuntimeHome) { Test-Ps7Runtime -RuntimeHome $finalState.RuntimeHome } else { $null }
-
-    $commandEnvironment = Get-ManifestedCommandEnvironmentResult -CommandName 'Initialize-Ps7Runtime' -RuntimeState $finalState
-    if ($commandEnvironment.Applicable) {
-        if (-not $PSCmdlet.ShouldProcess($commandEnvironment.DesiredCommandDirectory, 'Synchronize PowerShell command-line environment')) {
-            return [pscustomobject]@{
-                LocalRoot          = $finalState.LocalRoot
-                Layout             = $finalState.Layout
-                InitialState       = $initialState
-                FinalState         = $finalState
-                ActionTaken        = @('WhatIf')
-                PlannedActions     = @($plannedActions)
-                RestartRequired    = $false
-                Package            = $packageInfo
-                PackageTest        = $packageTest
-                RuntimeTest        = $runtimeTest
-                RepairResult       = $repairResult
-                InstallResult      = $installResult
-                CommandEnvironment = $commandEnvironment
-                PersistedStatePath = $null
-                Elevation          = $elevationPlan
-            }
-        }
-
-        $commandEnvironment = Sync-ManifestedCommandLineEnvironment -Specification (Get-ManifestedCommandEnvironmentSpec -CommandName 'Initialize-Ps7Runtime' -RuntimeState $finalState)
-        if ($commandEnvironment.Status -eq 'Updated') {
-            $actionsTaken.Add('Sync-ManifestedCommandLineEnvironment') | Out-Null
-        }
-    }
-
-    $result = [pscustomobject]@{
-        LocalRoot       = $finalState.LocalRoot
-        Layout          = $finalState.Layout
-        InitialState    = $initialState
-        FinalState      = $finalState
-        ActionTaken     = if ($actionsTaken.Count -gt 0) { @($actionsTaken) } else { @('None') }
-        PlannedActions  = @($plannedActions)
-        RestartRequired = $false
-        Package         = $packageInfo
-        PackageTest     = $packageTest
-        RuntimeTest     = $runtimeTest
-        RepairResult    = $repairResult
-        InstallResult   = $installResult
-        CommandEnvironment = $commandEnvironment
-        Elevation       = $elevationPlan
-    }
-
-    if ($WhatIfPreference) {
-        Add-Member -InputObject $result -NotePropertyName PersistedStatePath -NotePropertyValue $null -Force
-        return $result
-    }
-
-    $statePath = Save-ManifestedInvokeState -CommandName 'Initialize-Ps7Runtime' -Result $result -LocalRoot $LocalRoot -Details @{
-        Tag         = if ($packageInfo) { $packageInfo.TagName } else { $null }
-        Version     = $finalState.CurrentVersion
-        Flavor      = $finalState.Flavor
-        AssetName   = if ($packageInfo) { $packageInfo.FileName } else { $null }
-        PackagePath = if ($packageInfo) { $packageInfo.Path } else { $finalState.PackagePath }
-        RuntimeHome = $finalState.RuntimeHome
-        RuntimeSource = $finalState.RuntimeSource
-        ExecutablePath = $finalState.ExecutablePath
-        DownloadUrl = if ($packageInfo) { $packageInfo.DownloadUrl } else { $null }
-        Sha256      = if ($packageInfo) { $packageInfo.Sha256 } else { $null }
-        ShaSource   = if ($packageInfo) { $packageInfo.ShaSource } else { $null }
-    }
-    Add-Member -InputObject $result -NotePropertyName PersistedStatePath -NotePropertyValue $statePath -Force
-
-    return $result
+    return (Invoke-ManifestedCommandInitialization -Name 'Initialize-Ps7Runtime' -PSCmdletObject $PSCmdlet -RefreshRequested:$RefreshPs7 -WhatIfMode:$WhatIfPreference)
 }

@@ -461,6 +461,37 @@ function Install-VCRuntime {
     }
 }
 
+function Get-VCRuntimeFacts {
+    [CmdletBinding()]
+    param(
+        [string]$LocalRoot = (Get-ManifestedLocalRoot)
+    )
+
+    if ([System.Environment]::OSVersion.Platform -ne [System.PlatformID]::Win32NT) {
+        return (New-ManifestedRuntimeFacts -RuntimeName 'VCRuntime' -CommandName 'Initialize-VCRuntime' -RuntimeKind 'MachinePrerequisite' -LocalRoot $LocalRoot -Layout $null -PlatformSupported:$false -BlockedReason 'Only Windows hosts are supported by this VC runtime bootstrap.')
+    }
+
+    $layout = Get-ManifestedLayout -LocalRoot $LocalRoot
+    $definition = Get-ManifestedCommandDefinition -CommandName 'Initialize-VCRuntime'
+    $artifact = if ($definition) { Get-ManifestedCachedInstallerArtifactFromDefinition -Definition $definition -LocalRoot $layout.LocalRoot } else { $null }
+    $installerInfo = Get-VCRuntimeInstallerInfo -LocalRoot $layout.LocalRoot
+    $partialPaths = @()
+    $downloadPath = Get-ManifestedDownloadPath -TargetPath $installerInfo.CachePath
+    if (Test-Path -LiteralPath $downloadPath) {
+        $partialPaths += $downloadPath
+    }
+
+    $installedRuntime = Get-InstalledVCRuntime
+    $runtime = Test-VCRuntime -InstalledRuntime $installedRuntime
+
+    return (New-ManifestedRuntimeFacts -RuntimeName 'VCRuntime' -CommandName 'Initialize-VCRuntime' -RuntimeKind 'MachinePrerequisite' -LocalRoot $layout.LocalRoot -Layout $layout -Artifact $artifact -PartialPaths $partialPaths -Version $(if ($runtime.Version) { $runtime.Version } elseif ($artifact) { $artifact.Version } else { $null }) -RuntimeHome $null -RuntimeSource $(if ($runtime.Installed) { 'Managed' } else { $null }) -ExecutablePath $null -RuntimeValidation $runtime -AdditionalProperties @{
+            InstalledRuntime = $installedRuntime
+            Runtime          = $runtime
+            Installer        = if ($artifact) { $artifact } else { Get-CachedVCRuntimeInstaller -LocalRoot $layout.LocalRoot }
+            InstallerPath    = if ($artifact) { $artifact.Path } else { $installerInfo.CachePath }
+        })
+}
+
 function Initialize-VCRuntime {
     [CmdletBinding(SupportsShouldProcess = $true)]
     param(
@@ -468,239 +499,7 @@ function Initialize-VCRuntime {
         [int]$InstallTimeoutSec = 300
     )
 
-    $LocalRoot = (Get-ManifestedLayout).LocalRoot
-    $selfElevationContext = Get-ManifestedSelfElevationContext
-
-    $actionsTaken = New-Object System.Collections.Generic.List[string]
-    $plannedActions = New-Object System.Collections.Generic.List[string]
-    $repairResult = $null
-    $installerInfo = $null
-    $installerTest = $null
-    $installResult = $null
-
-    $initialState = Get-VCRuntimeState -LocalRoot $LocalRoot
-    $state = $initialState
-    $elevationPlan = Get-ManifestedCommandElevationPlan -CommandName 'Initialize-VCRuntime' -LocalRoot $LocalRoot -SkipSelfElevation:$selfElevationContext.SkipSelfElevation -WasSelfElevated:$selfElevationContext.WasSelfElevated -WhatIfMode:$WhatIfPreference
-
-    if ($state.Status -eq 'Blocked') {
-        $result = [pscustomobject]@{
-            LocalRoot       = $state.LocalRoot
-            Layout          = $state.Layout
-            InitialState    = $initialState
-            FinalState      = $state
-            ActionTaken     = @('None')
-            PlannedActions  = @()
-            RestartRequired = $false
-            Installer       = $null
-            InstallerTest   = $null
-            RuntimeTest     = $null
-            RepairResult    = $null
-            InstallResult   = $null
-            Elevation       = $elevationPlan
-        }
-
-        if ($WhatIfPreference) {
-            Add-Member -InputObject $result -NotePropertyName PersistedStatePath -NotePropertyValue $null -Force
-            return $result
-        }
-
-        $statePath = Save-ManifestedInvokeState -CommandName 'Initialize-VCRuntime' -Result $result -LocalRoot $LocalRoot -Details @{
-            Version       = $state.CurrentVersion
-            InstallerPath = $state.InstallerPath
-        }
-        Add-Member -InputObject $result -NotePropertyName PersistedStatePath -NotePropertyValue $statePath -Force
-        return $result
-    }
-
-    $needsRepair = $state.Status -in @('Partial', 'NeedsRepair')
-    $needsInstall = $RefreshVCRuntime -or ($state.Status -ne 'Ready')
-    $needsAcquire = $RefreshVCRuntime -or (-not $state.InstallerPath) -or (-not (Test-Path -LiteralPath $state.InstallerPath))
-
-    if ($needsRepair) {
-        $plannedActions.Add('Repair-VCRuntime') | Out-Null
-    }
-    if ($needsInstall -and $needsAcquire) {
-        $plannedActions.Add('Save-VCRuntimeInstaller') | Out-Null
-    }
-    if ($needsInstall) {
-        $plannedActions.Add('Test-VCRuntimeInstaller') | Out-Null
-        $plannedActions.Add('Install-VCRuntime') | Out-Null
-    }
-
-    $elevationPlan = Get-ManifestedCommandElevationPlan -CommandName 'Initialize-VCRuntime' -PlannedActions @($plannedActions) -LocalRoot $LocalRoot -SkipSelfElevation:$selfElevationContext.SkipSelfElevation -WasSelfElevated:$selfElevationContext.WasSelfElevated -WhatIfMode:$WhatIfPreference
-
-    if ($needsRepair) {
-        if (-not $PSCmdlet.ShouldProcess($state.InstallerPath, 'Repair VC runtime state')) {
-            return [pscustomobject]@{
-                LocalRoot          = $state.LocalRoot
-                Layout             = $state.Layout
-                InitialState       = $initialState
-                FinalState         = $state
-                ActionTaken        = @('WhatIf')
-                PlannedActions     = @($plannedActions)
-                RestartRequired    = $false
-                Installer          = $null
-                InstallerTest      = $null
-                RuntimeTest        = $state.Runtime
-                RepairResult       = $null
-                InstallResult      = $null
-                PersistedStatePath = $null
-                Elevation          = $elevationPlan
-            }
-        }
-
-        $repairResult = Repair-VCRuntime -State $state -LocalRoot $state.LocalRoot
-        if ($repairResult.Action -eq 'Repaired') {
-            $actionsTaken.Add('Repair-VCRuntime') | Out-Null
-        }
-
-        $state = Get-VCRuntimeState -LocalRoot $state.LocalRoot
-        $needsInstall = $RefreshVCRuntime -or ($state.Status -ne 'Ready')
-        $needsAcquire = $RefreshVCRuntime -or (-not $state.InstallerPath) -or (-not (Test-Path -LiteralPath $state.InstallerPath))
-    }
-
-    if ($needsInstall) {
-        if ($needsAcquire) {
-            if (-not $PSCmdlet.ShouldProcess($state.Layout.VCRuntimeCacheRoot, 'Acquire VC runtime installer')) {
-                return [pscustomobject]@{
-                    LocalRoot          = $state.LocalRoot
-                    Layout             = $state.Layout
-                    InitialState       = $initialState
-                    FinalState         = $state
-                    ActionTaken        = @('WhatIf')
-                    PlannedActions     = @($plannedActions)
-                    RestartRequired    = $false
-                    Installer          = $null
-                    InstallerTest      = $null
-                    RuntimeTest        = $state.Runtime
-                    RepairResult       = $repairResult
-                    InstallResult      = $null
-                    PersistedStatePath = $null
-                    Elevation          = $elevationPlan
-                }
-            }
-
-            $installerInfo = Save-VCRuntimeInstaller -RefreshVCRuntime:$RefreshVCRuntime -LocalRoot $state.LocalRoot
-            if ($installerInfo.Action -eq 'Downloaded') {
-                $actionsTaken.Add('Save-VCRuntimeInstaller') | Out-Null
-            }
-        }
-        else {
-            $installerInfo = $state.Installer
-        }
-
-        $installerTest = Test-VCRuntimeInstaller -InstallerInfo $installerInfo
-        if ($installerTest.Status -eq 'CorruptCache') {
-            if (-not $PSCmdlet.ShouldProcess($installerInfo.Path, 'Repair corrupt VC runtime installer')) {
-                return [pscustomobject]@{
-                    LocalRoot          = $state.LocalRoot
-                    Layout             = $state.Layout
-                    InitialState       = $initialState
-                    FinalState         = $state
-                    ActionTaken        = @('WhatIf')
-                    PlannedActions     = @($plannedActions)
-                    RestartRequired    = $false
-                    Installer          = $installerInfo
-                    InstallerTest      = $installerTest
-                    RuntimeTest        = $state.Runtime
-                    RepairResult       = $repairResult
-                    InstallResult      = $null
-                    PersistedStatePath = $null
-                    Elevation          = $elevationPlan
-                }
-            }
-
-            $repairResult = Repair-VCRuntime -State $state -CorruptInstallerPaths @($installerInfo.Path) -LocalRoot $state.LocalRoot
-            if ($repairResult.Action -eq 'Repaired') {
-                $actionsTaken.Add('Repair-VCRuntime') | Out-Null
-            }
-
-            $installerInfo = Save-VCRuntimeInstaller -RefreshVCRuntime:$true -LocalRoot $state.LocalRoot
-            if ($installerInfo.Action -eq 'Downloaded') {
-                $actionsTaken.Add('Save-VCRuntimeInstaller') | Out-Null
-            }
-
-            $installerTest = Test-VCRuntimeInstaller -InstallerInfo $installerInfo
-        }
-
-        if ($installerTest.Status -ne 'Ready') {
-            throw "VC runtime installer validation failed with status $($installerTest.Status)."
-        }
-
-        $elevationPlan = Get-ManifestedCommandElevationPlan -CommandName 'Initialize-VCRuntime' -PlannedActions @($plannedActions) -Context @{
-            InstalledRuntime = $state.InstalledRuntime
-            InstallerInfo    = $installerInfo
-        } -LocalRoot $state.LocalRoot -SkipSelfElevation:$selfElevationContext.SkipSelfElevation -WasSelfElevated:$selfElevationContext.WasSelfElevated -WhatIfMode:$WhatIfPreference
-
-        $commandParameters = @{
+    return (Invoke-ManifestedCommandInitialization -Name 'Initialize-VCRuntime' -PSCmdletObject $PSCmdlet -RefreshRequested:$RefreshVCRuntime -CommandOptions @{
             InstallTimeoutSec = $InstallTimeoutSec
-        }
-        if ($RefreshVCRuntime) {
-            $commandParameters['RefreshVCRuntime'] = $true
-        }
-        if ($PSBoundParameters.ContainsKey('WhatIf')) {
-            $commandParameters['WhatIf'] = $true
-        }
-
-        $elevatedResult = Invoke-ManifestedElevatedCommand -ElevationPlan $elevationPlan -CommandName 'Initialize-VCRuntime' -CommandParameters $commandParameters
-        if ($null -ne $elevatedResult) {
-            return $elevatedResult
-        }
-
-        if (-not $PSCmdlet.ShouldProcess('Microsoft Visual C++ Redistributable (x64)', 'Install VC runtime')) {
-            return [pscustomobject]@{
-                LocalRoot          = $state.LocalRoot
-                Layout             = $state.Layout
-                InitialState       = $initialState
-                FinalState         = $state
-                ActionTaken        = @('WhatIf')
-                PlannedActions     = @($plannedActions)
-                RestartRequired    = $false
-                Installer          = $installerInfo
-                InstallerTest      = $installerTest
-                RuntimeTest        = $state.Runtime
-                RepairResult       = $repairResult
-                InstallResult      = $null
-                PersistedStatePath = $null
-                Elevation          = $elevationPlan
-            }
-        }
-
-        $installResult = Install-VCRuntime -InstallerInfo $installerInfo -InstallTimeoutSec $InstallTimeoutSec -LocalRoot $state.LocalRoot
-        if ($installResult.Action -eq 'Installed') {
-            $actionsTaken.Add('Install-VCRuntime') | Out-Null
-        }
-    }
-
-    $finalState = Get-VCRuntimeState -LocalRoot $state.LocalRoot
-    $runtimeTest = Test-VCRuntime -InstalledRuntime $finalState.InstalledRuntime
-
-    $result = [pscustomobject]@{
-        LocalRoot       = $finalState.LocalRoot
-        Layout          = $finalState.Layout
-        InitialState    = $initialState
-        FinalState      = $finalState
-        ActionTaken     = if ($actionsTaken.Count -gt 0) { @($actionsTaken) } else { @('None') }
-        PlannedActions  = @($plannedActions)
-        RestartRequired = if ($installResult) { [bool]$installResult.RestartRequired } else { $false }
-        Installer       = $installerInfo
-        InstallerTest   = $installerTest
-        RuntimeTest     = $runtimeTest
-        RepairResult    = $repairResult
-        InstallResult   = $installResult
-        Elevation       = $elevationPlan
-    }
-
-    if ($WhatIfPreference) {
-        Add-Member -InputObject $result -NotePropertyName PersistedStatePath -NotePropertyValue $null -Force
-        return $result
-    }
-
-    $statePath = Save-ManifestedInvokeState -CommandName 'Initialize-VCRuntime' -Result $result -LocalRoot $LocalRoot -Details @{
-        Version       = $finalState.CurrentVersion
-        InstallerPath = $finalState.InstallerPath
-    }
-    Add-Member -InputObject $result -NotePropertyName PersistedStatePath -NotePropertyValue $statePath -Force
-
-    return $result
+        } -WhatIfMode:$WhatIfPreference)
 }

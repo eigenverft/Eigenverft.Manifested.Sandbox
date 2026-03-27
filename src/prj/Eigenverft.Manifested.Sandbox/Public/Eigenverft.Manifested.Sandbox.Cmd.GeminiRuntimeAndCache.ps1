@@ -57,7 +57,8 @@ function Test-GeminiNodeRuntime {
     $requiredVersion = Get-GeminiRequiredNodeVersion
     $currentVersion = $null
     if ($NodeState -and $NodeState.PSObject.Properties['CurrentVersion']) {
-        $currentVersion = ConvertTo-NodeVersion -VersionText $NodeState.CurrentVersion
+        $versionSpec = Get-ManifestedVersionSpec -Definition (Get-ManifestedCommandDefinition -CommandName 'Initialize-NodeRuntime')
+        $currentVersion = ConvertTo-ManifestedVersionObjectFromRule -VersionText $NodeState.CurrentVersion -Rule $versionSpec.RuntimeVersionRule
     }
 
     $npmCmd = $null
@@ -341,6 +342,20 @@ function Get-GeminiRuntimeState {
     }
 }
 
+function Get-GeminiRuntimeFacts {
+    [CmdletBinding()]
+    param(
+        [string]$LocalRoot = (Get-ManifestedLocalRoot)
+    )
+
+    $definition = Get-ManifestedCommandDefinition -CommandName 'Initialize-GeminiRuntime'
+    if (-not $definition) {
+        return (New-ManifestedRuntimeFacts -RuntimeName 'GeminiRuntime' -CommandName 'Initialize-GeminiRuntime' -RuntimeKind 'NpmCli' -LocalRoot $LocalRoot -Layout $null -PlatformSupported:$false -BlockedReason 'The packaged command definition for GeminiRuntime is not available.')
+    }
+
+    return (Get-ManifestedNpmCliFactsFromDefinition -Definition $definition -LocalRoot $LocalRoot)
+}
+
 function Repair-GeminiRuntime {
     [CmdletBinding()]
     param(
@@ -445,244 +460,10 @@ function Install-GeminiRuntime {
 }
 
 function Initialize-GeminiRuntime {
-<#
-.SYNOPSIS
-Ensures the Gemini runtime is available and ready for command-line use.
-
-.DESCRIPTION
-Evaluates the current Gemini runtime state, repairs partial or invalid installs,
-ensures required Node.js dependencies are present, installs the managed runtime
-when needed, and synchronizes the command-line environment metadata.
-
-.PARAMETER RefreshGemini
-Forces the managed Gemini runtime to be reinstalled even when one is already ready.
-
-.EXAMPLE
-Initialize-GeminiRuntime
-
-.EXAMPLE
-Initialize-GeminiRuntime -RefreshGemini
-
-.NOTES
-Supports WhatIf and may trigger dependent runtime initialization steps.
-#>
     [CmdletBinding(SupportsShouldProcess = $true)]
     param(
         [switch]$RefreshGemini
     )
 
-    $LocalRoot = (Get-ManifestedLayout).LocalRoot
-    $selfElevationContext = Get-ManifestedSelfElevationContext
-
-    $actionsTaken = New-Object System.Collections.Generic.List[string]
-    $plannedActions = New-Object System.Collections.Generic.List[string]
-    $repairResult = $null
-    $installResult = $null
-    $nodeRequirement = $null
-    $commandEnvironment = $null
-
-    $initialState = Get-GeminiRuntimeState -LocalRoot $LocalRoot
-    $state = $initialState
-    $elevationPlan = Get-ManifestedCommandElevationPlan -CommandName 'Initialize-GeminiRuntime' -LocalRoot $LocalRoot -SkipSelfElevation:$selfElevationContext.SkipSelfElevation -WasSelfElevated:$selfElevationContext.WasSelfElevated -WhatIfMode:$WhatIfPreference
-
-    if ($state.Status -eq 'Blocked') {
-        $commandEnvironment = Get-ManifestedCommandEnvironmentResult -CommandName 'Initialize-GeminiRuntime' -RuntimeState $state
-        $result = [pscustomobject]@{
-            LocalRoot          = $state.LocalRoot
-            Layout             = $state.Layout
-            InitialState       = $initialState
-            FinalState         = $state
-            ActionTaken        = @('None')
-            PlannedActions     = @()
-            RestartRequired    = $false
-            RuntimeTest        = $null
-            RepairResult       = $null
-            InstallResult      = $null
-            CommandEnvironment = $commandEnvironment
-            Elevation          = $elevationPlan
-        }
-
-        if ($WhatIfPreference) {
-            Add-Member -InputObject $result -NotePropertyName PersistedStatePath -NotePropertyValue $null -Force
-            return $result
-        }
-
-        $statePath = Save-ManifestedInvokeState -CommandName 'Initialize-GeminiRuntime' -Result $result -LocalRoot $LocalRoot -Details @{
-            Version         = $state.CurrentVersion
-            RuntimeHome     = $state.RuntimeHome
-            RuntimeSource   = $state.RuntimeSource
-            ExecutablePath  = $state.ExecutablePath
-            PackageJsonPath = $state.PackageJsonPath
-        }
-        Add-Member -InputObject $result -NotePropertyName PersistedStatePath -NotePropertyValue $statePath -Force
-        return $result
-    }
-
-    $needsRepair = $state.Status -in @('Partial', 'NeedsRepair')
-    $needsInstall = $RefreshGemini -or ($state.Status -ne 'Ready')
-
-    if ($needsRepair) {
-        $plannedActions.Add('Repair-GeminiRuntime') | Out-Null
-    }
-    if ($needsInstall) {
-        $nodeRequirement = Test-GeminiNodeRuntime -NodeState (Get-NodeRuntimeState -LocalRoot $LocalRoot)
-        if (-not $nodeRequirement.IsCompatible) {
-            $plannedActions.Add('Initialize-NodeRuntime') | Out-Null
-        }
-
-        $plannedActions.Add('Install-GeminiRuntime') | Out-Null
-    }
-    $plannedActions.Add('Sync-ManifestedCommandLineEnvironment') | Out-Null
-
-    $elevationPlan = Get-ManifestedCommandElevationPlan -CommandName 'Initialize-GeminiRuntime' -PlannedActions @($plannedActions) -LocalRoot $LocalRoot -SkipSelfElevation:$selfElevationContext.SkipSelfElevation -WasSelfElevated:$selfElevationContext.WasSelfElevated -WhatIfMode:$WhatIfPreference
-
-    if ($needsRepair) {
-        if (-not $PSCmdlet.ShouldProcess($state.Layout.GeminiToolsRoot, 'Repair Gemini runtime state')) {
-            return [pscustomobject]@{
-                LocalRoot          = $state.LocalRoot
-                Layout             = $state.Layout
-                InitialState       = $initialState
-                FinalState         = $state
-                ActionTaken        = @('WhatIf')
-                PlannedActions     = @($plannedActions)
-                RestartRequired    = $false
-                RuntimeTest        = $state.Runtime
-                RepairResult       = $null
-                InstallResult      = $null
-                CommandEnvironment = (Get-ManifestedCommandEnvironmentResult -CommandName 'Initialize-GeminiRuntime' -RuntimeState $state)
-                PersistedStatePath = $null
-                Elevation          = $elevationPlan
-            }
-        }
-
-        $repairResult = Repair-GeminiRuntime -State $state -LocalRoot $state.LocalRoot
-        if ($repairResult.Action -eq 'Repaired') {
-            $actionsTaken.Add('Repair-GeminiRuntime') | Out-Null
-        }
-
-        $state = Get-GeminiRuntimeState -LocalRoot $state.LocalRoot
-        $needsInstall = $RefreshGemini -or ($state.Status -ne 'Ready')
-    }
-
-    if ($needsInstall) {
-        if (-not $PSCmdlet.ShouldProcess($state.Layout.GeminiToolsRoot, 'Ensure Gemini runtime dependencies and install Gemini runtime')) {
-            return [pscustomobject]@{
-                LocalRoot          = $state.LocalRoot
-                Layout             = $state.Layout
-                InitialState       = $initialState
-                FinalState         = $state
-                ActionTaken        = @('WhatIf')
-                PlannedActions     = @($plannedActions)
-                RestartRequired    = $false
-                RuntimeTest        = $state.Runtime
-                RepairResult       = $repairResult
-                InstallResult      = $null
-                CommandEnvironment = (Get-ManifestedCommandEnvironmentResult -CommandName 'Initialize-GeminiRuntime' -RuntimeState $state)
-                PersistedStatePath = $null
-                Elevation          = $elevationPlan
-            }
-        }
-
-        $nodeState = Get-NodeRuntimeState -LocalRoot $LocalRoot
-        $nodeRequirement = Test-GeminiNodeRuntime -NodeState $nodeState
-        if (-not $nodeRequirement.IsCompatible) {
-            $nodeCommandParameters = @{}
-            if ($nodeRequirement.NeedsRefresh) {
-                $nodeCommandParameters['RefreshNode'] = $true
-            }
-
-            $nodeResult = Initialize-NodeRuntime @nodeCommandParameters
-            if (@(@($nodeResult.ActionTaken) | Where-Object { $_ -and $_ -ne 'None' }).Count -gt 0) {
-                $actionsTaken.Add('Initialize-NodeRuntime') | Out-Null
-            }
-
-            $nodeState = Get-NodeRuntimeState -LocalRoot $LocalRoot
-            $nodeRequirement = Test-GeminiNodeRuntime -NodeState $nodeState
-        }
-
-        $npmCmd = $nodeRequirement.NpmCmd
-
-        if (-not $nodeRequirement.IsCompatible -or [string]::IsNullOrWhiteSpace($npmCmd) -or -not (Test-Path -LiteralPath $npmCmd)) {
-            throw ('A Node.js runtime compatible with Gemini was not available after ensuring dependencies. Required: {0}. Current: {1}.' -f $nodeRequirement.RequiredVersion, $nodeRequirement.CurrentVersion)
-        }
-
-        $installResult = Install-GeminiRuntime -NpmCmd $npmCmd -LocalRoot $LocalRoot
-        if ($installResult.Action -eq 'Installed') {
-            $actionsTaken.Add('Install-GeminiRuntime') | Out-Null
-        }
-    }
-
-    $finalState = Get-GeminiRuntimeState -LocalRoot $LocalRoot
-    $runtimeTest = if ($finalState.RuntimeHome) {
-        Test-GeminiRuntime -RuntimeHome $finalState.RuntimeHome
-    }
-    else {
-        [pscustomobject]@{
-            Status          = 'Missing'
-            IsReady         = $false
-            RuntimeHome     = $null
-            GeminiCmd       = $null
-            PackageJsonPath = $null
-            PackageVersion  = $null
-            ReportedVersion = $null
-        }
-    }
-
-    $commandEnvironment = Get-ManifestedCommandEnvironmentResult -CommandName 'Initialize-GeminiRuntime' -RuntimeState $finalState
-    if ($commandEnvironment.Applicable) {
-        if (-not $PSCmdlet.ShouldProcess($commandEnvironment.DesiredCommandDirectory, 'Synchronize Gemini command-line environment')) {
-            return [pscustomobject]@{
-                LocalRoot          = $finalState.LocalRoot
-                Layout             = $finalState.Layout
-                InitialState       = $initialState
-                FinalState         = $finalState
-                ActionTaken        = @('WhatIf')
-                PlannedActions     = @($plannedActions)
-                RestartRequired    = $false
-                RuntimeTest        = $runtimeTest
-                RepairResult       = $repairResult
-                InstallResult      = $installResult
-                CommandEnvironment = $commandEnvironment
-                PersistedStatePath = $null
-                Elevation          = $elevationPlan
-            }
-        }
-
-        $commandEnvironment = Sync-ManifestedCommandLineEnvironment -Specification (Get-ManifestedCommandEnvironmentSpec -CommandName 'Initialize-GeminiRuntime' -RuntimeState $finalState)
-        if ($commandEnvironment.Status -eq 'Updated') {
-            $actionsTaken.Add('Sync-ManifestedCommandLineEnvironment') | Out-Null
-        }
-    }
-
-    $result = [pscustomobject]@{
-        LocalRoot          = $finalState.LocalRoot
-        Layout             = $finalState.Layout
-        InitialState       = $initialState
-        FinalState         = $finalState
-        ActionTaken        = if ($actionsTaken.Count -gt 0) { @($actionsTaken) } else { @('None') }
-        PlannedActions     = @($plannedActions)
-        RestartRequired    = $false
-        RuntimeTest        = $runtimeTest
-        RepairResult       = $repairResult
-        InstallResult      = $installResult
-        CommandEnvironment = $commandEnvironment
-        Elevation          = $elevationPlan
-    }
-
-    if ($WhatIfPreference) {
-        Add-Member -InputObject $result -NotePropertyName PersistedStatePath -NotePropertyValue $null -Force
-        return $result
-    }
-
-    $statePath = Save-ManifestedInvokeState -CommandName 'Initialize-GeminiRuntime' -Result $result -LocalRoot $LocalRoot -Details @{
-        Version         = $finalState.CurrentVersion
-        RuntimeHome     = $finalState.RuntimeHome
-        RuntimeSource   = $finalState.RuntimeSource
-        ExecutablePath  = $finalState.ExecutablePath
-        PackageJsonPath = $finalState.PackageJsonPath
-    }
-    Add-Member -InputObject $result -NotePropertyName PersistedStatePath -NotePropertyValue $statePath -Force
-
-    return $result
+    return (Invoke-ManifestedCommandInitialization -Name 'Initialize-GeminiRuntime' -PSCmdletObject $PSCmdlet -RefreshRequested:$RefreshGemini -WhatIfMode:$WhatIfPreference)
 }
-

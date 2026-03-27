@@ -2,59 +2,7 @@
     Eigenverft.Manifested.Sandbox.Cmd.GitRuntimeAndCache
 #>
 
-function ConvertTo-GitVersion {
-    [CmdletBinding()]
-    param(
-        [string]$VersionText
-    )
-
-    if ([string]::IsNullOrWhiteSpace($VersionText)) {
-        return $null
-    }
-
-    $match = [regex]::Match($VersionText, '(\d+\.\d+\.\d+)(?:\.windows\.(\d+)|\.(\d+))?')
-    if (-not $match.Success) {
-        return $null
-    }
-
-    $revision = if ($match.Groups[2].Success) { $match.Groups[2].Value } elseif ($match.Groups[3].Success) { $match.Groups[3].Value } else { $null }
-    $normalized = if ($revision) { '{0}.{1}' -f $match.Groups[1].Value, $revision } else { $match.Groups[1].Value }
-    return [version]$normalized
-}
-
-function ConvertTo-GitReleaseVersion {
-    [CmdletBinding()]
-    param(
-        [string]$TagName
-    )
-
-    $versionObject = ConvertTo-GitVersion -VersionText $TagName
-    if (-not $versionObject) {
-        throw "Could not parse the Git for Windows release tag '$TagName'."
-    }
-
-    return $versionObject.ToString()
-}
-
-function Get-GitFlavor {
-    [CmdletBinding()]
-    param()
-
-    if ([System.Environment]::OSVersion.Platform -ne [System.PlatformID]::Win32NT) {
-        throw 'Only Windows hosts are supported by this MinGit runtime bootstrap.'
-    }
-
-    $archHints = @($env:PROCESSOR_ARCHITECTURE, $env:PROCESSOR_ARCHITEW6432) -join ';'
-    if ($archHints -match 'ARM64') {
-        return 'arm64'
-    }
-
-    if ([Environment]::Is64BitOperatingSystem) {
-        return '64-bit'
-    }
-
-    throw 'Only 64-bit Windows targets are supported by this MinGit runtime bootstrap.'
-}
+$script:ManifestedGitRuntimeVersionSpec = Get-ManifestedVersionSpec -Definition (Get-ManifestedCommandDefinition -CommandName 'Initialize-GitRuntime')
 
 function Get-GitPersistedPackageDetails {
     [CmdletBinding()]
@@ -77,7 +25,7 @@ function Get-GitRelease {
     )
 
     if ([string]::IsNullOrWhiteSpace($Flavor)) {
-        $Flavor = Get-GitFlavor
+        $Flavor = Get-ManifestedCommandFlavor -CommandName 'Initialize-GitRuntime'
     }
 
     $owner = 'git-for-windows'
@@ -89,7 +37,7 @@ function Get-GitRelease {
             throw 'The latest Git for Windows release is not a stable release.'
         }
 
-        $version = ConvertTo-GitReleaseVersion -TagName $release.TagName
+        $version = ConvertTo-ManifestedVersionTextFromRule -VersionText $release.TagName -Rule $script:ManifestedGitRuntimeVersionSpec.ReleaseVersionRule
         $fileName = 'MinGit-{0}-{1}.zip' -f $version, $Flavor
         $asset = Get-ManifestedGitHubReleaseAsset -Release $release -AssetName $fileName
         if (-not $asset) {
@@ -121,7 +69,7 @@ function Get-GitRelease {
             throw 'Unable to determine the latest stable Git for Windows release.'
         }
 
-        $version = ConvertTo-GitReleaseVersion -TagName $tagInfo.TagName
+        $version = ConvertTo-ManifestedVersionTextFromRule -VersionText $tagInfo.TagName -Rule $script:ManifestedGitRuntimeVersionSpec.ReleaseVersionRule
         $fileName = 'MinGit-{0}-{1}.zip' -f $version, $Flavor
         $checksum = Get-ManifestedGitHubReleaseAssetChecksum -Owner $owner -Repository $repository -TagName $tagInfo.TagName -AssetName $fileName -FallbackSource ReleaseHtml
         if (-not $checksum) {
@@ -152,7 +100,7 @@ function Get-CachedGitRuntimePackages {
     )
 
     if ([string]::IsNullOrWhiteSpace($Flavor)) {
-        $Flavor = Get-GitFlavor
+        $Flavor = Get-ManifestedCommandFlavor -CommandName 'Initialize-GitRuntime'
     }
 
     $layout = Get-ManifestedLayout -LocalRoot $LocalRoot
@@ -192,7 +140,7 @@ function Get-CachedGitRuntimePackages {
                 ReleaseUrl  = $null
             }
         } |
-        Sort-Object -Descending -Property @{ Expression = { ConvertTo-GitVersion -VersionText $_.Version } }
+        Sort-Object -Descending -Property @{ Expression = { ConvertTo-ManifestedVersionObjectFromRule -VersionText $_.Version -Rule $script:ManifestedGitRuntimeVersionSpec.RuntimeVersionRule } }
 
     return @($items)
 }
@@ -233,7 +181,10 @@ function Test-GitRuntime {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true)]
-        [string]$RuntimeHome
+        [string]$RuntimeHome,
+
+        [Parameter(Mandatory = $true)]
+        [pscustomobject]$VersionSpec
     )
 
     $gitCmd = Join-Path $RuntimeHome 'cmd\git.exe'
@@ -260,7 +211,7 @@ function Test-GitRuntime {
             $reportedBanner = $null
         }
 
-        $reportedVersionObject = ConvertTo-GitVersion -VersionText $reportedBanner
+        $reportedVersionObject = ConvertTo-ManifestedVersionObjectFromRule -VersionText $reportedBanner -Rule $versionSpec.RuntimeVersionRule
         $reportedVersion = if ($reportedVersionObject) { $reportedVersionObject.ToString() } else { $null }
         $status = if ($reportedVersion) { 'Ready' } else { 'NeedsRepair' }
     }
@@ -283,7 +234,7 @@ function Get-InstalledGitRuntime {
     )
 
     if ([string]::IsNullOrWhiteSpace($Flavor)) {
-        $Flavor = Get-GitFlavor
+        $Flavor = Get-ManifestedCommandFlavor -CommandName 'Initialize-GitRuntime'
     }
 
     $layout = Get-ManifestedLayout -LocalRoot $LocalRoot
@@ -291,7 +242,7 @@ function Get-InstalledGitRuntime {
 
     if (Test-Path -LiteralPath $layout.GitToolsRoot) {
         $versionRoots = Get-ChildItem -LiteralPath $layout.GitToolsRoot -Directory -ErrorAction SilentlyContinue |
-            Sort-Object -Descending -Property @{ Expression = { ConvertTo-GitVersion -VersionText $_.Name } }
+            Sort-Object -Descending -Property @{ Expression = { ConvertTo-ManifestedVersionObjectFromRule -VersionText $_.Name -Rule $script:ManifestedGitRuntimeVersionSpec.RuntimeVersionRule } }
 
         foreach ($versionRoot in $versionRoots) {
             $runtimeHome = Join-Path $versionRoot.FullName $Flavor
@@ -299,9 +250,9 @@ function Get-InstalledGitRuntime {
                 continue
             }
 
-            $validation = Test-GitRuntime -RuntimeHome $runtimeHome
-            $expectedVersion = ConvertTo-GitVersion -VersionText $versionRoot.Name
-            $reportedVersion = ConvertTo-GitVersion -VersionText $validation.ReportedVersion
+            $validation = Test-GitRuntime -RuntimeHome $runtimeHome -VersionSpec $script:ManifestedGitRuntimeVersionSpec
+            $expectedVersion = ConvertTo-ManifestedVersionObjectFromRule -VersionText $versionRoot.Name -Rule $script:ManifestedGitRuntimeVersionSpec.RuntimeVersionRule
+            $reportedVersion = ConvertTo-ManifestedVersionObjectFromRule -VersionText $validation.ReportedVersion -Rule $script:ManifestedGitRuntimeVersionSpec.RuntimeVersionRule
             $versionMatches = (-not $reportedVersion) -or (-not $expectedVersion) -or ($reportedVersion -eq $expectedVersion)
 
             $entries += [pscustomobject]@{
@@ -344,12 +295,12 @@ function Get-SystemGitRuntime {
     }
 
     $runtimeHome = Split-Path (Split-Path -Parent $gitCmd) -Parent
-    $validation = Test-GitRuntime -RuntimeHome $runtimeHome
+    $validation = Test-GitRuntime -RuntimeHome $runtimeHome -VersionSpec $script:ManifestedGitRuntimeVersionSpec
     if (-not $validation.IsReady) {
         return $null
     }
 
-    $versionObject = ConvertTo-GitVersion -VersionText $validation.ReportedVersion
+    $versionObject = ConvertTo-ManifestedVersionObjectFromRule -VersionText $validation.ReportedVersion -Rule $script:ManifestedGitRuntimeVersionSpec.RuntimeVersionRule
     if (-not $versionObject) {
         return $null
     }
@@ -432,7 +383,7 @@ function Get-GitRuntimeState {
 
     try {
         if ([string]::IsNullOrWhiteSpace($Flavor)) {
-            $Flavor = Get-GitFlavor
+            $Flavor = Get-ManifestedCommandFlavor -CommandName 'Initialize-GitRuntime'
         }
 
         $layout = Get-ManifestedLayout -LocalRoot $LocalRoot
@@ -562,7 +513,7 @@ function Save-GitRuntimePackage {
     )
 
     if ([string]::IsNullOrWhiteSpace($Flavor)) {
-        $Flavor = Get-GitFlavor
+        $Flavor = Get-ManifestedCommandFlavor -CommandName 'Initialize-GitRuntime'
     }
 
     $layout = Get-ManifestedLayout -LocalRoot $LocalRoot
@@ -648,11 +599,11 @@ function Install-GitRuntime {
     )
 
     if ([string]::IsNullOrWhiteSpace($Flavor)) {
-        $Flavor = if ($PackageInfo.Flavor) { $PackageInfo.Flavor } else { Get-GitFlavor }
+        $Flavor = if ($PackageInfo.Flavor) { $PackageInfo.Flavor } else { Get-ManifestedCommandFlavor -CommandName 'Initialize-GitRuntime' }
     }
 
     $runtimeHome = Get-ManagedGitRuntimeHome -Version $PackageInfo.Version -Flavor $Flavor -LocalRoot $LocalRoot
-    $currentValidation = Test-GitRuntime -RuntimeHome $runtimeHome
+    $currentValidation = Test-GitRuntime -RuntimeHome $runtimeHome -VersionSpec $script:ManifestedGitRuntimeVersionSpec
 
     if ($currentValidation.Status -ne 'Ready') {
         New-ManifestedDirectory -Path (Split-Path -Parent $runtimeHome) | Out-Null
@@ -677,7 +628,7 @@ function Install-GitRuntime {
         }
     }
 
-    $validation = Test-GitRuntime -RuntimeHome $runtimeHome
+    $validation = Test-GitRuntime -RuntimeHome $runtimeHome -VersionSpec $script:ManifestedGitRuntimeVersionSpec
     if ($validation.Status -ne 'Ready') {
         throw "MinGit runtime validation failed after install at $runtimeHome."
     }
@@ -695,291 +646,64 @@ function Install-GitRuntime {
     }
 }
 
+function Get-GitRuntimeFacts {
+    [CmdletBinding()]
+    param(
+        [string]$Flavor,
+        [string]$LocalRoot = (Get-ManifestedLocalRoot)
+    )
+
+    $layout = $null
+    try {
+        if ([string]::IsNullOrWhiteSpace($Flavor)) {
+            $Flavor = Get-ManifestedCommandFlavor -CommandName 'Initialize-GitRuntime'
+        }
+
+        $layout = Get-ManifestedLayout -LocalRoot $LocalRoot
+    }
+    catch {
+        return (New-ManifestedRuntimeFacts -RuntimeName 'GitRuntime' -CommandName 'Initialize-GitRuntime' -RuntimeKind 'PortablePackage' -LocalRoot $LocalRoot -Layout $layout -PlatformSupported:$false -BlockedReason $_.Exception.Message -AdditionalProperties @{
+                Flavor              = $Flavor
+                Package             = $null
+                PackagePath         = $null
+                CommandDirectory    = $null
+                InvalidRuntimeHomes = @()
+            })
+    }
+
+    $partialPaths = @()
+    if (Test-Path -LiteralPath $layout.GitCacheRoot) {
+        $partialPaths += @(Get-ChildItem -LiteralPath $layout.GitCacheRoot -File -Filter '*.download' -ErrorAction SilentlyContinue | Select-Object -ExpandProperty FullName)
+    }
+    $partialPaths += @(Get-ManifestedStageDirectories -Prefix 'git' -Mode TemporaryShort -LegacyRootPaths @($layout.ToolsRoot) | Select-Object -ExpandProperty FullName)
+
+    $installed = Get-InstalledGitRuntime -Flavor $Flavor -LocalRoot $layout.LocalRoot
+    $managedRuntime = $installed.Current
+    $externalRuntime = $null
+    if (-not $managedRuntime) {
+        $externalRuntime = Get-SystemGitRuntime -LocalRoot $layout.LocalRoot
+    }
+
+    $definition = Get-ManifestedCommandDefinition -CommandName 'Initialize-GitRuntime'
+    $package = if ($definition) { Get-LatestCachedZipArtifactFromDefinition -Definition $definition -Flavor $Flavor -LocalRoot $layout.LocalRoot } else { $null }
+    $currentRuntime = if ($managedRuntime) { $managedRuntime } else { $externalRuntime }
+    $invalidRuntimeHomes = @($installed.Invalid | Select-Object -ExpandProperty RuntimeHome)
+    $executablePath = if ($currentRuntime) { $currentRuntime.GitCmd } else { $null }
+
+    return (New-ManifestedRuntimeFacts -RuntimeName 'GitRuntime' -CommandName 'Initialize-GitRuntime' -RuntimeKind 'PortablePackage' -LocalRoot $layout.LocalRoot -Layout $layout -ManagedRuntime $managedRuntime -ExternalRuntime $externalRuntime -Artifact $package -PartialPaths $partialPaths -InvalidPaths $invalidRuntimeHomes -Version $(if ($currentRuntime) { $currentRuntime.Version } elseif ($package) { $package.Version } else { $null }) -RuntimeHome $(if ($currentRuntime) { $currentRuntime.RuntimeHome } else { $null }) -RuntimeSource $(if ($managedRuntime) { 'Managed' } elseif ($externalRuntime) { 'External' } else { $null }) -ExecutablePath $executablePath -RuntimeValidation $(if ($currentRuntime) { $currentRuntime.Validation } else { $null }) -AdditionalProperties @{
+            Flavor              = $Flavor
+            Package             = $package
+            PackagePath         = if ($package) { $package.Path } else { $null }
+            CommandDirectory    = if (-not [string]::IsNullOrWhiteSpace($executablePath)) { Split-Path -Parent $executablePath } else { $null }
+            InvalidRuntimeHomes = $invalidRuntimeHomes
+        })
+}
+
 function Initialize-GitRuntime {
     [CmdletBinding(SupportsShouldProcess = $true)]
     param(
         [switch]$RefreshGit
     )
 
-    $LocalRoot = (Get-ManifestedLayout).LocalRoot
-    $selfElevationContext = Get-ManifestedSelfElevationContext
-
-    $actionsTaken = New-Object System.Collections.Generic.List[string]
-    $plannedActions = New-Object System.Collections.Generic.List[string]
-    $repairResult = $null
-    $packageInfo = $null
-    $packageTest = $null
-    $installResult = $null
-    $commandEnvironment = $null
-
-    $initialState = Get-GitRuntimeState -LocalRoot $LocalRoot
-    $state = $initialState
-    $elevationPlan = Get-ManifestedCommandElevationPlan -CommandName 'Initialize-GitRuntime' -LocalRoot $LocalRoot -SkipSelfElevation:$selfElevationContext.SkipSelfElevation -WasSelfElevated:$selfElevationContext.WasSelfElevated -WhatIfMode:$WhatIfPreference
-
-    if ($state.Status -eq 'Blocked') {
-        $commandEnvironment = Get-ManifestedCommandEnvironmentResult -CommandName 'Initialize-GitRuntime' -RuntimeState $state
-        $result = [pscustomobject]@{
-            LocalRoot       = $state.LocalRoot
-            Layout          = $state.Layout
-            InitialState    = $initialState
-            FinalState      = $state
-            ActionTaken     = @('None')
-            PlannedActions  = @()
-            RestartRequired = $false
-            Package         = $null
-            PackageTest     = $null
-            RuntimeTest     = $null
-            RepairResult    = $null
-            InstallResult   = $null
-            CommandEnvironment = $commandEnvironment
-            Elevation       = $elevationPlan
-        }
-
-        if ($WhatIfPreference) {
-            Add-Member -InputObject $result -NotePropertyName PersistedStatePath -NotePropertyValue $null -Force
-            return $result
-        }
-
-        $statePath = Save-ManifestedInvokeState -CommandName 'Initialize-GitRuntime' -Result $result -LocalRoot $LocalRoot -Details @{
-            Version = $state.CurrentVersion
-            Flavor  = $state.Flavor
-            RuntimeHome = $state.RuntimeHome
-            RuntimeSource = $state.RuntimeSource
-            ExecutablePath = $state.ExecutablePath
-        }
-        Add-Member -InputObject $result -NotePropertyName PersistedStatePath -NotePropertyValue $statePath -Force
-        return $result
-    }
-
-    $needsRepair = $state.Status -in @('Partial', 'NeedsRepair')
-    $needsInstall = $RefreshGit -or -not $state.RuntimeHome
-    $needsAcquire = $RefreshGit -or (-not $state.PackagePath)
-
-    if ($needsRepair) {
-        $plannedActions.Add('Repair-GitRuntime') | Out-Null
-    }
-    if ($needsInstall -and $needsAcquire) {
-        $plannedActions.Add('Save-GitRuntimePackage') | Out-Null
-    }
-    if ($needsInstall) {
-        $plannedActions.Add('Test-GitRuntimePackage') | Out-Null
-        $plannedActions.Add('Install-GitRuntime') | Out-Null
-    }
-    $plannedActions.Add('Sync-ManifestedCommandLineEnvironment') | Out-Null
-
-    $elevationPlan = Get-ManifestedCommandElevationPlan -CommandName 'Initialize-GitRuntime' -PlannedActions @($plannedActions) -LocalRoot $LocalRoot -SkipSelfElevation:$selfElevationContext.SkipSelfElevation -WasSelfElevated:$selfElevationContext.WasSelfElevated -WhatIfMode:$WhatIfPreference
-
-    if ($needsRepair) {
-        if (-not $PSCmdlet.ShouldProcess($state.Layout.GitToolsRoot, 'Repair MinGit runtime state')) {
-            return [pscustomobject]@{
-                LocalRoot          = $state.LocalRoot
-                Layout             = $state.Layout
-                InitialState       = $initialState
-                FinalState         = $state
-                ActionTaken        = @('WhatIf')
-                PlannedActions     = @($plannedActions)
-                RestartRequired    = $false
-                Package            = $null
-                PackageTest        = $null
-                RuntimeTest        = $state.Runtime
-                RepairResult       = $null
-                InstallResult      = $null
-                CommandEnvironment = (Get-ManifestedCommandEnvironmentResult -CommandName 'Initialize-GitRuntime' -RuntimeState $state)
-                PersistedStatePath = $null
-                Elevation          = $elevationPlan
-            }
-        }
-
-        $repairResult = Repair-GitRuntime -State $state -Flavor $state.Flavor -LocalRoot $state.LocalRoot
-        if ($repairResult.Action -eq 'Repaired') {
-            $actionsTaken.Add('Repair-GitRuntime') | Out-Null
-        }
-
-        $state = Get-GitRuntimeState -Flavor $state.Flavor -LocalRoot $state.LocalRoot
-        $needsInstall = $RefreshGit -or -not $state.RuntimeHome
-        $needsAcquire = $RefreshGit -or (-not $state.PackagePath)
-    }
-
-    if ($needsInstall) {
-        if ($needsAcquire) {
-            if (-not $PSCmdlet.ShouldProcess($state.Layout.GitCacheRoot, 'Acquire MinGit runtime package')) {
-                return [pscustomobject]@{
-                    LocalRoot          = $state.LocalRoot
-                    Layout             = $state.Layout
-                    InitialState       = $initialState
-                    FinalState         = $state
-                    ActionTaken        = @('WhatIf')
-                    PlannedActions     = @($plannedActions)
-                    RestartRequired    = $false
-                    Package            = $null
-                    PackageTest        = $null
-                    RuntimeTest        = $state.Runtime
-                    RepairResult       = $repairResult
-                    InstallResult      = $null
-                    CommandEnvironment = (Get-ManifestedCommandEnvironmentResult -CommandName 'Initialize-GitRuntime' -RuntimeState $state)
-                    PersistedStatePath = $null
-                    Elevation          = $elevationPlan
-                }
-            }
-
-            $packageInfo = Save-GitRuntimePackage -RefreshGit:$RefreshGit -Flavor $state.Flavor -LocalRoot $state.LocalRoot
-            if ($packageInfo.Action -eq 'Downloaded') {
-                $actionsTaken.Add('Save-GitRuntimePackage') | Out-Null
-            }
-        }
-        else {
-            $packageInfo = $state.Package
-        }
-
-        $packageTest = Test-GitRuntimePackage -PackageInfo $packageInfo
-        if ($packageTest.Status -eq 'CorruptCache') {
-            if (-not $PSCmdlet.ShouldProcess($packageInfo.Path, 'Repair corrupt MinGit runtime package')) {
-                return [pscustomobject]@{
-                    LocalRoot          = $state.LocalRoot
-                    Layout             = $state.Layout
-                    InitialState       = $initialState
-                    FinalState         = $state
-                    ActionTaken        = @('WhatIf')
-                    PlannedActions     = @($plannedActions)
-                    RestartRequired    = $false
-                    Package            = $packageInfo
-                    PackageTest        = $packageTest
-                    RuntimeTest        = $state.Runtime
-                    RepairResult       = $repairResult
-                    InstallResult      = $null
-                    CommandEnvironment = (Get-ManifestedCommandEnvironmentResult -CommandName 'Initialize-GitRuntime' -RuntimeState $state)
-                    PersistedStatePath = $null
-                    Elevation          = $elevationPlan
-                }
-            }
-
-            $repairResult = Repair-GitRuntime -State $state -CorruptPackagePaths @($packageInfo.Path) -Flavor $state.Flavor -LocalRoot $state.LocalRoot
-            if ($repairResult.Action -eq 'Repaired') {
-                $actionsTaken.Add('Repair-GitRuntime') | Out-Null
-            }
-
-            $packageInfo = Save-GitRuntimePackage -RefreshGit:$true -Flavor $state.Flavor -LocalRoot $state.LocalRoot
-            if ($packageInfo.Action -eq 'Downloaded') {
-                $actionsTaken.Add('Save-GitRuntimePackage') | Out-Null
-            }
-
-            $packageTest = Test-GitRuntimePackage -PackageInfo $packageInfo
-        }
-
-        if ($packageTest.Status -eq 'UnverifiedCache') {
-            throw "MinGit runtime package validation failed because no trusted checksum could be resolved for $($packageInfo.FileName)."
-        }
-
-        if ($packageTest.Status -ne 'Ready') {
-            throw "MinGit runtime package validation failed with status $($packageTest.Status)."
-        }
-
-        $commandParameters = @{}
-        if ($RefreshGit) {
-            $commandParameters['RefreshGit'] = $true
-        }
-        if ($PSBoundParameters.ContainsKey('WhatIf')) {
-            $commandParameters['WhatIf'] = $true
-        }
-
-        $elevatedResult = Invoke-ManifestedElevatedCommand -ElevationPlan $elevationPlan -CommandName 'Initialize-GitRuntime' -CommandParameters $commandParameters
-        if ($null -ne $elevatedResult) {
-            return $elevatedResult
-        }
-
-        if (-not $PSCmdlet.ShouldProcess($state.Layout.GitToolsRoot, 'Install MinGit runtime')) {
-            return [pscustomobject]@{
-                LocalRoot          = $state.LocalRoot
-                Layout             = $state.Layout
-                InitialState       = $initialState
-                FinalState         = $state
-                ActionTaken        = @('WhatIf')
-                PlannedActions     = @($plannedActions)
-                RestartRequired    = $false
-                Package            = $packageInfo
-                PackageTest        = $packageTest
-                RuntimeTest        = $state.Runtime
-                RepairResult       = $repairResult
-                InstallResult      = $null
-                CommandEnvironment = (Get-ManifestedCommandEnvironmentResult -CommandName 'Initialize-GitRuntime' -RuntimeState $state)
-                PersistedStatePath = $null
-                Elevation          = $elevationPlan
-            }
-        }
-
-        $installResult = Install-GitRuntime -PackageInfo $packageInfo -Flavor $state.Flavor -LocalRoot $state.LocalRoot
-        if ($installResult.Action -eq 'Installed') {
-            $actionsTaken.Add('Install-GitRuntime') | Out-Null
-        }
-    }
-
-    $finalState = Get-GitRuntimeState -Flavor $state.Flavor -LocalRoot $state.LocalRoot
-    $runtimeTest = if ($finalState.RuntimeHome) { Test-GitRuntime -RuntimeHome $finalState.RuntimeHome } else { $null }
-
-    $commandEnvironment = Get-ManifestedCommandEnvironmentResult -CommandName 'Initialize-GitRuntime' -RuntimeState $finalState
-    if ($commandEnvironment.Applicable) {
-        if (-not $PSCmdlet.ShouldProcess($commandEnvironment.DesiredCommandDirectory, 'Synchronize Git command-line environment')) {
-            return [pscustomobject]@{
-                LocalRoot          = $finalState.LocalRoot
-                Layout             = $finalState.Layout
-                InitialState       = $initialState
-                FinalState         = $finalState
-                ActionTaken        = @('WhatIf')
-                PlannedActions     = @($plannedActions)
-                RestartRequired    = $false
-                Package            = $packageInfo
-                PackageTest        = $packageTest
-                RuntimeTest        = $runtimeTest
-                RepairResult       = $repairResult
-                InstallResult      = $installResult
-                CommandEnvironment = $commandEnvironment
-                PersistedStatePath = $null
-                Elevation          = $elevationPlan
-            }
-        }
-
-        $commandEnvironment = Sync-ManifestedCommandLineEnvironment -Specification (Get-ManifestedCommandEnvironmentSpec -CommandName 'Initialize-GitRuntime' -RuntimeState $finalState)
-        if ($commandEnvironment.Status -eq 'Updated') {
-            $actionsTaken.Add('Sync-ManifestedCommandLineEnvironment') | Out-Null
-        }
-    }
-
-    $result = [pscustomobject]@{
-        LocalRoot       = $finalState.LocalRoot
-        Layout          = $finalState.Layout
-        InitialState    = $initialState
-        FinalState      = $finalState
-        ActionTaken     = if ($actionsTaken.Count -gt 0) { @($actionsTaken) } else { @('None') }
-        PlannedActions  = @($plannedActions)
-        RestartRequired = $false
-        Package         = $packageInfo
-        PackageTest     = $packageTest
-        RuntimeTest     = $runtimeTest
-        RepairResult    = $repairResult
-        InstallResult   = $installResult
-        CommandEnvironment = $commandEnvironment
-        Elevation       = $elevationPlan
-    }
-
-    if ($WhatIfPreference) {
-        Add-Member -InputObject $result -NotePropertyName PersistedStatePath -NotePropertyValue $null -Force
-        return $result
-    }
-
-    $statePath = Save-ManifestedInvokeState -CommandName 'Initialize-GitRuntime' -Result $result -LocalRoot $LocalRoot -Details @{
-        Tag         = if ($packageInfo) { $packageInfo.TagName } else { $null }
-        Version     = $finalState.CurrentVersion
-        Flavor      = $finalState.Flavor
-        AssetName   = if ($packageInfo) { $packageInfo.FileName } else { $null }
-        PackagePath = if ($packageInfo) { $packageInfo.Path } else { $finalState.PackagePath }
-        RuntimeHome = $finalState.RuntimeHome
-        RuntimeSource = $finalState.RuntimeSource
-        ExecutablePath = $finalState.ExecutablePath
-        DownloadUrl = if ($packageInfo) { $packageInfo.DownloadUrl } else { $null }
-        Sha256      = if ($packageInfo) { $packageInfo.Sha256 } else { $null }
-        ShaSource   = if ($packageInfo) { $packageInfo.ShaSource } else { $null }
-    }
-    Add-Member -InputObject $result -NotePropertyName PersistedStatePath -NotePropertyValue $statePath -Force
-
-    return $result
+    return (Invoke-ManifestedCommandInitialization -Name 'Initialize-GitRuntime' -PSCmdletObject $PSCmdlet -RefreshRequested:$RefreshGit -WhatIfMode:$WhatIfPreference)
 }

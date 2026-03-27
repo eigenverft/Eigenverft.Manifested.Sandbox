@@ -1,0 +1,58 @@
+{
+  "schemaVersion": 2,
+  "commandName": "Initialize-CodexRuntime",
+  "runtimeName": "CodexRuntime",
+  "kind": "npm-cli",
+  "wrapperCommand": "Initialize-CodexRuntime",
+  "refreshSwitchName": "RefreshCodex",
+  "facts": {
+    "npmCli": {
+      "commandFileName": "codex.cmd",
+      "packageJsonRelativePath": "node_modules\\@openai\\codex\\package.json"
+    }
+  },
+  "supply": null,
+  "artifact": null,
+  "install": {
+    "npmGlobalPackage": {
+      "packageSpec": "@openai/codex@latest",
+      "stagePrefix": "codex",
+      "cacheRootLayoutProperty": "CodexCacheRoot",
+      "toolsRootLayoutProperty": "CodexToolsRoot"
+    }
+  },
+  "environment": {
+    "commandProjection": {
+      "desiredDirectoryFact": "RuntimeHome",
+      "executableFact": "ExecutablePath",
+      "expectedCommands": [
+        "codex.cmd"
+      ]
+    }
+  },
+  "dependencies": [
+    {
+      "runtimeName": "VCRuntime",
+      "minimumVersion": "",
+      "satisfactionMode": "managed-only",
+      "autoInstall": true,
+      "reason": "Codex requires the Microsoft Visual C++ runtime on Windows."
+    },
+    {
+      "runtimeName": "NodeRuntime",
+      "minimumVersion": "20.0.0",
+      "satisfactionMode": "managed-or-external",
+      "autoInstall": true,
+      "reason": "Codex requires a compatible Node.js runtime and npm command."
+    }
+  ],
+  "policies": {
+    "allowExternalSatisfaction": true,
+    "requireTrustedArtifact": false,
+    "supportsEnvironmentSync": true,
+    "installRequiresElevation": false
+  },
+  "hooks": {
+    "postInstall": null
+  }
+}
