@@ -120,6 +120,8 @@ Test-ModuleManifest -Path $($manifestFile.FullName)
 
 
 
+$remoteResourcesOk = $false
+
 $pushToLocalSource = $true
 $pushToGitHubSource = $false
 $pushToPsGallery = $false
