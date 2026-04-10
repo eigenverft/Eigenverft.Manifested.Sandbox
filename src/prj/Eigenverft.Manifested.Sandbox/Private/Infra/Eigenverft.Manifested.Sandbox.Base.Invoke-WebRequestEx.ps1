@@ -98,7 +98,7 @@ function Invoke-WebRequestEx {
     - Retry handling for all HTTP methods
     - Optional total retry budget
     - Optional streaming download path for compatible GET + OutFile scenarios
-    - Optional certificate validation bypass for development environments
+    - Certificate validation bypass by default, with an explicit enforcement option
     - Optional automatic upgrade to UseDefaultCredentials after an unauthenticated 401 response when WWW-Authenticate is present
       and the target resolves as intranet-like via dotless host, loopback, or private/link-local addressing
 
@@ -132,16 +132,18 @@ function Invoke-WebRequestEx {
     Prefer the streaming download engine when the request is compatible with it.
 
 .PARAMETER SkipCertificateCheck
-    Skips TLS server certificate validation for this request. Intended for
-    development or lab scenarios only.
+    Skips TLS server certificate validation for this request. If neither
+    SkipCertificateCheck nor EnforceCertificateCheck is supplied, certificate
+    validation is skipped by default.
+
+.PARAMETER EnforceCertificateCheck
+    Enforces TLS server certificate validation for this request. Use this to
+    opt out of the default certificate validation bypass.
 
 .PARAMETER DisableAutoUseDefaultCredentials
     Disables the automatic retry with UseDefaultCredentials when the initial
     unauthenticated request receives a 401 response with a WWW-Authenticate
     challenge and the target resolves as intranet-like.
-
-.PARAMETER AllowSelfSigned
-    Legacy alias for SkipCertificateCheck.
 
 .EXAMPLE
     Invoke-WebRequestEx -Uri 'https://example.org'
@@ -154,6 +156,9 @@ function Invoke-WebRequestEx {
 
 .EXAMPLE
     Invoke-WebRequestEx -Uri 'https://devbox.local/file.zip' -OutFile 'C:\Temp\file.zip' -SkipCertificateCheck
+
+.EXAMPLE
+    Invoke-WebRequestEx -Uri 'https://example.org' -EnforceCertificateCheck
 #>
     [CmdletBinding(PositionalBinding = $false)]
     param(
@@ -228,8 +233,10 @@ function Invoke-WebRequestEx {
         [switch]$PassThru,
 
         [Parameter()]
-        [Alias('AllowSelfSigned')]
         [switch]$SkipCertificateCheck,
+
+        [Parameter()]
+        [switch]$EnforceCertificateCheck,
 
         [Parameter()]
         [switch]$DisableAutoUseDefaultCredentials,
@@ -530,6 +537,19 @@ function Invoke-WebRequestEx {
 
     $runningOnPwsh = $PSVersionTable.PSEdition -eq 'Core'
     $nativeSupportsSkipCertificateCheck = $runningOnPwsh -and $PSVersionTable.PSVersion -ge [version]'7.0'
+    $explicitSkipCertificateCheckSupplied = $PSBoundParameters.ContainsKey('SkipCertificateCheck')
+    $explicitEnforceCertificateCheckSupplied = $PSBoundParameters.ContainsKey('EnforceCertificateCheck')
+
+    # Default to bypassing certificate validation unless the caller explicitly enforces it.
+    $effectiveSkipCertificateCheck = if ($explicitSkipCertificateCheckSupplied) {
+        [bool]$SkipCertificateCheck
+    }
+    elseif ($explicitEnforceCertificateCheckSupplied) {
+        -not [bool]$EnforceCertificateCheck
+    }
+    else {
+        $true
+    }
 
     $explicitCredentialSupplied = $PSBoundParameters.ContainsKey('Credential') -and $null -ne $Credential
     $explicitUseDefaultCredentialsSupplied = $PSBoundParameters.ContainsKey('UseDefaultCredentials')
@@ -545,12 +565,8 @@ function Invoke-WebRequestEx {
     $callParams = @{}
     foreach ($entry in $PSBoundParameters.GetEnumerator()) {
         switch ($entry.Key) {
-            'SkipCertificateCheck' {
-                if ($nativeSupportsSkipCertificateCheck) {
-                    $callParams[$entry.Key] = $entry.Value
-                }
-                continue
-            }
+            'SkipCertificateCheck' { continue }
+            'EnforceCertificateCheck' { continue }
             'DisableAutoUseDefaultCredentials' { continue }
             'RetryCount' { continue }
             'RetryDelayMilliseconds' { continue }
@@ -561,6 +577,10 @@ function Invoke-WebRequestEx {
             'UseStreamingDownload' { continue }
             default { $callParams[$entry.Key] = $entry.Value }
         }
+    }
+
+    if ($nativeSupportsSkipCertificateCheck -and $effectiveSkipCertificateCheck) {
+        $callParams['SkipCertificateCheck'] = $true
     }
 
     # --- TLS: Ensure TLS 1.2 is enabled (additive; do not remove other flags) ---
@@ -683,12 +703,15 @@ function Invoke-WebRequestEx {
         }
     }
 
-    if ($nativeSupportsSkipCertificateCheck -and $SkipCertificateCheck) {
+    if ($nativeSupportsSkipCertificateCheck -and $effectiveSkipCertificateCheck) {
         $useStreamingEngine = $false
         Write-StandardMessage -Message (
             "[STATUS] PowerShell {0} will pass -SkipCertificateCheck directly to native Invoke-WebRequest. Streaming path is disabled for '{1}'." -f
             $PSVersionTable.PSVersion, $uriDisplay
         ) -Level INF
+    }
+    elseif (-not $effectiveSkipCertificateCheck) {
+        Write-StandardMessage -Message ("[STATUS] TLS server certificate validation remains enabled for '{0}'." -f $uriDisplay) -Level INF
     }
 
     if ($useStreamingEngine) {
@@ -703,7 +726,7 @@ function Invoke-WebRequestEx {
     $skipCertificateCheckEnabled = $false
 
     try {
-        if ($SkipCertificateCheck -and -not $nativeSupportsSkipCertificateCheck) {
+        if ($effectiveSkipCertificateCheck -and -not $nativeSupportsSkipCertificateCheck) {
             Write-StandardMessage -Message ("[STATUS] Enabling temporary certificate validation bypass for '{0}'." -f $uriDisplay) -Level INF
 
             if (-not ('CertificateValidationHelper' -as [type])) {
