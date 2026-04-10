@@ -19,6 +19,7 @@ Use via (Proxy-aware for corporate environments):
 $u='https://raw.githubusercontent.com/eigenverft/Eigenverft.Manifested.Sandbox/refs/heads/<branch>/iwr/bootstrapper.sandbox.generic.ps1';try{[Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12}catch{};$p=[System.Net.WebRequest]::GetSystemWebProxy();if(-not $p.IsBypassed($u)){iwr $u -Proxy ($p.GetProxy($u).AbsoluteUri) -ProxyUseDefaultCredentials -UseBasicParsing|iex}else{iwr $u -UseBasicParsing|iex}
 
 This is the configurable variant of iwr/bootstrapper.ps1.
+For the certificate-bypass variant, see iwr/bootstrapper.sandbox.generic.skipcert.ps1.
 The published bootstrapper one-liner stays unchanged.
 
 #>
