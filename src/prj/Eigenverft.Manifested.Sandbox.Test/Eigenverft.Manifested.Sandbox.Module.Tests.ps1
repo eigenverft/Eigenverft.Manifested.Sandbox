@@ -52,7 +52,7 @@ Describe 'Eigenverft.Manifested.Sandbox module' {
         $command.Parameters['SkipCertificateCheck'].Aliases | Should -Not -Contain 'AllowSelfSigned'
     }
 
-    It 'defaults to skipping certificate validation on PowerShell 7+' -Skip:($PSVersionTable.PSEdition -ne 'Core' -or $PSVersionTable.PSVersion -lt [version]'7.0') {
+    It 'starts with certificate validation enabled by default on PowerShell 7+' -Skip:($PSVersionTable.PSEdition -ne 'Core' -or $PSVersionTable.PSVersion -lt [version]'7.0') {
         $global:ConsoleLogMinLevel = 'FTL'
 
         Mock Invoke-WebRequest {
@@ -64,6 +64,29 @@ Describe 'Eigenverft.Manifested.Sandbox module' {
 
         $null = Invoke-WebRequestEx -Uri 'https://example.org' -UseBasicParsing
 
+        Assert-MockCalled Invoke-WebRequest -Times 1 -Exactly -Scope It -ParameterFilter { -not $SkipCertificateCheck }
+    }
+
+    It 'retries with SkipCertificateCheck after a certificate validation failure on PowerShell 7+' -Skip:($PSVersionTable.PSEdition -ne 'Core' -or $PSVersionTable.PSVersion -lt [version]'7.0') {
+        $global:ConsoleLogMinLevel = 'FTL'
+        $script:invokeWebRequestCallCount = 0
+
+        Mock Invoke-WebRequest {
+            $script:invokeWebRequestCallCount += 1
+
+            if ($script:invokeWebRequestCallCount -eq 1) {
+                throw ([System.Security.Authentication.AuthenticationException]::new('certificate validation failed'))
+            }
+
+            [pscustomobject]@{
+                StatusCode = 200
+                Content = 'ok'
+            }
+        }
+
+        $null = Invoke-WebRequestEx -Uri 'https://example.org' -UseBasicParsing
+
+        Assert-MockCalled Invoke-WebRequest -Times 1 -Exactly -Scope It -ParameterFilter { -not $SkipCertificateCheck }
         Assert-MockCalled Invoke-WebRequest -Times 1 -Exactly -Scope It -ParameterFilter { $SkipCertificateCheck }
     }
 
