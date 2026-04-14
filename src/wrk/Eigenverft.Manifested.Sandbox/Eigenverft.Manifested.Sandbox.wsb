@@ -6,20 +6,23 @@
 
   <AudioInput>Enable</AudioInput>
   <VideoInput>Enable</VideoInput>
+  <ProtectedClient>Enable</ProtectedClient>
 
   <PrinterRedirection>Enable</PrinterRedirection>
   <ClipboardRedirection>Enable</ClipboardRedirection>
 
   <MemoryInMB>4096</MemoryInMB>
 
-  <!-- Map host folder into the sandbox -->
+  <!-- Optional host folder mapping. Uncomment only if you want host file sharing. Prefer ReadOnly=true when write access is not required. -->
+  <!--
   <MappedFolders>
     <MappedFolder>
       <HostFolder>C:\temp</HostFolder>
       <SandboxFolder>C:\temp</SandboxFolder>
-      <ReadOnly>false</ReadOnly>
+      <ReadOnly>true</ReadOnly>
     </MappedFolder>
   </MappedFolders>
+  -->
 
 <!-- Auto-start: PowerShell startup invokes the proxy management function. The Initialize-ProxyCompact and Initialize-Bootstrap commands from Eigenverft.Manifested.Drydock are embedded here in compressed form so they remain within the 8 KB console command-line limit. -->
   <LogonCommand>

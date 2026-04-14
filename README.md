@@ -37,13 +37,13 @@ Example Windows Sandbox session after the repository's `.wsb` profile opens Powe
 ## 🚀 Quick Start
 
 1. Download the sandbox profile: [Eigenverft.Manifested.Sandbox.wsb](src/wrk/Eigenverft.Manifested.Sandbox/Eigenverft.Manifested.Sandbox.wsb) or [raw .wsb download](https://raw.githubusercontent.com/eigenverft/Eigenverft.Manifested.Sandbox/refs/heads/main/src/wrk/Eigenverft.Manifested.Sandbox/Eigenverft.Manifested.Sandbox.wsb)
-2. Before first launch, edit the file for your environment, especially the mapped folders and startup defaults shown below.
+2. Before first launch, edit the file for your environment, especially the integration/security toggles, optional mapped folders, and startup defaults shown below.
 3. Launch the `.wsb` file from Windows.
 4. When the sandbox opens PowerShell, run the follow-up runtime commands you want.
 
 ### 🔧 Customize the `.wsb`
 
-This is the main pre-launch customization point. Most users only need to edit the mapped folders plus the four startup defaults inside `LogonCommand`.
+This is the main pre-launch customization point. Most users only need to review the integration toggles, decide whether they want any host folder mapping, and edit the four startup defaults inside `LogonCommand`.
 
 ```powershell
 $dprx='http://test.corp.com:8080'
@@ -59,7 +59,19 @@ $i='PackageManagement','PowerShellGet','Eigenverft.Manifested.Sandbox'
 | `$c` | `Get-SandboxVersion` | Post-bootstrap command or semicolon-separated command chain executed in the fresh PowerShell window. |
 | `$i` | `PackageManagement`, `PowerShellGet`, `Eigenverft.Manifested.Sandbox` | Module list requested by the embedded bootstrap step. It currently matches the built-in default inside `Initialize-Bootstrap`, so most users can leave it unchanged. |
 
-You will usually also want to review `<HostFolder>` and `<SandboxFolder>` so the mapped path matches your machine.
+### 🔐 Security Notes for the `.wsb`
+
+This shipped `.wsb` is a convenience and testing profile first, not a hardened security-analysis profile.
+
+A useful sandbox always needs some transfer path for content to come in and results to go back out. In practice that usually means `Networking`, `MappedFolders`, `ClipboardRedirection`, or some combination of them. This profile keeps `Networking` enabled because bootstrap, proxy resolution, and package download are the main use case.
+
+`MappedFolders` is commented out by default. If you enable it, prefer a dedicated staging folder and keep `<ReadOnly>true</ReadOnly>` unless sandbox write-back is actually required. Writable mappings expose real host files to whatever runs inside the sandbox.
+
+`ClipboardRedirection`, `PrinterRedirection`, `AudioInput`, `VideoInput`, and `VGpu` are convenience features. Turn off anything you do not need for the current run. `ProtectedClient` is enabled as an extra hardening layer, but it can restrict some host interaction flows.
+
+If startup falls back to a manual proxy prompt, the resolved proxy profile is stored at `%LOCALAPPDATA%\Programs\ProxyAccessProfile\ProxyAccessProfile.clixml`. It is written with `Export-Clixml`, so on Windows the `PSCredential` stays bound to that sandbox user and sandbox instance. This is useful across in-sandbox restarts, but the whole sandbox is discarded when it is closed.
+
+⚠ **Important:** If you entered manual proxy credentials and then want to continue with suspicious or unknown payload testing in the same sandbox, delete `%LOCALAPPDATA%\Programs\ProxyAccessProfile\ProxyAccessProfile.clixml` first. If the later test phase no longer needs the stored proxy/bootstrap state, an even tighter option is to run that phase in a fresh sandbox instance.
 
 For most users, these are the only startup values worth touching. Leave the embedded helper payload alone unless you are intentionally maintaining the startup chain itself.
 
@@ -85,6 +97,8 @@ The original bootstrapper approach was useful groundwork, but the more practical
 The embedded startup chain exists because many managed corporate environments do not have a reliable first outbound connection. Proxy discovery, proxy authentication, certificate friction, and resilient download behavior are the real hurdles before any runtime install work begins.
 
 `Initialize-ProxyCompact` in the `.wsb` is a highly compacted form of nearly the same proxy-resolution logic as `Initialize-ProxyAccessProfile`, and `Invoke-WebRequestEx` is the readable download-side reference in the module. `Initialize-Bootstrap` is still part of the embedded startup chain, but it is background implementation rather than the recommended public entrypoint.
+
+When manual proxy entry is required, that resolved proxy profile stays inside the current sandbox instance and can survive in-sandbox restarts, but it is still discarded when the sandbox is closed.
 
 The startup helpers are compacted and compressed so the Windows Sandbox `LogonCommand` stays within the practical 8 KB command-line limit. The tracked `.wsb` file in this repository is the authoritative version to download and edit, so the README intentionally does not reproduce the full embedded command blob.
 
