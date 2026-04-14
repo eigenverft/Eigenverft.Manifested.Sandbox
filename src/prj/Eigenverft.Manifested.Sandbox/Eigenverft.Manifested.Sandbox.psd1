@@ -83,7 +83,9 @@ FunctionsToExport = @(
     'Initialize-PythonRuntime',
     'Initialize-Ps7Runtime',
     'Initialize-VSCodeRuntime',
-    'Initialize-VCRuntime'
+    'Initialize-VCRuntime',
+    'Invoke-WebRequestEx',
+    'Initialize-ProxyAccessProfile'
 )
 
 # Cmdlets to export from this module, for best performance, do not use wildcards and do not delete the entry, use an empty array if there are no cmdlets to export.
