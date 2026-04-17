@@ -11,7 +11,7 @@
   <PrinterRedirection>Enable</PrinterRedirection>
   <ClipboardRedirection>Enable</ClipboardRedirection>
 
-  <MemoryInMB>4096</MemoryInMB>
+  <MemoryInMB>16384</MemoryInMB>
 
   <!-- Optional host folder mapping. Uncomment only if you want host file sharing. Prefer ReadOnly=true when write access is not required. -->
   <!--

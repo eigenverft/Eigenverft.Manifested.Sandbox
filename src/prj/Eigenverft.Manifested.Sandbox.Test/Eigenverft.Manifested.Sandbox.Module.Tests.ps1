@@ -41,8 +41,25 @@ Describe 'Eigenverft.Manifested.Sandbox module' {
 
     It 'returns the loaded module version from Get-SandboxVersion' {
         $versionText = Get-SandboxVersion
+        $moduleInfo = Get-Module -Name Eigenverft.Manifested.Sandbox | Sort-Object -Descending -Property Version | Select-Object -First 1
+        $expectedCommands = @(
+            $moduleInfo.ExportedCommands.Keys |
+                Sort-Object
+        )
+        $commandLines = @(
+            $versionText -split '\r?\n' |
+                Where-Object { $_ -like '- *' }
+        )
 
-        $versionText | Should -Match '^Eigenverft\.Manifested\.Sandbox \d+\.\d+\.\d+'
+        $versionText | Should -Match '(?m)^Module: Eigenverft\.Manifested\.Sandbox\r?$'
+        $versionText | Should -Match '(?m)^Version: \d+\.\d+\.\d+\r?$'
+        $versionText | Should -Match '(?m)^Available Commands:\r?$'
+        $expectedCommands.Count | Should -BeGreaterThan 0
+        $commandLines | Should -Be @($expectedCommands | ForEach-Object { '- {0}' -f $_ })
+
+        foreach ($commandName in $expectedCommands) {
+            $versionText | Should -Match ('(?m)^- {0}\r?$' -f [regex]::Escape($commandName))
+        }
     }
 
     It 'exposes EnforceCertificateCheck and no longer exposes the AllowSelfSigned alias' {
