@@ -31,7 +31,7 @@ Describe 'Eigenverft.Manifested.Sandbox module' {
 
         Import-Module $moduleManifestPath -Force
 
-        . (Join-Path $moduleProjectRoot 'Private\Infra\Eigenverft.Manifested.Sandbox.Base.Invoke-WebRequestEx.ps1')
+        . (Join-Path $moduleProjectRoot 'StateModel\Support\Eigenverft.Manifested.Sandbox.Base.Invoke-WebRequestEx.ps1')
     }
 
     AfterAll {
