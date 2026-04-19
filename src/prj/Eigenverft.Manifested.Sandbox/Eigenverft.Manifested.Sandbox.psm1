@@ -32,13 +32,21 @@
 . "$PSScriptRoot\StateModel\Commands\Eigenverft.Manifested.Sandbox.Cmd.VsCodeRuntimeAndCache.ps1"
 . "$PSScriptRoot\StateModel\Commands\Eigenverft.Manifested.Sandbox.Cmd.VCRuntimeAndCache.ps1"
 
-# ConfigurationModel support
-# ConfigurationModel is intentionally empty in this structure-only pass.
+# PackageModel support
+. "$PSScriptRoot\PackageModel\Support\ExecutionEngine\Eigenverft.Manifested.Sandbox.PackageModel.ExecutionEngine.StandardMessage.ps1"
+. "$PSScriptRoot\PackageModel\Support\Package\Eigenverft.Manifested.Sandbox.PackageModel.Bootstrap.ps1"
+. "$PSScriptRoot\PackageModel\Support\Package\Eigenverft.Manifested.Sandbox.PackageModel.Config.ps1"
+. "$PSScriptRoot\PackageModel\Support\Package\Eigenverft.Manifested.Sandbox.PackageModel.Selection.ps1"
+. "$PSScriptRoot\PackageModel\Support\Package\Eigenverft.Manifested.Sandbox.PackageModel.Source.ps1"
+. "$PSScriptRoot\PackageModel\Support\Package\Eigenverft.Manifested.Sandbox.PackageModel.Ownership.ps1"
+. "$PSScriptRoot\PackageModel\Support\Package\Eigenverft.Manifested.Sandbox.PackageModel.Validation.ps1"
+. "$PSScriptRoot\PackageModel\Support\Package\Eigenverft.Manifested.Sandbox.PackageModel.Install.ps1"
+. "$PSScriptRoot\PackageModel\Support\Package\Eigenverft.Manifested.Sandbox.PackageModel.EntryPoints.ps1"
 
-# ConfigurationModel definitions
-# ConfigurationModel is intentionally empty in this structure-only pass.
+# PackageModel definitions
+# PackageModel definitions are JSON-only in this package-definition pass.
 
-# ConfigurationModel commands
-# ConfigurationModel is intentionally empty in this structure-only pass.
+# PackageModel commands
+. "$PSScriptRoot\PackageModel\Commands\Eigenverft.Manifested.Sandbox.PackageModel.Cmd.VSCodeRuntime.ps1"
 
 

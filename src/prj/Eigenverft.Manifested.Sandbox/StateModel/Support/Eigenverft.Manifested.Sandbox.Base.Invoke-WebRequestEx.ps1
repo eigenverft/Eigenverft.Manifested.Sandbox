@@ -93,7 +93,7 @@ function Invoke-WebRequestEx {
     Includes transient proxy-host DNS readiness retries before proxied inner requests.
 
 .DESCRIPTION
-    Invoke-WebRequestExP is intended for Windows PowerShell 5.1 and
+    Invoke-WebRequestEx is intended for Windows PowerShell 5.1 and
     PowerShell 7+ on Windows where outbound access may depend on proxy
     discovery and where large or long-running downloads need stronger
     operational behavior.
@@ -351,36 +351,36 @@ function Invoke-WebRequestEx {
     Deletes the persisted proxy-profile file before proxy resolution starts.
 
 .EXAMPLE
-    Invoke-WebRequestExP -Uri 'https://example.org'
+    Invoke-WebRequestEx -Uri 'https://example.org'
 
     Performs a general web request using the native request path when
     no function-managed download path is needed.
 
 .EXAMPLE
-    Invoke-WebRequestExP -Uri 'https://example.org/file.zip' -OutFile 'C:\Temp\file.zip'
+    Invoke-WebRequestEx -Uri 'https://example.org/file.zip' -OutFile 'C:\Temp\file.zip'
 
     Downloads a file. For compatible GET + OutFile requests, the function may use
     the streaming download engine automatically.
 
 .EXAMPLE
-    Invoke-WebRequestExP -Uri 'https://example.org/file.iso' -OutFile 'C:\Temp\file.iso' -UseStreamingDownload -RetryCount 10 -RetryDelayMilliseconds 5000
+    Invoke-WebRequestEx -Uri 'https://example.org/file.iso' -OutFile 'C:\Temp\file.iso' -UseStreamingDownload -RetryCount 10 -RetryDelayMilliseconds 5000
 
     Explicitly prefers the streaming path and retries the download up to 10 times
     with a 5 second delay between attempts.
 
 .EXAMPLE
-    Invoke-WebRequestExP -Uri 'https://intranet-app/api/status' -EnforceCertificateCheck
+    Invoke-WebRequestEx -Uri 'https://intranet-app/api/status' -EnforceCertificateCheck
 
     Performs a request with normal TLS certificate validation enforced and
     without the automatic certificate-bypass fallback.
 
 .EXAMPLE
-    Invoke-WebRequestExP -Uri 'https://artifact.example.corp/file.zip' -OutFile 'C:\Temp\file.zip' -ForceRefreshProxyProfile
+    Invoke-WebRequestEx -Uri 'https://artifact.example.corp/file.zip' -OutFile 'C:\Temp\file.zip' -ForceRefreshProxyProfile
 
     Forces fresh persisted proxy-profile detection before the request.
 
 .EXAMPLE
-    Invoke-WebRequestExP -Uri 'https://example.org/file.iso' -OutFile 'C:\Temp\file.iso' -RequiredStreamingHashType SHA256 -RequiredStreamingHash '570CE2BBC92545CFFBCB01DF43CBA59D86093DADC34C25DA9F554D256BC70B91'
+    Invoke-WebRequestEx -Uri 'https://example.org/file.iso' -OutFile 'C:\Temp\file.iso' -RequiredStreamingHashType SHA256 -RequiredStreamingHash '570CE2BBC92545CFFBCB01DF43CBA59D86093DADC34C25DA9F554D256BC70B91'
 
     Downloads an artifact and verifies the final file against the required SHA256
     before success is reported.
@@ -1432,7 +1432,7 @@ public static class CertificateValidationHelper
                 $request.ReadWriteTimeout = $ProbeTimeoutSec * 1000
                 $request.AllowAutoRedirect = $true
                 $request.Proxy = $ProxyObject
-                $request.UserAgent = 'PowerShell Invoke-WebRequestExP ProxyProfileProbe'
+        $request.UserAgent = 'PowerShell Invoke-WebRequestEx ProxyProfileProbe'
 
                 if ($certificateValidationBypassActiveForProbe -and $null -ne $acceptAllCallback) {
                     $request.ServerCertificateValidationCallback = $acceptAllCallback
@@ -2964,7 +2964,7 @@ public static class CertificateValidationHelper
 
     $isWindowsEnv = [System.Environment]::OSVersion.Platform -eq [System.PlatformID]::Win32NT
     if (-not $isWindowsEnv) {
-        throw "Invoke-WebRequestExP is intended for Windows PowerShell 5.1 and PowerShell 7+ on Windows."
+        throw "Invoke-WebRequestEx is intended for Windows PowerShell 5.1 and PowerShell 7+ on Windows."
     }
 
     $uriDisplay = _UriDisplayShortener -TargetUri $Uri
@@ -3010,7 +3010,7 @@ public static class CertificateValidationHelper
         $certificateFallbackAuthorityCache = _GetCertificateFallbackAuthorityCacheTable
     }
 
-    _Write-StandardMessage -Message ("[STATUS] Initializing Invoke-WebRequestExP for '{0}'." -f $uriDisplay) -Level INF
+    _Write-StandardMessage -Message ("[STATUS] Initializing Invoke-WebRequestEx for '{0}'." -f $uriDisplay) -Level INF
 
     $explicitCredentialSupplied = $PSBoundParameters.ContainsKey('Credential') -and $null -ne $Credential
     $explicitUseDefaultCredentialsSupplied = $PSBoundParameters.ContainsKey('UseDefaultCredentials')

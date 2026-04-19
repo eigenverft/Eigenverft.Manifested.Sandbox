@@ -122,9 +122,12 @@ The module currently exports these public commands:
 - `Initialize-QwenRuntime`
 - `Initialize-VCRuntime`
 - `Initialize-VSCodeRuntime`
+- `Invoke-ConfigurationVSCodeRuntime`
 - `Invoke-WebRequestEx`
 
 There is not yet a single combined `Initialize-Sandbox` command. The current model is a set of small init commands that each read real state, plan from that state, perform bounded repair or install work, and persist the observed result.
+
+The first `ConfigurationModel` entrypoint is `Invoke-ConfigurationVSCodeRuntime`. It reads a JSON document, inspects `features.vsCodeRuntime.kind`, and normalizes `features.vsCodeRuntime.data` into a new-command request without replacing the legacy `Initialize-VSCodeRuntime` flow.
 
 ---
 
@@ -139,6 +142,7 @@ Initialize-Ps7Runtime
 Initialize-GitRuntime
 Initialize-GHCliRuntime
 Initialize-VSCodeRuntime
+Invoke-ConfigurationVSCodeRuntime -ConfigurationPath .\sandbox.features.json
 Initialize-NodeRuntime
 Initialize-OpenCodeRuntime
 Initialize-GeminiRuntime
@@ -162,6 +166,22 @@ Get-SandboxState
 - `Initialize-CodexRuntime` installs `@openai/codex` into the sandbox-managed tool root and prefers that managed copy when refreshed. It always ensures the VC runtime prerequisite before install, and if no usable Node/npm is available yet it also ensures the required Node runtime first.
 - `Initialize-VCRuntime` is different because the VC runtime is a machine/runtime prerequisite rather than a sandbox-managed portable tool.
 - `Initialize-VCRuntime` should be run in an elevated PowerShell process when the Microsoft Visual C++ Redistributable needs to be installed or repaired.
+- `Invoke-ConfigurationVSCodeRuntime` is the first config-driven wrapper in `ConfigurationModel`. Its current JSON contract is:
+
+```json
+{
+  "features": {
+    "vsCodeRuntime": {
+      "kind": "EnsureManagedRuntime",
+      "data": {
+        "refreshVSCode": true
+      }
+    }
+  }
+}
+```
+
+- `Invoke-ConfigurationVSCodeRuntime` currently establishes and validates the new `ConfigurationModel` contract for `vsCodeRuntime`; it does not replace or delegate into the legacy `Initialize-VSCodeRuntime` command.
 
 ## 📦 Direct Module Usage
 

@@ -84,6 +84,7 @@ FunctionsToExport = @(
     'Initialize-Ps7Runtime',
     'Initialize-VSCodeRuntime',
     'Initialize-VCRuntime',
+    'Invoke-PackageModel-VSCodeRuntime',
     'Invoke-WebRequestEx',
     'Initialize-ProxyAccessProfile'
 )
@@ -127,6 +128,18 @@ FileList = @(
     'StateModel\Commands\Eigenverft.Manifested.Sandbox.Cmd.VsCodeRuntimeAndCache.ps1',
     'StateModel\Commands\Eigenverft.Manifested.Sandbox.Cmd.VCRuntimeAndCache.ps1',
     'StateModel\Support\Eigenverft.Manifested.Sandbox.Base.Invoke-WebRequestEx.ps1',
+    'PackageModel\Support\ExecutionEngine\Eigenverft.Manifested.Sandbox.PackageModel.ExecutionEngine.StandardMessage.ps1',
+    'PackageModel\Support\Package\Eigenverft.Manifested.Sandbox.PackageModel.Bootstrap.ps1',
+    'PackageModel\Support\Package\Eigenverft.Manifested.Sandbox.PackageModel.Config.ps1',
+    'PackageModel\Support\Package\Eigenverft.Manifested.Sandbox.PackageModel.Selection.ps1',
+    'PackageModel\Support\Package\Eigenverft.Manifested.Sandbox.PackageModel.Source.ps1',
+    'PackageModel\Support\Package\Eigenverft.Manifested.Sandbox.PackageModel.Ownership.ps1',
+    'PackageModel\Support\Package\Eigenverft.Manifested.Sandbox.PackageModel.Validation.ps1',
+    'PackageModel\Support\Package\Eigenverft.Manifested.Sandbox.PackageModel.Install.ps1',
+    'PackageModel\Support\Package\Eigenverft.Manifested.Sandbox.PackageModel.EntryPoints.ps1',
+    'PackageModel\Definitions\PackageModel.Global.json',
+    'PackageModel\Definitions\VSCodeRuntime.json',
+    'PackageModel\Commands\Eigenverft.Manifested.Sandbox.PackageModel.Cmd.VSCodeRuntime.ps1',
     'Eigenverft.Manifested.Sandbox.psm1',
     'Eigenverft.Manifested.Sandbox.psd1',
     'LICENSE.txt'
