@@ -52,3 +52,4 @@ $moduleProjectRoot = Join-Path (Split-Path -Parent $PSScriptRoot) 'Eigenverft.Ma
 # PackageModel commands
 . "$moduleProjectRoot\PackageModel\Commands\Eigenverft.Manifested.Sandbox.PackageModel.Cmd.VSCodeRuntime.ps1"
 
+#Invoke-PackageModel-VSCodeRuntime 

@@ -74,6 +74,22 @@ Find-PackageModelExistingPackage -PackageModelResult $result
         [psobject]$PackageModelResult
     )
 
+    if (-not [string]::IsNullOrWhiteSpace([string]$PackageModelResult.InstallDirectory) -and
+        (Test-Path -LiteralPath $PackageModelResult.InstallDirectory -PathType Container)) {
+        $resolvedPackageModelOwnedInstallDirectory = [System.IO.Path]::GetFullPath([string]$PackageModelResult.InstallDirectory)
+        $PackageModelResult.ExistingPackage = [pscustomobject]@{
+            SearchKind       = 'packageModelTargetInstallPath'
+            CandidatePath    = $resolvedPackageModelOwnedInstallDirectory
+            InstallDirectory = $resolvedPackageModelOwnedInstallDirectory
+            Decision         = 'Pending'
+            Validation       = $null
+            Classification   = $null
+            OwnershipRecord  = $null
+        }
+        Write-PackageModelExecutionMessage -Message ("[DISCOVERY] Found PackageModel target install directory '{0}'." -f $resolvedPackageModelOwnedInstallDirectory)
+        return $PackageModelResult
+    }
+
     $package = $PackageModelResult.Package
     if (-not $package -or -not $package.PSObject.Properties['existingInstallDiscovery'] -or $null -eq $package.existingInstallDiscovery) {
         return $PackageModelResult
@@ -134,6 +150,7 @@ Find-PackageModelExistingPackage -PackageModelResult $result
             Classification   = $null
             OwnershipRecord  = $null
         }
+        Write-PackageModelExecutionMessage -Message ("[DISCOVERY] Found existing package candidate '{0}' via '{1}'." -f $candidatePath, $searchLocation.kind)
         return $PackageModelResult
     }
 
@@ -204,9 +221,9 @@ Resolve-PackageModelExistingPackageDecision -PackageModelResult $result
         $upgradeAdoptedInstall = [bool]$existingInstallPolicy.upgradeAdoptedInstall
     }
 
-    $requireManagedOwnership = $false
-    if ($existingInstallPolicy.PSObject.Properties['requireManagedOwnership']) {
-        $requireManagedOwnership = [bool]$existingInstallPolicy.requireManagedOwnership
+    $requirePackageModelOwnership = $false
+    if ($existingInstallPolicy.PSObject.Properties['requirePackageModelOwnership']) {
+        $requirePackageModelOwnership = [bool]$existingInstallPolicy.requirePackageModelOwnership
     }
 
     $sameRelease = $false
@@ -215,49 +232,93 @@ Resolve-PackageModelExistingPackageDecision -PackageModelResult $result
             [string]::Equals([string]$ownershipRecord.currentVersion, [string]$PackageModelResult.PackageVersion, [System.StringComparison]::OrdinalIgnoreCase)
     }
 
-    if ([string]::Equals($classification, 'ManagedByPackageModel', [System.StringComparison]::OrdinalIgnoreCase) -and $ownershipRecord) {
+    if ([string]::Equals($classification, 'PackageModelOwned', [System.StringComparison]::OrdinalIgnoreCase) -and -not $ownershipRecord) {
+        $PackageModelResult.ExistingPackage.Decision = 'ReusePackageModelOwned'
+        $PackageModelResult.InstallOrigin = 'PackageModelReused'
+        Write-PackageModelExecutionMessage -Message ("[DECISION] Reusing PackageModel-owned target install '{0}'." -f $PackageModelResult.ExistingPackage.InstallDirectory)
+        Write-PackageModelExecutionMessage -Message ("[STATE] Existing install decision resolved to '{0}' with installOrigin='{1}'." -f $PackageModelResult.ExistingPackage.Decision, $PackageModelResult.InstallOrigin)
+        return $PackageModelResult
+    }
+
+    if ([string]::Equals($classification, 'PackageModelOwned', [System.StringComparison]::OrdinalIgnoreCase) -and $ownershipRecord) {
         if ([string]::Equals([string]$ownershipRecord.ownershipKind, 'AdoptedExternal', [System.StringComparison]::OrdinalIgnoreCase)) {
             if ($sameRelease -or (-not $upgradeAdoptedInstall)) {
                 $PackageModelResult.ExistingPackage.Decision = 'AdoptExternal'
                 $PackageModelResult.InstallOrigin = 'AdoptedExternal'
+                Write-PackageModelExecutionMessage -Message ("[DECISION] Reusing adopted external install '{0}'." -f $PackageModelResult.ExistingPackage.InstallDirectory)
+                Write-PackageModelExecutionMessage -Message ("[STATE] Existing install decision resolved to '{0}' with installOrigin='{1}'." -f $PackageModelResult.ExistingPackage.Decision, $PackageModelResult.InstallOrigin)
                 return $PackageModelResult
             }
 
             $PackageModelResult.ExistingPackage.Decision = 'UpgradeAdoptedInstall'
             $PackageModelResult.InstallDirectory = $originalInstallDirectory
             $PackageModelResult.Validation = $null
+            Write-PackageModelExecutionMessage -Level 'WRN' -Message ("[DECISION] Replacing adopted install at '{0}' with a PackageModel-owned install." -f $PackageModelResult.ExistingPackage.InstallDirectory)
+            Write-PackageModelExecutionMessage -Message ("[STATE] Existing install decision resolved to '{0}'." -f $PackageModelResult.ExistingPackage.Decision)
             return $PackageModelResult
         }
 
         if ($sameRelease) {
-            $PackageModelResult.ExistingPackage.Decision = 'ReuseManaged'
-            $PackageModelResult.InstallOrigin = 'ManagedReused'
+            $PackageModelResult.ExistingPackage.Decision = 'ReusePackageModelOwned'
+            $PackageModelResult.InstallOrigin = 'PackageModelReused'
+            Write-PackageModelExecutionMessage -Message ("[DECISION] Reusing PackageModel-owned install '{0}'." -f $PackageModelResult.ExistingPackage.InstallDirectory)
+            Write-PackageModelExecutionMessage -Message ("[STATE] Existing install decision resolved to '{0}' with installOrigin='{1}'." -f $PackageModelResult.ExistingPackage.Decision, $PackageModelResult.InstallOrigin)
             return $PackageModelResult
         }
 
-        $PackageModelResult.ExistingPackage.Decision = 'UpgradeManagedInstall'
+        $PackageModelResult.ExistingPackage.Decision = 'ReplacePackageModelOwnedInstall'
         $PackageModelResult.InstallDirectory = $originalInstallDirectory
         $PackageModelResult.Validation = $null
+        Write-PackageModelExecutionMessage -Level 'WRN' -Message ("[DECISION] Replacing outdated PackageModel-owned install at '{0}'." -f $PackageModelResult.ExistingPackage.InstallDirectory)
+        Write-PackageModelExecutionMessage -Message ("[STATE] Existing install decision resolved to '{0}'." -f $PackageModelResult.ExistingPackage.Decision)
         return $PackageModelResult
     }
 
-    if ($requireManagedOwnership) {
+    if ($requirePackageModelOwnership) {
         $PackageModelResult.ExistingPackage.Decision = 'ExternalIgnored'
         $PackageModelResult.InstallDirectory = $originalInstallDirectory
         $PackageModelResult.Validation = $null
+        Write-PackageModelExecutionMessage -Level 'WRN' -Message ("[DECISION] Ignoring external install '{0}' because PackageModel ownership is required." -f $PackageModelResult.ExistingPackage.InstallDirectory)
+        Write-PackageModelExecutionMessage -Message ("[STATE] Existing install decision resolved to '{0}'." -f $PackageModelResult.ExistingPackage.Decision)
         return $PackageModelResult
     }
 
     if ($allowAdoptExternal) {
         $PackageModelResult.ExistingPackage.Decision = 'AdoptExternal'
         $PackageModelResult.InstallOrigin = 'AdoptedExternal'
+        Write-PackageModelExecutionMessage -Message ("[DECISION] Adopting external install '{0}'." -f $PackageModelResult.ExistingPackage.InstallDirectory)
+        Write-PackageModelExecutionMessage -Message ("[STATE] Existing install decision resolved to '{0}' with installOrigin='{1}'." -f $PackageModelResult.ExistingPackage.Decision, $PackageModelResult.InstallOrigin)
         return $PackageModelResult
     }
 
     $PackageModelResult.ExistingPackage.Decision = 'ExternalIgnored'
     $PackageModelResult.InstallDirectory = $originalInstallDirectory
     $PackageModelResult.Validation = $null
+    Write-PackageModelExecutionMessage -Level 'WRN' -Message ("[DECISION] Ignoring external install '{0}'." -f $PackageModelResult.ExistingPackage.InstallDirectory)
+    Write-PackageModelExecutionMessage -Message ("[STATE] Existing install decision resolved to '{0}'." -f $PackageModelResult.ExistingPackage.Decision)
     return $PackageModelResult
+}
+
+function Get-PackageModelOwnedInstallStatus {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [psobject]$PackageModelResult
+    )
+
+    if ($PackageModelResult.ExistingPackage) {
+        switch -Exact ([string]$PackageModelResult.ExistingPackage.Decision) {
+            'ExistingInstallValidationFailed' {
+                if ([string]::Equals([string]$PackageModelResult.ExistingPackage.SearchKind, 'packageModelTargetInstallPath', [System.StringComparison]::OrdinalIgnoreCase)) {
+                    return 'RepairedPackageModelOwnedInstall'
+                }
+            }
+            'ReplacePackageModelOwnedInstall' { return 'ReplacedPackageModelOwnedInstall' }
+            'UpgradeAdoptedInstall' { return 'ReplacedAdoptedInstall' }
+        }
+    }
+
+    return 'Installed'
 }
 
 function Install-PackageModelArchive {
@@ -323,7 +384,7 @@ Install-PackageModelArchive -PackageModelResult $result
     }
 
     return [pscustomobject]@{
-        Status           = 'Installed'
+        Status           = Get-PackageModelOwnedInstallStatus -PackageModelResult $PackageModelResult
         InstallKind      = 'expandArchive'
         InstallDirectory = $PackageModelResult.InstallDirectory
         ReusedExisting   = $false
@@ -468,7 +529,7 @@ Install-PackageModelPackageManagerPackage -PackageModelResult $result
     }
 
     return [pscustomobject]@{
-        Status           = 'Installed'
+        Status           = Get-PackageModelOwnedInstallStatus -PackageModelResult $PackageModelResult
         InstallKind      = 'packageManagerInstall'
         InstallDirectory = $PackageModelResult.InstallDirectory
         ReusedExisting   = $false
@@ -506,17 +567,18 @@ Install-PackageModelPackage -PackageModelResult $result
         throw "PackageModel release '$($package.id)' does not define install.kind."
     }
 
-    if ($PackageModelResult.ExistingPackage -and $PackageModelResult.ExistingPackage.Decision -eq 'ReuseManaged') {
+    if ($PackageModelResult.ExistingPackage -and $PackageModelResult.ExistingPackage.Decision -eq 'ReusePackageModelOwned') {
         $PackageModelResult.InstallDirectory = $PackageModelResult.ExistingPackage.InstallDirectory
-        $PackageModelResult.InstallOrigin = 'ManagedReused'
+        $PackageModelResult.InstallOrigin = 'PackageModelReused'
         $PackageModelResult.Install = [pscustomobject]@{
-            Status           = 'ReusedManaged'
+            Status           = 'ReusedPackageModelOwned'
             InstallKind      = 'existingInstall'
             InstallDirectory = $PackageModelResult.ExistingPackage.InstallDirectory
             ReusedExisting   = $true
             CandidatePath    = $PackageModelResult.ExistingPackage.CandidatePath
         }
         $PackageModelResult.Validation = $PackageModelResult.ExistingPackage.Validation
+        Write-PackageModelExecutionMessage -Message ("[ACTION] Reused PackageModel-owned install '{0}'." -f $PackageModelResult.ExistingPackage.InstallDirectory)
         return $PackageModelResult
     }
 
@@ -531,6 +593,7 @@ Install-PackageModelPackage -PackageModelResult $result
             CandidatePath    = $PackageModelResult.ExistingPackage.CandidatePath
         }
         $PackageModelResult.Validation = $PackageModelResult.ExistingPackage.Validation
+        Write-PackageModelExecutionMessage -Message ("[ACTION] Adopted external install '{0}'." -f $PackageModelResult.ExistingPackage.InstallDirectory)
         return $PackageModelResult
     }
 
@@ -544,12 +607,14 @@ Install-PackageModelPackage -PackageModelResult $result
 
     switch -Exact ([string]$install.kind) {
         'expandArchive' {
+            Write-PackageModelExecutionMessage -Message ("[ACTION] Installing package archive into '{0}'." -f $PackageModelResult.InstallDirectory)
             $PackageModelResult.Install = Install-PackageModelArchive -PackageModelResult $PackageModelResult
         }
         'runInstaller' {
+            Write-PackageModelExecutionMessage -Message ("[ACTION] Running installer into '{0}'." -f $PackageModelResult.InstallDirectory)
             $installerResult = Invoke-PackageModelInstallerProcess -PackageModelResult $PackageModelResult
             $PackageModelResult.Install = [pscustomobject]@{
-                Status           = 'Installed'
+                Status           = Get-PackageModelOwnedInstallStatus -PackageModelResult $PackageModelResult
                 InstallKind      = 'runInstaller'
                 InstallDirectory = $PackageModelResult.InstallDirectory
                 ReusedExisting   = $false
@@ -557,6 +622,7 @@ Install-PackageModelPackage -PackageModelResult $result
             }
         }
         'packageManagerInstall' {
+            Write-PackageModelExecutionMessage -Message ("[ACTION] Running package-manager install into '{0}'." -f $PackageModelResult.InstallDirectory)
             $PackageModelResult.Install = Install-PackageModelPackageManagerPackage -PackageModelResult $PackageModelResult
         }
         default {
@@ -564,6 +630,7 @@ Install-PackageModelPackage -PackageModelResult $result
         }
     }
 
-    $PackageModelResult.InstallOrigin = 'ManagedInstalled'
+    $PackageModelResult.InstallOrigin = 'PackageModelInstalled'
+    Write-PackageModelExecutionMessage -Message ("[ACTION] Completed PackageModel-owned install with status '{0}'." -f $PackageModelResult.Install.Status)
     return $PackageModelResult
 }

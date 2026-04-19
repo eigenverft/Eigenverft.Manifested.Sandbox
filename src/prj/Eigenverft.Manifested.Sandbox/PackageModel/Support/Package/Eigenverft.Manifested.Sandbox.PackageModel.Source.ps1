@@ -522,6 +522,94 @@ function Get-PackageModelPreferredVerification {
     return [pscustomobject]@{ mode = 'none' }
 }
 
+function Resolve-PackageModelAcquisitionCandidateVerification {
+<#
+.SYNOPSIS
+Builds the effective verification policy for one acquisition candidate.
+
+.DESCRIPTION
+Combines acquisition-candidate verification mode with canonical package-file
+integrity metadata when present, while remaining compatible with older
+candidate-local hash definitions.
+
+.PARAMETER Package
+The selected effective release.
+
+.PARAMETER AcquisitionCandidate
+The raw acquisition candidate.
+#>
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [psobject]$Package,
+
+        [AllowNull()]
+        [psobject]$AcquisitionCandidate
+    )
+
+    $candidateVerification = if ($AcquisitionCandidate -and $AcquisitionCandidate.PSObject.Properties['verification']) {
+        $AcquisitionCandidate.verification
+    }
+    else {
+        $null
+    }
+    if ($candidateVerification -is [System.Collections.IDictionary]) {
+        $candidateVerification = [pscustomobject]$candidateVerification
+    }
+
+    $packageIntegrity = if ($Package -and
+        $Package.PSObject.Properties['packageFile'] -and
+        $Package.packageFile -and
+        $Package.packageFile.PSObject.Properties['integrity']) {
+        $Package.packageFile.integrity
+    }
+    else {
+        $null
+    }
+    if ($packageIntegrity -is [System.Collections.IDictionary]) {
+        $packageIntegrity = [pscustomobject]$packageIntegrity
+    }
+
+    $mode = if ($candidateVerification -and $candidateVerification.PSObject.Properties['mode'] -and -not [string]::IsNullOrWhiteSpace([string]$candidateVerification.mode)) {
+        [string]$candidateVerification.mode
+    }
+    else {
+        'none'
+    }
+
+    $algorithm = if ($packageIntegrity -and $packageIntegrity.PSObject.Properties['algorithm'] -and -not [string]::IsNullOrWhiteSpace([string]$packageIntegrity.algorithm)) {
+        [string]$packageIntegrity.algorithm
+    }
+    elseif ($candidateVerification -and $candidateVerification.PSObject.Properties['algorithm'] -and -not [string]::IsNullOrWhiteSpace([string]$candidateVerification.algorithm)) {
+        [string]$candidateVerification.algorithm
+    }
+    else {
+        'sha256'
+    }
+
+    $sha256 = if ($packageIntegrity -and $packageIntegrity.PSObject.Properties['sha256'] -and -not [string]::IsNullOrWhiteSpace([string]$packageIntegrity.sha256)) {
+        [string]$packageIntegrity.sha256
+    }
+    elseif ($candidateVerification -and $candidateVerification.PSObject.Properties['sha256'] -and -not [string]::IsNullOrWhiteSpace([string]$candidateVerification.sha256)) {
+        [string]$candidateVerification.sha256
+    }
+    else {
+        $null
+    }
+
+    $verification = [ordered]@{
+        mode = $mode
+    }
+    if (-not [string]::IsNullOrWhiteSpace($algorithm)) {
+        $verification.algorithm = $algorithm
+    }
+    if (-not [string]::IsNullOrWhiteSpace($sha256)) {
+        $verification.sha256 = $sha256
+    }
+
+    return [pscustomobject]$verification
+}
+
 function Get-PackageModelPackageDepotSources {
     [CmdletBinding()]
     param(
@@ -589,6 +677,7 @@ Build-PackageModelAcquisitionPlan -PackageModelResult $result
         foreach ($candidate in @($package.acquisitionCandidates | Sort-Object -Property @{
                     Expression = { if ($_.PSObject.Properties['priority']) { [int]$_.priority } else { [int]::MaxValue } }
                 })) {
+            $resolvedVerification = Resolve-PackageModelAcquisitionCandidateVerification -Package $package -AcquisitionCandidate $candidate
             switch -Exact ([string]$candidate.kind) {
                 'packageDepot' {
                     $resolvedDepotSourcePath = Join-Path $PackageModelResult.PackageFileRelativeDirectory ([string]$package.packageFile.fileName)
@@ -601,7 +690,7 @@ Build-PackageModelAcquisitionPlan -PackageModelResult $result
                                 id    = $depotSource.id
                             }
                             sourcePath   = $resolvedDepotSourcePath
-                            verification = $candidate.verification
+                            verification = $resolvedVerification
                         }) | Out-Null
                     }
                 }
@@ -614,7 +703,7 @@ Build-PackageModelAcquisitionPlan -PackageModelResult $result
                             id    = [string]$candidate.sourceId
                         }
                         sourcePath   = [string]$candidate.sourcePath
-                        verification = $candidate.verification
+                        verification = $resolvedVerification
                     }) | Out-Null
                 }
                 'filesystem' {
@@ -631,7 +720,7 @@ Build-PackageModelAcquisitionPlan -PackageModelResult $result
                             $null
                         }
                         sourcePath   = [string]$candidate.sourcePath
-                        verification = $candidate.verification
+                        verification = $resolvedVerification
                     }) | Out-Null
                 }
             }
@@ -651,6 +740,22 @@ Build-PackageModelAcquisitionPlan -PackageModelResult $result
                 }
         )
     }
+
+    $candidateSummary = @(
+        foreach ($candidate in @($PackageModelResult.AcquisitionPlan.Candidates)) {
+            $sourceSummary = if ($candidate.sourceRef) {
+                '{0}:{1}' -f [string]$candidate.sourceRef.scope, [string]$candidate.sourceRef.id
+            }
+            else {
+                'direct'
+            }
+            '{0}@{1}->{2}' -f [string]$candidate.kind, [string]$candidate.priority, $sourceSummary
+        }
+    ) -join ', '
+    if ([string]::IsNullOrWhiteSpace($candidateSummary)) {
+        $candidateSummary = '<none>'
+    }
+    Write-PackageModelExecutionMessage -Message ("[STATE] Acquisition plan packageFileRequired='{0}' with {1} candidate(s): {2}." -f $requiresPackageFile, @($PackageModelResult.AcquisitionPlan.Candidates).Count, $candidateSummary)
 
     return $PackageModelResult
 }
@@ -686,7 +791,7 @@ Save-PackageModelPackageFile -PackageModelResult $result
 
     if ($PackageModelResult.ExistingPackage -and
         $PackageModelResult.ExistingPackage.PSObject.Properties['Decision'] -and
-        $PackageModelResult.ExistingPackage.Decision -in @('ReuseManaged', 'AdoptExternal')) {
+        $PackageModelResult.ExistingPackage.Decision -in @('ReusePackageModelOwned', 'AdoptExternal')) {
         $PackageModelResult.PackageFileSave = [pscustomobject]@{
             Success         = $true
             Status          = 'Skipped'
@@ -697,6 +802,7 @@ Save-PackageModelPackageFile -PackageModelResult $result
             FailureReason   = $null
             ErrorMessage    = $null
         }
+        Write-PackageModelExecutionMessage -Message ("[STATE] Package file step skipped because existing install decision is '{0}'." -f [string]$PackageModelResult.ExistingPackage.Decision)
         return $PackageModelResult
     }
 
@@ -715,6 +821,7 @@ Save-PackageModelPackageFile -PackageModelResult $result
             FailureReason   = $null
             ErrorMessage    = $null
         }
+        Write-PackageModelExecutionMessage -Message "[STATE] Package file step skipped because the selected install kind does not require a saved package file."
         return $PackageModelResult
     }
 
@@ -760,6 +867,7 @@ Save-PackageModelPackageFile -PackageModelResult $result
                 FailureReason   = $null
                 ErrorMessage    = $null
             }
+            Write-PackageModelExecutionMessage -Message ("[ACTION] Reused install workspace package file '{0}'." -f $PackageModelResult.PackageFilePath)
             return $PackageModelResult
         }
     }
@@ -798,6 +906,7 @@ Save-PackageModelPackageFile -PackageModelResult $result
                 FailureReason   = $null
                 ErrorMessage    = $null
             }
+            Write-PackageModelExecutionMessage -Message ("[ACTION] Hydrated install workspace package file from default package depot '{0}'." -f $PackageModelResult.DefaultPackageDepotFilePath)
             return $PackageModelResult
         }
     }
@@ -909,6 +1018,7 @@ Save-PackageModelPackageFile -PackageModelResult $result
                 FailureReason   = $null
                 ErrorMessage    = $null
             }
+            Write-PackageModelExecutionMessage -Message ("[ACTION] Saved package file from '{0}:{1}'." -f $sourceDefinition.Scope, $sourceDefinition.Id)
             return $PackageModelResult
         }
         catch {
@@ -943,6 +1053,8 @@ Save-PackageModelPackageFile -PackageModelResult $result
         FailureReason   = 'AllSourcesFailed'
         ErrorMessage    = "All acquisition candidates failed for PackageModel release '$($package.id)'."
     }
+
+    Write-PackageModelExecutionMessage -Level 'ERR' -Message ("[ACTION] All acquisition candidates failed for release '{0}'." -f $package.id)
 
     return $PackageModelResult
 }

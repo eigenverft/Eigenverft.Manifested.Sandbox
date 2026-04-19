@@ -1,4 +1,5 @@
 {
+  "schemaVersion": "1.0",
   "id": "VSCodeRuntime",
   "display": {
     "default": {
@@ -31,7 +32,13 @@
   },
   "releaseDefaults": {
     "requirements": {
-      "packages": []
+      "checks": [
+        {
+          "kind": "osVersion",
+          "operator": ">=",
+          "value": "10.0"
+        }
+      ]
     },
     "install": {
       "kind": "expandArchive",
@@ -114,7 +121,7 @@
     "existingInstallPolicy": {
       "allowAdoptExternal": true,
       "upgradeAdoptedInstall": true,
-      "requireManagedOwnership": false
+      "requirePackageModelOwnership": false
     }
   },
   "releases": [
@@ -135,16 +142,18 @@
         "fileName": "VSCode-win32-x64-1.116.0.zip",
         "format": "zip",
         "portable": true,
-        "autoUpdateSupported": false
+        "autoUpdateSupported": false,
+        "integrity": {
+          "algorithm": "sha256",
+          "sha256": "365c3d275deb3a1c0a1aa626f274824b8db15ee150d567a7323b8dbce2cdfa8f"
+        }
       },
       "acquisitionCandidates": [
         {
           "kind": "packageDepot",
           "priority": 250,
           "verification": {
-            "mode": "optional",
-            "algorithm": "sha256",
-            "sha256": "365c3d275deb3a1c0a1aa626f274824b8db15ee150d567a7323b8dbce2cdfa8f"
+            "mode": "optional"
           }
         },
         {
@@ -153,9 +162,7 @@
           "priority": 200,
           "sourcePath": "1.116.0/win32-x64-archive/stable",
           "verification": {
-            "mode": "required",
-            "algorithm": "sha256",
-            "sha256": "365c3d275deb3a1c0a1aa626f274824b8db15ee150d567a7323b8dbce2cdfa8f"
+            "mode": "required"
           }
         }
       ]
@@ -177,16 +184,18 @@
         "fileName": "VSCode-win32-arm64-1.116.0.zip",
         "format": "zip",
         "portable": true,
-        "autoUpdateSupported": false
+        "autoUpdateSupported": false,
+        "integrity": {
+          "algorithm": "sha256",
+          "sha256": "6712506c9541823e2c9a52aec6efcfb2f95df4247606eaa9fbade2b08df84fe7"
+        }
       },
       "acquisitionCandidates": [
         {
           "kind": "packageDepot",
           "priority": 50,
           "verification": {
-            "mode": "optional",
-            "algorithm": "sha256",
-            "sha256": "6712506c9541823e2c9a52aec6efcfb2f95df4247606eaa9fbade2b08df84fe7"
+            "mode": "optional"
           }
         },
         {
@@ -195,9 +204,7 @@
           "priority": 200,
           "sourcePath": "1.116.0/win32-arm64-archive/stable",
           "verification": {
-            "mode": "required",
-            "algorithm": "sha256",
-            "sha256": "6712506c9541823e2c9a52aec6efcfb2f95df4247606eaa9fbade2b08df84fe7"
+            "mode": "required"
           }
         }
       ]

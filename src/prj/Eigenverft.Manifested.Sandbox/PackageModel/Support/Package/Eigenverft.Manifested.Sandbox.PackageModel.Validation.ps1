@@ -446,5 +446,8 @@ Test-PackageModelInstalledPackage -PackageModelResult $result
         Registry         = @($registryResults.ToArray())
     }
 
+    $failedCount = @($allResults | Where-Object { $_.Status -ne 'Ready' }).Count
+    Write-PackageModelExecutionMessage -Message ("[STATE] Validation completed for '{0}' with accepted='{1}', failedChecks={2}." -f $installDirectory, $accepted, $failedCount)
+
     return $PackageModelResult
 }

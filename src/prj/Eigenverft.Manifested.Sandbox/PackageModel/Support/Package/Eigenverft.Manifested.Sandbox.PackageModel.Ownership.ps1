@@ -145,6 +145,20 @@ Get-PackageModelOwnershipRecord -PackageModelResult $result
     return $null
 }
 
+function Resolve-PackageModelOwnershipKindText {
+    [CmdletBinding()]
+    param(
+        [AllowNull()]
+        [string]$OwnershipKind
+    )
+
+    switch -Exact ([string]$OwnershipKind) {
+        'ManagedInstalled' { return 'PackageModelInstalled' }
+        'ManagedReused' { return 'PackageModelInstalled' }
+        default { return $OwnershipKind }
+    }
+}
+
 function Classify-PackageModelExistingPackage {
 <#
 .SYNOPSIS
@@ -152,7 +166,7 @@ Classifies a discovered existing install against the ownership index.
 
 .DESCRIPTION
 Attaches ownership classification data to the current existing install so later
-helpers can decide whether the install is managed, adopted, or external.
+helpers can decide whether the install is PackageModel-owned, adopted, or external.
 
 .PARAMETER PackageModelResult
 The PackageModel result object to enrich.
@@ -177,7 +191,12 @@ Classify-PackageModelExistingPackage -PackageModelResult $result
     }
 
     $record = Get-PackageModelOwnershipRecord -PackageModelResult $PackageModelResult
-    $classification = if ($record) { 'ManagedByPackageModel' } else { 'ExternalInstall' }
+    $classification = if ($record -or [string]::Equals([string]$PackageModelResult.ExistingPackage.SearchKind, 'packageModelTargetInstallPath', [System.StringComparison]::OrdinalIgnoreCase)) {
+        'PackageModelOwned'
+    }
+    else {
+        'ExternalInstall'
+    }
     $installSlotId = Get-PackageModelInstallSlotId -PackageModelResult $PackageModelResult
     $PackageModelResult.Ownership = [pscustomobject]@{
         IndexPath       = $PackageModelResult.PackageModelConfig.OwnershipIndexFilePath
@@ -187,6 +206,13 @@ Classify-PackageModelExistingPackage -PackageModelResult $result
     }
     $PackageModelResult.ExistingPackage.Classification = $classification
     $PackageModelResult.ExistingPackage.OwnershipRecord = $record
+    $ownershipKindText = if ($record -and $record.PSObject.Properties['ownershipKind']) {
+        Resolve-PackageModelOwnershipKindText -OwnershipKind ([string]$record.ownershipKind)
+    }
+    else {
+        '<none>'
+    }
+    Write-PackageModelExecutionMessage -Message ("[STATE] Ownership classification for installSlotId '{0}' is '{1}' (ownershipKind='{2}')." -f $installSlotId, $classification, $ownershipKindText)
 
     return $PackageModelResult
 }
@@ -197,8 +223,8 @@ function Update-PackageModelOwnershipRecord {
 Updates the central ownership record after a PackageModel run.
 
 .DESCRIPTION
-Writes or refreshes the ownership record for managed installs, managed reuse,
-and adopted external installs. External installs that were ignored are not
+Writes or refreshes the ownership record for PackageModel-owned installs,
+PackageModel-owned reuse, and adopted external installs. External installs that were ignored are not
 written to the central index.
 
 .PARAMETER PackageModelResult
@@ -218,8 +244,8 @@ Update-PackageModelOwnershipRecord -PackageModelResult $result
     }
 
     $ownershipKind = switch -Exact ([string]$PackageModelResult.InstallOrigin) {
-        'ManagedInstalled' { 'ManagedInstalled'; break }
-        'ManagedReused' { 'ManagedInstalled'; break }
+        'PackageModelInstalled' { 'PackageModelInstalled'; break }
+        'PackageModelReused' { 'PackageModelInstalled'; break }
         'AdoptedExternal' { 'AdoptedExternal'; break }
         default { $null }
     }
@@ -259,9 +285,11 @@ Update-PackageModelOwnershipRecord -PackageModelResult $result
     $PackageModelResult.Ownership = [pscustomobject]@{
         IndexPath       = $index.Path
         InstallSlotId   = $installSlotId
-        Classification  = if ($ownershipKind -eq 'AdoptedExternal') { 'AdoptedExternal' } else { 'ManagedByPackageModel' }
+        Classification  = if ($ownershipKind -eq 'AdoptedExternal') { 'AdoptedExternal' } else { 'PackageModelOwned' }
         OwnershipRecord = $newRecord
     }
+
+    Write-PackageModelExecutionMessage -Message ("[STATE] Updated ownership record for installSlotId '{0}' with ownershipKind='{1}' at '{2}'." -f $installSlotId, $ownershipKind, $index.Path)
 
     return $PackageModelResult
 }

@@ -117,6 +117,7 @@ Get-PackageModelRuntimeContext
     return [pscustomobject]@{
         Platform     = $platform
         Architecture = $architecture
+        OSVersion    = [Environment]::OSVersion.Version.ToString()
     }
 }
 
@@ -890,10 +891,16 @@ Assert-PackageModelDefinitionSchema -DefinitionDocumentInfo $definitionInfo -Def
         }
     }
 
-    foreach ($requiredProperty in @('id', 'display', 'upstreamSources', 'providedTools', 'releaseDefaults', 'releases')) {
+    foreach ($requiredProperty in @('schemaVersion', 'id', 'display', 'upstreamSources', 'providedTools', 'releaseDefaults', 'releases')) {
         if (-not $definition.PSObject.Properties[$requiredProperty]) {
             throw "PackageModel definition '$($DefinitionDocumentInfo.Path)' is missing required property '$requiredProperty'."
         }
+    }
+    if ([string]::IsNullOrWhiteSpace([string]$definition.schemaVersion)) {
+        throw "PackageModel definition '$($DefinitionDocumentInfo.Path)' defines schemaVersion, but it is empty."
+    }
+    if (-not [string]::Equals([string]$definition.schemaVersion, '1.0', [System.StringComparison]::Ordinal)) {
+        throw "PackageModel definition '$($DefinitionDocumentInfo.Path)' uses unsupported schemaVersion '$($definition.schemaVersion)'. Supported schemaVersion is '1.0'."
     }
 
     if (-not [string]::Equals([string]$definition.id, [string]$DefinitionId, [System.StringComparison]::Ordinal)) {
@@ -935,6 +942,50 @@ Assert-PackageModelDefinitionSchema -DefinitionDocumentInfo $definitionInfo -Def
                 throw "PackageModel release '$($release.id)' in '$($definition.id)' is missing required effective property '$requiredEffectiveProperty'."
             }
         }
+        if ($effectiveRelease.requirements.PSObject.Properties['packages']) {
+            throw "PackageModel release '$($release.id)' in '$($definition.id)' still uses retired property 'requirements.packages'. Use 'requirements.checks'."
+        }
+        if (-not $effectiveRelease.requirements.PSObject.Properties['checks']) {
+            throw "PackageModel release '$($release.id)' in '$($definition.id)' is missing requirements.checks."
+        }
+        foreach ($requirementCheck in @($effectiveRelease.requirements.checks)) {
+            if ($null -eq $requirementCheck) {
+                continue
+            }
+            if (-not $requirementCheck.PSObject.Properties['kind'] -or [string]::IsNullOrWhiteSpace([string]$requirementCheck.kind)) {
+                throw "PackageModel release '$($release.id)' in '$($definition.id)' has a requirement check without kind."
+            }
+            switch -Exact ([string]$requirementCheck.kind) {
+                'osFamily' {
+                    $hasAllowed = $requirementCheck.PSObject.Properties['allowed'] -and @($requirementCheck.allowed).Count -gt 0
+                    $hasBlocked = $requirementCheck.PSObject.Properties['blocked'] -and @($requirementCheck.blocked).Count -gt 0
+                    if (-not $hasAllowed -and -not $hasBlocked) {
+                        throw "PackageModel release '$($release.id)' in '$($definition.id)' has an osFamily requirement without allowed or blocked values."
+                    }
+                }
+                'cpuArchitecture' {
+                    $hasAllowed = $requirementCheck.PSObject.Properties['allowed'] -and @($requirementCheck.allowed).Count -gt 0
+                    $hasBlocked = $requirementCheck.PSObject.Properties['blocked'] -and @($requirementCheck.blocked).Count -gt 0
+                    if (-not $hasAllowed -and -not $hasBlocked) {
+                        throw "PackageModel release '$($release.id)' in '$($definition.id)' has a cpuArchitecture requirement without allowed or blocked values."
+                    }
+                }
+                'osVersion' {
+                    if (-not $requirementCheck.PSObject.Properties['operator'] -or [string]::IsNullOrWhiteSpace([string]$requirementCheck.operator)) {
+                        throw "PackageModel release '$($release.id)' in '$($definition.id)' has an osVersion requirement without operator."
+                    }
+                    if (-not $requirementCheck.PSObject.Properties['value'] -or [string]::IsNullOrWhiteSpace([string]$requirementCheck.value)) {
+                        throw "PackageModel release '$($release.id)' in '$($definition.id)' has an osVersion requirement without value."
+                    }
+                }
+                default {
+                    throw "PackageModel release '$($release.id)' in '$($definition.id)' uses unsupported requirement kind '$($requirementCheck.kind)'."
+                }
+            }
+        }
+        if ($effectiveRelease.existingInstallPolicy -and $effectiveRelease.existingInstallPolicy.PSObject.Properties['requireManagedOwnership']) {
+            throw "PackageModel release '$($release.id)' in '$($definition.id)' still uses retired property 'requireManagedOwnership'. Use 'requirePackageModelOwnership'."
+        }
 
         $installKind = if ($effectiveRelease.install -and $effectiveRelease.install.PSObject.Properties['kind']) {
             [string]$effectiveRelease.install.kind
@@ -970,6 +1021,21 @@ Assert-PackageModelDefinitionSchema -DefinitionDocumentInfo $definitionInfo -Def
         if ($effectiveRelease.PSObject.Properties['packageFile'] -and $effectiveRelease.packageFile -and
             (-not $effectiveRelease.packageFile.PSObject.Properties['fileName'] -or [string]::IsNullOrWhiteSpace([string]$effectiveRelease.packageFile.fileName))) {
             throw "PackageModel release '$($release.id)' in '$($definition.id)' defines packageFile without packageFile.fileName."
+        }
+        if ($effectiveRelease.PSObject.Properties['packageFile'] -and
+            $effectiveRelease.packageFile -and
+            $effectiveRelease.packageFile.PSObject.Properties['integrity'] -and
+            $null -ne $effectiveRelease.packageFile.integrity) {
+            $integrity = $effectiveRelease.packageFile.integrity
+            if (-not $integrity.PSObject.Properties['algorithm'] -or [string]::IsNullOrWhiteSpace([string]$integrity.algorithm)) {
+                throw "PackageModel release '$($release.id)' in '$($definition.id)' defines packageFile.integrity without algorithm."
+            }
+            if (-not $integrity.PSObject.Properties['sha256'] -or [string]::IsNullOrWhiteSpace([string]$integrity.sha256)) {
+                throw "PackageModel release '$($release.id)' in '$($definition.id)' defines packageFile.integrity without sha256."
+            }
+            if (-not [string]::Equals([string]$integrity.algorithm, 'sha256', [System.StringComparison]::OrdinalIgnoreCase)) {
+                throw "PackageModel release '$($release.id)' in '$($definition.id)' uses unsupported packageFile.integrity.algorithm '$($integrity.algorithm)'."
+            }
         }
 
         if ($requiresAcquisitionCandidates) {
@@ -1092,7 +1158,7 @@ Loads the effective PackageModel config for a definition id.
 .DESCRIPTION
 Loads the shipped PackageModel global document, applies the optional external
 source inventory, loads one shipped PackageModel definition, validates the
-current schema, resolves runtime context and managed roots, and returns the
+current schema, resolves runtime context and PackageModel roots, and returns the
 combined config object for command orchestration.
 
 .PARAMETER DefinitionId
@@ -1167,8 +1233,10 @@ Get-PackageModelConfig -DefinitionId VSCodeRuntime
         DefinitionId                       = [string]$definition.id
         DefinitionUpstreamSources          = $definition.upstreamSources
         Display                            = $display
+        SchemaVersion                      = [string]$definition.schemaVersion
         Platform                           = $runtimeContext.Platform
         Architecture                       = $runtimeContext.Architecture
+        OSVersion                          = $runtimeContext.OSVersion
         ReleaseTrack                       = $selectionReleaseTrack
         SelectionStrategy                  = $selectionStrategy
         InstallWorkspaceRootDirectory      = $effectiveAcquisitionEnvironment.Stores.InstallWorkspaceDirectory
@@ -1264,6 +1332,15 @@ Resolve-PackageModelPaths -PackageModelResult $result
     $PackageModelResult.PackageFilePath = $packageFilePath
     $PackageModelResult.DefaultPackageDepotFilePath = $defaultPackageDepotFilePath
 
+    $resolvedInstallDirectoryText = if ([string]::IsNullOrWhiteSpace([string]$installDirectory)) { '<none>' } else { $installDirectory }
+    $resolvedPackageFilePathText = if ([string]::IsNullOrWhiteSpace([string]$packageFilePath)) { '<none>' } else { $packageFilePath }
+    $resolvedDefaultDepotFilePathText = if ([string]::IsNullOrWhiteSpace([string]$defaultPackageDepotFilePath)) { '<none>' } else { $defaultPackageDepotFilePath }
+    Write-PackageModelExecutionMessage -Message '[STATE] Resolved paths:'
+    Write-PackageModelExecutionMessage -Message ("[PATH] Install workspace: {0}" -f $installWorkspaceDirectory)
+    Write-PackageModelExecutionMessage -Message ("[PATH] Target install directory: {0}" -f $resolvedInstallDirectoryText)
+    Write-PackageModelExecutionMessage -Message ("[PATH] Package file: {0}" -f $resolvedPackageFilePathText)
+    Write-PackageModelExecutionMessage -Message ("[PATH] Default package depot file: {0}" -f $resolvedDefaultDepotFilePathText)
+
     return $PackageModelResult
 }
 
@@ -1304,6 +1381,7 @@ New-PackageModelResult -CommandName Invoke-PackageModel-VSCodeRuntime -PackageMo
         Display                          = $PackageModelConfig.Display
         Platform                         = $PackageModelConfig.Platform
         Architecture                     = $PackageModelConfig.Architecture
+        OSVersion                        = $PackageModelConfig.OSVersion
         ReleaseTrack                     = $PackageModelConfig.ReleaseTrack
         SourceInventoryPath              = $PackageModelConfig.SourceInventoryPath
         InstallWorkspaceRootDirectory    = $PackageModelConfig.InstallWorkspaceRootDirectory

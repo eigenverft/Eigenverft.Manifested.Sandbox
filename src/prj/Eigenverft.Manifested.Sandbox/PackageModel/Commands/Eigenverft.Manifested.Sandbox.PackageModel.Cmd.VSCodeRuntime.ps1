@@ -20,46 +20,77 @@ Invoke-PackageModel-VSCodeRuntime
     [CmdletBinding()]
     param()
 
+    function Get-PackageModelOutcomeSummary {
+        param(
+            [Parameter(Mandatory = $true)]
+            [psobject]$PackageModelResult
+        )
+
+        $installDirectoryText = if ([string]::IsNullOrWhiteSpace([string]$PackageModelResult.InstallDirectory)) {
+            '<none>'
+        }
+        else {
+            [string]$PackageModelResult.InstallDirectory
+        }
+        $packageFileStatusText = if ($PackageModelResult.PackageFileSave -and $PackageModelResult.PackageFileSave.PSObject.Properties['Status']) {
+            [string]$PackageModelResult.PackageFileSave.Status
+        }
+        else {
+            '<none>'
+        }
+        $existingDecisionText = if ($PackageModelResult.ExistingPackage -and $PackageModelResult.ExistingPackage.PSObject.Properties['Decision']) {
+            [string]$PackageModelResult.ExistingPackage.Decision
+        }
+        else {
+            '<none>'
+        }
+
+        switch -Exact ([string]$PackageModelResult.InstallOrigin) {
+            'PackageModelReused' {
+                return ("[OUTCOME] Reused PackageModel-owned install '{0}' (existingDecision='{1}', packageFileStep='{2}')." -f $installDirectoryText, $existingDecisionText, $packageFileStatusText)
+            }
+            'AdoptedExternal' {
+                return ("[OUTCOME] Adopted external install '{0}' (existingDecision='{1}', packageFileStep='{2}')." -f $installDirectoryText, $existingDecisionText, $packageFileStatusText)
+            }
+            'PackageModelInstalled' {
+                return ("[OUTCOME] Completed PackageModel-owned install into '{0}' with installStatus='{1}' and packageFileStep='{2}'." -f $installDirectoryText, [string]$PackageModelResult.Install.Status, $packageFileStatusText)
+            }
+            default {
+                return ("[OUTCOME] Completed PackageModel run with installOrigin='{0}', installStatus='{1}', packageFileStep='{2}', installDirectory='{3}'." -f [string]$PackageModelResult.InstallOrigin, [string]$PackageModelResult.Install.Status, $packageFileStatusText, $installDirectoryText)
+            }
+        }
+    }
+
     $packageModelConfig = Get-PackageModelConfig -DefinitionId 'VSCodeRuntime'
     $result = New-PackageModelResult -CommandName 'Invoke-PackageModel-VSCodeRuntime' -PackageModelConfig $packageModelConfig
+    $steps = @(
+        [pscustomobject]@{ Name = 'ResolvePackage'; Message = '[STEP] Resolving package selection.'; Action = { param($r) Resolve-PackageModelPackage -PackageModelResult $r } },
+        [pscustomobject]@{ Name = 'ResolvePaths'; Message = '[STEP] Resolving package paths.'; Action = { param($r) Resolve-PackageModelPaths -PackageModelResult $r } },
+        [pscustomobject]@{ Name = 'BuildAcquisitionPlan'; Message = '[STEP] Building acquisition plan.'; Action = { param($r) Build-PackageModelAcquisitionPlan -PackageModelResult $r } },
+        [pscustomobject]@{ Name = 'FindExistingPackage'; Message = '[STEP] Discovering existing installs.'; Action = { param($r) Find-PackageModelExistingPackage -PackageModelResult $r } },
+        [pscustomobject]@{ Name = 'ClassifyExistingPackage'; Message = '[STEP] Classifying install ownership.'; Action = { param($r) Classify-PackageModelExistingPackage -PackageModelResult $r } },
+        [pscustomobject]@{ Name = 'ResolveExistingPackageDecision'; Message = '[STEP] Deciding reuse, adoption, or replacement.'; Action = { param($r) Resolve-PackageModelExistingPackageDecision -PackageModelResult $r } },
+        [pscustomobject]@{ Name = 'SavePackageFile'; Message = '[STEP] Ensuring package file is available.'; Action = { param($r) Save-PackageModelPackageFile -PackageModelResult $r } },
+        [pscustomobject]@{ Name = 'InstallPackage'; Message = '[STEP] Installing or reusing the package.'; Action = { param($r) Install-PackageModelPackage -PackageModelResult $r } },
+        [pscustomobject]@{ Name = 'ValidateInstalledPackage'; Message = '[STEP] Validating the installed package.'; Action = { param($r) Test-PackageModelInstalledPackage -PackageModelResult $r } },
+        [pscustomobject]@{ Name = 'ResolveEntryPoints'; Message = '[STEP] Resolving entry points.'; Action = { param($r) Resolve-PackageModelEntryPoints -PackageModelResult $r } },
+        [pscustomobject]@{ Name = 'UpdateOwnership'; Message = '[STEP] Updating ownership tracking.'; Action = { param($r) Update-PackageModelOwnershipRecord -PackageModelResult $r } }
+    )
 
     try {
-        $result.CurrentStep = 'ResolvePackage'
-        $result = Resolve-PackageModelPackage -PackageModelResult $result
-
-        $result.CurrentStep = 'ResolvePaths'
-        $result = Resolve-PackageModelPaths -PackageModelResult $result
-
-        $result.CurrentStep = 'BuildAcquisitionPlan'
-        $result = Build-PackageModelAcquisitionPlan -PackageModelResult $result
-
-        $result.CurrentStep = 'FindExistingPackage'
-        $result = Find-PackageModelExistingPackage -PackageModelResult $result
-
-        $result.CurrentStep = 'ClassifyExistingPackage'
-        $result = Classify-PackageModelExistingPackage -PackageModelResult $result
-
-        $result.CurrentStep = 'ResolveExistingPackageDecision'
-        $result = Resolve-PackageModelExistingPackageDecision -PackageModelResult $result
-
-        $result.CurrentStep = 'SavePackageFile'
-        $result = Save-PackageModelPackageFile -PackageModelResult $result
-
-        $result.CurrentStep = 'InstallPackage'
-        $result = Install-PackageModelPackage -PackageModelResult $result
-
-        $result.CurrentStep = 'ValidateInstalledPackage'
-        $result = Test-PackageModelInstalledPackage -PackageModelResult $result
-
-        $result.CurrentStep = 'ResolveEntryPoints'
-        $result = Resolve-PackageModelEntryPoints -PackageModelResult $result
-
-        $result.CurrentStep = 'UpdateOwnership'
-        $result = Update-PackageModelOwnershipRecord -PackageModelResult $result
+        Write-PackageModelExecutionMessage -Message '[START] Invoke-PackageModel-VSCodeRuntime'
+        foreach ($step in $steps) {
+            $result.CurrentStep = $step.Name
+            Write-PackageModelExecutionMessage -Message $step.Message
+            $result = & $step.Action $result
+        }
+        Write-PackageModelExecutionMessage -Message (Get-PackageModelOutcomeSummary -PackageModelResult $result)
+        Write-PackageModelExecutionMessage -Message ("[OK] PackageModel completed with InstallOrigin='{0}' and InstallStatus='{1}'." -f $result.InstallOrigin, $result.Install.Status)
     }
     catch {
         $result.Status = 'Failed'
         $result.ErrorMessage = $_.Exception.Message
+        Write-PackageModelExecutionMessage -Level 'ERR' -Message ("[FAIL] Step '{0}' failed: {1}" -f $result.CurrentStep, $_.Exception.Message)
         switch -Exact ([string]$result.CurrentStep) {
             'ResolvePackage' { $result.FailureReason = 'PackageSelectionFailed' }
             'ResolvePaths' { $result.FailureReason = 'PackagePathResolutionFailed' }

@@ -85,6 +85,157 @@ Test-PackageModelConstraintSetMatch -Values @('windows') -ActualValue 'windows'
     return $false
 }
 
+function Test-PackageModelRequirementAllowedBlockedMatch {
+<#
+.SYNOPSIS
+Checks allowed/blocked requirement lists against one actual value.
+
+.DESCRIPTION
+Treats empty allowed/blocked lists as unrestricted and otherwise enforces
+case-insensitive allow and block matching for one actual value.
+
+.PARAMETER Allowed
+The optional allowed values.
+
+.PARAMETER Blocked
+The optional blocked values.
+
+.PARAMETER ActualValue
+The value to test.
+#>
+    [CmdletBinding()]
+    [OutputType([bool])]
+    param(
+        [AllowNull()]
+        [object[]]$Allowed,
+
+        [AllowNull()]
+        [object[]]$Blocked,
+
+        [AllowNull()]
+        [string]$ActualValue
+    )
+
+    if ($Blocked -and $Blocked.Count -gt 0) {
+        foreach ($value in @($Blocked)) {
+            if ([string]::Equals([string]$value, [string]$ActualValue, [System.StringComparison]::OrdinalIgnoreCase)) {
+                return $false
+            }
+        }
+    }
+
+    if ($Allowed -and $Allowed.Count -gt 0) {
+        foreach ($value in @($Allowed)) {
+            if ([string]::Equals([string]$value, [string]$ActualValue, [System.StringComparison]::OrdinalIgnoreCase)) {
+                return $true
+            }
+        }
+
+        return $false
+    }
+
+    return $true
+}
+
+function Test-PackageModelRequirementChecks {
+<#
+.SYNOPSIS
+Evaluates typed PackageModel requirement checks for one selected release.
+
+.DESCRIPTION
+Runs the current requirement kinds against the resolved runtime context and
+returns the normalized requirement results and overall acceptance state.
+
+.PARAMETER PackageModelConfig
+The resolved PackageModel config object.
+
+.PARAMETER Requirements
+The effective release requirements object.
+#>
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [psobject]$PackageModelConfig,
+
+        [AllowNull()]
+        [psobject]$Requirements
+    )
+
+    $results = New-Object System.Collections.Generic.List[object]
+    $allAccepted = $true
+    $checks = if ($Requirements -and $Requirements.PSObject.Properties['checks']) { @($Requirements.checks) } else { @() }
+
+    foreach ($check in @($checks)) {
+        if ($null -eq $check) {
+            continue
+        }
+
+        $kind = [string]$check.kind
+        $accepted = $false
+        $actualValue = $null
+        $expectedSummary = $null
+
+        switch -Exact ($kind) {
+            'osFamily' {
+                $actualValue = [string]$PackageModelConfig.Platform
+                $allowedValues = if ($check.PSObject.Properties['allowed']) { @($check.allowed) } else { @() }
+                $blockedValues = if ($check.PSObject.Properties['blocked']) { @($check.blocked) } else { @() }
+                $accepted = Test-PackageModelRequirementAllowedBlockedMatch -Allowed $allowedValues -Blocked $blockedValues -ActualValue $actualValue
+                $expectedSummary = @(
+                    if ($allowedValues.Count -gt 0) { 'allowed=' + (($allowedValues | ForEach-Object { [string]$_ }) -join ',') }
+                    if ($blockedValues.Count -gt 0) { 'blocked=' + (($blockedValues | ForEach-Object { [string]$_ }) -join ',') }
+                ) -join '; '
+            }
+            'cpuArchitecture' {
+                $actualValue = [string]$PackageModelConfig.Architecture
+                $allowedValues = if ($check.PSObject.Properties['allowed']) { @($check.allowed) } else { @() }
+                $blockedValues = if ($check.PSObject.Properties['blocked']) { @($check.blocked) } else { @() }
+                $accepted = Test-PackageModelRequirementAllowedBlockedMatch -Allowed $allowedValues -Blocked $blockedValues -ActualValue $actualValue
+                $expectedSummary = @(
+                    if ($allowedValues.Count -gt 0) { 'allowed=' + (($allowedValues | ForEach-Object { [string]$_ }) -join ',') }
+                    if ($blockedValues.Count -gt 0) { 'blocked=' + (($blockedValues | ForEach-Object { [string]$_ }) -join ',') }
+                ) -join '; '
+            }
+            'osVersion' {
+                $actualValue = [string]$PackageModelConfig.OSVersion
+                $expectedVersion = ConvertTo-PackageModelVersion -VersionText ([string]$check.value)
+                $actualVersion = ConvertTo-PackageModelVersion -VersionText $actualValue
+                $operator = [string]$check.operator
+                $accepted = switch -Exact ($operator) {
+                    '=' { $actualVersion -eq $expectedVersion }
+                    '==' { $actualVersion -eq $expectedVersion }
+                    '!=' { $actualVersion -ne $expectedVersion }
+                    '>' { $actualVersion -gt $expectedVersion }
+                    '>=' { $actualVersion -ge $expectedVersion }
+                    '<' { $actualVersion -lt $expectedVersion }
+                    '<=' { $actualVersion -le $expectedVersion }
+                    default { throw "Unsupported PackageModel osVersion requirement operator '$operator'." }
+                }
+                $expectedSummary = '{0} {1}' -f $operator, [string]$check.value
+            }
+            default {
+                throw "Unsupported PackageModel requirement kind '$kind'."
+            }
+        }
+
+        if (-not $accepted) {
+            $allAccepted = $false
+        }
+
+        $results.Add([pscustomobject]@{
+            Kind     = $kind
+            Accepted = $accepted
+            Actual   = $actualValue
+            Expected = $expectedSummary
+        }) | Out-Null
+    }
+
+    return [pscustomobject]@{
+        Accepted = $allAccepted
+        Checks   = @($results.ToArray())
+    }
+}
+
 function Resolve-PackageModelPackage {
 <#
 .SYNOPSIS
@@ -149,10 +300,28 @@ Resolve-PackageModelPackage -PackageModelResult $result
     $PackageModelResult.EffectiveRelease = $selectedPackage
     $PackageModelResult.PackageId = [string]$selectedPackage.id
     $PackageModelResult.PackageVersion = [string]$selectedPackage.version
-    if ($selectedPackage.PSObject.Properties['requirements'] -and
-        $selectedPackage.requirements -and
-        $selectedPackage.requirements.PSObject.Properties['packages']) {
-        $PackageModelResult.Requirements = @($selectedPackage.requirements.packages)
+    $requirementsEvaluation = Test-PackageModelRequirementChecks -PackageModelConfig $packageModelConfig -Requirements $selectedPackage.requirements
+    $PackageModelResult.Requirements = @($requirementsEvaluation.Checks)
+    if (-not $requirementsEvaluation.Accepted) {
+        $failedRequirementText = @(
+            foreach ($checkResult in @($requirementsEvaluation.Checks)) {
+                if (-not $checkResult.Accepted) {
+                    "{0} actual='{1}' expected='{2}'" -f $checkResult.Kind, [string]$checkResult.Actual, [string]$checkResult.Expected
+                }
+            }
+        ) -join '; '
+        throw "PackageModel release '$($selectedPackage.id)' does not satisfy requirements.checks. $failedRequirementText"
+    }
+
+    $selectedFlavor = if ($selectedPackage.PSObject.Properties['flavor']) { [string]$selectedPackage.flavor } else { 'default' }
+    Write-PackageModelExecutionMessage -Message ("[STATE] Selected release '{0}' version '{1}' for platform '{2}', architecture '{3}', releaseTrack '{4}', flavor '{5}'." -f $PackageModelResult.PackageId, $PackageModelResult.PackageVersion, $packageModelConfig.Platform, $packageModelConfig.Architecture, $effectiveReleaseTrack, $selectedFlavor)
+    if (@($requirementsEvaluation.Checks).Count -gt 0) {
+        $requirementSummary = @(
+            foreach ($checkResult in @($requirementsEvaluation.Checks)) {
+                "{0}={1}" -f $checkResult.Kind, $(if ($checkResult.Accepted) { 'accepted' } else { 'rejected' })
+            }
+        ) -join ', '
+        Write-PackageModelExecutionMessage -Message ("[STATE] Requirement checks accepted: {0}." -f $requirementSummary)
     }
 
     return $PackageModelResult

@@ -51,6 +51,25 @@ Resolve-PackageModelEntryPoints -PackageModelResult $result
         Apps     = $apps
     }
 
+    Write-PackageModelExecutionMessage -Message '[STATE] Resolved entry points:'
+    if (@($commands).Count -eq 0) {
+        Write-PackageModelExecutionMessage -Message '[PATH] Command entry points: <none>'
+    }
+    else {
+        foreach ($command in $commands) {
+            Write-PackageModelExecutionMessage -Message ("[PATH] Command {0}: {1} (exists={2})" -f [string]$command.Name, [string]$command.Path, [bool]$command.Exists)
+        }
+    }
+
+    if (@($apps).Count -eq 0) {
+        Write-PackageModelExecutionMessage -Message '[PATH] App entry points: <none>'
+    }
+    else {
+        foreach ($app in $apps) {
+            Write-PackageModelExecutionMessage -Message ("[PATH] App {0}: {1} (exists={2})" -f [string]$app.Name, [string]$app.Path, [bool]$app.Exists)
+        }
+    }
+
     return $PackageModelResult
 }
 
