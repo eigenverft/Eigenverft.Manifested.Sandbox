@@ -43,6 +43,13 @@
     "install": {
       "kind": "expandArchive",
       "installDirectory": "vscode-runtime/{releaseTrack}/{version}/{flavor}",
+      "pathRegistration": {
+        "mode": "user",
+        "source": {
+          "kind": "commandEntryPoint",
+          "value": "code"
+        }
+      },
       "expandedRoot": "auto",
       "createDirectories": [
         "data"

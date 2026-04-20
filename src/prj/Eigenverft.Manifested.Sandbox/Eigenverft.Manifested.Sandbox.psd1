@@ -129,6 +129,7 @@ FileList = @(
     'StateModel\Commands\Eigenverft.Manifested.Sandbox.Cmd.VCRuntimeAndCache.ps1',
     'StateModel\Support\Eigenverft.Manifested.Sandbox.Base.Invoke-WebRequestEx.ps1',
     'PackageModel\Support\ExecutionEngine\Eigenverft.Manifested.Sandbox.PackageModel.ExecutionEngine.StandardMessage.ps1',
+    'PackageModel\Support\ExecutionEngine\Eigenverft.Manifested.Sandbox.PackageModel.ExecutionEngine.PathRegistration.ps1',
     'PackageModel\Support\Package\Eigenverft.Manifested.Sandbox.PackageModel.Bootstrap.ps1',
     'PackageModel\Support\Package\Eigenverft.Manifested.Sandbox.PackageModel.Config.ps1',
     'PackageModel\Support\Package\Eigenverft.Manifested.Sandbox.PackageModel.Selection.ps1',

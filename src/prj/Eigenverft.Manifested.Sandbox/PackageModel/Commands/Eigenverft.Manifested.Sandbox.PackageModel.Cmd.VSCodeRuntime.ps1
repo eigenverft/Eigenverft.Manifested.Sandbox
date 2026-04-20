@@ -73,6 +73,7 @@ Invoke-PackageModel-VSCodeRuntime
         [pscustomobject]@{ Name = 'SavePackageFile'; Message = '[STEP] Ensuring package file is available.'; Action = { param($r) Save-PackageModelPackageFile -PackageModelResult $r } },
         [pscustomobject]@{ Name = 'InstallPackage'; Message = '[STEP] Installing or reusing the package.'; Action = { param($r) Install-PackageModelPackage -PackageModelResult $r } },
         [pscustomobject]@{ Name = 'ValidateInstalledPackage'; Message = '[STEP] Validating the installed package.'; Action = { param($r) Test-PackageModelInstalledPackage -PackageModelResult $r } },
+        [pscustomobject]@{ Name = 'RegisterPath'; Message = '[STEP] Applying PATH registration.'; Action = { param($r) Register-PackageModelPath -PackageModelResult $r } },
         [pscustomobject]@{ Name = 'ResolveEntryPoints'; Message = '[STEP] Resolving entry points.'; Action = { param($r) Resolve-PackageModelEntryPoints -PackageModelResult $r } },
         [pscustomobject]@{ Name = 'UpdateOwnership'; Message = '[STEP] Updating ownership tracking.'; Action = { param($r) Update-PackageModelOwnershipRecord -PackageModelResult $r } }
     )
@@ -101,6 +102,7 @@ Invoke-PackageModel-VSCodeRuntime
             'SavePackageFile' { $result.FailureReason = 'PackageFileSaveFailed' }
             'InstallPackage' { $result.FailureReason = 'PackageInstallFailed' }
             'ValidateInstalledPackage' { $result.FailureReason = 'InstalledPackageValidationFailed' }
+            'RegisterPath' { $result.FailureReason = 'PathRegistrationFailed' }
             'ResolveEntryPoints' { $result.FailureReason = 'EntryPointResolutionFailed' }
             'UpdateOwnership' { $result.FailureReason = 'OwnershipUpdateFailed' }
             default { $result.FailureReason = 'PackageModelCommandFailed' }

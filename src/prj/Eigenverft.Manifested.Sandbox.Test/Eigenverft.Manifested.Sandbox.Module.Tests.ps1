@@ -351,6 +351,13 @@ function global:New-TestVSCodeDefinitionDocument {
         $ReleaseDefaultsInstall = @{
             kind             = 'expandArchive'
             installDirectory = 'vscode-runtime/{releaseTrack}/{version}/{flavor}'
+            pathRegistration = @{
+                mode   = 'user'
+                source = @{
+                    kind  = 'commandEntryPoint'
+                    value = 'code'
+                }
+            }
             expandedRoot     = 'auto'
             createDirectories = @('data')
         }
@@ -704,6 +711,312 @@ Describe 'Eigenverft.Manifested.Sandbox PackageModel' {
         @($messages | Where-Object { $_.StartsWith('[PATH] Target install directory:') }).Count | Should -Be 1
         @($messages | Where-Object { $_.StartsWith('[PATH] Package file:') }).Count | Should -Be 1
         @($messages | Where-Object { $_.StartsWith('[PATH] Default package depot file:') }).Count | Should -Be 1
+    }
+
+    It 'skips PATH registration when mode is none' {
+        $installRoot = Join-Path $TestDrive 'path-registration-none'
+        $null = New-Item -ItemType Directory -Path $installRoot -Force
+        $packageModelResult = [pscustomobject]@{
+            PackageModelConfig = ConvertTo-TestPsObject @{
+                Definition = @{
+                    providedTools = @{
+                        commands = @()
+                        apps     = @()
+                    }
+                }
+            }
+            Package = ConvertTo-TestPsObject @{
+                install = @{
+                    pathRegistration = @{
+                        mode = 'none'
+                    }
+                }
+            }
+            InstallDirectory = $installRoot
+            InstallOrigin    = 'PackageModelInstalled'
+        }
+
+        Mock Get-PackageModelEnvironmentVariableValue {}
+        Mock Set-PackageModelEnvironmentVariableValue {}
+
+        $packageModelResult = Register-PackageModelPath -PackageModelResult $packageModelResult
+
+        $packageModelResult.PathRegistration.Status | Should -Be 'Skipped'
+        Assert-MockCalled Set-PackageModelEnvironmentVariableValue -Times 0
+    }
+
+    It 'registers a command entry point directory in Process and User PATH for user mode' {
+        $installRoot = Join-Path $TestDrive 'path-registration-user'
+        $binDirectory = Join-Path $installRoot 'bin'
+        $null = New-Item -ItemType Directory -Path $binDirectory -Force
+        Write-TestTextFile -Path (Join-Path $binDirectory 'code.cmd') -Content '@echo off'
+
+        $packageModelResult = [pscustomobject]@{
+            PackageModelConfig = ConvertTo-TestPsObject @{
+                Definition = @{
+                    providedTools = @{
+                        commands = @(
+                            @{
+                                name         = 'code'
+                                relativePath = 'bin/code.cmd'
+                            }
+                        )
+                        apps = @()
+                    }
+                }
+            }
+            Package = ConvertTo-TestPsObject @{
+                install = @{
+                    pathRegistration = @{
+                        mode   = 'user'
+                        source = @{
+                            kind  = 'commandEntryPoint'
+                            value = 'code'
+                        }
+                    }
+                }
+            }
+            InstallDirectory = $installRoot
+            InstallOrigin    = 'PackageModelInstalled'
+        }
+
+        $writes = New-Object System.Collections.Generic.List[object]
+        Mock Get-PackageModelEnvironmentVariableValue {
+            param([string]$Name, [string]$Target)
+            switch ($Target) {
+                'Process' { 'C:\Windows\System32' }
+                'User' { 'C:\Users\Test\bin' }
+                default { $null }
+            }
+        }
+        Mock Set-PackageModelEnvironmentVariableValue {
+            param([string]$Name, [string]$Value, [string]$Target)
+            $writes.Add([pscustomobject]@{
+                Name   = $Name
+                Value  = $Value
+                Target = $Target
+            }) | Out-Null
+        }
+
+        $packageModelResult = Register-PackageModelPath -PackageModelResult $packageModelResult
+
+        $packageModelResult.PathRegistration.Status | Should -Be 'Registered'
+        @($packageModelResult.PathRegistration.UpdatedTargets) | Should -Be @('Process', 'User')
+        $packageModelResult.PathRegistration.RegisteredPath | Should -Be $binDirectory
+        @($writes | ForEach-Object { $_.Target }) | Should -Be @('Process', 'User')
+        $expectedBinPattern = [regex]::Escape($binDirectory)
+        @($writes | Where-Object { $_.Target -eq 'Process' })[0].Value | Should -Match $expectedBinPattern
+        @($writes | Where-Object { $_.Target -eq 'User' })[0].Value | Should -Match $expectedBinPattern
+    }
+
+    It 'skips PATH registration for adopted external installs' {
+        $installRoot = Join-Path $TestDrive 'path-registration-adopted-external'
+        $binDirectory = Join-Path $installRoot 'bin'
+        $null = New-Item -ItemType Directory -Path $binDirectory -Force
+        Write-TestTextFile -Path (Join-Path $binDirectory 'code.cmd') -Content '@echo off'
+
+        $packageModelResult = [pscustomobject]@{
+            PackageModelConfig = ConvertTo-TestPsObject @{
+                Definition = @{
+                    providedTools = @{
+                        commands = @(
+                            @{
+                                name         = 'code'
+                                relativePath = 'bin/code.cmd'
+                            }
+                        )
+                        apps = @()
+                    }
+                }
+            }
+            Package = ConvertTo-TestPsObject @{
+                install = @{
+                    pathRegistration = @{
+                        mode   = 'user'
+                        source = @{
+                            kind  = 'commandEntryPoint'
+                            value = 'code'
+                        }
+                    }
+                }
+            }
+            InstallDirectory = $installRoot
+            InstallOrigin    = 'AdoptedExternal'
+        }
+
+        Mock Get-PackageModelEnvironmentVariableValue {}
+        Mock Set-PackageModelEnvironmentVariableValue {}
+
+        $packageModelResult = Register-PackageModelPath -PackageModelResult $packageModelResult
+
+        $packageModelResult.PathRegistration.Status | Should -Be 'SkippedNotPackageModelOwned'
+        Assert-MockCalled Set-PackageModelEnvironmentVariableValue -Times 0
+    }
+
+    It 'removes stale PackageModel-owned paths for the same install slot before registering the active path' {
+        $oldInstallRoot = Join-Path $TestDrive 'path-registration-stale-owned\old'
+        $newInstallRoot = Join-Path $TestDrive 'path-registration-stale-owned\new'
+        $oldBinDirectory = Join-Path $oldInstallRoot 'bin'
+        $newBinDirectory = Join-Path $newInstallRoot 'bin'
+        $null = New-Item -ItemType Directory -Path $oldBinDirectory -Force
+        $null = New-Item -ItemType Directory -Path $newBinDirectory -Force
+        Write-TestTextFile -Path (Join-Path $newBinDirectory 'code.cmd') -Content '@echo off'
+
+        $packageModelResult = [pscustomobject]@{
+            PackageModelConfig = ConvertTo-TestPsObject @{
+                Definition = @{
+                    providedTools = @{
+                        commands = @(
+                            @{
+                                name         = 'code'
+                                relativePath = 'bin/code.cmd'
+                            }
+                        )
+                        apps = @()
+                    }
+                }
+            }
+            Package = ConvertTo-TestPsObject @{
+                install = @{
+                    pathRegistration = @{
+                        mode   = 'user'
+                        source = @{
+                            kind  = 'commandEntryPoint'
+                            value = 'code'
+                        }
+                    }
+                }
+            }
+            ExistingPackage = [pscustomobject]@{
+                InstallDirectory = $oldInstallRoot
+                Classification   = 'PackageModelOwned'
+                Decision         = 'ReplacePackageModelOwnedInstall'
+            }
+            Ownership = [pscustomobject]@{
+                InstallSlotId   = 'VSCodeRuntime:stable:win32-x64'
+                Classification  = 'PackageModelOwned'
+                OwnershipRecord = [pscustomobject]@{
+                    installDirectory = $oldInstallRoot
+                    ownershipKind    = 'PackageModelInstalled'
+                }
+            }
+            InstallDirectory = $newInstallRoot
+            InstallOrigin    = 'PackageModelInstalled'
+        }
+
+        $writes = New-Object System.Collections.Generic.List[object]
+        Mock Get-PackageModelEnvironmentVariableValue {
+            param([string]$Name, [string]$Target)
+            switch ($Target) {
+                'Process' { "C:\\Windows\\System32;$oldBinDirectory" }
+                'User' { "C:\\Users\\Test\\bin;$oldBinDirectory;C:\\Users\\Test\\ExternalVSCode\\bin" }
+                default { $null }
+            }
+        }
+        Mock Set-PackageModelEnvironmentVariableValue {
+            param([string]$Name, [string]$Value, [string]$Target)
+            $writes.Add([pscustomobject]@{
+                Name   = $Name
+                Value  = $Value
+                Target = $Target
+            }) | Out-Null
+        }
+
+        $packageModelResult = Register-PackageModelPath -PackageModelResult $packageModelResult
+
+        $packageModelResult.PathRegistration.Status | Should -Be 'Registered'
+        @($packageModelResult.PathRegistration.CleanedTargets) | Should -Be @('Process', 'User')
+        $packageModelResult.PathRegistration.CleanupDirectories | Should -Contain $oldBinDirectory
+        @($writes | ForEach-Object { $_.Target }) | Should -Be @('Process', 'User')
+        @($writes | Where-Object { $_.Target -eq 'Process' })[0].Value | Should -Not -Match ([regex]::Escape($oldBinDirectory))
+        @($writes | Where-Object { $_.Target -eq 'Process' })[0].Value | Should -Match ([regex]::Escape($newBinDirectory))
+        @($writes | Where-Object { $_.Target -eq 'User' })[0].Value | Should -Not -Match ([regex]::Escape($oldBinDirectory))
+        @($writes | Where-Object { $_.Target -eq 'User' })[0].Value | Should -Match ([regex]::Escape($newBinDirectory))
+    }
+
+    It 'registers an install-relative directory in Process and Machine PATH for machine mode' {
+        $installRoot = Join-Path $TestDrive 'path-registration-machine'
+        $null = New-Item -ItemType Directory -Path $installRoot -Force
+
+        $packageModelResult = [pscustomobject]@{
+            PackageModelConfig = ConvertTo-TestPsObject @{
+                Definition = @{
+                    providedTools = @{
+                        commands = @()
+                        apps     = @()
+                    }
+                }
+            }
+            Package = ConvertTo-TestPsObject @{
+                install = @{
+                    pathRegistration = @{
+                        mode   = 'machine'
+                        source = @{
+                            kind  = 'installRelativeDirectory'
+                            value = '.'
+                        }
+                    }
+                }
+            }
+            InstallDirectory = $installRoot
+            InstallOrigin    = 'PackageModelInstalled'
+        }
+
+        $writes = New-Object System.Collections.Generic.List[object]
+        Mock Get-PackageModelEnvironmentVariableValue {
+            param([string]$Name, [string]$Target)
+            switch ($Target) {
+                'Process' { 'C:\Windows\System32' }
+                'Machine' { 'C:\Program Files\Common Files' }
+                default { $null }
+            }
+        }
+        Mock Set-PackageModelEnvironmentVariableValue {
+            param([string]$Name, [string]$Value, [string]$Target)
+            $writes.Add([pscustomobject]@{
+                Name   = $Name
+                Value  = $Value
+                Target = $Target
+            }) | Out-Null
+        }
+
+        $packageModelResult = Register-PackageModelPath -PackageModelResult $packageModelResult
+
+        $packageModelResult.PathRegistration.Status | Should -Be 'Registered'
+        @($packageModelResult.PathRegistration.UpdatedTargets) | Should -Be @('Process', 'Machine')
+        $packageModelResult.PathRegistration.RegisteredPath | Should -Be $installRoot
+        @($writes | ForEach-Object { $_.Target }) | Should -Be @('Process', 'Machine')
+    }
+
+    It 'fails clearly when shim PATH registration is requested' {
+        $installRoot = Join-Path $TestDrive 'path-registration-shim'
+        $null = New-Item -ItemType Directory -Path $installRoot -Force
+
+        $packageModelResult = [pscustomobject]@{
+            PackageModelConfig = ConvertTo-TestPsObject @{
+                Definition = @{
+                    providedTools = @{
+                        commands = @()
+                        apps     = @()
+                    }
+                }
+            }
+            Package = ConvertTo-TestPsObject @{
+                install = @{
+                    pathRegistration = @{
+                        mode   = 'user'
+                        source = @{
+                            kind  = 'shim'
+                            value = 'bin/code.cmd'
+                        }
+                    }
+                }
+            }
+            InstallDirectory = $installRoot
+            InstallOrigin    = 'PackageModelInstalled'
+        }
+
+        { Register-PackageModelPath -PackageModelResult $packageModelResult } | Should -Throw '*shim*not implemented*'
     }
 
     It 'resolves installRootRules for code.cmd and Code.exe' {

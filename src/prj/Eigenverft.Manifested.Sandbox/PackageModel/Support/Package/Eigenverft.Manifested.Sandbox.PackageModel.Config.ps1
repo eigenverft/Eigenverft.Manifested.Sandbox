@@ -994,6 +994,40 @@ Assert-PackageModelDefinitionSchema -DefinitionDocumentInfo $definitionInfo -Def
             $null
         }
 
+        if ($effectiveRelease.install -and $effectiveRelease.install.PSObject.Properties['pathRegistration'] -and $null -ne $effectiveRelease.install.pathRegistration) {
+            $pathRegistration = $effectiveRelease.install.pathRegistration
+            if (-not $pathRegistration.PSObject.Properties['mode'] -or [string]::IsNullOrWhiteSpace([string]$pathRegistration.mode)) {
+                throw "PackageModel release '$($release.id)' in '$($definition.id)' defines install.pathRegistration without mode."
+            }
+
+            $pathRegistrationMode = ([string]$pathRegistration.mode).ToLowerInvariant()
+            if ($pathRegistrationMode -notin @('none', 'user', 'machine')) {
+                throw "PackageModel release '$($release.id)' in '$($definition.id)' uses unsupported install.pathRegistration.mode '$($pathRegistration.mode)'."
+            }
+
+            if ($pathRegistrationMode -ne 'none') {
+                if (-not $pathRegistration.PSObject.Properties['source'] -or $null -eq $pathRegistration.source) {
+                    throw "PackageModel release '$($release.id)' in '$($definition.id)' defines install.pathRegistration.mode '$($pathRegistration.mode)' without source."
+                }
+                if (-not $pathRegistration.source.PSObject.Properties['kind'] -or [string]::IsNullOrWhiteSpace([string]$pathRegistration.source.kind)) {
+                    throw "PackageModel release '$($release.id)' in '$($definition.id)' defines install.pathRegistration without source.kind."
+                }
+                if (-not $pathRegistration.source.PSObject.Properties['value'] -or [string]::IsNullOrWhiteSpace([string]$pathRegistration.source.value)) {
+                    throw "PackageModel release '$($release.id)' in '$($definition.id)' defines install.pathRegistration without source.value."
+                }
+
+                switch -Exact ([string]$pathRegistration.source.kind) {
+                    'commandEntryPoint' { }
+                    'appEntryPoint' { }
+                    'installRelativeDirectory' { }
+                    'shim' { }
+                    default {
+                        throw "PackageModel release '$($release.id)' in '$($definition.id)' uses unsupported install.pathRegistration.source.kind '$($pathRegistration.source.kind)'."
+                    }
+                }
+            }
+        }
+
         $requiresPackageFile = $false
         $requiresAcquisitionCandidates = $false
         switch -Exact ($installKind) {
@@ -1407,6 +1441,7 @@ New-PackageModelResult -CommandName Invoke-PackageModel-VSCodeRuntime -PackageMo
         Install                          = $null
         Validation                       = $null
         EntryPoints                      = $null
+        PathRegistration                 = $null
         PackageModelConfig               = $PackageModelConfig
     }
 }
