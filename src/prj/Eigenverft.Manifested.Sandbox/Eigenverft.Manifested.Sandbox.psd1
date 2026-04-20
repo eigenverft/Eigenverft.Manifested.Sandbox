@@ -13,7 +13,7 @@
 RootModule = 'Eigenverft.Manifested.Sandbox.psm1'
 
 # Version number of this module.
-ModuleVersion = '1.20262.12924'
+  ModuleVersion = '1.20262.16309'
 
 # Supported PSEditions
 CompatiblePSEditions = @('Desktop', 'Core')
@@ -84,6 +84,7 @@ FunctionsToExport = @(
     'Initialize-Ps7Runtime',
     'Initialize-VSCodeRuntime',
     'Initialize-VCRuntime',
+    'Invoke-PackageModel-VSCodeRuntime',
     'Invoke-WebRequestEx',
     'Initialize-ProxyAccessProfile'
 )
@@ -106,27 +107,40 @@ AliasesToExport = @()
 # List of all files packaged with this module
 FileList = @(
     'Eigenverft.Manifested.Sandbox.ps1',
-    'Private\Common\Eigenverft.Manifested.Sandbox.Shared.Paths.ps1',
-    'Private\Common\Eigenverft.Manifested.Sandbox.Shared.Npm.ps1',
-    'Private\Common\Eigenverft.Manifested.Sandbox.Shared.Pip.ps1',
-    'Private\Common\Eigenverft.Manifested.Sandbox.Shared.Cache.ps1',
-    'Private\Common\Eigenverft.Manifested.Sandbox.Shared.Extraction.ps1',
-    'Public\Eigenverft.Manifested.Sandbox.Shared.State.ps1',
-    'Private\Infra\Eigenverft.Manifested.Sandbox.Shared.Elevation.ps1',
-    'Private\Infra\Eigenverft.Manifested.Sandbox.Shared.GitHubReleases.ps1',
-    'Private\Logic\Eigenverft.Manifested.Sandbox.Shared.CommandEnvironment.ps1',
-    'Public\Eigenverft.Manifested.Sandbox.Cmd.Ps7RuntimeAndCache.ps1',
-    'Public\Eigenverft.Manifested.Sandbox.Cmd.PythonRuntimeAndCache.ps1',
-    'Public\Eigenverft.Manifested.Sandbox.Cmd.NodeRuntimeAndCache.ps1',
-    'Public\Eigenverft.Manifested.Sandbox.Cmd.OpenCodeRuntimeAndCache.ps1',
-    'Public\Eigenverft.Manifested.Sandbox.Cmd.GeminiRuntimeAndCache.ps1',
-    'Public\Eigenverft.Manifested.Sandbox.Cmd.QwenRuntimeAndCache.ps1',
-    'Public\Eigenverft.Manifested.Sandbox.Cmd.CodexRuntimeAndCache.ps1',
-    'Public\Eigenverft.Manifested.Sandbox.Cmd.GHCliRuntimeAndCache.ps1',
-    'Public\Eigenverft.Manifested.Sandbox.Cmd.GitRuntimeAndCache.ps1',
-    'Public\Eigenverft.Manifested.Sandbox.Cmd.VsCodeRuntimeAndCache.ps1',
-    'Public\Eigenverft.Manifested.Sandbox.Cmd.VCRuntimeAndCache.ps1',
-    'Private\Infra\Eigenverft.Manifested.Sandbox.Base.Invoke-WebRequestEx.ps1',
+    'StateModel\Support\Eigenverft.Manifested.Sandbox.Shared.Paths.ps1',
+    'StateModel\Support\Eigenverft.Manifested.Sandbox.Shared.Npm.ps1',
+    'StateModel\Support\Eigenverft.Manifested.Sandbox.Shared.Pip.ps1',
+    'StateModel\Support\Eigenverft.Manifested.Sandbox.Shared.Cache.ps1',
+    'StateModel\Support\Eigenverft.Manifested.Sandbox.Shared.Extraction.ps1',
+    'StateModel\Definitions\Eigenverft.Manifested.Sandbox.Shared.State.ps1',
+    'StateModel\Support\Eigenverft.Manifested.Sandbox.Shared.Elevation.ps1',
+    'StateModel\Support\Eigenverft.Manifested.Sandbox.Shared.GitHubReleases.ps1',
+    'StateModel\Support\Eigenverft.Manifested.Sandbox.Shared.CommandEnvironment.ps1',
+    'StateModel\Commands\Eigenverft.Manifested.Sandbox.Cmd.Ps7RuntimeAndCache.ps1',
+    'StateModel\Commands\Eigenverft.Manifested.Sandbox.Cmd.PythonRuntimeAndCache.ps1',
+    'StateModel\Commands\Eigenverft.Manifested.Sandbox.Cmd.NodeRuntimeAndCache.ps1',
+    'StateModel\Commands\Eigenverft.Manifested.Sandbox.Cmd.OpenCodeRuntimeAndCache.ps1',
+    'StateModel\Commands\Eigenverft.Manifested.Sandbox.Cmd.GeminiRuntimeAndCache.ps1',
+    'StateModel\Commands\Eigenverft.Manifested.Sandbox.Cmd.QwenRuntimeAndCache.ps1',
+    'StateModel\Commands\Eigenverft.Manifested.Sandbox.Cmd.CodexRuntimeAndCache.ps1',
+    'StateModel\Commands\Eigenverft.Manifested.Sandbox.Cmd.GHCliRuntimeAndCache.ps1',
+    'StateModel\Commands\Eigenverft.Manifested.Sandbox.Cmd.GitRuntimeAndCache.ps1',
+    'StateModel\Commands\Eigenverft.Manifested.Sandbox.Cmd.VsCodeRuntimeAndCache.ps1',
+    'StateModel\Commands\Eigenverft.Manifested.Sandbox.Cmd.VCRuntimeAndCache.ps1',
+    'StateModel\Support\Eigenverft.Manifested.Sandbox.Base.Invoke-WebRequestEx.ps1',
+    'PackageModel\Support\ExecutionEngine\Eigenverft.Manifested.Sandbox.PackageModel.ExecutionEngine.StandardMessage.ps1',
+    'PackageModel\Support\ExecutionEngine\Eigenverft.Manifested.Sandbox.PackageModel.ExecutionEngine.PathRegistration.ps1',
+    'PackageModel\Support\Package\Eigenverft.Manifested.Sandbox.PackageModel.Bootstrap.ps1',
+    'PackageModel\Support\Package\Eigenverft.Manifested.Sandbox.PackageModel.Config.ps1',
+    'PackageModel\Support\Package\Eigenverft.Manifested.Sandbox.PackageModel.Selection.ps1',
+    'PackageModel\Support\Package\Eigenverft.Manifested.Sandbox.PackageModel.Source.ps1',
+    'PackageModel\Support\Package\Eigenverft.Manifested.Sandbox.PackageModel.Ownership.ps1',
+    'PackageModel\Support\Package\Eigenverft.Manifested.Sandbox.PackageModel.Validation.ps1',
+    'PackageModel\Support\Package\Eigenverft.Manifested.Sandbox.PackageModel.Install.ps1',
+    'PackageModel\Support\Package\Eigenverft.Manifested.Sandbox.PackageModel.EntryPoints.ps1',
+    'PackageModel\Definitions\PackageModel.Global.json',
+    'PackageModel\Definitions\VSCodeRuntime.json',
+    'PackageModel\Commands\Eigenverft.Manifested.Sandbox.PackageModel.Cmd.VSCodeRuntime.ps1',
     'Eigenverft.Manifested.Sandbox.psm1',
     'Eigenverft.Manifested.Sandbox.psd1',
     'LICENSE.txt'
@@ -153,7 +167,7 @@ PrivateData = @{
         ReleaseNotes = 'Added sandbox-managed Python runtime initialization with pip bootstrap and proxy-aware pip config ownership, plus refreshed runtime state and bootstrap documentation.'
 
         # Prerelease string of this module
-        Prerelease = ''
+        Prerelease = 'dev'
 
         # Flag to indicate whether the module requires explicit user acceptance for install/update/save
         # RequireLicenseAcceptance = $false

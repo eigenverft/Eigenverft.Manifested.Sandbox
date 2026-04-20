@@ -51,7 +51,7 @@ function Get-ManifestedModuleManifestPath {
     [CmdletBinding()]
     param()
 
-    return (Join-Path $PSScriptRoot 'Eigenverft.Manifested.Sandbox.psd1')
+    return (Join-Path (Split-Path -Parent (Split-Path -Parent $PSScriptRoot)) 'Eigenverft.Manifested.Sandbox.psd1')
 }
 
 function Get-ManifestedSelfElevationContext {

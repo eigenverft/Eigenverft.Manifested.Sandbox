@@ -1,0 +1,220 @@
+{
+  "schemaVersion": "1.0",
+  "id": "VSCodeRuntime",
+  "display": {
+    "default": {
+      "name": "Visual Studio Code",
+      "publisher": "Microsoft",
+      "corporation": "Microsoft Corporation",
+      "summary": "Code editor"
+    },
+    "localizations": {}
+  },
+  "upstreamSources": {
+    "vsCodeUpdateService": {
+      "kind": "download",
+      "baseUri": "https://update.code.visualstudio.com"
+    }
+  },
+  "providedTools": {
+    "commands": [
+      {
+        "name": "code",
+        "relativePath": "bin/code.cmd"
+      }
+    ],
+    "apps": [
+      {
+        "name": "Code",
+        "relativePath": "Code.exe"
+      }
+    ]
+  },
+  "releaseDefaults": {
+    "requirements": {
+      "checks": [
+        {
+          "kind": "osVersion",
+          "operator": ">=",
+          "value": "10.0"
+        }
+      ]
+    },
+    "install": {
+      "kind": "expandArchive",
+      "installDirectory": "vscode-runtime/{releaseTrack}/{version}/{flavor}",
+      "pathRegistration": {
+        "mode": "user",
+        "source": {
+          "kind": "commandEntryPoint",
+          "value": "code"
+        }
+      },
+      "expandedRoot": "auto",
+      "createDirectories": [
+        "data"
+      ]
+    },
+    "validation": {
+      "files": [
+        "Code.exe",
+        "bin/code.cmd"
+      ],
+      "directories": [
+        "data"
+      ],
+      "commandChecks": [
+        {
+          "entryPoint": "code",
+          "arguments": [
+            "--version"
+          ],
+          "outputPattern": "(?m)^(?<value>\\d+\\.\\d+\\.\\d+)\\s*$",
+          "expectedValue": "{version}"
+        }
+      ],
+      "signatures": [
+        {
+          "relativePath": "Code.exe",
+          "requireValid": true,
+          "subjectContains": "Microsoft Corporation"
+        }
+      ],
+      "fileDetails": [
+        {
+          "relativePath": "Code.exe",
+          "productName": "Visual Studio Code",
+          "fileDescription": "Visual Studio Code"
+        }
+      ]
+    },
+    "existingInstallDiscovery": {
+      "enableDetection": true,
+      "searchLocations": [
+        {
+          "kind": "command",
+          "name": "code.cmd"
+        },
+        {
+          "kind": "command",
+          "name": "code"
+        },
+        {
+          "kind": "path",
+          "path": "%ProgramFiles%/Microsoft VS Code/bin/code.cmd"
+        },
+        {
+          "kind": "path",
+          "path": "%LOCALAPPDATA%/Programs/Microsoft VS Code/bin/code.cmd"
+        }
+      ],
+      "installRootRules": [
+        {
+          "match": {
+            "kind": "fileName",
+            "value": "code.cmd"
+          },
+          "installRootRelativePath": ".."
+        },
+        {
+          "match": {
+            "kind": "fileName",
+            "value": "Code.exe"
+          },
+          "installRootRelativePath": "."
+        }
+      ]
+    },
+    "existingInstallPolicy": {
+      "allowAdoptExternal": true,
+      "upgradeAdoptedInstall": true,
+      "requirePackageModelOwnership": false
+    }
+  },
+  "releases": [
+    {
+      "id": "vsCode-win-x64-stable",
+      "version": "1.116.0",
+      "releaseTrack": "stable",
+      "flavor": "win32-x64",
+      "constraints": {
+        "os": [
+          "windows"
+        ],
+        "cpu": [
+          "x64"
+        ]
+      },
+      "packageFile": {
+        "fileName": "VSCode-win32-x64-1.116.0.zip",
+        "format": "zip",
+        "portable": true,
+        "autoUpdateSupported": false,
+        "integrity": {
+          "algorithm": "sha256",
+          "sha256": "365c3d275deb3a1c0a1aa626f274824b8db15ee150d567a7323b8dbce2cdfa8f"
+        }
+      },
+      "acquisitionCandidates": [
+        {
+          "kind": "packageDepot",
+          "priority": 250,
+          "verification": {
+            "mode": "optional"
+          }
+        },
+        {
+          "kind": "download",
+          "sourceId": "vsCodeUpdateService",
+          "priority": 200,
+          "sourcePath": "1.116.0/win32-x64-archive/stable",
+          "verification": {
+            "mode": "required"
+          }
+        }
+      ]
+    },
+    {
+      "id": "vsCode-win-arm64-stable",
+      "version": "1.116.0",
+      "releaseTrack": "stable",
+      "flavor": "win32-arm64",
+      "constraints": {
+        "os": [
+          "windows"
+        ],
+        "cpu": [
+          "arm64"
+        ]
+      },
+      "packageFile": {
+        "fileName": "VSCode-win32-arm64-1.116.0.zip",
+        "format": "zip",
+        "portable": true,
+        "autoUpdateSupported": false,
+        "integrity": {
+          "algorithm": "sha256",
+          "sha256": "6712506c9541823e2c9a52aec6efcfb2f95df4247606eaa9fbade2b08df84fe7"
+        }
+      },
+      "acquisitionCandidates": [
+        {
+          "kind": "packageDepot",
+          "priority": 50,
+          "verification": {
+            "mode": "optional"
+          }
+        },
+        {
+          "kind": "download",
+          "sourceId": "vsCodeUpdateService",
+          "priority": 200,
+          "sourcePath": "1.116.0/win32-arm64-archive/stable",
+          "verification": {
+            "mode": "required"
+          }
+        }
+      ]
+    }
+  ]
+}
