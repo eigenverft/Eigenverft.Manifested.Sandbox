@@ -37,7 +37,9 @@ $moduleProjectRoot = Join-Path (Split-Path -Parent $PSScriptRoot) 'Eigenverft.Ma
 
 # PackageModel support
 . "$moduleProjectRoot\PackageModel\Support\ExecutionEngine\Eigenverft.Manifested.Sandbox.PackageModel.ExecutionEngine.StandardMessage.ps1"
+. "$moduleProjectRoot\PackageModel\Support\ExecutionEngine\Eigenverft.Manifested.Sandbox.PackageModel.ExecutionEngine.InvokeWebRequestEx.ps1"
 . "$moduleProjectRoot\PackageModel\Support\ExecutionEngine\Eigenverft.Manifested.Sandbox.PackageModel.ExecutionEngine.PathRegistration.ps1"
+. "$moduleProjectRoot\PackageModel\Support\Package\Eigenverft.Manifested.Sandbox.PackageModel.ExecutionMessage.ps1"
 . "$moduleProjectRoot\PackageModel\Support\Package\Eigenverft.Manifested.Sandbox.PackageModel.Bootstrap.ps1"
 . "$moduleProjectRoot\PackageModel\Support\Package\Eigenverft.Manifested.Sandbox.PackageModel.Config.ps1"
 . "$moduleProjectRoot\PackageModel\Support\Package\Eigenverft.Manifested.Sandbox.PackageModel.Selection.ps1"
@@ -46,6 +48,7 @@ $moduleProjectRoot = Join-Path (Split-Path -Parent $PSScriptRoot) 'Eigenverft.Ma
 . "$moduleProjectRoot\PackageModel\Support\Package\Eigenverft.Manifested.Sandbox.PackageModel.Validation.ps1"
 . "$moduleProjectRoot\PackageModel\Support\Package\Eigenverft.Manifested.Sandbox.PackageModel.Install.ps1"
 . "$moduleProjectRoot\PackageModel\Support\Package\Eigenverft.Manifested.Sandbox.PackageModel.EntryPoints.ps1"
+. "$moduleProjectRoot\PackageModel\Support\Package\Eigenverft.Manifested.Sandbox.PackageModel.PathRegistration.ps1"
 
 # PackageModel definitions
 # PackageModel definitions are JSON-only in this package-definition pass.
@@ -53,4 +56,3 @@ $moduleProjectRoot = Join-Path (Split-Path -Parent $PSScriptRoot) 'Eigenverft.Ma
 # PackageModel commands
 . "$moduleProjectRoot\PackageModel\Commands\Eigenverft.Manifested.Sandbox.PackageModel.Cmd.VSCodeRuntime.ps1"
 
-#Invoke-PackageModel-VSCodeRuntime 

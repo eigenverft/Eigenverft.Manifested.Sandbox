@@ -34,7 +34,9 @@
 
 # PackageModel support
 . "$PSScriptRoot\PackageModel\Support\ExecutionEngine\Eigenverft.Manifested.Sandbox.PackageModel.ExecutionEngine.StandardMessage.ps1"
+. "$PSScriptRoot\PackageModel\Support\ExecutionEngine\Eigenverft.Manifested.Sandbox.PackageModel.ExecutionEngine.InvokeWebRequestEx.ps1"
 . "$PSScriptRoot\PackageModel\Support\ExecutionEngine\Eigenverft.Manifested.Sandbox.PackageModel.ExecutionEngine.PathRegistration.ps1"
+. "$PSScriptRoot\PackageModel\Support\Package\Eigenverft.Manifested.Sandbox.PackageModel.ExecutionMessage.ps1"
 . "$PSScriptRoot\PackageModel\Support\Package\Eigenverft.Manifested.Sandbox.PackageModel.Bootstrap.ps1"
 . "$PSScriptRoot\PackageModel\Support\Package\Eigenverft.Manifested.Sandbox.PackageModel.Config.ps1"
 . "$PSScriptRoot\PackageModel\Support\Package\Eigenverft.Manifested.Sandbox.PackageModel.Selection.ps1"
@@ -43,6 +45,7 @@
 . "$PSScriptRoot\PackageModel\Support\Package\Eigenverft.Manifested.Sandbox.PackageModel.Validation.ps1"
 . "$PSScriptRoot\PackageModel\Support\Package\Eigenverft.Manifested.Sandbox.PackageModel.Install.ps1"
 . "$PSScriptRoot\PackageModel\Support\Package\Eigenverft.Manifested.Sandbox.PackageModel.EntryPoints.ps1"
+. "$PSScriptRoot\PackageModel\Support\Package\Eigenverft.Manifested.Sandbox.PackageModel.PathRegistration.ps1"
 
 # PackageModel definitions
 # PackageModel definitions are JSON-only in this package-definition pass.

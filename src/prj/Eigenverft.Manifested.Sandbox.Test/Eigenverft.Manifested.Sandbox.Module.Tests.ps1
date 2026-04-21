@@ -736,13 +736,13 @@ Describe 'Eigenverft.Manifested.Sandbox PackageModel' {
             InstallOrigin    = 'PackageModelInstalled'
         }
 
-        Mock Get-PackageModelEnvironmentVariableValue {}
-        Mock Set-PackageModelEnvironmentVariableValue {}
+        Mock Get-EnvironmentVariableValue {}
+        Mock Set-EnvironmentVariableValue {}
 
         $packageModelResult = Register-PackageModelPath -PackageModelResult $packageModelResult
 
         $packageModelResult.PathRegistration.Status | Should -Be 'Skipped'
-        Assert-MockCalled Set-PackageModelEnvironmentVariableValue -Times 0
+        Assert-MockCalled Set-EnvironmentVariableValue -Times 0
     }
 
     It 'registers a command entry point directory in Process and User PATH for user mode' {
@@ -781,7 +781,7 @@ Describe 'Eigenverft.Manifested.Sandbox PackageModel' {
         }
 
         $writes = New-Object System.Collections.Generic.List[object]
-        Mock Get-PackageModelEnvironmentVariableValue {
+        Mock Get-EnvironmentVariableValue {
             param([string]$Name, [string]$Target)
             switch ($Target) {
                 'Process' { 'C:\Windows\System32' }
@@ -789,7 +789,7 @@ Describe 'Eigenverft.Manifested.Sandbox PackageModel' {
                 default { $null }
             }
         }
-        Mock Set-PackageModelEnvironmentVariableValue {
+        Mock Set-EnvironmentVariableValue {
             param([string]$Name, [string]$Value, [string]$Target)
             $writes.Add([pscustomobject]@{
                 Name   = $Name
@@ -844,13 +844,13 @@ Describe 'Eigenverft.Manifested.Sandbox PackageModel' {
             InstallOrigin    = 'AdoptedExternal'
         }
 
-        Mock Get-PackageModelEnvironmentVariableValue {}
-        Mock Set-PackageModelEnvironmentVariableValue {}
+        Mock Get-EnvironmentVariableValue {}
+        Mock Set-EnvironmentVariableValue {}
 
         $packageModelResult = Register-PackageModelPath -PackageModelResult $packageModelResult
 
         $packageModelResult.PathRegistration.Status | Should -Be 'SkippedNotPackageModelOwned'
-        Assert-MockCalled Set-PackageModelEnvironmentVariableValue -Times 0
+        Assert-MockCalled Set-EnvironmentVariableValue -Times 0
     }
 
     It 'removes stale PackageModel-owned paths for the same install slot before registering the active path' {
@@ -905,7 +905,7 @@ Describe 'Eigenverft.Manifested.Sandbox PackageModel' {
         }
 
         $writes = New-Object System.Collections.Generic.List[object]
-        Mock Get-PackageModelEnvironmentVariableValue {
+        Mock Get-EnvironmentVariableValue {
             param([string]$Name, [string]$Target)
             switch ($Target) {
                 'Process' { "C:\\Windows\\System32;$oldBinDirectory" }
@@ -913,7 +913,7 @@ Describe 'Eigenverft.Manifested.Sandbox PackageModel' {
                 default { $null }
             }
         }
-        Mock Set-PackageModelEnvironmentVariableValue {
+        Mock Set-EnvironmentVariableValue {
             param([string]$Name, [string]$Value, [string]$Target)
             $writes.Add([pscustomobject]@{
                 Name   = $Name
@@ -963,7 +963,7 @@ Describe 'Eigenverft.Manifested.Sandbox PackageModel' {
         }
 
         $writes = New-Object System.Collections.Generic.List[object]
-        Mock Get-PackageModelEnvironmentVariableValue {
+        Mock Get-EnvironmentVariableValue {
             param([string]$Name, [string]$Target)
             switch ($Target) {
                 'Process' { 'C:\Windows\System32' }
@@ -971,7 +971,7 @@ Describe 'Eigenverft.Manifested.Sandbox PackageModel' {
                 default { $null }
             }
         }
-        Mock Set-PackageModelEnvironmentVariableValue {
+        Mock Set-EnvironmentVariableValue {
             param([string]$Name, [string]$Value, [string]$Target)
             $writes.Add([pscustomobject]@{
                 Name   = $Name
@@ -1370,6 +1370,44 @@ Describe 'Eigenverft.Manifested.Sandbox PackageModel' {
 
         Assert-MockCalled Write-StandardMessage -Times 1
         Assert-MockCalled Write-Host -Times 1
+    }
+
+    It 'loads Write-StandardMessage from ExecutionEngine and the PackageModel logger adapter from Support Package' {
+        $writeStandardMessage = Get-Command Write-StandardMessage -CommandType Function
+        $packageModelExecutionMessage = Get-Command Write-PackageModelExecutionMessage -CommandType Function
+
+        $writeStandardMessage.ScriptBlock.File | Should -Match 'PackageModel\\Support\\ExecutionEngine\\.*StandardMessage\.ps1$'
+        $packageModelExecutionMessage.ScriptBlock.File | Should -Match 'PackageModel\\Support\\Package\\.*ExecutionMessage\.ps1$'
+    }
+
+    It 'registers PATH from generic inputs without a PackageModel result object' {
+        $registeredDirectory = Join-Path $TestDrive 'generic-path-registration\bin'
+        $null = New-Item -ItemType Directory -Path $registeredDirectory -Force
+
+        $writes = New-Object System.Collections.Generic.List[object]
+        Mock Get-EnvironmentVariableValue {
+            param([string]$Name, [string]$Target)
+            switch ($Target) {
+                'Process' { 'C:\Windows\System32' }
+                'User' { 'C:\Users\Test\bin' }
+                default { $null }
+            }
+        }
+        Mock Set-EnvironmentVariableValue {
+            param([string]$Name, [string]$Value, [string]$Target)
+            $writes.Add([pscustomobject]@{
+                Name   = $Name
+                Value  = $Value
+                Target = $Target
+            }) | Out-Null
+        }
+
+        $registration = Register-PathEnvironment -Mode 'user' -RegisteredPath $registeredDirectory -CleanupDirectories @()
+
+        $registration.Status | Should -Be 'Registered'
+        @($registration.UpdatedTargets) | Should -Be @('Process', 'User')
+        $registration.RegisteredPath | Should -Be $registeredDirectory
+        @($writes | ForEach-Object { $_.Target }) | Should -Be @('Process', 'User')
     }
 
     It 'writes ownership records keyed by install slot and updates current release metadata' {
