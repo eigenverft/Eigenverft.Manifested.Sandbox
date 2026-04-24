@@ -537,6 +537,30 @@ Describe 'Eigenverft.Manifested.Sandbox PackageModel' {
         $publicParameterNames = @($command.Parameters.Keys | Where-Object {
                 $_ -notin [System.Management.Automation.PSCmdlet]::CommonParameters -and
                 $_ -notin [System.Management.Automation.PSCmdlet]::OptionalCommonParameters
+        })
+        $publicParameterNames.Count | Should -Be 0
+    }
+
+    It 'exports Invoke-PackageModel-Ps7Runtime and keeps it parameterless' {
+        $module = Import-Module -Name $script:ModuleManifestPath -Force -PassThru
+        $command = Get-Command -Name 'Invoke-PackageModel-Ps7Runtime'
+
+        $command | Should -Not -BeNullOrEmpty
+        $publicParameterNames = @($command.Parameters.Keys | Where-Object {
+                $_ -notin [System.Management.Automation.PSCmdlet]::CommonParameters -and
+                $_ -notin [System.Management.Automation.PSCmdlet]::OptionalCommonParameters
+            })
+        $publicParameterNames.Count | Should -Be 0
+    }
+
+    It 'exports Invoke-PackageModel-VCRuntime and keeps it parameterless' {
+        $module = Import-Module -Name $script:ModuleManifestPath -Force -PassThru
+        $command = Get-Command -Name 'Invoke-PackageModel-VCRuntime'
+
+        $command | Should -Not -BeNullOrEmpty
+        $publicParameterNames = @($command.Parameters.Keys | Where-Object {
+                $_ -notin [System.Management.Automation.PSCmdlet]::CommonParameters -and
+                $_ -notin [System.Management.Automation.PSCmdlet]::OptionalCommonParameters
             })
         $publicParameterNames.Count | Should -Be 0
     }
@@ -638,6 +662,58 @@ Describe 'Eigenverft.Manifested.Sandbox PackageModel' {
         $result.Package.packageFile.fileName | Should -Be $expectedFileName
         $result.Package.packageFile.integrity.sha256 | Should -Be $expectedSha256
         $result.Package.install.pathRegistration.source.value | Should -Be 'gh'
+    }
+
+    It 'loads the shipped Ps7Runtime definition and selects the fixed GitHub-backed release' {
+        [Environment]::SetEnvironmentVariable($script:SourceInventoryEnvVarName, (Join-Path $TestDrive 'missing-inventory.json'), 'Process')
+
+        $config = Get-PackageModelConfig -DefinitionId 'Ps7Runtime'
+        $result = New-PackageModelResult -CommandName 'test' -PackageModelConfig $config
+        $result = Resolve-PackageModelPackage -PackageModelResult $result
+        $sourceDefinition = Get-PackageModelSourceDefinition -PackageModelConfig $config -SourceRef ([pscustomobject]@{ scope = 'definition'; id = 'powerShellGitHub' })
+
+        $expectedFileName = if ([string]::Equals([string]$config.Architecture, 'arm64', [System.StringComparison]::OrdinalIgnoreCase)) {
+            'PowerShell-7.6.1-win-arm64.zip'
+        }
+        else {
+            'PowerShell-7.6.1-win-x64.zip'
+        }
+        $expectedSha256 = if ([string]::Equals([string]$config.Architecture, 'arm64', [System.StringComparison]::OrdinalIgnoreCase)) {
+            'f8976558a687dd610eec33a42868a090f611f3bfbc0ae69c2bc5d986e3b53847'
+        }
+        else {
+            'b5c9e8457ca7df4998abe3cc2c58e6dd4005ad1b4c5320bbac86244a747db91d'
+        }
+
+        $config.DefinitionId | Should -Be 'Ps7Runtime'
+        $sourceDefinition.Kind | Should -Be 'githubRelease'
+        $sourceDefinition.RepositoryOwner | Should -Be 'PowerShell'
+        $sourceDefinition.RepositoryName | Should -Be 'PowerShell'
+        $result.Package.version | Should -Be '7.6.1'
+        $result.Package.releaseTag | Should -Be 'v7.6.1'
+        $result.Package.packageFile.fileName | Should -Be $expectedFileName
+        $result.Package.packageFile.integrity.sha256 | Should -Be $expectedSha256
+        $result.Package.install.pathRegistration.source.value | Should -Be 'pwsh'
+    }
+
+    It 'loads the shipped VCRuntime definition as an elevated machine prerequisite' {
+        [Environment]::SetEnvironmentVariable($script:SourceInventoryEnvVarName, (Join-Path $TestDrive 'missing-inventory.json'), 'Process')
+
+        $config = Get-PackageModelConfig -DefinitionId 'VCRuntime'
+        $result = New-PackageModelResult -CommandName 'test' -PackageModelConfig $config
+        $result = Resolve-PackageModelPackage -PackageModelResult $result
+        $sourceDefinition = Get-PackageModelSourceDefinition -PackageModelConfig $config -SourceRef ([pscustomobject]@{ scope = 'definition'; id = 'visualCppRedistributableDownload' })
+
+        $config.DefinitionId | Should -Be 'VCRuntime'
+        $sourceDefinition.Kind | Should -Be 'download'
+        $sourceDefinition.BaseUri | Should -Be 'https://aka.ms/'
+        $result.PackageId | Should -Be 'vc-runtime-x64-stable'
+        $result.Package.install.kind | Should -Be 'runInstaller'
+        $result.Package.install.targetKind | Should -Be 'machinePrerequisite'
+        $result.Package.install.elevation | Should -Be 'required'
+        $result.Package.install.commandArguments | Should -Be @('/install', '/quiet', '/norestart', '/log', '{logPath}')
+        $result.Package.packageFile.fileName | Should -Be 'vc_redist.x64.exe'
+        $result.Package.packageFile.authenticode.subjectContains | Should -Be 'Microsoft Corporation'
     }
 
     It 'loads the shipped Qwen35_2B_Q6K definition and selects the fixed Hugging Face-backed resource release' {
@@ -1219,6 +1295,28 @@ Describe 'Eigenverft.Manifested.Sandbox PackageModel' {
 
         $packageModelResult.PathRegistration.Status | Should -Be 'Registered'
         $packageModelResult.PathRegistration.RegisteredPath | Should -Be $binDirectory
+    }
+
+    It 'resolves shipped Ps7Runtime PATH registration to the install directory' {
+        [Environment]::SetEnvironmentVariable($script:SourceInventoryEnvVarName, (Join-Path $TestDrive 'missing-inventory.json'), 'Process')
+
+        $installRoot = Join-Path $TestDrive 'path-registration-shipped-ps7'
+        $null = New-Item -ItemType Directory -Path $installRoot -Force
+        Write-TestTextFile -Path (Join-Path $installRoot 'pwsh.exe') -Content 'fake pwsh'
+
+        $config = Get-PackageModelConfig -DefinitionId 'Ps7Runtime'
+        $packageModelResult = New-PackageModelResult -CommandName 'test' -PackageModelConfig $config
+        $packageModelResult = Resolve-PackageModelPackage -PackageModelResult $packageModelResult
+        $packageModelResult.InstallDirectory = $installRoot
+        $packageModelResult.InstallOrigin = 'PackageModelInstalled'
+
+        Mock Get-EnvironmentVariableValue {}
+        Mock Set-EnvironmentVariableValue {}
+
+        $packageModelResult = Register-PackageModelPath -PackageModelResult $packageModelResult
+
+        $packageModelResult.PathRegistration.Status | Should -Be 'Registered'
+        $packageModelResult.PathRegistration.RegisteredPath | Should -Be $installRoot
     }
 
     It 'skips PATH registration for adopted external installs' {
@@ -2009,6 +2107,179 @@ Describe 'Eigenverft.Manifested.Sandbox PackageModel' {
         $installResult.InstallKind | Should -Be 'expandArchive'
         Test-Path -LiteralPath (Join-Path $installDirectory 'Code.exe') -PathType Leaf | Should -BeTrue
         Test-Path -LiteralPath (Join-Path $installDirectory 'data') -PathType Container | Should -BeTrue
+    }
+
+    It 'accepts package-file Authenticode verification without a SHA256 hash' {
+        $packageFilePath = Join-Path $TestDrive 'authenticode-package\vc_redist.x64.exe'
+        Write-TestTextFile -Path $packageFilePath -Content 'signed installer placeholder'
+
+        Mock Get-AuthenticodeSignature {
+            [pscustomobject]@{
+                Status            = [System.Management.Automation.SignatureStatus]::Valid
+                SignerCertificate = [pscustomobject]@{
+                    Subject = 'CN=Microsoft Corporation, O=Microsoft Corporation, L=Redmond, S=Washington, C=US'
+                }
+            }
+        }
+
+        $verification = [pscustomobject]@{
+            mode = 'required'
+            authenticode = [pscustomobject]@{
+                requireValid    = $true
+                subjectContains = 'Microsoft Corporation'
+            }
+        }
+
+        $result = Test-PackageModelSavedFile -Path $packageFilePath -Verification $verification
+
+        $result.Accepted | Should -BeTrue
+        $result.Status | Should -Be 'AuthenticodePassed'
+        $result.SignatureStatus | Should -Be 'Valid'
+    }
+
+    It 'validates registry-only machine prerequisites without an install directory' {
+        $registryPath = 'HKLM:\SOFTWARE\Microsoft\VisualStudio\14.0\VC\Runtimes\x64'
+        $packageModelResult = [pscustomobject]@{
+            InstallDirectory = $null
+            Validation = $null
+            PackageModelConfig = [pscustomobject]@{}
+            Package = [pscustomobject]@{
+                validation = [pscustomobject]@{
+                    files = @()
+                    directories = @()
+                    commandChecks = @()
+                    metadataFiles = @()
+                    signatures = @()
+                    fileDetails = @()
+                    registryChecks = @(
+                        [pscustomobject]@{
+                            paths = @($registryPath)
+                            valueName = 'Installed'
+                            expectedValue = '1'
+                        },
+                        [pscustomobject]@{
+                            paths = @($registryPath)
+                            valueName = 'Version'
+                            operator = '>='
+                            expectedValue = '14.0'
+                        }
+                    )
+                }
+            }
+        }
+
+        Mock Test-Path { $true } -ParameterFilter { $LiteralPath -eq $registryPath }
+        Mock Get-ItemProperty {
+            [pscustomobject]@{
+                Installed = 1
+                Version   = '14.44.35211.0'
+            }
+        } -ParameterFilter { $LiteralPath -eq $registryPath }
+
+        $packageModelResult = Test-PackageModelInstalledPackage -PackageModelResult $packageModelResult
+
+        $packageModelResult.Validation.Accepted | Should -BeTrue
+        @($packageModelResult.Validation.Registry | ForEach-Object { $_.Status }) | Should -Be @('Ready', 'Ready')
+    }
+
+    It 'marks a satisfied machine prerequisite so acquisition and installer execution can be skipped' {
+        $packageModelResult = [pscustomobject]@{
+            InstallOrigin = $null
+            Install       = $null
+            Validation    = $null
+            Package       = [pscustomobject]@{
+                install = [pscustomobject]@{
+                    kind       = 'runInstaller'
+                    targetKind = 'machinePrerequisite'
+                }
+            }
+        }
+
+        Mock Test-PackageModelInstalledPackage {
+            param([psobject]$PackageModelResult)
+            $PackageModelResult.Validation = [pscustomobject]@{
+                Accepted      = $true
+                Files         = @()
+                Directories   = @()
+                Commands      = @()
+                MetadataFiles = @()
+                Signatures    = @()
+                FileDetails   = @()
+                Registry      = @([pscustomobject]@{ Status = 'Ready' })
+            }
+            $PackageModelResult
+        }
+
+        $packageModelResult = Resolve-PackageModelPreInstallSatisfaction -PackageModelResult $packageModelResult
+
+        $packageModelResult.InstallOrigin | Should -Be 'AlreadySatisfied'
+        $packageModelResult.Install.Status | Should -Be 'AlreadySatisfied'
+        $packageModelResult.Install.TargetKind | Should -Be 'machinePrerequisite'
+    }
+
+    It 'runs required-elevation installers with RunAs and quoted log-path arguments' {
+        $rootPath = Join-Path $TestDrive 'installer path with space'
+        $installerPath = Join-Path $rootPath 'vc_redist.x64.exe'
+        $workspacePath = Join-Path $rootPath 'workspace'
+        Write-TestTextFile -Path $installerPath -Content 'installer'
+
+        $process = [pscustomobject]@{
+            Id       = 42
+            ExitCode = 0
+        }
+        $process | Add-Member -MemberType ScriptMethod -Name WaitForExit -Value { param([int]$Timeout) $true }
+        $process | Add-Member -MemberType ScriptMethod -Name Refresh -Value { }
+
+        $startProcessCalls = New-Object System.Collections.Generic.List[object]
+        Mock Test-ProcessElevation { $false }
+        Mock Start-Process {
+            param(
+                [string]$FilePath,
+                [object[]]$ArgumentList,
+                [string]$WorkingDirectory,
+                [switch]$PassThru,
+                [string]$Verb
+            )
+            $startProcessCalls.Add([pscustomobject]@{
+                FilePath         = $FilePath
+                ArgumentList     = @($ArgumentList)
+                WorkingDirectory = $WorkingDirectory
+                Verb             = $Verb
+            }) | Out-Null
+            $process
+        }
+
+        $packageModelResult = [pscustomobject]@{
+            PackageFilePath           = $installerPath
+            InstallWorkspaceDirectory = $workspacePath
+            InstallDirectory          = $null
+            PackageModelConfig        = [pscustomobject]@{
+                PreferredTargetInstallRootDirectory = $rootPath
+            }
+            Package = [pscustomobject]@{
+                install = [pscustomobject]@{
+                    kind           = 'runInstaller'
+                    targetKind     = 'machinePrerequisite'
+                    installerKind  = 'burn'
+                    uiMode         = 'quiet'
+                    elevation      = 'required'
+                    logRelativePath = 'logs/vc-runtime/{timestamp}.log'
+                    commandArguments = @('/install', '/quiet', '/norestart', '/log', '{logPath}')
+                    successExitCodes = @(0)
+                    restartExitCodes = @(3010)
+                }
+            }
+        }
+
+        $result = Invoke-PackageModelInstallerProcess -PackageModelResult $packageModelResult
+
+        $startProcessCalls.Count | Should -Be 1
+        $startProcessCalls[0].Verb | Should -Be 'RunAs'
+        $startProcessCalls[0].WorkingDirectory | Should -Be $workspacePath
+        $startProcessCalls[0].ArgumentList[-1].StartsWith('"') | Should -BeTrue
+        $startProcessCalls[0].ArgumentList[-1].EndsWith('"') | Should -BeTrue
+        $result.TargetKind | Should -Be 'machinePrerequisite'
+        $result.Elevation.ShouldElevate | Should -BeTrue
     }
 
     It 'installs a single package file into the configured target-relative path' {

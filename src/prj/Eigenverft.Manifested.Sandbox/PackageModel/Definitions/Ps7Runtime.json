@@ -1,0 +1,172 @@
+{
+  "schemaVersion": "1.0",
+  "id": "Ps7Runtime",
+  "display": {
+    "default": {
+      "name": "PowerShell 7",
+      "publisher": "Microsoft",
+      "corporation": "Microsoft Corporation",
+      "summary": "Portable PowerShell 7 runtime"
+    },
+    "localizations": {}
+  },
+  "upstreamSources": {
+    "powerShellGitHub": {
+      "kind": "githubRelease",
+      "repositoryOwner": "PowerShell",
+      "repositoryName": "PowerShell"
+    }
+  },
+  "providedTools": {
+    "commands": [
+      {
+        "name": "pwsh",
+        "relativePath": "pwsh.exe"
+      }
+    ],
+    "apps": []
+  },
+  "releaseDefaults": {
+    "compatibility": {
+      "checks": [
+        {
+          "kind": "osVersion",
+          "operator": ">=",
+          "value": "10.0"
+        }
+      ]
+    },
+    "install": {
+      "kind": "expandArchive",
+      "installDirectory": "ps7-runtime/{releaseTrack}/{version}/{flavor}",
+      "pathRegistration": {
+        "mode": "user",
+        "source": {
+          "kind": "commandEntryPoint",
+          "value": "pwsh"
+        }
+      },
+      "expandedRoot": "auto",
+      "createDirectories": []
+    },
+    "validation": {
+      "files": [
+        "pwsh.exe"
+      ],
+      "directories": [],
+      "commandChecks": [
+        {
+          "entryPoint": "pwsh",
+          "arguments": [
+            "-NoLogo",
+            "-NoProfile",
+            "-Command",
+            "$PSVersionTable.PSVersion.ToString()"
+          ],
+          "outputPattern": "(?m)^(?<value>\\d+\\.\\d+\\.\\d+)\\s*$",
+          "expectedValue": "{version}"
+        }
+      ],
+      "metadataFiles": [],
+      "signatures": [],
+      "fileDetails": [],
+      "registryChecks": []
+    },
+    "existingInstallDiscovery": {
+      "enableDetection": false,
+      "searchLocations": [],
+      "installRootRules": []
+    },
+    "existingInstallPolicy": {
+      "allowAdoptExternal": false,
+      "upgradeAdoptedInstall": false,
+      "requirePackageModelOwnership": true
+    }
+  },
+  "releases": [
+    {
+      "id": "ps7-runtime-win-x64-stable",
+      "version": "7.6.1",
+      "releaseTag": "v7.6.1",
+      "releaseTrack": "stable",
+      "flavor": "win-x64",
+      "constraints": {
+        "os": [
+          "windows"
+        ],
+        "cpu": [
+          "x64"
+        ]
+      },
+      "packageFile": {
+        "fileName": "PowerShell-7.6.1-win-x64.zip",
+        "format": "zip",
+        "portable": true,
+        "autoUpdateSupported": false,
+        "integrity": {
+          "algorithm": "sha256",
+          "sha256": "b5c9e8457ca7df4998abe3cc2c58e6dd4005ad1b4c5320bbac86244a747db91d"
+        }
+      },
+      "acquisitionCandidates": [
+        {
+          "kind": "packageDepot",
+          "priority": 250,
+          "verification": {
+            "mode": "optional"
+          }
+        },
+        {
+          "kind": "download",
+          "sourceId": "powerShellGitHub",
+          "priority": 200,
+          "verification": {
+            "mode": "required"
+          }
+        }
+      ]
+    },
+    {
+      "id": "ps7-runtime-win-arm64-stable",
+      "version": "7.6.1",
+      "releaseTag": "v7.6.1",
+      "releaseTrack": "stable",
+      "flavor": "win-arm64",
+      "constraints": {
+        "os": [
+          "windows"
+        ],
+        "cpu": [
+          "arm64"
+        ]
+      },
+      "packageFile": {
+        "fileName": "PowerShell-7.6.1-win-arm64.zip",
+        "format": "zip",
+        "portable": true,
+        "autoUpdateSupported": false,
+        "integrity": {
+          "algorithm": "sha256",
+          "sha256": "f8976558a687dd610eec33a42868a090f611f3bfbc0ae69c2bc5d986e3b53847"
+        }
+      },
+      "acquisitionCandidates": [
+        {
+          "kind": "packageDepot",
+          "priority": 250,
+          "verification": {
+            "mode": "optional"
+          }
+        },
+        {
+          "kind": "download",
+          "sourceId": "powerShellGitHub",
+          "priority": 200,
+          "verification": {
+            "mode": "required"
+          }
+        }
+      ]
+    }
+  ]
+}

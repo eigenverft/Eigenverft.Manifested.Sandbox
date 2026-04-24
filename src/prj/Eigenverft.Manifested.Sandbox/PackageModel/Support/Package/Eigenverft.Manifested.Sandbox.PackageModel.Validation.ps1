@@ -125,6 +125,41 @@ Get-PackageModelJsonValue -InputObject $document -PropertyPath version
     return $current
 }
 
+function Test-PackageModelValidationValueComparison {
+    [CmdletBinding()]
+    [OutputType([bool])]
+    param(
+        [AllowNull()]
+        [object]$ActualValue,
+
+        [AllowNull()]
+        [object]$ExpectedValue,
+
+        [string]$Operator = '=='
+    )
+
+    $actualText = [string]$ActualValue
+    $expectedText = [string]$ExpectedValue
+    $operatorText = if ([string]::IsNullOrWhiteSpace($Operator)) { '==' } else { $Operator }
+
+    if ($operatorText -in @('=', '==')) {
+        return [string]::Equals($actualText, $expectedText, [System.StringComparison]::OrdinalIgnoreCase)
+    }
+    if ($operatorText -eq '!=') {
+        return (-not [string]::Equals($actualText, $expectedText, [System.StringComparison]::OrdinalIgnoreCase))
+    }
+
+    $actualVersion = ConvertTo-PackageModelVersion -VersionText $actualText
+    $expectedVersion = ConvertTo-PackageModelVersion -VersionText $expectedText
+    switch -Exact ($operatorText) {
+        '>' { return $actualVersion -gt $expectedVersion }
+        '>=' { return $actualVersion -ge $expectedVersion }
+        '<' { return $actualVersion -lt $expectedVersion }
+        '<=' { return $actualVersion -le $expectedVersion }
+        default { throw "Unsupported PackageModel validation comparison operator '$operatorText'." }
+    }
+}
+
 function Test-PackageModelInstalledPackage {
 <#
 .SYNOPSIS
@@ -166,7 +201,13 @@ Test-PackageModelInstalledPackage -PackageModelResult $result
 
     $installDirectory = $PackageModelResult.InstallDirectory
     $validation = $package.validation
-    if ([string]::IsNullOrWhiteSpace($installDirectory) -or -not (Test-Path -LiteralPath $installDirectory)) {
+    $requiresInstallDirectory = (@($validation.files).Count -gt 0) -or
+        (@($validation.directories).Count -gt 0) -or
+        (@($validation.commandChecks).Count -gt 0) -or
+        (@($validation.metadataFiles).Count -gt 0) -or
+        (@($validation.signatures).Count -gt 0) -or
+        (@($validation.fileDetails).Count -gt 0)
+    if ($requiresInstallDirectory -and ([string]::IsNullOrWhiteSpace($installDirectory) -or -not (Test-Path -LiteralPath $installDirectory))) {
         $PackageModelResult.Validation = [pscustomobject]@{
             Status           = 'Failed'
             Accepted         = $false
@@ -395,36 +436,67 @@ Test-PackageModelInstalledPackage -PackageModelResult $result
         if ($null -eq $registryCheck) {
             continue
         }
-        $registryPath = [string]$registryCheck.path
-        $expectedValue = if ($registryCheck.PSObject.Properties['expectedValue']) { [string]$registryCheck.expectedValue } else { $null }
+        $registryPaths = if ($registryCheck.PSObject.Properties['paths'] -and @($registryCheck.paths).Count -gt 0) {
+            @($registryCheck.paths | ForEach-Object { [string]$_ })
+        }
+        elseif ($registryCheck.PSObject.Properties['path'] -and -not [string]::IsNullOrWhiteSpace([string]$registryCheck.path)) {
+            @([string]$registryCheck.path)
+        }
+        else {
+            @()
+        }
+        $expectedValue = if ($registryCheck.PSObject.Properties['expectedValue']) {
+            Resolve-PackageModelTemplateText -Text ([string]$registryCheck.expectedValue) -PackageModelConfig $PackageModelResult.PackageModelConfig -Package $package
+        }
+        else {
+            $null
+        }
+        $operator = if ($registryCheck.PSObject.Properties['operator'] -and -not [string]::IsNullOrWhiteSpace([string]$registryCheck.operator)) {
+            [string]$registryCheck.operator
+        }
+        else {
+            '=='
+        }
+        $registryPath = if ($registryPaths.Count -gt 0) { $registryPaths[0] } else { $null }
         $actualValue = $null
         $status = 'Missing'
 
-        try {
-            if (Test-Path -LiteralPath $registryPath) {
-                if ($registryCheck.PSObject.Properties['valueName'] -and -not [string]::IsNullOrWhiteSpace([string]$registryCheck.valueName)) {
-                    $actualValue = (Get-ItemProperty -LiteralPath $registryPath -Name ([string]$registryCheck.valueName) -ErrorAction Stop).$($registryCheck.valueName)
-                    if ($registryCheck.PSObject.Properties['expectedValue']) {
-                        $status = if ([string]::Equals([string]$actualValue, [string]$expectedValue, [System.StringComparison]::OrdinalIgnoreCase)) { 'Ready' } else { 'Failed' }
+        foreach ($candidateRegistryPath in $registryPaths) {
+            try {
+                if (Test-Path -LiteralPath $candidateRegistryPath) {
+                    $registryPath = $candidateRegistryPath
+                    $status = 'Ready'
+                    if ($registryCheck.PSObject.Properties['valueName'] -and -not [string]::IsNullOrWhiteSpace([string]$registryCheck.valueName)) {
+                        $actualValue = (Get-ItemProperty -LiteralPath $candidateRegistryPath -Name ([string]$registryCheck.valueName) -ErrorAction Stop).$($registryCheck.valueName)
+                        if ($registryCheck.PSObject.Properties['expectedValue']) {
+                            $status = if (Test-PackageModelValidationValueComparison -ActualValue $actualValue -ExpectedValue $expectedValue -Operator $operator) { 'Ready' } else { 'Failed' }
+                        }
+                        else {
+                            $status = 'Ready'
+                        }
                     }
                     else {
                         $status = 'Ready'
                     }
                 }
-                else {
-                    $status = 'Ready'
-                }
             }
-        }
-        catch {
-            $status = 'Failed'
+            catch {
+                $registryPath = $candidateRegistryPath
+                $status = 'Failed'
+            }
+
+            if ($status -eq 'Ready') {
+                break
+            }
         }
 
         $registryResults.Add([pscustomobject]@{
             Path         = $registryPath
+            Paths        = @($registryPaths)
             ValueName    = if ($registryCheck.PSObject.Properties['valueName']) { $registryCheck.valueName } else { $null }
             ActualValue  = $actualValue
             ExpectedValue = $expectedValue
+            Operator     = if ($registryCheck.PSObject.Properties['expectedValue']) { $operator } else { $null }
             Status       = $status
         }) | Out-Null
     }

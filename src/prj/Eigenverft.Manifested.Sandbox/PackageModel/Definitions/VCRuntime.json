@@ -1,0 +1,142 @@
+{
+  "schemaVersion": "1.0",
+  "id": "VCRuntime",
+  "display": {
+    "default": {
+      "name": "Microsoft Visual C++ Redistributable",
+      "publisher": "Microsoft",
+      "corporation": "Microsoft Corporation",
+      "summary": "Machine-wide Visual C++ runtime prerequisite"
+    },
+    "localizations": {}
+  },
+  "upstreamSources": {
+    "visualCppRedistributableDownload": {
+      "kind": "download",
+      "baseUri": "https://aka.ms/"
+    }
+  },
+  "providedTools": {
+    "commands": [],
+    "apps": []
+  },
+  "releaseDefaults": {
+    "compatibility": {
+      "checks": [
+        {
+          "kind": "osVersion",
+          "operator": ">=",
+          "value": "10.0"
+        }
+      ]
+    },
+    "install": {
+      "kind": "runInstaller",
+      "targetKind": "machinePrerequisite",
+      "installerKind": "burn",
+      "uiMode": "quiet",
+      "elevation": "required",
+      "timeoutSec": 300,
+      "logRelativePath": "logs/vc-runtime/{timestamp}.log",
+      "commandArguments": [
+        "/install",
+        "/quiet",
+        "/norestart",
+        "/log",
+        "{logPath}"
+      ],
+      "successExitCodes": [
+        0,
+        1638
+      ],
+      "restartExitCodes": [
+        3010
+      ],
+      "pathRegistration": {
+        "mode": "none"
+      }
+    },
+    "validation": {
+      "files": [],
+      "directories": [],
+      "commandChecks": [],
+      "metadataFiles": [],
+      "signatures": [],
+      "fileDetails": [],
+      "registryChecks": [
+        {
+          "paths": [
+            "HKLM:\\SOFTWARE\\Microsoft\\VisualStudio\\14.0\\VC\\Runtimes\\x64",
+            "HKLM:\\SOFTWARE\\Wow6432Node\\Microsoft\\VisualStudio\\14.0\\VC\\Runtimes\\x64"
+          ],
+          "valueName": "Installed",
+          "expectedValue": "1"
+        },
+        {
+          "paths": [
+            "HKLM:\\SOFTWARE\\Microsoft\\VisualStudio\\14.0\\VC\\Runtimes\\x64",
+            "HKLM:\\SOFTWARE\\Wow6432Node\\Microsoft\\VisualStudio\\14.0\\VC\\Runtimes\\x64"
+          ],
+          "valueName": "Version",
+          "operator": ">=",
+          "expectedValue": "14.0"
+        }
+      ]
+    },
+    "existingInstallDiscovery": {
+      "enableDetection": false,
+      "searchLocations": [],
+      "installRootRules": []
+    },
+    "existingInstallPolicy": {
+      "allowAdoptExternal": false,
+      "upgradeAdoptedInstall": false,
+      "requirePackageModelOwnership": false
+    }
+  },
+  "releases": [
+    {
+      "id": "vc-runtime-x64-stable",
+      "version": "14.0",
+      "releaseTrack": "stable",
+      "flavor": "x64",
+      "constraints": {
+        "os": [
+          "windows"
+        ],
+        "cpu": [
+          "x64"
+        ]
+      },
+      "packageFile": {
+        "fileName": "vc_redist.x64.exe",
+        "format": "exe",
+        "portable": false,
+        "autoUpdateSupported": false,
+        "integrity": null,
+        "authenticode": {
+          "requireValid": true,
+          "subjectContains": "Microsoft Corporation"
+        }
+      },
+      "acquisitionCandidates": [
+        {
+          "kind": "packageDepot",
+          "priority": 250,
+          "verification": {
+            "mode": "optional"
+          }
+        },
+        {
+          "kind": "download",
+          "sourceId": "visualCppRedistributableDownload",
+          "sourcePath": "vc14/vc_redist.x64.exe",
+          "priority": 200,
+          "verification": {
+            "mode": "required"
+          }
+        }
+      ]
+    }
+  ]
+}

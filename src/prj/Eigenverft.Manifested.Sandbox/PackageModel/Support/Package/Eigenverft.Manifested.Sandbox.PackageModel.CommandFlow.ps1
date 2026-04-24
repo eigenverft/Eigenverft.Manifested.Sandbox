@@ -37,6 +37,12 @@ function Get-PackageModelOutcomeSummary {
         'PackageModelInstalled' {
             return ("[OUTCOME] Completed PackageModel-owned install into '{0}' with installStatus='{1}' and packageFileStep='{2}'." -f $installDirectoryText, [string]$PackageModelResult.Install.Status, $packageFileStatusText)
         }
+        'PackageModelApplied' {
+            return ("[OUTCOME] Applied PackageModel prerequisite with installStatus='{0}', packageFileStep='{1}', restartRequired='{2}'." -f [string]$PackageModelResult.Install.Status, $packageFileStatusText, [string]$PackageModelResult.Install.Installer.RestartRequired)
+        }
+        'AlreadySatisfied' {
+            return ("[OUTCOME] Package prerequisite already satisfied; installer and package-file acquisition were skipped.")
+        }
         default {
             return ("[OUTCOME] Completed PackageModel run with installOrigin='{0}', installStatus='{1}', packageFileStep='{2}', installDirectory='{3}'." -f [string]$PackageModelResult.InstallOrigin, [string]$PackageModelResult.Install.Status, $packageFileStatusText, $installDirectoryText)
         }
@@ -52,6 +58,7 @@ function Get-PackageModelCommandFailureReason {
     switch -Exact ($CurrentStep) {
         'ResolvePackage' { return 'PackageSelectionFailed' }
         'ResolvePaths' { return 'PackagePathResolutionFailed' }
+        'ResolvePreInstallSatisfaction' { return 'PreInstallSatisfactionCheckFailed' }
         'BuildAcquisitionPlan' { return 'AcquisitionPlanBuildFailed' }
         'FindExistingPackage' { return 'ExistingPackageDiscoveryFailed' }
         'ClassifyExistingPackage' { return 'ExistingPackageOwnershipClassificationFailed' }
@@ -83,6 +90,7 @@ function Invoke-PackageModelDefinitionCommand {
     $steps = @(
         [pscustomobject]@{ Name = 'ResolvePackage'; Message = '[STEP] Resolving package selection.'; Action = { param($r) Resolve-PackageModelPackage -PackageModelResult $r } },
         [pscustomobject]@{ Name = 'ResolvePaths'; Message = '[STEP] Resolving package paths.'; Action = { param($r) Resolve-PackageModelPaths -PackageModelResult $r } },
+        [pscustomobject]@{ Name = 'ResolvePreInstallSatisfaction'; Message = '[STEP] Checking pre-install satisfaction.'; Action = { param($r) Resolve-PackageModelPreInstallSatisfaction -PackageModelResult $r } },
         [pscustomobject]@{ Name = 'BuildAcquisitionPlan'; Message = '[STEP] Building acquisition plan.'; Action = { param($r) Build-PackageModelAcquisitionPlan -PackageModelResult $r } },
         [pscustomobject]@{ Name = 'FindExistingPackage'; Message = '[STEP] Discovering existing installs.'; Action = { param($r) Find-PackageModelExistingPackage -PackageModelResult $r } },
         [pscustomobject]@{ Name = 'ClassifyExistingPackage'; Message = '[STEP] Classifying install ownership.'; Action = { param($r) Classify-PackageModelExistingPackage -PackageModelResult $r } },

@@ -11,6 +11,7 @@
 . "$PSScriptRoot\PackageModel\Support\ExecutionEngine\Eigenverft.Manifested.Sandbox.PackageModel.ExecutionEngine.CommandResolution.ps1"
 . "$PSScriptRoot\PackageModel\Support\ExecutionEngine\Eigenverft.Manifested.Sandbox.PackageModel.ExecutionEngine.FileSystem.ps1"
 . "$PSScriptRoot\PackageModel\Support\ExecutionEngine\Eigenverft.Manifested.Sandbox.PackageModel.ExecutionEngine.SystemResources.ps1"
+. "$PSScriptRoot\PackageModel\Support\ExecutionEngine\Eigenverft.Manifested.Sandbox.PackageModel.ExecutionEngine.Elevation.ps1"
 . "$PSScriptRoot\PackageModel\Support\ExecutionEngine\Eigenverft.Manifested.Sandbox.PackageModel.ExecutionEngine.PathRegistration.ps1"
 
 # StateModel support
@@ -58,6 +59,8 @@
 # PackageModel commands
 . "$PSScriptRoot\PackageModel\Commands\Eigenverft.Manifested.Sandbox.PackageModel.Cmd.Qwen35_2B_Q6K.ps1"
 . "$PSScriptRoot\PackageModel\Commands\Eigenverft.Manifested.Sandbox.PackageModel.Cmd.LlamaCppRuntime.ps1"
+. "$PSScriptRoot\PackageModel\Commands\Eigenverft.Manifested.Sandbox.PackageModel.Cmd.VCRuntime.ps1"
+. "$PSScriptRoot\PackageModel\Commands\Eigenverft.Manifested.Sandbox.PackageModel.Cmd.Ps7Runtime.ps1"
 . "$PSScriptRoot\PackageModel\Commands\Eigenverft.Manifested.Sandbox.PackageModel.Cmd.GHCliRuntime.ps1"
 . "$PSScriptRoot\PackageModel\Commands\Eigenverft.Manifested.Sandbox.PackageModel.Cmd.GitRuntime.ps1"
 . "$PSScriptRoot\PackageModel\Commands\Eigenverft.Manifested.Sandbox.PackageModel.Cmd.VSCodeRuntime.ps1"

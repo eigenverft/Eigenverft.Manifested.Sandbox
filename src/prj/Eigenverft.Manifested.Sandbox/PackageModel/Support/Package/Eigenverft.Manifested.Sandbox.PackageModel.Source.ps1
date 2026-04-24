@@ -371,6 +371,18 @@ Test-PackageModelSavedFile -Path .\package.zip -Verification $verification
         $Verification = [pscustomobject]$Verification
     }
 
+    $authenticode = if ($Verification -and $Verification.PSObject.Properties['authenticode'] -and $null -ne $Verification.authenticode) {
+        if ($Verification.authenticode -is [System.Collections.IDictionary]) {
+            [pscustomobject]$Verification.authenticode
+        }
+        else {
+            $Verification.authenticode
+        }
+    }
+    else {
+        $null
+    }
+
     $mode = if ($Verification -and $Verification.PSObject.Properties['mode'] -and -not [string]::IsNullOrWhiteSpace([string]$Verification.mode)) {
         ([string]$Verification.mode).ToLowerInvariant()
     }
@@ -390,7 +402,7 @@ Test-PackageModelSavedFile -Path .\package.zip -Verification $verification
         }
     }
 
-    if ($mode -eq 'none') {
+    if ($mode -eq 'none' -and -not $authenticode) {
         return [pscustomobject]@{
             Status       = 'VerificationSkipped'
             Accepted     = $true
@@ -399,6 +411,8 @@ Test-PackageModelSavedFile -Path .\package.zip -Verification $verification
             Algorithm    = $null
             ExpectedHash = $null
             ActualHash   = $null
+            SignatureStatus = $null
+            SignerSubject = $null
         }
     }
 
@@ -417,6 +431,8 @@ Test-PackageModelSavedFile -Path .\package.zip -Verification $verification
             Algorithm    = $algorithm
             ExpectedHash = $null
             ActualHash   = $null
+            SignatureStatus = $null
+            SignerSubject = $null
         }
     }
 
@@ -427,7 +443,7 @@ Test-PackageModelSavedFile -Path .\package.zip -Verification $verification
         $null
     }
 
-    if ([string]::IsNullOrWhiteSpace($expectedHash)) {
+    if ([string]::IsNullOrWhiteSpace($expectedHash) -and -not $authenticode) {
         return [pscustomobject]@{
             Status       = if ($mode -eq 'required') { 'VerificationHashMissing' } else { 'VerificationHashMissingOptional' }
             Accepted     = ($mode -ne 'required')
@@ -436,18 +452,68 @@ Test-PackageModelSavedFile -Path .\package.zip -Verification $verification
             Algorithm    = $algorithm
             ExpectedHash = $null
             ActualHash   = $null
+            SignatureStatus = $null
+            SignerSubject = $null
         }
     }
 
-    $actualHash = (Get-FileHash -LiteralPath $Path -Algorithm SHA256).Hash.ToLowerInvariant()
+    $actualHash = $null
+    $hashAccepted = $true
+    if (-not [string]::IsNullOrWhiteSpace($expectedHash)) {
+        $actualHash = (Get-FileHash -LiteralPath $Path -Algorithm SHA256).Hash.ToLowerInvariant()
+        $hashAccepted = ($actualHash -eq $expectedHash)
+    }
+
+    $signatureStatus = $null
+    $signerSubject = $null
+    $authenticodeAccepted = $true
+    if ($authenticode) {
+        $authenticodeAccepted = $false
+        try {
+            $signature = Get-AuthenticodeSignature -FilePath $Path
+            $signatureStatus = $signature.Status.ToString()
+            $signerSubject = if ($signature.SignerCertificate) { $signature.SignerCertificate.Subject } else { $null }
+            $requiresValid = $true
+            if ($authenticode.PSObject.Properties['requireValid']) {
+                $requiresValid = [bool]$authenticode.requireValid
+            }
+
+            $authenticodeAccepted = (-not $requiresValid) -or ($signature.Status -eq [System.Management.Automation.SignatureStatus]::Valid)
+            if ($authenticodeAccepted -and $authenticode.PSObject.Properties['subjectContains'] -and
+                -not [string]::IsNullOrWhiteSpace([string]$authenticode.subjectContains)) {
+                $authenticodeAccepted = ($null -ne $signerSubject -and $signerSubject -match [regex]::Escape([string]$authenticode.subjectContains))
+            }
+        }
+        catch {
+            $signatureStatus = 'Failed'
+            $authenticodeAccepted = $false
+        }
+    }
+
+    $accepted = $hashAccepted -and $authenticodeAccepted
+    $status = if (-not $hashAccepted) {
+        'VerificationFailed'
+    }
+    elseif ($authenticode -and -not $authenticodeAccepted) {
+        'AuthenticodeFailed'
+    }
+    elseif ($authenticode -and [string]::IsNullOrWhiteSpace($expectedHash)) {
+        'AuthenticodePassed'
+    }
+    else {
+        'VerificationPassed'
+    }
+
     return [pscustomobject]@{
-        Status       = if ($actualHash -eq $expectedHash) { 'VerificationPassed' } else { 'VerificationFailed' }
-        Accepted     = ($actualHash -eq $expectedHash)
+        Status       = $status
+        Accepted     = $accepted
         Verified     = $true
         Mode         = $mode
         Algorithm    = $algorithm
         ExpectedHash = $expectedHash
         ActualHash   = $actualHash
+        SignatureStatus = $signatureStatus
+        SignerSubject = $signerSubject
     }
 }
 
@@ -619,6 +685,19 @@ The raw acquisition candidate.
         $packageIntegrity = [pscustomobject]$packageIntegrity
     }
 
+    $packageAuthenticode = if ($Package -and
+        $Package.PSObject.Properties['packageFile'] -and
+        $Package.packageFile -and
+        $Package.packageFile.PSObject.Properties['authenticode']) {
+        $Package.packageFile.authenticode
+    }
+    else {
+        $null
+    }
+    if ($packageAuthenticode -is [System.Collections.IDictionary]) {
+        $packageAuthenticode = [pscustomobject]$packageAuthenticode
+    }
+
     $mode = if ($candidateVerification -and $candidateVerification.PSObject.Properties['mode'] -and -not [string]::IsNullOrWhiteSpace([string]$candidateVerification.mode)) {
         [string]$candidateVerification.mode
     }
@@ -654,6 +733,9 @@ The raw acquisition candidate.
     }
     if (-not [string]::IsNullOrWhiteSpace($sha256)) {
         $verification.sha256 = $sha256
+    }
+    if ($packageAuthenticode) {
+        $verification.authenticode = $packageAuthenticode
     }
 
     return [pscustomobject]$verification
@@ -718,6 +800,16 @@ Build-PackageModelAcquisitionPlan -PackageModelResult $result
     $package = $PackageModelResult.Package
     if (-not $package) {
         throw 'Build-PackageModelAcquisitionPlan requires a selected release.'
+    }
+
+    if ([string]::Equals([string]$PackageModelResult.InstallOrigin, 'AlreadySatisfied', [System.StringComparison]::OrdinalIgnoreCase)) {
+        $PackageModelResult.AcquisitionPlan = [pscustomobject]@{
+            PackageFileRequired      = $false
+            InstallWorkspaceFilePath = $PackageModelResult.PackageFilePath
+            Candidates               = @()
+        }
+        Write-PackageModelExecutionMessage -Message '[STATE] Acquisition skipped because package target is already satisfied.'
+        return $PackageModelResult
     }
 
     $requiresPackageFile = Test-PackageModelPackageFileAcquisitionRequired -Package $package

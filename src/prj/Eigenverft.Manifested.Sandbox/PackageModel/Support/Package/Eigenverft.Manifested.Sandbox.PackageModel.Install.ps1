@@ -321,6 +321,114 @@ function Get-PackageModelOwnedInstallStatus {
     return 'Installed'
 }
 
+function Get-PackageModelInstallTargetKind {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [psobject]$Package
+    )
+
+    if ($Package.install -and $Package.install.PSObject.Properties['targetKind'] -and
+        -not [string]::IsNullOrWhiteSpace([string]$Package.install.targetKind)) {
+        return [string]$Package.install.targetKind
+    }
+
+    return 'directory'
+}
+
+function Get-PackageModelInstallerElevationPlan {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [psobject]$PackageModelResult
+    )
+
+    $install = $PackageModelResult.Package.install
+    $mode = if ($install.PSObject.Properties['elevation'] -and -not [string]::IsNullOrWhiteSpace([string]$install.elevation)) {
+        ([string]$install.elevation).ToLowerInvariant()
+    }
+    else {
+        'none'
+    }
+    $processIsElevated = Test-ProcessElevation
+    $shouldElevate = ($mode -in @('required', 'auto')) -and (-not $processIsElevated)
+
+    return [pscustomobject]@{
+        Mode              = $mode
+        ProcessIsElevated = $processIsElevated
+        ShouldElevate     = $shouldElevate
+    }
+}
+
+function Resolve-PackageModelPreInstallSatisfaction {
+<#
+.SYNOPSIS
+Checks whether a machine-prerequisite package is already satisfied.
+
+.DESCRIPTION
+Runs validation before acquisition/install for prerequisite-style packages that
+do not own an install directory. When validation succeeds, later acquisition
+and installer steps are skipped.
+
+.PARAMETER PackageModelResult
+The PackageModel result object to enrich.
+
+.EXAMPLE
+Resolve-PackageModelPreInstallSatisfaction -PackageModelResult $result
+#>
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [psobject]$PackageModelResult
+    )
+
+    $package = $PackageModelResult.Package
+    if (-not $package -or -not $package.install) {
+        return $PackageModelResult
+    }
+
+    $installKind = if ($package.install.PSObject.Properties['kind']) { [string]$package.install.kind } else { $null }
+    $targetKind = Get-PackageModelInstallTargetKind -Package $package
+    if (-not [string]::Equals($installKind, 'runInstaller', [System.StringComparison]::OrdinalIgnoreCase) -or
+        -not [string]::Equals($targetKind, 'machinePrerequisite', [System.StringComparison]::OrdinalIgnoreCase)) {
+        return $PackageModelResult
+    }
+
+    $PackageModelResult = Test-PackageModelInstalledPackage -PackageModelResult $PackageModelResult
+    if ($PackageModelResult.Validation -and $PackageModelResult.Validation.Accepted) {
+        $PackageModelResult.InstallOrigin = 'AlreadySatisfied'
+        $PackageModelResult.Install = [pscustomobject]@{
+            Status           = 'AlreadySatisfied'
+            InstallKind      = 'runInstaller'
+            TargetKind       = 'machinePrerequisite'
+            InstallDirectory = $null
+            ReusedExisting   = $true
+        }
+        Write-PackageModelExecutionMessage -Message "[DECISION] Machine prerequisite is already satisfied; skipping acquisition and installer execution."
+    }
+    else {
+        $failedCount = if ($PackageModelResult.Validation) {
+            @(
+                @($PackageModelResult.Validation.Files) +
+                @($PackageModelResult.Validation.Directories) +
+                @($PackageModelResult.Validation.Commands) +
+                @($PackageModelResult.Validation.MetadataFiles) +
+                @($PackageModelResult.Validation.Signatures) +
+                @($PackageModelResult.Validation.FileDetails) +
+                @($PackageModelResult.Validation.Registry) |
+                    Where-Object { $_.Status -ne 'Ready' }
+            ).Count
+        }
+        else {
+            0
+        }
+        Write-PackageModelExecutionMessage -Message ("[STATE] Machine prerequisite is not satisfied yet; failedChecks={0}." -f $failedCount)
+        $PackageModelResult.Validation = $null
+    }
+
+    return $PackageModelResult
+}
+
 function Install-PackageModelArchive {
 <#
 .SYNOPSIS
@@ -470,6 +578,28 @@ saved package file into the configured target-relative path.
     }
 }
 
+function Format-PackageModelProcessArgument {
+    [CmdletBinding()]
+    param(
+        [AllowNull()]
+        [string]$Value
+    )
+
+    if ($null -eq $Value) {
+        return ''
+    }
+
+    $text = [string]$Value
+    if ($text.Length -ge 2 -and $text.StartsWith('"') -and $text.EndsWith('"')) {
+        return $text
+    }
+    if ($text.IndexOfAny([char[]]@(' ', "`t", '"')) -lt 0) {
+        return $text
+    }
+
+    return '"' + ($text -replace '"', '\"') + '"'
+}
+
 function Invoke-PackageModelInstallerProcess {
 <#
 .SYNOPSIS
@@ -509,22 +639,48 @@ Invoke-PackageModelInstallerProcess -PackageModelResult $result
 
     $commandArguments = @()
     foreach ($argument in @($install.commandArguments)) {
-        $commandArguments += (Resolve-PackageModelTemplateText -Text ([string]$argument) -PackageModelConfig $PackageModelResult.PackageModelConfig -Package $PackageModelResult.Package -ExtraTokens @{
+        $resolvedArgument = Resolve-PackageModelTemplateText -Text ([string]$argument) -PackageModelConfig $PackageModelResult.PackageModelConfig -Package $PackageModelResult.Package -ExtraTokens @{
                 packageFilePath   = $PackageModelResult.PackageFilePath
                 installDirectory  = $PackageModelResult.InstallDirectory
                 installWorkspaceDirectory = $PackageModelResult.InstallWorkspaceDirectory
                 downloadDirectory = $PackageModelResult.InstallWorkspaceDirectory
                 logPath           = $logPath
                 timestamp         = $timestamp
-            })
+            }
+        $commandArguments += (Format-PackageModelProcessArgument -Value $resolvedArgument)
     }
 
     $timeoutSec = if ($install.PSObject.Properties['timeoutSec']) { [int]$install.timeoutSec } else { 300 }
     $successExitCodes = if ($install.PSObject.Properties['successExitCodes']) { @($install.successExitCodes | ForEach-Object { [int]$_ }) } else { @(0) }
     $restartExitCodes = if ($install.PSObject.Properties['restartExitCodes']) { @($install.restartExitCodes | ForEach-Object { [int]$_ }) } else { @() }
+    $targetKind = Get-PackageModelInstallTargetKind -Package $PackageModelResult.Package
+    $workingDirectory = if (-not [string]::IsNullOrWhiteSpace([string]$PackageModelResult.InstallDirectory)) {
+        $null = New-Item -ItemType Directory -Path $PackageModelResult.InstallDirectory -Force
+        $PackageModelResult.InstallDirectory
+    }
+    else {
+        $PackageModelResult.InstallWorkspaceDirectory
+    }
+    if (-not [string]::IsNullOrWhiteSpace([string]$workingDirectory)) {
+        $null = New-Item -ItemType Directory -Path $workingDirectory -Force
+    }
 
-    $null = New-Item -ItemType Directory -Path $PackageModelResult.InstallDirectory -Force
-    $process = Start-Process -FilePath $commandPath -ArgumentList $commandArguments -WorkingDirectory $PackageModelResult.InstallDirectory -PassThru
+    $elevationPlan = Get-PackageModelInstallerElevationPlan -PackageModelResult $PackageModelResult
+    $installerKind = if ($install.PSObject.Properties['installerKind'] -and -not [string]::IsNullOrWhiteSpace([string]$install.installerKind)) { [string]$install.installerKind } else { '<unspecified>' }
+    $uiMode = if ($install.PSObject.Properties['uiMode'] -and -not [string]::IsNullOrWhiteSpace([string]$install.uiMode)) { [string]$install.uiMode } else { '<unspecified>' }
+    Write-PackageModelExecutionMessage -Message ("[STATE] Installer execution: targetKind='{0}', installerKind='{1}', uiMode='{2}', elevation='{3}', processIsElevated='{4}', willElevate='{5}'." -f $targetKind, $installerKind, $uiMode, $elevationPlan.Mode, $elevationPlan.ProcessIsElevated, $elevationPlan.ShouldElevate)
+
+    $startProcessParameters = @{
+        FilePath         = $commandPath
+        ArgumentList     = $commandArguments
+        WorkingDirectory = $workingDirectory
+        PassThru         = $true
+    }
+    if ($elevationPlan.ShouldElevate) {
+        $startProcessParameters['Verb'] = 'RunAs'
+    }
+
+    $process = Start-Process @startProcessParameters
     if (-not $process.WaitForExit($timeoutSec * 1000)) {
         try {
             Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue
@@ -548,6 +704,10 @@ Invoke-PackageModelInstallerProcess -PackageModelResult $result
         LogPath          = $logPath
         CommandPath      = $commandPath
         CommandArguments = @($commandArguments)
+        TargetKind       = $targetKind
+        InstallerKind    = $installerKind
+        UiMode           = $uiMode
+        Elevation        = $elevationPlan
     }
 }
 
@@ -646,6 +806,11 @@ Install-PackageModelPackage -PackageModelResult $result
         throw "PackageModel release '$($package.id)' does not define install.kind."
     }
 
+    if ([string]::Equals([string]$PackageModelResult.InstallOrigin, 'AlreadySatisfied', [System.StringComparison]::OrdinalIgnoreCase)) {
+        Write-PackageModelExecutionMessage -Message "[ACTION] Skipped installer because machine prerequisite is already satisfied."
+        return $PackageModelResult
+    }
+
     if ($PackageModelResult.ExistingPackage -and $PackageModelResult.ExistingPackage.Decision -eq 'ReusePackageModelOwned') {
         $PackageModelResult.InstallDirectory = $PackageModelResult.ExistingPackage.InstallDirectory
         $PackageModelResult.InstallOrigin = 'PackageModelReused'
@@ -694,11 +859,14 @@ Install-PackageModelPackage -PackageModelResult $result
             $PackageModelResult.Install = Install-PackageModelPackageFile -PackageModelResult $PackageModelResult
         }
         'runInstaller' {
-            Write-PackageModelExecutionMessage -Message ("[ACTION] Running installer into '{0}'." -f $PackageModelResult.InstallDirectory)
+            $targetKind = Get-PackageModelInstallTargetKind -Package $package
+            $targetText = if ([string]::IsNullOrWhiteSpace([string]$PackageModelResult.InstallDirectory)) { '<machine prerequisite>' } else { [string]$PackageModelResult.InstallDirectory }
+            Write-PackageModelExecutionMessage -Message ("[ACTION] Running installer for target '{0}'." -f $targetText)
             $installerResult = Invoke-PackageModelInstallerProcess -PackageModelResult $PackageModelResult
             $PackageModelResult.Install = [pscustomobject]@{
                 Status           = Get-PackageModelOwnedInstallStatus -PackageModelResult $PackageModelResult
                 InstallKind      = 'runInstaller'
+                TargetKind       = $targetKind
                 InstallDirectory = $PackageModelResult.InstallDirectory
                 ReusedExisting   = $false
                 Installer        = $installerResult
@@ -713,7 +881,12 @@ Install-PackageModelPackage -PackageModelResult $result
         }
     }
 
-    $PackageModelResult.InstallOrigin = 'PackageModelInstalled'
+    $PackageModelResult.InstallOrigin = if ([string]::Equals((Get-PackageModelInstallTargetKind -Package $package), 'machinePrerequisite', [System.StringComparison]::OrdinalIgnoreCase)) {
+        'PackageModelApplied'
+    }
+    else {
+        'PackageModelInstalled'
+    }
     Write-PackageModelExecutionMessage -Message ("[ACTION] Completed PackageModel-owned install with status '{0}'." -f $PackageModelResult.Install.Status)
     return $PackageModelResult
 }

@@ -1100,6 +1100,26 @@ Assert-PackageModelDefinitionSchema -DefinitionDocumentInfo $definitionInfo -Def
             $null
         }
 
+        if ([string]::IsNullOrWhiteSpace($installKind)) {
+            throw "PackageModel release '$($release.id)' in '$($definition.id)' is missing install.kind."
+        }
+
+        if ($installKind -notin @('expandArchive', 'placePackageFile', 'runInstaller', 'packageManagerInstall', 'reuseExisting')) {
+            throw "PackageModel release '$($release.id)' in '$($definition.id)' uses unsupported install.kind '$installKind'."
+        }
+
+        if ($effectiveRelease.install.PSObject.Properties['targetKind'] -and
+            -not [string]::IsNullOrWhiteSpace([string]$effectiveRelease.install.targetKind) -and
+            ([string]$effectiveRelease.install.targetKind) -notin @('directory', 'machinePrerequisite')) {
+            throw "PackageModel release '$($release.id)' in '$($definition.id)' uses unsupported install.targetKind '$($effectiveRelease.install.targetKind)'."
+        }
+
+        if ($effectiveRelease.install.PSObject.Properties['elevation'] -and
+            -not [string]::IsNullOrWhiteSpace([string]$effectiveRelease.install.elevation) -and
+            ([string]$effectiveRelease.install.elevation) -notin @('none', 'required', 'auto')) {
+            throw "PackageModel release '$($release.id)' in '$($definition.id)' uses unsupported install.elevation '$($effectiveRelease.install.elevation)'."
+        }
+
         if ($effectiveRelease.install -and $effectiveRelease.install.PSObject.Properties['pathRegistration'] -and $null -ne $effectiveRelease.install.pathRegistration) {
             $pathRegistration = $effectiveRelease.install.pathRegistration
             if (-not $pathRegistration.PSObject.Properties['mode'] -or [string]::IsNullOrWhiteSpace([string]$pathRegistration.mode)) {
@@ -1183,6 +1203,21 @@ Assert-PackageModelDefinitionSchema -DefinitionDocumentInfo $definitionInfo -Def
             }
             if (-not [string]::Equals([string]$integrity.algorithm, 'sha256', [System.StringComparison]::OrdinalIgnoreCase)) {
                 throw "PackageModel release '$($release.id)' in '$($definition.id)' uses unsupported packageFile.integrity.algorithm '$($integrity.algorithm)'."
+            }
+        }
+
+        if ($effectiveRelease.PSObject.Properties['packageFile'] -and
+            $effectiveRelease.packageFile -and
+            $effectiveRelease.packageFile.PSObject.Properties['authenticode'] -and
+            $null -ne $effectiveRelease.packageFile.authenticode) {
+            $authenticode = $effectiveRelease.packageFile.authenticode
+            if ($authenticode.PSObject.Properties['requireValid'] -and
+                $null -eq $authenticode.requireValid) {
+                throw "PackageModel release '$($release.id)' in '$($definition.id)' defines packageFile.authenticode.requireValid without a value."
+            }
+            if ($authenticode.PSObject.Properties['subjectContains'] -and
+                [string]::IsNullOrWhiteSpace([string]$authenticode.subjectContains)) {
+                throw "PackageModel release '$($release.id)' in '$($definition.id)' defines packageFile.authenticode.subjectContains without a value."
             }
         }
 
@@ -1467,6 +1502,13 @@ Resolve-PackageModelPaths -PackageModelResult $result
     else {
         $null
     }
+    $installTargetKind = if ($package.PSObject.Properties['install'] -and $package.install -and $package.install.PSObject.Properties['targetKind'] -and
+        -not [string]::IsNullOrWhiteSpace([string]$package.install.targetKind)) {
+        [string]$package.install.targetKind
+    }
+    else {
+        'directory'
+    }
 
     $packageFileRelativeDirectory = Get-PackageModelPackageFileRelativeDirectory -PackageModelConfig $packageModelConfig -Package $package
     $installDirectoryTemplate = $null
@@ -1475,7 +1517,8 @@ Resolve-PackageModelPaths -PackageModelResult $result
         -not [string]::IsNullOrWhiteSpace([string]$package.install.installDirectory)) {
         $installDirectoryTemplate = Resolve-PackageModelTemplateText -Text ([string]$package.install.installDirectory) -PackageModelConfig $packageModelConfig -Package $package
     }
-    elseif (-not [string]::Equals($installKind, 'reuseExisting', [System.StringComparison]::OrdinalIgnoreCase)) {
+    elseif (-not [string]::Equals($installKind, 'reuseExisting', [System.StringComparison]::OrdinalIgnoreCase) -and
+        -not [string]::Equals($installTargetKind, 'machinePrerequisite', [System.StringComparison]::OrdinalIgnoreCase)) {
         throw "PackageModel definition '$($definition.id)' does not define an install target path. Use install.installDirectory."
     }
 

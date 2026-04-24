@@ -246,6 +246,7 @@ Update-PackageModelOwnershipRecord -PackageModelResult $result
     $ownershipKind = switch -Exact ([string]$PackageModelResult.InstallOrigin) {
         'PackageModelInstalled' { 'PackageModelInstalled'; break }
         'PackageModelReused' { 'PackageModelInstalled'; break }
+        'PackageModelApplied' { 'PackageModelApplied'; break }
         'AdoptedExternal' { 'AdoptedExternal'; break }
         default { $null }
     }
@@ -255,12 +256,18 @@ Update-PackageModelOwnershipRecord -PackageModelResult $result
     }
 
     $index = Get-PackageModelOwnershipIndex -PackageModelConfig $PackageModelResult.PackageModelConfig
-    $normalizedInstallDirectory = [System.IO.Path]::GetFullPath($PackageModelResult.InstallDirectory)
+    $normalizedInstallDirectory = if ([string]::IsNullOrWhiteSpace([string]$PackageModelResult.InstallDirectory)) {
+        $null
+    }
+    else {
+        [System.IO.Path]::GetFullPath($PackageModelResult.InstallDirectory)
+    }
     $installSlotId = Get-PackageModelInstallSlotId -PackageModelResult $PackageModelResult
     $records = @(
         foreach ($record in @($index.Records)) {
             $sameInstallSlot = [string]::Equals([string]$record.installSlotId, $installSlotId, [System.StringComparison]::OrdinalIgnoreCase)
-            $sameInstallDirectory = [string]::Equals([string]$record.installDirectory, $normalizedInstallDirectory, [System.StringComparison]::OrdinalIgnoreCase)
+            $sameInstallDirectory = (-not [string]::IsNullOrWhiteSpace([string]$normalizedInstallDirectory)) -and
+                [string]::Equals([string]$record.installDirectory, $normalizedInstallDirectory, [System.StringComparison]::OrdinalIgnoreCase)
             if (-not $sameInstallSlot -and -not $sameInstallDirectory) {
                 $record
             }
