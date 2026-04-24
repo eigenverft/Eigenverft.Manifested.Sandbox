@@ -214,18 +214,18 @@ function global:New-TestValidation {
                 expectedValue = '{version}'
             }
         )
-        metadataFiles = @()
-        signatures    = @()
-        fileDetails   = @()
-        registryChecks = @()
+        metadataFiles = [object[]]@()
+        signatures    = [object[]]@()
+        fileDetails   = [object[]]@()
+        registryChecks = [object[]]@()
     }
 }
 
 function global:New-TestExistingInstallDiscovery {
     param(
         [bool]$EnableDetection = $false,
-        [array]$SearchLocations = @(),
-        [array]$InstallRootRules = @()
+        [array]$SearchLocations = [object[]]@(),
+        [array]$InstallRootRules = [object[]]@()
     )
 
     return @{
@@ -265,13 +265,15 @@ function global:New-TestPackageModelRelease {
 
         [string]$ReleaseTrack = 'stable',
 
+        [string]$ReleaseTag = '',
+
         [string]$FileName = '',
 
         [string]$PackageFileSha256 = '',
 
-        [array]$AcquisitionCandidates = @(),
+        [array]$AcquisitionCandidates = [object[]]@(),
 
-        [hashtable]$Requirements = $null,
+        [hashtable]$Compatibility = $null,
 
         [hashtable]$Install = $null,
 
@@ -312,8 +314,12 @@ function global:New-TestPackageModelRelease {
         acquisitionCandidates = $AcquisitionCandidates
     }
 
-    if ($PSBoundParameters.ContainsKey('Requirements')) {
-        $release.requirements = $Requirements
+    if (-not [string]::IsNullOrWhiteSpace($ReleaseTag)) {
+        $release.releaseTag = $ReleaseTag
+    }
+
+    if ($PSBoundParameters.ContainsKey('Compatibility')) {
+        $release.compatibility = $Compatibility
     }
     if ($PSBoundParameters.ContainsKey('Install')) {
         $release.install = $Install
@@ -337,6 +343,8 @@ function global:New-TestVSCodeDefinitionDocument {
         [array]$Releases,
 
         [string]$UpstreamBaseUri = 'https://update.code.visualstudio.com',
+
+        [hashtable]$UpstreamSources = $null,
 
         [hashtable]$ReleaseDefaultsInstall = $null,
 
@@ -384,10 +392,15 @@ function global:New-TestVSCodeDefinitionDocument {
             }
             localizations = @{}
         }
-        upstreamSources = @{
-            vsCodeUpdateService = @{
-                kind    = 'download'
-                baseUri = $UpstreamBaseUri
+        upstreamSources = if ($PSBoundParameters.ContainsKey('UpstreamSources') -and $null -ne $UpstreamSources) {
+            $UpstreamSources
+        }
+        else {
+            @{
+                vsCodeUpdateService = @{
+                    kind    = 'download'
+                    baseUri = $UpstreamBaseUri
+                }
             }
         }
         providedTools = @{
@@ -405,8 +418,8 @@ function global:New-TestVSCodeDefinitionDocument {
             )
         }
         releaseDefaults = @{
-            requirements             = @{
-                checks = @()
+            compatibility            = @{
+                checks = [object[]]@()
             }
             install                  = $ReleaseDefaultsInstall
             validation               = $ReleaseDefaultsValidation
@@ -480,6 +493,62 @@ Describe 'Eigenverft.Manifested.Sandbox PackageModel' {
         $publicParameterNames.Count | Should -Be 0
     }
 
+    It 'exports Invoke-PackageModel-LlamaCppRuntime and keeps it parameterless' {
+        $module = Import-Module -Name $script:ModuleManifestPath -Force -PassThru
+        $command = Get-Command -Name 'Invoke-PackageModel-LlamaCppRuntime'
+
+        $command | Should -Not -BeNullOrEmpty
+        $publicParameterNames = @($command.Parameters.Keys | Where-Object {
+                $_ -notin [System.Management.Automation.PSCmdlet]::CommonParameters -and
+                $_ -notin [System.Management.Automation.PSCmdlet]::OptionalCommonParameters
+            })
+        $publicParameterNames.Count | Should -Be 0
+    }
+
+    It 'exports Invoke-PackageModel-Qwen35-2B-Q6K and keeps it parameterless' {
+        $module = Import-Module -Name $script:ModuleManifestPath -Force -PassThru
+        $command = Get-Command -Name 'Invoke-PackageModel-Qwen35-2B-Q6K'
+
+        $command | Should -Not -BeNullOrEmpty
+        $publicParameterNames = @($command.Parameters.Keys | Where-Object {
+                $_ -notin [System.Management.Automation.PSCmdlet]::CommonParameters -and
+                $_ -notin [System.Management.Automation.PSCmdlet]::OptionalCommonParameters
+        })
+        $publicParameterNames.Count | Should -Be 0
+    }
+
+    It 'exports Invoke-PackageModel-GitRuntime and keeps it parameterless' {
+        $module = Import-Module -Name $script:ModuleManifestPath -Force -PassThru
+        $command = Get-Command -Name 'Invoke-PackageModel-GitRuntime'
+
+        $command | Should -Not -BeNullOrEmpty
+        $publicParameterNames = @($command.Parameters.Keys | Where-Object {
+                $_ -notin [System.Management.Automation.PSCmdlet]::CommonParameters -and
+                $_ -notin [System.Management.Automation.PSCmdlet]::OptionalCommonParameters
+            })
+        $publicParameterNames.Count | Should -Be 0
+    }
+
+    It 'exports Invoke-PackageModel-GHCliRuntime and keeps it parameterless' {
+        $module = Import-Module -Name $script:ModuleManifestPath -Force -PassThru
+        $command = Get-Command -Name 'Invoke-PackageModel-GHCliRuntime'
+
+        $command | Should -Not -BeNullOrEmpty
+        $publicParameterNames = @($command.Parameters.Keys | Where-Object {
+                $_ -notin [System.Management.Automation.PSCmdlet]::CommonParameters -and
+                $_ -notin [System.Management.Automation.PSCmdlet]::OptionalCommonParameters
+            })
+        $publicParameterNames.Count | Should -Be 0
+    }
+
+    It 'does not export migrated StateModel runtime commands' {
+        $module = Import-Module -Name $script:ModuleManifestPath -Force -PassThru
+
+        Get-Command -Name 'Initialize-VSCodeRuntime' -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
+        Get-Command -Name 'Initialize-GitRuntime' -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
+        Get-Command -Name 'Initialize-GHCliRuntime' -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
+    }
+
     It 'loads the shipped global config without baked-in environment sources' {
         $globalInfo = Read-PackageModelJsonDocument -Path (Get-PackageModelGlobalConfigPath)
 
@@ -487,6 +556,113 @@ Describe 'Eigenverft.Manifested.Sandbox PackageModel' {
         $globalInfo.Document.packageModel.acquisitionEnvironment.stores.PSObject.Properties.Name | Should -Contain 'installWorkspaceDirectory'
         $globalInfo.Document.packageModel.acquisitionEnvironment.stores.PSObject.Properties.Name | Should -Contain 'defaultPackageDepotDirectory'
         $globalInfo.Document.packageModel.acquisitionEnvironment.PSObject.Properties['environmentSources'] | Should -BeNullOrEmpty
+    }
+
+    It 'loads the shipped LlamaCppRuntime definition and selects the fixed GitHub-backed release' {
+        [Environment]::SetEnvironmentVariable($script:SourceInventoryEnvVarName, (Join-Path $TestDrive 'missing-inventory.json'), 'Process')
+
+        $config = Get-PackageModelConfig -DefinitionId 'LlamaCppRuntime'
+        $result = New-PackageModelResult -CommandName 'test' -PackageModelConfig $config
+        $result = Resolve-PackageModelPackage -PackageModelResult $result
+        $sourceDefinition = Get-PackageModelSourceDefinition -PackageModelConfig $config -SourceRef ([pscustomobject]@{ scope = 'definition'; id = 'llamaCppGitHub' })
+
+        $config.DefinitionId | Should -Be 'LlamaCppRuntime'
+        $sourceDefinition.Kind | Should -Be 'githubRelease'
+        $sourceDefinition.RepositoryOwner | Should -Be 'ggml-org'
+        $sourceDefinition.RepositoryName | Should -Be 'llama.cpp'
+        $result.PackageId | Should -Be 'llama-cpp-win-cpu-x64-stable'
+        $result.Package.version | Should -Be '8863'
+        $result.Package.releaseTag | Should -Be 'b8863'
+        $result.Package.packageFile.fileName | Should -Be 'llama-b8863-bin-win-cpu-x64.zip'
+    }
+
+    It 'loads the shipped GitRuntime definition and selects the fixed GitHub-backed release' {
+        [Environment]::SetEnvironmentVariable($script:SourceInventoryEnvVarName, (Join-Path $TestDrive 'missing-inventory.json'), 'Process')
+
+        $config = Get-PackageModelConfig -DefinitionId 'GitRuntime'
+        $result = New-PackageModelResult -CommandName 'test' -PackageModelConfig $config
+        $result = Resolve-PackageModelPackage -PackageModelResult $result
+        $sourceDefinition = Get-PackageModelSourceDefinition -PackageModelConfig $config -SourceRef ([pscustomobject]@{ scope = 'definition'; id = 'gitForWindowsGitHub' })
+
+        $expectedFileName = if ([string]::Equals([string]$config.Architecture, 'arm64', [System.StringComparison]::OrdinalIgnoreCase)) {
+            'MinGit-2.54.0-arm64.zip'
+        }
+        else {
+            'MinGit-2.54.0-64-bit.zip'
+        }
+        $expectedSha256 = if ([string]::Equals([string]$config.Architecture, 'arm64', [System.StringComparison]::OrdinalIgnoreCase)) {
+            '68f6bdda5b58f4e40f431c0da48b05ba5596445314d5e491e7b4aebb1ec2e985'
+        }
+        else {
+            '04f937e1f0918b17b9be6f2294cb2bb66e96e1d9832d1c298e2de088a1d0e668'
+        }
+
+        $config.DefinitionId | Should -Be 'GitRuntime'
+        $sourceDefinition.Kind | Should -Be 'githubRelease'
+        $sourceDefinition.RepositoryOwner | Should -Be 'git-for-windows'
+        $sourceDefinition.RepositoryName | Should -Be 'git'
+        $result.Package.version | Should -Be '2.54.0'
+        $result.Package.releaseTag | Should -Be 'v2.54.0.windows.1'
+        $result.Package.packageFile.fileName | Should -Be $expectedFileName
+        $result.Package.packageFile.integrity.sha256 | Should -Be $expectedSha256
+        $result.Package.install.pathRegistration.source.value | Should -Be 'git'
+    }
+
+    It 'loads the shipped GHCliRuntime definition and selects the fixed GitHub-backed release' {
+        [Environment]::SetEnvironmentVariable($script:SourceInventoryEnvVarName, (Join-Path $TestDrive 'missing-inventory.json'), 'Process')
+
+        $config = Get-PackageModelConfig -DefinitionId 'GHCliRuntime'
+        $result = New-PackageModelResult -CommandName 'test' -PackageModelConfig $config
+        $result = Resolve-PackageModelPackage -PackageModelResult $result
+        $sourceDefinition = Get-PackageModelSourceDefinition -PackageModelConfig $config -SourceRef ([pscustomobject]@{ scope = 'definition'; id = 'ghCliGitHub' })
+
+        $expectedFileName = if ([string]::Equals([string]$config.Architecture, 'arm64', [System.StringComparison]::OrdinalIgnoreCase)) {
+            'gh_2.91.0_windows_arm64.zip'
+        }
+        else {
+            'gh_2.91.0_windows_amd64.zip'
+        }
+        $expectedSha256 = if ([string]::Equals([string]$config.Architecture, 'arm64', [System.StringComparison]::OrdinalIgnoreCase)) {
+            'ae0333d2f9b13fc28f785ca7379514f9a1cea382cd4726abb6e6f4d2a874dd15'
+        }
+        else {
+            'ced3e6f4bb5a9865056b594b7ad0cf42137dc92c494346f1ca705b5dbf14c88e'
+        }
+
+        $config.DefinitionId | Should -Be 'GHCliRuntime'
+        $sourceDefinition.Kind | Should -Be 'githubRelease'
+        $sourceDefinition.RepositoryOwner | Should -Be 'cli'
+        $sourceDefinition.RepositoryName | Should -Be 'cli'
+        $result.Package.version | Should -Be '2.91.0'
+        $result.Package.releaseTag | Should -Be 'v2.91.0'
+        $result.Package.packageFile.fileName | Should -Be $expectedFileName
+        $result.Package.packageFile.integrity.sha256 | Should -Be $expectedSha256
+        $result.Package.install.pathRegistration.source.value | Should -Be 'gh'
+    }
+
+    It 'loads the shipped Qwen35_2B_Q6K definition and selects the fixed Hugging Face-backed resource release' {
+        [Environment]::SetEnvironmentVariable($script:SourceInventoryEnvVarName, (Join-Path $TestDrive 'missing-inventory.json'), 'Process')
+        Mock Get-PhysicalMemoryGiB { 2.0 }
+        Mock Get-VideoMemoryGiB { 1.0 }
+
+        $config = Get-PackageModelConfig -DefinitionId 'Qwen35_2B_Q6K'
+        $result = New-PackageModelResult -CommandName 'test' -PackageModelConfig $config
+        $result = Resolve-PackageModelPackage -PackageModelResult $result
+        $sourceDefinition = Get-PackageModelSourceDefinition -PackageModelConfig $config -SourceRef ([pscustomobject]@{ scope = 'definition'; id = 'huggingFaceDownload' })
+
+        $config.DefinitionId | Should -Be 'Qwen35_2B_Q6K'
+        $sourceDefinition.Kind | Should -Be 'download'
+        $sourceDefinition.BaseUri | Should -Be 'https://huggingface.co/unsloth/Qwen3.5-2B-GGUF/resolve/main/'
+        $result.PackageId | Should -Be 'qwen35-2b-q6-k-stable'
+        $result.Package.version | Should -Be '3.5.0'
+        $result.Package.packageFile.fileName | Should -Be 'Qwen3.5-2B-Q6_K.gguf'
+        $result.Package.packageFile.integrity.algorithm | Should -Be 'sha256'
+        $result.Package.packageFile.integrity.sha256 | Should -Be 'fc90339420b4298887aafb307a4291c55440b730133bbffe6ba9630503dcb548'
+        $result.Package.install.kind | Should -Be 'placePackageFile'
+        $result.Compatibility.Count | Should -Be 1
+        $result.Compatibility[0].Kind | Should -Be 'physicalOrVideoMemoryGiB'
+        $result.Compatibility[0].OnFail | Should -Be 'warn'
+        $result.Compatibility[0].Accepted | Should -BeFalse
     }
 
     It 'fails clearly when the shipped global config still defines vsCodeUpdateService as an environment source' {
@@ -525,17 +701,17 @@ Describe 'Eigenverft.Manifested.Sandbox PackageModel' {
         { Assert-PackageModelDefinitionSchema -DefinitionDocumentInfo $definitionInfo -DefinitionId 'VSCodeRuntime' } | Should -Throw '*schemaVersion*'
     }
 
-    It 'fails clearly when a definition still uses requirements.packages' {
+    It 'fails clearly when a definition still uses releaseDefaults.requirements' {
         $rootPath = Join-Path $TestDrive 'retired-requirements-packages'
         $release = New-TestPackageModelRelease -Id 'vsCode-win-x64-stable' -Version '2.0.0' -Architecture 'x64' -Flavor 'win32-x64' -Install @{ kind = 'reuseExisting' } -Validation (New-TestValidation -Version '2.0.0')
         $definitionDocument = New-TestVSCodeDefinitionDocument -Releases @($release)
         $definitionDocument.releaseDefaults.requirements = @{
-            packages = @()
+            checks = [object[]]@()
         }
         $documents = Write-TestPackageModelDocuments -RootPath $rootPath -GlobalDocument (New-TestPackageModelGlobalDocument) -DefinitionDocument $definitionDocument
 
         $definitionInfo = Read-PackageModelJsonDocument -Path $documents.DefinitionPath
-        { Assert-PackageModelDefinitionSchema -DefinitionDocumentInfo $definitionInfo -DefinitionId 'VSCodeRuntime' } | Should -Throw '*requirements.checks*'
+        { Assert-PackageModelDefinitionSchema -DefinitionDocumentInfo $definitionInfo -DefinitionId 'VSCodeRuntime' } | Should -Throw '*releaseDefaults.requirements*'
     }
 
     It 'uses the default source inventory path when the env var is unset' {
@@ -605,9 +781,9 @@ Describe 'Eigenverft.Manifested.Sandbox PackageModel' {
         $config.EnvironmentSources.remotePackageDepot.basePath | Should -Be (Join-Path $TestDrive 'site-remote')
     }
 
-    It 'rejects a selected release when requirements.checks are not satisfied' {
+    It 'rejects a selected release when compatibility.checks are not satisfied with onFail fail' {
         $rootPath = Join-Path $TestDrive 'requirements-checks-fail'
-        $release = New-TestPackageModelRelease -Id 'vsCode-win-x64-stable' -Version '2.0.0' -Architecture 'x64' -Flavor 'win32-x64' -Install @{ kind = 'reuseExisting' } -Requirements @{
+        $release = New-TestPackageModelRelease -Id 'vsCode-win-x64-stable' -Version '2.0.0' -Architecture 'x64' -Flavor 'win32-x64' -Install @{ kind = 'reuseExisting' } -Compatibility @{
             checks = @(
                 @{
                     kind    = 'osFamily'
@@ -624,7 +800,7 @@ Describe 'Eigenverft.Manifested.Sandbox PackageModel' {
         $config = Get-PackageModelConfig -DefinitionId 'VSCodeRuntime'
         $result = New-PackageModelResult -CommandName 'test' -PackageModelConfig $config
 
-        { Resolve-PackageModelPackage -PackageModelResult $result } | Should -Throw '*requirements.checks*'
+        { Resolve-PackageModelPackage -PackageModelResult $result } | Should -Throw '*compatibility.checks*'
     }
 
     It 'resolves environment and definition source refs from the effective acquisition environment and upstream sources' {
@@ -650,6 +826,196 @@ Describe 'Eigenverft.Manifested.Sandbox PackageModel' {
         $environmentSource.BasePath | Should -Be (Join-Path $TestDrive 'remote-depot')
         $definitionSource.Kind | Should -Be 'download'
         $definitionSource.BaseUri | Should -Be 'https://example.invalid/vscode/'
+    }
+
+    It 'loads GitHub release upstream sources and keeps releaseTag separate from version' {
+        $rootPath = Join-Path $TestDrive 'github-release-source'
+        $release = New-TestPackageModelRelease -Id 'llama-cpu-x64-stable' -Version '0.0.1' -ReleaseTag 'b8863' -Architecture 'x64' -Flavor 'win-cpu-x64' -FileName 'llama-b8863-bin-win-cpu-x64.zip' -AcquisitionCandidates @(
+            @{
+                kind         = 'download'
+                sourceId     = 'llamaCppGitHub'
+                priority     = 100
+                verification = @{ mode = 'required' }
+            }
+        )
+        $documents = Write-TestPackageModelDocuments -RootPath $rootPath -GlobalDocument (New-TestPackageModelGlobalDocument) -DefinitionDocument (New-TestVSCodeDefinitionDocument -Releases @($release) -ReleaseDefaultsValidation (New-TestValidation -Version '0.0.1') -UpstreamSources @{
+            llamaCppGitHub = @{
+                kind            = 'githubRelease'
+                repositoryOwner = 'ggml-org'
+                repositoryName  = 'llama.cpp'
+            }
+        })
+
+        [Environment]::SetEnvironmentVariable($script:SourceInventoryEnvVarName, (Join-Path $TestDrive 'missing-inventory.json'), 'Process')
+        Mock Get-PackageModelGlobalConfigPath { $documents.GlobalConfigPath }
+        Mock Get-PackageModelDefinitionPath { param($DefinitionId) $documents.DefinitionPath }
+
+        $config = Get-PackageModelConfig -DefinitionId 'VSCodeRuntime'
+        $result = New-PackageModelResult -CommandName 'test' -PackageModelConfig $config
+        $result = Resolve-PackageModelPackage -PackageModelResult $result
+        $definitionSource = Get-PackageModelSourceDefinition -PackageModelConfig $config -SourceRef ([pscustomobject]@{ scope = 'definition'; id = 'llamaCppGitHub' })
+
+        $definitionSource.Kind | Should -Be 'githubRelease'
+        $definitionSource.RepositoryOwner | Should -Be 'ggml-org'
+        $definitionSource.RepositoryName | Should -Be 'llama.cpp'
+        $result.Package.version | Should -Be '0.0.1'
+        $result.Package.releaseTag | Should -Be 'b8863'
+    }
+
+    It 'requires releaseTag for GitHub-backed releases' {
+        $rootPath = Join-Path $TestDrive 'github-release-tag-required'
+        $release = New-TestPackageModelRelease -Id 'llama-cpu-x64-stable' -Version '0.0.1' -Architecture 'x64' -Flavor 'win-cpu-x64' -FileName 'llama-b8863-bin-win-cpu-x64.zip' -AcquisitionCandidates @(
+            @{
+                kind         = 'download'
+                sourceId     = 'llamaCppGitHub'
+                priority     = 100
+                verification = @{ mode = 'required' }
+            }
+        )
+        $documents = Write-TestPackageModelDocuments -RootPath $rootPath -GlobalDocument (New-TestPackageModelGlobalDocument) -DefinitionDocument (New-TestVSCodeDefinitionDocument -Releases @($release) -ReleaseDefaultsValidation (New-TestValidation -Version '0.0.1') -UpstreamSources @{
+            llamaCppGitHub = @{
+                kind            = 'githubRelease'
+                repositoryOwner = 'ggml-org'
+                repositoryName  = 'llama.cpp'
+            }
+        })
+
+        [Environment]::SetEnvironmentVariable($script:SourceInventoryEnvVarName, (Join-Path $TestDrive 'missing-inventory.json'), 'Process')
+        Mock Get-PackageModelGlobalConfigPath { $documents.GlobalConfigPath }
+        Mock Get-PackageModelDefinitionPath { param($DefinitionId) $documents.DefinitionPath }
+
+        { Get-PackageModelConfig -DefinitionId 'VSCodeRuntime' } | Should -Throw '*requires releaseTag*'
+    }
+
+    It 'resolves a GitHub release asset URL from releaseTag and packageFile.fileName' {
+        $rootPath = Join-Path $TestDrive 'github-release-resolve'
+        $release = New-TestPackageModelRelease -Id 'llama-cpu-x64-stable' -Version '0.0.1' -ReleaseTag 'b8863' -Architecture 'x64' -Flavor 'win-cpu-x64' -FileName 'llama-b8863-bin-win-cpu-x64.zip' -AcquisitionCandidates @(
+            @{
+                kind         = 'download'
+                sourceId     = 'llamaCppGitHub'
+                priority     = 100
+                verification = @{ mode = 'required' }
+            }
+        )
+        $documents = Write-TestPackageModelDocuments -RootPath $rootPath -GlobalDocument (New-TestPackageModelGlobalDocument) -DefinitionDocument (New-TestVSCodeDefinitionDocument -Releases @($release) -ReleaseDefaultsValidation (New-TestValidation -Version '0.0.1') -UpstreamSources @{
+            llamaCppGitHub = @{
+                kind            = 'githubRelease'
+                repositoryOwner = 'ggml-org'
+                repositoryName  = 'llama.cpp'
+            }
+        })
+
+        [Environment]::SetEnvironmentVariable($script:SourceInventoryEnvVarName, (Join-Path $TestDrive 'missing-inventory.json'), 'Process')
+        Mock Get-PackageModelGlobalConfigPath { $documents.GlobalConfigPath }
+        Mock Get-PackageModelDefinitionPath { param($DefinitionId) $documents.DefinitionPath }
+        Mock Get-GitHubRelease {
+            [pscustomobject]@{
+                RepositoryOwner = 'ggml-org'
+                RepositoryName  = 'llama.cpp'
+                ReleaseTag      = 'b8863'
+                Assets          = @(
+                    [pscustomobject]@{
+                        Name        = 'llama-b8863-bin-win-cpu-x64.zip'
+                        DownloadUrl = 'https://example.invalid/ggml-org/llama.cpp/releases/download/b8863/llama-b8863-bin-win-cpu-x64.zip'
+                    }
+                )
+            }
+        }
+
+        $config = Get-PackageModelConfig -DefinitionId 'VSCodeRuntime'
+        $result = New-PackageModelResult -CommandName 'test' -PackageModelConfig $config
+        $result = Resolve-PackageModelPackage -PackageModelResult $result
+        $sourceDefinition = Get-PackageModelSourceDefinition -PackageModelConfig $config -SourceRef ([pscustomobject]@{ scope = 'definition'; id = 'llamaCppGitHub' })
+        $resolvedSource = Resolve-PackageModelSource -SourceDefinition $sourceDefinition -AcquisitionCandidate $result.Package.acquisitionCandidates[0] -Package $result.Package
+
+        $resolvedSource.Kind | Should -Be 'download'
+        $resolvedSource.ResolvedSource | Should -Be 'https://example.invalid/ggml-org/llama.cpp/releases/download/b8863/llama-b8863-bin-win-cpu-x64.zip'
+        Assert-MockCalled Get-GitHubRelease -Times 1 -Exactly
+    }
+
+    It 'fails clearly when a GitHub release tag cannot be resolved' {
+        Mock Invoke-WebRequestEx { throw '404 Not Found' }
+
+        { Get-GitHubRelease -RepositoryOwner 'ggml-org' -RepositoryName 'llama.cpp' -ReleaseTag 'b9999' } | Should -Throw "*repository 'ggml-org/llama.cpp'*release tag 'b9999'*"
+    }
+
+    It 'normalizes GitHub release API metadata and assets' {
+        $responseBody = @{
+            id           = 42
+            tag_name     = 'b8863'
+            name         = 'b8863'
+            html_url     = 'https://github.com/ggml-org/llama.cpp/releases/tag/b8863'
+            published_at = '2026-04-20T23:54:06Z'
+            draft        = $false
+            prerelease   = $false
+            immutable    = $false
+            assets       = @(
+                @{
+                    id                   = 99
+                    name                 = 'llama-b8863-bin-win-cpu-x64.zip'
+                    browser_download_url = 'https://example.invalid/llama-b8863-bin-win-cpu-x64.zip'
+                    content_type         = 'application/zip'
+                    size                 = 12345
+                    digest               = 'sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef'
+                    created_at           = '2026-04-20T23:54:06Z'
+                    updated_at           = '2026-04-20T23:54:06Z'
+                }
+            )
+        } | ConvertTo-Json -Depth 10
+
+        Mock Invoke-WebRequestEx {
+            [pscustomobject]@{
+                Content = $responseBody
+            }
+        }
+
+        $release = Get-GitHubRelease -RepositoryOwner 'ggml-org' -RepositoryName 'llama.cpp' -ReleaseTag 'b8863'
+
+        $release.ReleaseId | Should -Be '42'
+        $release.ReleaseTag | Should -Be 'b8863'
+        $release.RepositoryOwner | Should -Be 'ggml-org'
+        $release.RepositoryName | Should -Be 'llama.cpp'
+        $release.Assets.Count | Should -Be 1
+        $release.Assets[0].Name | Should -Be 'llama-b8863-bin-win-cpu-x64.zip'
+        $release.Assets[0].DownloadUrl | Should -Be 'https://example.invalid/llama-b8863-bin-win-cpu-x64.zip'
+        $release.Assets[0].Sha256 | Should -Be '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef'
+    }
+
+    It 'fails clearly when the GitHub release asset is missing' {
+        $sourceDefinition = [pscustomobject]@{
+            Scope           = 'definition'
+            Id              = 'llamaCppGitHub'
+            Kind            = 'githubRelease'
+            RepositoryOwner = 'ggml-org'
+            RepositoryName  = 'llama.cpp'
+        }
+        $package = ConvertTo-TestPsObject @{
+            id         = 'llama-cpu-x64-stable'
+            releaseTag = 'b8863'
+            packageFile = @{
+                fileName = 'llama-b8863-bin-win-cpu-x64.zip'
+            }
+        }
+        $candidate = ConvertTo-TestPsObject @{
+            kind     = 'download'
+            sourceId = 'llamaCppGitHub'
+        }
+
+        Mock Get-GitHubRelease {
+            [pscustomobject]@{
+                RepositoryOwner = 'ggml-org'
+                RepositoryName  = 'llama.cpp'
+                ReleaseTag      = 'b8863'
+                Assets          = @(
+                    [pscustomobject]@{
+                        Name        = 'llama-b8863-bin-win-cuda-12.4-x64.zip'
+                        DownloadUrl = 'https://example.invalid/other.zip'
+                    }
+                )
+            }
+        }
+
+        { Resolve-PackageModelSource -SourceDefinition $sourceDefinition -AcquisitionCandidate $candidate -Package $package } | Should -Throw '*does not contain asset*llama-b8863-bin-win-cpu-x64.zip*'
     }
 
     It 'builds an effective release from releaseDefaults and uses ReleaseTrack in path resolution' {
@@ -807,6 +1173,52 @@ Describe 'Eigenverft.Manifested.Sandbox PackageModel' {
         $expectedBinPattern = [regex]::Escape($binDirectory)
         @($writes | Where-Object { $_.Target -eq 'Process' })[0].Value | Should -Match $expectedBinPattern
         @($writes | Where-Object { $_.Target -eq 'User' })[0].Value | Should -Match $expectedBinPattern
+    }
+
+    It 'resolves shipped GitRuntime PATH registration to the cmd directory' {
+        [Environment]::SetEnvironmentVariable($script:SourceInventoryEnvVarName, (Join-Path $TestDrive 'missing-inventory.json'), 'Process')
+
+        $installRoot = Join-Path $TestDrive 'path-registration-shipped-git'
+        $cmdDirectory = Join-Path $installRoot 'cmd'
+        $null = New-Item -ItemType Directory -Path $cmdDirectory -Force
+        Write-TestTextFile -Path (Join-Path $cmdDirectory 'git.exe') -Content 'fake git'
+
+        $config = Get-PackageModelConfig -DefinitionId 'GitRuntime'
+        $packageModelResult = New-PackageModelResult -CommandName 'test' -PackageModelConfig $config
+        $packageModelResult = Resolve-PackageModelPackage -PackageModelResult $packageModelResult
+        $packageModelResult.InstallDirectory = $installRoot
+        $packageModelResult.InstallOrigin = 'PackageModelInstalled'
+
+        Mock Get-EnvironmentVariableValue {}
+        Mock Set-EnvironmentVariableValue {}
+
+        $packageModelResult = Register-PackageModelPath -PackageModelResult $packageModelResult
+
+        $packageModelResult.PathRegistration.Status | Should -Be 'Registered'
+        $packageModelResult.PathRegistration.RegisteredPath | Should -Be $cmdDirectory
+    }
+
+    It 'resolves shipped GHCliRuntime PATH registration to the bin directory' {
+        [Environment]::SetEnvironmentVariable($script:SourceInventoryEnvVarName, (Join-Path $TestDrive 'missing-inventory.json'), 'Process')
+
+        $installRoot = Join-Path $TestDrive 'path-registration-shipped-ghcli'
+        $binDirectory = Join-Path $installRoot 'bin'
+        $null = New-Item -ItemType Directory -Path $binDirectory -Force
+        Write-TestTextFile -Path (Join-Path $binDirectory 'gh.exe') -Content 'fake gh'
+
+        $config = Get-PackageModelConfig -DefinitionId 'GHCliRuntime'
+        $packageModelResult = New-PackageModelResult -CommandName 'test' -PackageModelConfig $config
+        $packageModelResult = Resolve-PackageModelPackage -PackageModelResult $packageModelResult
+        $packageModelResult.InstallDirectory = $installRoot
+        $packageModelResult.InstallOrigin = 'PackageModelInstalled'
+
+        Mock Get-EnvironmentVariableValue {}
+        Mock Set-EnvironmentVariableValue {}
+
+        $packageModelResult = Register-PackageModelPath -PackageModelResult $packageModelResult
+
+        $packageModelResult.PathRegistration.Status | Should -Be 'Registered'
+        $packageModelResult.PathRegistration.RegisteredPath | Should -Be $binDirectory
     }
 
     It 'skips PATH registration for adopted external installs' {
@@ -1378,6 +1790,527 @@ Describe 'Eigenverft.Manifested.Sandbox PackageModel' {
 
         $writeStandardMessage.ScriptBlock.File | Should -Match 'PackageModel\\Support\\ExecutionEngine\\.*StandardMessage\.ps1$'
         $packageModelExecutionMessage.ScriptBlock.File | Should -Match 'PackageModel\\Support\\Package\\.*ExecutionMessage\.ps1$'
+    }
+
+    It 'loads archive helpers from ExecutionEngine and keeps the StateModel extraction wrapper in place' {
+        $expandArchiveToStage = Get-Command Expand-ArchiveToStage -CommandType Function
+        $expandManifestedArchiveToStage = Get-Command Expand-ManifestedArchiveToStage -CommandType Function
+
+        $expandArchiveToStage.ScriptBlock.File | Should -Match 'PackageModel\\Support\\ExecutionEngine\\.*Archive\.ps1$'
+        $expandManifestedArchiveToStage.ScriptBlock.File | Should -Match 'StateModel\\Support\\.*Shared\.Extraction\.ps1$'
+    }
+
+    It 'loads command resolution and filesystem helpers from ExecutionEngine' {
+        $getResolvedApplicationPath = Get-Command Get-ResolvedApplicationPath -CommandType Function
+        $removePathIfExists = Get-Command Remove-PathIfExists -CommandType Function
+        $copyFileToPath = Get-Command Copy-FileToPath -CommandType Function
+
+        $getResolvedApplicationPath.ScriptBlock.File | Should -Match 'PackageModel\\Support\\ExecutionEngine\\.*CommandResolution\.ps1$'
+        $removePathIfExists.ScriptBlock.File | Should -Match 'PackageModel\\Support\\ExecutionEngine\\.*FileSystem\.ps1$'
+        $copyFileToPath.ScriptBlock.File | Should -Match 'PackageModel\\Support\\ExecutionEngine\\.*FileSystem\.ps1$'
+    }
+
+    It 'returns null when Get-ResolvedApplicationPath cannot resolve a command' {
+        Mock Get-Command { @() } -ParameterFilter { $Name -eq 'missing-tool' -and $CommandType -eq 'Application' -and $All }
+
+        $resolvedPath = Get-ResolvedApplicationPath -CommandName 'missing-tool'
+
+        $resolvedPath | Should -BeNullOrEmpty
+    }
+
+    It 'returns the normalized full path of the first resolved application' {
+        Mock Get-Command {
+            [pscustomobject]@{
+                Source = 'C:\Tools\bin\tool.exe'
+            }
+        } -ParameterFilter { $Name -eq 'tool' -and $CommandType -eq 'Application' -and $All }
+
+        $resolvedPath = Get-ResolvedApplicationPath -CommandName 'tool'
+
+        $resolvedPath | Should -Be ([System.IO.Path]::GetFullPath('C:\Tools\bin\tool.exe'))
+    }
+
+    It 'returns false when Remove-PathIfExists receives a missing path' {
+        $removed = Remove-PathIfExists -Path (Join-Path $TestDrive 'missing-path')
+
+        $removed | Should -BeFalse
+    }
+
+    It 'removes an existing file and returns true' {
+        $filePath = Join-Path $TestDrive 'remove-file\test.txt'
+        Write-TestTextFile -Path $filePath -Content 'content'
+
+        $removed = Remove-PathIfExists -Path $filePath
+
+        $removed | Should -BeTrue
+        Test-Path -LiteralPath $filePath | Should -BeFalse
+    }
+
+    It 'removes an existing directory and returns true' {
+        $directoryPath = Join-Path $TestDrive 'remove-directory'
+        Write-TestTextFile -Path (Join-Path $directoryPath 'test.txt') -Content 'content'
+
+        $removed = Remove-PathIfExists -Path $directoryPath
+
+        $removed | Should -BeTrue
+        Test-Path -LiteralPath $directoryPath | Should -BeFalse
+    }
+
+    It 'copies a file to a target path and returns the resolved target path' {
+        $sourcePath = Join-Path $TestDrive 'copy-file\source.txt'
+        $targetPath = Join-Path $TestDrive 'copy-file\target.txt'
+        Write-TestTextFile -Path $sourcePath -Content 'version-a'
+
+        $resolvedTarget = Copy-FileToPath -SourcePath $sourcePath -TargetPath $targetPath
+
+        $resolvedTarget | Should -Be ([System.IO.Path]::GetFullPath($targetPath))
+        (Get-Content -LiteralPath $targetPath -Raw) | Should -Be 'version-a'
+    }
+
+    It 'overwrites a copied file when requested' {
+        $sourcePath = Join-Path $TestDrive 'copy-file-overwrite\source.txt'
+        $targetPath = Join-Path $TestDrive 'copy-file-overwrite\target.txt'
+        Write-TestTextFile -Path $sourcePath -Content 'version-b'
+        Write-TestTextFile -Path $targetPath -Content 'version-a'
+
+        Copy-FileToPath -SourcePath $sourcePath -TargetPath $targetPath -Overwrite | Out-Null
+
+        (Get-Content -LiteralPath $targetPath -Raw) | Should -Be 'version-b'
+    }
+
+    It 'extracts an archive into an empty destination directory' {
+        $rootPath = Join-Path $TestDrive 'archive-extract-empty'
+        $sourceDirectory = Join-Path $rootPath 'source'
+        $destinationDirectory = Join-Path $rootPath 'destination'
+        $zipPath = Join-Path $rootPath 'package.zip'
+
+        $null = New-Item -ItemType Directory -Path (Join-Path $sourceDirectory 'bin') -Force
+        Write-TestTextFile -Path (Join-Path $sourceDirectory 'Code.exe') -Content 'binary-a'
+        Write-TestTextFile -Path (Join-Path $sourceDirectory 'bin\code.cmd') -Content '@echo off'
+        Write-TestZipFromDirectory -SourceDirectory $sourceDirectory -ZipPath $zipPath
+
+        $resolvedDestination = Expand-ArchiveToDirectory -ArchivePath $zipPath -DestinationDirectory $destinationDirectory
+
+        $resolvedDestination | Should -Be ([System.IO.Path]::GetFullPath($destinationDirectory))
+        Test-Path -LiteralPath (Join-Path $destinationDirectory 'Code.exe') | Should -BeTrue
+        Test-Path -LiteralPath (Join-Path $destinationDirectory 'bin\code.cmd') | Should -BeTrue
+    }
+
+    It 'overwrites existing extracted files when requested' {
+        $rootPath = Join-Path $TestDrive 'archive-extract-overwrite'
+        $firstSourceDirectory = Join-Path $rootPath 'source-a'
+        $secondSourceDirectory = Join-Path $rootPath 'source-b'
+        $destinationDirectory = Join-Path $rootPath 'destination'
+        $firstZipPath = Join-Path $rootPath 'package-a.zip'
+        $secondZipPath = Join-Path $rootPath 'package-b.zip'
+
+        $null = New-Item -ItemType Directory -Path $firstSourceDirectory -Force
+        $null = New-Item -ItemType Directory -Path $secondSourceDirectory -Force
+        Write-TestTextFile -Path (Join-Path $firstSourceDirectory 'app.txt') -Content 'version-a'
+        Write-TestTextFile -Path (Join-Path $secondSourceDirectory 'app.txt') -Content 'version-b'
+        Write-TestZipFromDirectory -SourceDirectory $firstSourceDirectory -ZipPath $firstZipPath
+        Write-TestZipFromDirectory -SourceDirectory $secondSourceDirectory -ZipPath $secondZipPath
+
+        Expand-ArchiveToDirectory -ArchivePath $firstZipPath -DestinationDirectory $destinationDirectory | Out-Null
+        Expand-ArchiveToDirectory -ArchivePath $secondZipPath -DestinationDirectory $destinationDirectory -Overwrite | Out-Null
+
+        (Get-Content -LiteralPath (Join-Path $destinationDirectory 'app.txt') -Raw) | Should -Be 'version-b'
+    }
+
+    It 'returns the single child directory when expanded content lands under one top-level folder' {
+        $stagePath = Join-Path $TestDrive 'expanded-root-single-child'
+        $childDirectory = Join-Path $stagePath 'payload'
+        $null = New-Item -ItemType Directory -Path $childDirectory -Force
+        Write-TestTextFile -Path (Join-Path $childDirectory 'tool.exe') -Content 'tool'
+
+        $expandedRoot = Get-ExpandedArchiveRoot -StagePath $stagePath
+
+        $expandedRoot | Should -Be ([System.IO.Path]::GetFullPath($childDirectory))
+    }
+
+    It 'returns the stage root when files are expanded directly into the stage' {
+        $stagePath = Join-Path $TestDrive 'expanded-root-stage'
+        $null = New-Item -ItemType Directory -Path $stagePath -Force
+        $null = New-Item -ItemType Directory -Path (Join-Path $stagePath 'payload') -Force
+        Write-TestTextFile -Path (Join-Path $stagePath 'tool.exe') -Content 'tool'
+
+        $expandedRoot = Get-ExpandedArchiveRoot -StagePath $stagePath
+
+        $expandedRoot | Should -Be ([System.IO.Path]::GetFullPath($stagePath))
+    }
+
+    It 'creates a temporary stage and resolves the expanded root from the extracted archive' {
+        $rootPath = Join-Path $TestDrive 'archive-stage'
+        $sourceDirectory = Join-Path $rootPath 'source'
+        $payloadDirectory = Join-Path $sourceDirectory 'payload'
+        $zipPath = Join-Path $rootPath 'package.zip'
+        $null = New-Item -ItemType Directory -Path $payloadDirectory -Force
+        Write-TestTextFile -Path (Join-Path $payloadDirectory 'tool.exe') -Content 'tool'
+        Write-TestZipFromDirectory -SourceDirectory $sourceDirectory -ZipPath $zipPath
+
+        $stageInfo = Expand-ArchiveToStage -ArchivePath $zipPath -Prefix 'pester'
+
+        try {
+            Test-Path -LiteralPath $stageInfo.StagePath -PathType Container | Should -BeTrue
+            $stageInfo.ExpandedRoot | Should -Be (Join-Path $stageInfo.StagePath 'payload')
+            Test-Path -LiteralPath (Join-Path $stageInfo.ExpandedRoot 'tool.exe') -PathType Leaf | Should -BeTrue
+        }
+        finally {
+            if (Test-Path -LiteralPath $stageInfo.StagePath) {
+                Remove-Item -LiteralPath $stageInfo.StagePath -Recurse -Force
+            }
+        }
+    }
+
+    It 'routes PackageModel archive installs through Expand-ArchiveToStage' {
+        $rootPath = Join-Path $TestDrive 'package-install-archive-route'
+        $packageFilePath = Join-Path $rootPath 'package.zip'
+        $stagePath = Join-Path $rootPath 'stage'
+        $expandedRoot = Join-Path $stagePath 'payload'
+        $installDirectory = Join-Path $rootPath 'install'
+        $null = New-Item -ItemType Directory -Path $expandedRoot -Force
+        Write-TestTextFile -Path $packageFilePath -Content 'placeholder'
+        Write-TestTextFile -Path (Join-Path $expandedRoot 'Code.exe') -Content 'binary'
+
+        Mock Expand-ArchiveToStage {
+            [pscustomobject]@{
+                StagePath    = $stagePath
+                ExpandedRoot = $expandedRoot
+            }
+        }
+        Mock Expand-ManifestedArchiveToStage {
+            throw 'legacy extraction path should not be used'
+        }
+        Mock Remove-PathIfExists { return $true }
+        Mock Remove-ManifestedPath {
+            throw 'legacy cleanup path should not be used'
+        }
+
+        $packageModelResult = [pscustomobject]@{
+            PackageId        = 'VSCodeRuntime'
+            PackageFilePath  = $packageFilePath
+            InstallDirectory = $installDirectory
+            Package          = [pscustomobject]@{
+                install = [pscustomobject]@{
+                    kind              = 'expandArchive'
+                    expandedRoot      = 'auto'
+                    createDirectories = @('data')
+                }
+            }
+            ExistingPackage = $null
+        }
+
+        $installResult = Install-PackageModelArchive -PackageModelResult $packageModelResult
+
+        Assert-MockCalled Expand-ArchiveToStage -Times 1
+        Assert-MockCalled Expand-ManifestedArchiveToStage -Times 0
+        Assert-MockCalled Remove-PathIfExists -Times 1 -ParameterFilter { $Path -eq $stagePath }
+        Assert-MockCalled Remove-ManifestedPath -Times 0
+        $installResult.InstallKind | Should -Be 'expandArchive'
+        Test-Path -LiteralPath (Join-Path $installDirectory 'Code.exe') -PathType Leaf | Should -BeTrue
+        Test-Path -LiteralPath (Join-Path $installDirectory 'data') -PathType Container | Should -BeTrue
+    }
+
+    It 'installs a single package file into the configured target-relative path' {
+        $rootPath = Join-Path $TestDrive 'package-install-file-route'
+        $packageFilePath = Join-Path $rootPath 'package\Qwen3.5-2B-Q6_K.gguf'
+        $installDirectory = Join-Path $rootPath 'install'
+        Write-TestTextFile -Path $packageFilePath -Content 'gguf-binary'
+
+        $packageModelResult = [pscustomobject]@{
+            PackageId        = 'Qwen35_2B_Q6K'
+            PackageFilePath  = $packageFilePath
+            InstallDirectory = $installDirectory
+            Package          = [pscustomobject]@{
+                packageFile = [pscustomobject]@{
+                    fileName = 'Qwen3.5-2B-Q6_K.gguf'
+                }
+                install = [pscustomobject]@{
+                    kind               = 'placePackageFile'
+                    targetRelativePath = 'models/Qwen3.5-2B-Q6_K.gguf'
+                }
+            }
+            ExistingPackage = $null
+        }
+
+        $installResult = Install-PackageModelPackageFile -PackageModelResult $packageModelResult
+
+        $installResult.InstallKind | Should -Be 'placePackageFile'
+        $installResult.InstalledFilePath | Should -Be (Join-Path $installDirectory 'models\Qwen3.5-2B-Q6_K.gguf')
+        Test-Path -LiteralPath $installResult.InstalledFilePath -PathType Leaf | Should -BeTrue
+        (Get-Content -LiteralPath $installResult.InstalledFilePath -Raw) | Should -Be 'gguf-binary'
+    }
+
+    It 'installs a shipped single-file resource from the default package depot and validates it' {
+        $rootPath = Join-Path $TestDrive 'resource-package-flow'
+        $installWorkspaceDirectory = Join-Path $rootPath 'workspace'
+        $defaultPackageDepotDirectory = Join-Path $rootPath 'default-depot'
+        $preferredTargetInstallDirectory = Join-Path $rootPath 'installs'
+        $ownershipIndexFilePath = Join-Path $rootPath 'ownership.json'
+        $definitionDocument = @{
+            schemaVersion = '1.0'
+            id = 'Qwen35_2B_Q6K'
+            display = @{
+                default = @{
+                    name = 'Qwen 3.5 2B Q6_K'
+                    publisher = 'Unsloth'
+                    corporation = 'Unsloth AI'
+                    summary = 'Quantized GGUF model resource'
+                }
+                localizations = @{}
+            }
+            upstreamSources = @{
+                huggingFaceDownload = @{
+                    kind = 'download'
+                    baseUri = 'https://huggingface.co/unsloth/Qwen3.5-2B-GGUF/resolve/main/'
+                }
+            }
+            providedTools = @{
+                commands = [object[]]@()
+                apps = [object[]]@()
+            }
+            releaseDefaults = @{
+                compatibility = @{
+                    checks = @(
+                        @{
+                            kind = 'physicalOrVideoMemoryGiB'
+                            operator = '>='
+                            value = 4
+                            onFail = 'warn'
+                        }
+                    )
+                }
+                install = @{
+                    kind = 'placePackageFile'
+                    installDirectory = 'qwen35-2b/{releaseTrack}/{version}/{flavor}'
+                    targetRelativePath = 'Qwen3.5-2B-Q6_K.gguf'
+                    pathRegistration = @{
+                        mode = 'none'
+                    }
+                }
+                validation = @{
+                    files = @('Qwen3.5-2B-Q6_K.gguf')
+                    directories = [object[]]@()
+                    commandChecks = [object[]]@()
+                    metadataFiles = [object[]]@()
+                    signatures = [object[]]@()
+                    fileDetails = [object[]]@()
+                    registryChecks = [object[]]@()
+                }
+                existingInstallDiscovery = @{
+                    enableDetection = $false
+                    searchLocations = [object[]]@()
+                    installRootRules = [object[]]@()
+                }
+                existingInstallPolicy = @{
+                    allowAdoptExternal = $false
+                    upgradeAdoptedInstall = $false
+                    requirePackageModelOwnership = $false
+                }
+            }
+            releases = @(
+                @{
+                    id = 'qwen35-2b-q6-k-stable'
+                    version = '3.5.0'
+                    releaseTrack = 'stable'
+                    flavor = 'q6-k'
+                    constraints = @{
+                        os = @('windows')
+                        cpu = @('x64')
+                    }
+                    packageFile = @{
+                        fileName = 'Qwen3.5-2B-Q6_K.gguf'
+                        format = 'gguf'
+                        portable = $true
+                        autoUpdateSupported = $false
+                    }
+                    acquisitionCandidates = @(
+                        @{
+                            kind = 'packageDepot'
+                            priority = 250
+                            verification = @{
+                                mode = 'none'
+                            }
+                        }
+                    )
+                }
+            )
+        }
+        $documents = Write-TestPackageModelDocuments -RootPath $rootPath -GlobalDocument (New-TestPackageModelGlobalDocument -InstallWorkspaceDirectory $installWorkspaceDirectory -DefaultPackageDepotDirectory $defaultPackageDepotDirectory -PreferredTargetInstallDirectory $preferredTargetInstallDirectory -OwnershipIndexFilePath $ownershipIndexFilePath) -DefinitionDocument $definitionDocument
+
+        [Environment]::SetEnvironmentVariable($script:SourceInventoryEnvVarName, (Join-Path $TestDrive 'missing-inventory.json'), 'Process')
+        Mock Get-PackageModelGlobalConfigPath { $documents.GlobalConfigPath }
+        Mock Get-PackageModelDefinitionPath { param($DefinitionId) $documents.DefinitionPath }
+
+        $config = Get-PackageModelConfig -DefinitionId 'Qwen35_2B_Q6K'
+        $result = New-PackageModelResult -CommandName 'test' -PackageModelConfig $config
+        $result = Resolve-PackageModelPackage -PackageModelResult $result
+        $result = Resolve-PackageModelPaths -PackageModelResult $result
+        $result = Build-PackageModelAcquisitionPlan -PackageModelResult $result
+
+        $null = New-Item -ItemType Directory -Path (Split-Path -Parent $result.DefaultPackageDepotFilePath) -Force
+        Write-TestTextFile -Path $result.DefaultPackageDepotFilePath -Content 'gguf-binary'
+
+        $result = Save-PackageModelPackageFile -PackageModelResult $result
+        $result = Install-PackageModelPackage -PackageModelResult $result
+        $result = Test-PackageModelInstalledPackage -PackageModelResult $result
+
+        $result.PackageFileSave.Status | Should -Be 'HydratedFromDefaultPackageDepot'
+        $result.Install.InstallKind | Should -Be 'placePackageFile'
+        $result.Install.InstalledFilePath | Should -Be (Join-Path $result.InstallDirectory 'Qwen3.5-2B-Q6_K.gguf')
+        Test-Path -LiteralPath $result.Install.InstalledFilePath -PathType Leaf | Should -BeTrue
+        $result.Validation.Accepted | Should -BeTrue
+    }
+
+    It 'discovers command-based existing installs through Get-ResolvedApplicationPath' {
+        $rootPath = Join-Path $TestDrive 'command-discovery-route'
+        $installRoot = Join-Path $rootPath 'existing-install'
+        $commandPath = Join-Path $installRoot 'bin\code.cmd'
+        $null = New-Item -ItemType Directory -Path (Split-Path -Parent $commandPath) -Force
+        Write-TestTextFile -Path (Join-Path $installRoot 'Code.exe') -Content 'fake'
+        Write-TestTextFile -Path $commandPath -Content '@echo off'
+
+        $packageModelResult = [pscustomobject]@{
+            InstallDirectory = $null
+            ExistingPackage  = $null
+            Package          = [pscustomobject]@{
+                id = 'VSCodeRuntime'
+                existingInstallDiscovery = [pscustomobject]@{
+                    enableDetection = $true
+                    searchLocations = @(
+                        [pscustomobject]@{
+                            kind = 'command'
+                            name = 'code'
+                        }
+                    )
+                    installRootRules = @(
+                        [pscustomobject]@{
+                            match = [pscustomobject]@{
+                                kind  = 'fileName'
+                                value = 'code.cmd'
+                            }
+                            installRootRelativePath = '..'
+                        }
+                    )
+                }
+            }
+        }
+
+        Mock Get-ResolvedApplicationPath { $commandPath } -ParameterFilter { $CommandName -eq 'code' }
+        Mock Get-ManifestedResolvedApplicationPath {
+            throw 'legacy command resolution path should not be used'
+        }
+
+        $packageModelResult = Find-PackageModelExistingPackage -PackageModelResult $packageModelResult
+
+        Assert-MockCalled Get-ResolvedApplicationPath -Times 1 -ParameterFilter { $CommandName -eq 'code' }
+        Assert-MockCalled Get-ManifestedResolvedApplicationPath -Times 0
+        $packageModelResult.ExistingPackage.SearchKind | Should -Be 'command'
+        $packageModelResult.ExistingPackage.CandidatePath | Should -Be $commandPath
+        $packageModelResult.ExistingPackage.InstallDirectory | Should -Be ([System.IO.Path]::GetFullPath($installRoot))
+    }
+
+    It 'routes filesystem package saves through Copy-FileToPath' {
+        $sourcePath = Join-Path $TestDrive 'filesystem-save\source.zip'
+        $targetPath = Join-Path $TestDrive 'filesystem-save\target.zip'
+        Write-TestTextFile -Path $sourcePath -Content 'archive'
+
+        Mock Copy-FileToPath { $TargetPath } -ParameterFilter { $SourcePath -eq $sourcePath -and $TargetPath -eq $targetPath -and $Overwrite }
+
+        $resolvedPath = Save-PackageModelFilesystemFile -SourcePath $sourcePath -TargetPath $targetPath
+
+        Assert-MockCalled Copy-FileToPath -Times 1 -ParameterFilter { $SourcePath -eq $sourcePath -and $TargetPath -eq $targetPath -and $Overwrite }
+        $resolvedPath | Should -Be $targetPath
+    }
+
+    It 'keeps Expand-ManifestedArchiveToStage as a compatibility wrapper over the generic archive helper' {
+        $packagePath = Join-Path $TestDrive 'compat-package.zip'
+        Write-TestTextFile -Path $packagePath -Content 'placeholder'
+        Mock Expand-ArchiveToStage {
+            [pscustomobject]@{
+                StagePath    = 'C:\temp\stage'
+                ExpandedRoot = 'C:\temp\stage\payload'
+            }
+        }
+
+        $stageInfo = Expand-ManifestedArchiveToStage -PackagePath $packagePath -Prefix 'compat'
+
+        Assert-MockCalled Expand-ArchiveToStage -Times 1 -ParameterFilter { $ArchivePath -eq $packagePath -and $Prefix -eq 'compat' }
+        $stageInfo.StagePath | Should -Be 'C:\temp\stage'
+        $stageInfo.ExpandedRoot | Should -Be 'C:\temp\stage\payload'
+    }
+
+    It 'returns physical memory GiB from Win32_ComputerSystem' {
+        Mock Get-CimInstance { [pscustomobject]@{ TotalPhysicalMemory = [uint64](16GB) } } -ParameterFilter { $ClassName -eq 'Win32_ComputerSystem' }
+
+        $physicalMemoryGiB = Get-PhysicalMemoryGiB
+
+        $physicalMemoryGiB | Should -Be 16
+    }
+
+    It 'returns the highest valid video memory GiB from Win32_VideoController' {
+        Mock Get-CimInstance {
+            @(
+                [pscustomobject]@{ AdapterRAM = [uint64](2GB) }
+                [pscustomobject]@{ AdapterRAM = [uint64](8GB) }
+                [pscustomobject]@{ AdapterRAM = [uint64]0 }
+            )
+        } -ParameterFilter { $ClassName -eq 'Win32_VideoController' }
+
+        $videoMemoryGiB = Get-VideoMemoryGiB
+
+        $videoMemoryGiB | Should -Be 8
+    }
+
+    It 'evaluates physicalMemoryGiB and videoMemoryGiB compatibility checks with mocked helper outputs' {
+        $packageModelConfig = [pscustomobject]@{
+            Platform     = 'windows'
+            Architecture = 'x64'
+            OSVersion    = '10.0'
+        }
+        $compatibility = [pscustomobject]@{
+            checks = @(
+                [pscustomobject]@{
+                    kind     = 'physicalMemoryGiB'
+                    operator = '>='
+                    value    = 8
+                },
+                [pscustomobject]@{
+                    kind     = 'videoMemoryGiB'
+                    operator = '>='
+                    value    = 4
+                }
+            )
+        }
+        Mock Get-PhysicalMemoryGiB { 16.0 }
+        Mock Get-VideoMemoryGiB { 8.0 }
+
+        $evaluation = Test-PackageModelCompatibilityChecks -PackageModelConfig $packageModelConfig -Compatibility $compatibility
+
+        $evaluation.Accepted | Should -BeTrue
+        $evaluation.BlockingAccepted | Should -BeTrue
+        @($evaluation.Checks | ForEach-Object { $_.Accepted }) | Should -Be @($true, $true)
+        @($evaluation.Checks | ForEach-Object { $_.OnFail }) | Should -Be @('fail', 'fail')
+    }
+
+    It 'passes a physicalOrVideoMemoryGiB requirement when either RAM or VRAM satisfies it' {
+        Mock Get-PhysicalMemoryGiB { 2.0 }
+        Mock Get-VideoMemoryGiB { 8.0 }
+
+        $evaluation = Test-PhysicalOrVideoMemoryRequirement -Operator '>=' -ValueGiB 4
+
+        $evaluation.Accepted | Should -BeTrue
+        $evaluation.PhysicalMemoryGiB | Should -Be 2
+        $evaluation.VideoMemoryGiB | Should -Be 8
+    }
+
+    It 'fails a physicalOrVideoMemoryGiB requirement when neither RAM nor VRAM satisfies it' {
+        Mock Get-PhysicalMemoryGiB { 2.0 }
+        Mock Get-VideoMemoryGiB { 1.0 }
+
+        $evaluation = Test-PhysicalOrVideoMemoryRequirement -Operator '>=' -ValueGiB 4
+
+        $evaluation.Accepted | Should -BeFalse
     }
 
     It 'registers PATH from generic inputs without a PackageModel result object' {

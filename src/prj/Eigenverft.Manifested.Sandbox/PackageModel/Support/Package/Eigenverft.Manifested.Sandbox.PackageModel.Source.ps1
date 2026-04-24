@@ -210,11 +210,13 @@ Get-PackageModelSourceDefinition -PackageModelConfig $config -SourceRef $candida
     }
 
     return [pscustomobject]@{
-        Scope   = $scope
-        Id      = $id
-        Kind    = if ($sourceObject.PSObject.Properties['kind']) { [string]$sourceObject.kind } else { $null }
-        BaseUri = if ($sourceObject.PSObject.Properties['baseUri']) { [string]$sourceObject.baseUri } else { $null }
-        BasePath = if ($sourceObject.PSObject.Properties['basePath']) { [string]$sourceObject.basePath } else { $null }
+        Scope           = $scope
+        Id              = $id
+        Kind            = if ($sourceObject.PSObject.Properties['kind']) { [string]$sourceObject.kind } else { $null }
+        BaseUri         = if ($sourceObject.PSObject.Properties['baseUri']) { [string]$sourceObject.baseUri } else { $null }
+        BasePath        = if ($sourceObject.PSObject.Properties['basePath']) { [string]$sourceObject.basePath } else { $null }
+        RepositoryOwner = if ($sourceObject.PSObject.Properties['repositoryOwner']) { [string]$sourceObject.repositoryOwner } else { $null }
+        RepositoryName  = if ($sourceObject.PSObject.Properties['repositoryName']) { [string]$sourceObject.repositoryName } else { $null }
     }
 }
 
@@ -234,6 +236,10 @@ The resolved source definition for the acquisition candidate.
 .PARAMETER AcquisitionCandidate
 The release acquisition candidate.
 
+.PARAMETER Package
+The selected effective release object. Required for source kinds that resolve
+through release metadata, such as GitHub release lookup by tag.
+
 .EXAMPLE
 Resolve-PackageModelSource -SourceDefinition $source -AcquisitionCandidate $candidate
 #>
@@ -243,7 +249,10 @@ Resolve-PackageModelSource -SourceDefinition $source -AcquisitionCandidate $cand
         [psobject]$SourceDefinition,
 
         [Parameter(Mandatory = $true)]
-        [psobject]$AcquisitionCandidate
+        [psobject]$AcquisitionCandidate,
+
+        [AllowNull()]
+        [psobject]$Package
     )
 
     switch -Exact ([string]$SourceDefinition.Kind) {
@@ -260,6 +269,46 @@ Resolve-PackageModelSource -SourceDefinition $source -AcquisitionCandidate $cand
             return [pscustomobject]@{
                 Kind           = 'download'
                 ResolvedSource = $resolvedUri.AbsoluteUri
+            }
+        }
+        'githubRelease' {
+            if (-not $Package) {
+                throw "PackageModel GitHub release source '$($SourceDefinition.Id)' requires the selected package release context."
+            }
+            if ([string]::IsNullOrWhiteSpace([string]$SourceDefinition.RepositoryOwner)) {
+                throw "PackageModel GitHub release source '$($SourceDefinition.Id)' does not define repositoryOwner."
+            }
+            if ([string]::IsNullOrWhiteSpace([string]$SourceDefinition.RepositoryName)) {
+                throw "PackageModel GitHub release source '$($SourceDefinition.Id)' does not define repositoryName."
+            }
+            if (-not $Package.PSObject.Properties['releaseTag'] -or [string]::IsNullOrWhiteSpace([string]$Package.releaseTag)) {
+                throw "PackageModel release '$($Package.id)' requires releaseTag when acquisition uses GitHub release source '$($SourceDefinition.Id)'."
+            }
+            if (-not $Package.PSObject.Properties['packageFile'] -or
+                $null -eq $Package.packageFile -or
+                -not $Package.packageFile.PSObject.Properties['fileName'] -or
+                [string]::IsNullOrWhiteSpace([string]$Package.packageFile.fileName)) {
+                throw "PackageModel release '$($Package.id)' requires packageFile.fileName when acquisition uses GitHub release source '$($SourceDefinition.Id)'."
+            }
+
+            $release = Get-GitHubRelease -RepositoryOwner $SourceDefinition.RepositoryOwner -RepositoryName $SourceDefinition.RepositoryName -ReleaseTag ([string]$Package.releaseTag)
+            $assetName = [string]$Package.packageFile.fileName
+            $matchedAsset = @(
+                $release.Assets | Where-Object {
+                    [string]::Equals([string]$_.Name, $assetName, [System.StringComparison]::OrdinalIgnoreCase)
+                }
+            ) | Select-Object -First 1
+
+            if (-not $matchedAsset) {
+                throw "GitHub release '$($Package.releaseTag)' for '$($SourceDefinition.RepositoryOwner)/$($SourceDefinition.RepositoryName)' does not contain asset '$assetName'."
+            }
+            if ([string]::IsNullOrWhiteSpace([string]$matchedAsset.DownloadUrl)) {
+                throw "GitHub release '$($Package.releaseTag)' asset '$assetName' for '$($SourceDefinition.RepositoryOwner)/$($SourceDefinition.RepositoryName)' does not expose a download URL."
+            }
+
+            return [pscustomobject]@{
+                Kind           = 'download'
+                ResolvedSource = [string]$matchedAsset.DownloadUrl
             }
         }
         'filesystem' {
@@ -464,8 +513,7 @@ Save-PackageModelFilesystemFile -SourcePath \\server\share\package.zip -TargetPa
         throw "PackageModel filesystem source '$SourcePath' does not exist."
     }
 
-    Copy-Item -LiteralPath $SourcePath -Destination $TargetPath -Force
-    return (Resolve-Path -LiteralPath $TargetPath -ErrorAction Stop).Path
+    return (Copy-FileToPath -SourcePath $SourcePath -TargetPath $TargetPath -Overwrite)
 }
 
 function Test-PackageModelPackageFileAcquisitionRequired {
@@ -499,6 +547,7 @@ Test-PackageModelPackageFileAcquisitionRequired -Package $package
 
     switch -Exact ($installKind) {
         'expandArchive' { return $true }
+        'placePackageFile' { return $true }
         'runInstaller' {
             return (-not $Package.install.PSObject.Properties['commandPath'] -or [string]::IsNullOrWhiteSpace([string]$Package.install.commandPath))
         }
@@ -888,7 +937,7 @@ Save-PackageModelPackageFile -PackageModelResult $result
 
         if ($verification.Accepted) {
             $null = New-Item -ItemType Directory -Path $PackageModelResult.InstallWorkspaceDirectory -Force
-            Copy-Item -LiteralPath $PackageModelResult.DefaultPackageDepotFilePath -Destination $PackageModelResult.PackageFilePath -Force
+            $null = Copy-FileToPath -SourcePath $PackageModelResult.DefaultPackageDepotFilePath -TargetPath $PackageModelResult.PackageFilePath -Overwrite
             Update-PackageModelArtifactIndexRecord -PackageModelResult $PackageModelResult -ArtifactPath $PackageModelResult.DefaultPackageDepotFilePath -SourceScope 'environment' -SourceId 'defaultPackageDepot'
             Update-PackageModelArtifactIndexRecord -PackageModelResult $PackageModelResult -ArtifactPath $PackageModelResult.PackageFilePath -SourceScope 'environment' -SourceId 'defaultPackageDepot'
             $PackageModelResult.PackageFileSave = [pscustomobject]@{
@@ -935,7 +984,7 @@ Save-PackageModelPackageFile -PackageModelResult $result
             else {
                 throw "PackageModel acquisition candidate kind '$($candidate.kind)' could not be resolved to a source definition."
             }
-            $resolvedSource = Resolve-PackageModelSource -SourceDefinition $sourceDefinition -AcquisitionCandidate $candidate
+            $resolvedSource = Resolve-PackageModelSource -SourceDefinition $sourceDefinition -AcquisitionCandidate $candidate -Package $package
 
             switch -Exact ([string]$resolvedSource.Kind) {
                 'download' {
@@ -983,7 +1032,7 @@ Save-PackageModelPackageFile -PackageModelResult $result
                 $packageModelConfig.MirrorDownloadedArtifactsToDefaultPackageDepot -and
                 -not [string]::IsNullOrWhiteSpace($PackageModelResult.DefaultPackageDepotFilePath)) {
                 $null = New-Item -ItemType Directory -Path (Split-Path -Parent $PackageModelResult.DefaultPackageDepotFilePath) -Force
-                Copy-Item -LiteralPath $PackageModelResult.PackageFilePath -Destination $PackageModelResult.DefaultPackageDepotFilePath -Force
+                $null = Copy-FileToPath -SourcePath $PackageModelResult.PackageFilePath -TargetPath $PackageModelResult.DefaultPackageDepotFilePath -Overwrite
                 Update-PackageModelArtifactIndexRecord -PackageModelResult $PackageModelResult -ArtifactPath $PackageModelResult.DefaultPackageDepotFilePath -SourceScope $sourceDefinition.Scope -SourceId $sourceDefinition.Id
             }
             elseif ([string]::Equals([string]$sourceDefinition.Scope, 'environment', [System.StringComparison]::OrdinalIgnoreCase) -and

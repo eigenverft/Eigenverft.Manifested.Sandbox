@@ -508,7 +508,36 @@ function ConvertTo-PackageModelObject {
         return $null
     }
 
-    return ((ConvertTo-PackageModelMergeValue -InputObject $InputObject | ConvertTo-Json -Depth 60) | ConvertFrom-Json)
+    if ($InputObject -is [string] -or
+        $InputObject -is [ValueType] -or
+        $InputObject -is [datetime] -or
+        $InputObject -is [guid]) {
+        return $InputObject
+    }
+
+    if ($InputObject -is [System.Collections.IDictionary]) {
+        $result = [ordered]@{}
+        foreach ($key in @($InputObject.Keys)) {
+            $result[[string]$key] = ConvertTo-PackageModelObject -InputObject $InputObject[$key]
+        }
+        return [pscustomobject]$result
+    }
+
+    if ($InputObject -is [System.Collections.IEnumerable] -and
+        -not ($InputObject -is [string]) -and
+        -not ($InputObject -is [psobject] -and $InputObject.PSObject.Properties.Count -gt 0)) {
+        return @($InputObject | ForEach-Object { ConvertTo-PackageModelObject -InputObject $_ })
+    }
+
+    if ($InputObject.PSObject.Properties.Count -gt 0) {
+        $result = [ordered]@{}
+        foreach ($property in @($InputObject.PSObject.Properties)) {
+            $result[$property.Name] = ConvertTo-PackageModelObject -InputObject $property.Value
+        }
+        return [pscustomobject]$result
+    }
+
+    return $InputObject
 }
 
 function Get-PackageModelSourceInventoryPath {
@@ -907,7 +936,37 @@ Assert-PackageModelDefinitionSchema -DefinitionDocumentInfo $definitionInfo -Def
         throw "PackageModel definition id '$($definition.id)' does not match requested definition id '$DefinitionId'."
     }
 
-    foreach ($requiredDefaultProperty in @('requirements', 'install', 'validation', 'existingInstallDiscovery', 'existingInstallPolicy')) {
+    foreach ($upstreamSourceProperty in @($definition.upstreamSources.PSObject.Properties)) {
+        $upstreamSource = $upstreamSourceProperty.Value
+        if (-not $upstreamSource.PSObject.Properties['kind'] -or [string]::IsNullOrWhiteSpace([string]$upstreamSource.kind)) {
+            throw "PackageModel definition '$($definition.id)' has upstream source '$($upstreamSourceProperty.Name)' without kind."
+        }
+
+        switch -Exact ([string]$upstreamSource.kind) {
+            'download' {
+                if (-not $upstreamSource.PSObject.Properties['baseUri'] -or [string]::IsNullOrWhiteSpace([string]$upstreamSource.baseUri)) {
+                    throw "PackageModel definition '$($definition.id)' has download upstream source '$($upstreamSourceProperty.Name)' without baseUri."
+                }
+            }
+            'githubRelease' {
+                if (-not $upstreamSource.PSObject.Properties['repositoryOwner'] -or [string]::IsNullOrWhiteSpace([string]$upstreamSource.repositoryOwner)) {
+                    throw "PackageModel definition '$($definition.id)' has GitHub release upstream source '$($upstreamSourceProperty.Name)' without repositoryOwner."
+                }
+                if (-not $upstreamSource.PSObject.Properties['repositoryName'] -or [string]::IsNullOrWhiteSpace([string]$upstreamSource.repositoryName)) {
+                    throw "PackageModel definition '$($definition.id)' has GitHub release upstream source '$($upstreamSourceProperty.Name)' without repositoryName."
+                }
+            }
+            default {
+                throw "PackageModel definition '$($definition.id)' uses unsupported upstream source kind '$($upstreamSource.kind)' for '$($upstreamSourceProperty.Name)'."
+            }
+        }
+    }
+
+    if ($definition.releaseDefaults.PSObject.Properties['requirements']) {
+        throw "PackageModel definition '$($definition.id)' still uses retired property 'releaseDefaults.requirements'. Use 'releaseDefaults.compatibility.checks'."
+    }
+
+    foreach ($requiredDefaultProperty in @('compatibility', 'install', 'validation', 'existingInstallDiscovery', 'existingInstallPolicy')) {
         if (-not $definition.releaseDefaults.PSObject.Properties[$requiredDefaultProperty]) {
             throw "PackageModel definition '$($definition.id)' is missing releaseDefaults.$requiredDefaultProperty."
         }
@@ -924,6 +983,9 @@ Assert-PackageModelDefinitionSchema -DefinitionDocumentInfo $definitionInfo -Def
                 throw "PackageModel release '$($release.id)' in '$($definition.id)' still uses retired property '$retiredProperty'."
             }
         }
+        if ($release.PSObject.Properties['requirements']) {
+            throw "PackageModel release '$($release.id)' in '$($definition.id)' still uses retired property 'requirements'. Use 'compatibility.checks'."
+        }
         foreach ($retiredReleaseProperty in @('existingInstall')) {
             if ($release.PSObject.Properties[$retiredReleaseProperty]) {
                 throw "PackageModel release '$($release.id)' in '$($definition.id)' still uses retired property '$retiredReleaseProperty'."
@@ -937,49 +999,93 @@ Assert-PackageModelDefinitionSchema -DefinitionDocumentInfo $definitionInfo -Def
         }
 
         $effectiveRelease = Resolve-PackageModelEffectiveRelease -Definition $definition -Release $release
-        foreach ($requiredEffectiveProperty in @('install', 'validation', 'requirements', 'existingInstallDiscovery', 'existingInstallPolicy')) {
+        foreach ($requiredEffectiveProperty in @('install', 'validation', 'compatibility', 'existingInstallDiscovery', 'existingInstallPolicy')) {
             if (-not $effectiveRelease.PSObject.Properties[$requiredEffectiveProperty]) {
                 throw "PackageModel release '$($release.id)' in '$($definition.id)' is missing required effective property '$requiredEffectiveProperty'."
             }
         }
-        if ($effectiveRelease.requirements.PSObject.Properties['packages']) {
-            throw "PackageModel release '$($release.id)' in '$($definition.id)' still uses retired property 'requirements.packages'. Use 'requirements.checks'."
+        if ($effectiveRelease.compatibility.PSObject.Properties['packages']) {
+            throw "PackageModel release '$($release.id)' in '$($definition.id)' still uses retired property 'compatibility.packages'. Use 'compatibility.checks'."
         }
-        if (-not $effectiveRelease.requirements.PSObject.Properties['checks']) {
-            throw "PackageModel release '$($release.id)' in '$($definition.id)' is missing requirements.checks."
+        if (-not $effectiveRelease.compatibility.PSObject.Properties['checks']) {
+            throw "PackageModel release '$($release.id)' in '$($definition.id)' is missing compatibility.checks."
         }
-        foreach ($requirementCheck in @($effectiveRelease.requirements.checks)) {
-            if ($null -eq $requirementCheck) {
+        foreach ($compatibilityCheck in @($effectiveRelease.compatibility.checks)) {
+            if ($null -eq $compatibilityCheck) {
                 continue
             }
-            if (-not $requirementCheck.PSObject.Properties['kind'] -or [string]::IsNullOrWhiteSpace([string]$requirementCheck.kind)) {
-                throw "PackageModel release '$($release.id)' in '$($definition.id)' has a requirement check without kind."
+            if (-not $compatibilityCheck.PSObject.Properties['kind'] -or [string]::IsNullOrWhiteSpace([string]$compatibilityCheck.kind)) {
+                throw "PackageModel release '$($release.id)' in '$($definition.id)' has a compatibility check without kind."
             }
-            switch -Exact ([string]$requirementCheck.kind) {
+            $onFail = 'fail'
+            if ($compatibilityCheck.PSObject.Properties['onFail'] -and -not [string]::IsNullOrWhiteSpace([string]$compatibilityCheck.onFail)) {
+                $onFail = ([string]$compatibilityCheck.onFail).ToLowerInvariant()
+            }
+            if ($onFail -notin @('fail', 'warn')) {
+                throw "PackageModel release '$($release.id)' in '$($definition.id)' uses unsupported compatibility onFail '$($compatibilityCheck.onFail)'."
+            }
+
+            switch -Exact ([string]$compatibilityCheck.kind) {
                 'osFamily' {
-                    $hasAllowed = $requirementCheck.PSObject.Properties['allowed'] -and @($requirementCheck.allowed).Count -gt 0
-                    $hasBlocked = $requirementCheck.PSObject.Properties['blocked'] -and @($requirementCheck.blocked).Count -gt 0
+                    $hasAllowed = $compatibilityCheck.PSObject.Properties['allowed'] -and @($compatibilityCheck.allowed).Count -gt 0
+                    $hasBlocked = $compatibilityCheck.PSObject.Properties['blocked'] -and @($compatibilityCheck.blocked).Count -gt 0
                     if (-not $hasAllowed -and -not $hasBlocked) {
-                        throw "PackageModel release '$($release.id)' in '$($definition.id)' has an osFamily requirement without allowed or blocked values."
+                        throw "PackageModel release '$($release.id)' in '$($definition.id)' has an osFamily compatibility check without allowed or blocked values."
                     }
                 }
                 'cpuArchitecture' {
-                    $hasAllowed = $requirementCheck.PSObject.Properties['allowed'] -and @($requirementCheck.allowed).Count -gt 0
-                    $hasBlocked = $requirementCheck.PSObject.Properties['blocked'] -and @($requirementCheck.blocked).Count -gt 0
+                    $hasAllowed = $compatibilityCheck.PSObject.Properties['allowed'] -and @($compatibilityCheck.allowed).Count -gt 0
+                    $hasBlocked = $compatibilityCheck.PSObject.Properties['blocked'] -and @($compatibilityCheck.blocked).Count -gt 0
                     if (-not $hasAllowed -and -not $hasBlocked) {
-                        throw "PackageModel release '$($release.id)' in '$($definition.id)' has a cpuArchitecture requirement without allowed or blocked values."
+                        throw "PackageModel release '$($release.id)' in '$($definition.id)' has a cpuArchitecture compatibility check without allowed or blocked values."
                     }
                 }
                 'osVersion' {
-                    if (-not $requirementCheck.PSObject.Properties['operator'] -or [string]::IsNullOrWhiteSpace([string]$requirementCheck.operator)) {
-                        throw "PackageModel release '$($release.id)' in '$($definition.id)' has an osVersion requirement without operator."
+                    if (-not $compatibilityCheck.PSObject.Properties['operator'] -or [string]::IsNullOrWhiteSpace([string]$compatibilityCheck.operator)) {
+                        throw "PackageModel release '$($release.id)' in '$($definition.id)' has an osVersion compatibility check without operator."
                     }
-                    if (-not $requirementCheck.PSObject.Properties['value'] -or [string]::IsNullOrWhiteSpace([string]$requirementCheck.value)) {
-                        throw "PackageModel release '$($release.id)' in '$($definition.id)' has an osVersion requirement without value."
+                    if (-not $compatibilityCheck.PSObject.Properties['value'] -or [string]::IsNullOrWhiteSpace([string]$compatibilityCheck.value)) {
+                        throw "PackageModel release '$($release.id)' in '$($definition.id)' has an osVersion compatibility check without value."
+                    }
+                }
+                'physicalMemoryGiB' {
+                    if (-not $compatibilityCheck.PSObject.Properties['operator'] -or [string]::IsNullOrWhiteSpace([string]$compatibilityCheck.operator)) {
+                        throw "PackageModel release '$($release.id)' in '$($definition.id)' has a physicalMemoryGiB compatibility check without operator."
+                    }
+                    if (-not $compatibilityCheck.PSObject.Properties['value']) {
+                        throw "PackageModel release '$($release.id)' in '$($definition.id)' has a physicalMemoryGiB compatibility check without value."
+                    }
+                    $parsedValue = 0.0
+                    if (-not [double]::TryParse(([string]$compatibilityCheck.value), [System.Globalization.NumberStyles]::Float, [System.Globalization.CultureInfo]::InvariantCulture, [ref]$parsedValue)) {
+                        throw "PackageModel release '$($release.id)' in '$($definition.id)' has a physicalMemoryGiB compatibility check with non-numeric value '$($compatibilityCheck.value)'."
+                    }
+                }
+                'videoMemoryGiB' {
+                    if (-not $compatibilityCheck.PSObject.Properties['operator'] -or [string]::IsNullOrWhiteSpace([string]$compatibilityCheck.operator)) {
+                        throw "PackageModel release '$($release.id)' in '$($definition.id)' has a videoMemoryGiB compatibility check without operator."
+                    }
+                    if (-not $compatibilityCheck.PSObject.Properties['value']) {
+                        throw "PackageModel release '$($release.id)' in '$($definition.id)' has a videoMemoryGiB compatibility check without value."
+                    }
+                    $parsedValue = 0.0
+                    if (-not [double]::TryParse(([string]$compatibilityCheck.value), [System.Globalization.NumberStyles]::Float, [System.Globalization.CultureInfo]::InvariantCulture, [ref]$parsedValue)) {
+                        throw "PackageModel release '$($release.id)' in '$($definition.id)' has a videoMemoryGiB compatibility check with non-numeric value '$($compatibilityCheck.value)'."
+                    }
+                }
+                'physicalOrVideoMemoryGiB' {
+                    if (-not $compatibilityCheck.PSObject.Properties['operator'] -or [string]::IsNullOrWhiteSpace([string]$compatibilityCheck.operator)) {
+                        throw "PackageModel release '$($release.id)' in '$($definition.id)' has a physicalOrVideoMemoryGiB compatibility check without operator."
+                    }
+                    if (-not $compatibilityCheck.PSObject.Properties['value']) {
+                        throw "PackageModel release '$($release.id)' in '$($definition.id)' has a physicalOrVideoMemoryGiB compatibility check without value."
+                    }
+                    $parsedValue = 0.0
+                    if (-not [double]::TryParse(([string]$compatibilityCheck.value), [System.Globalization.NumberStyles]::Float, [System.Globalization.CultureInfo]::InvariantCulture, [ref]$parsedValue)) {
+                        throw "PackageModel release '$($release.id)' in '$($definition.id)' has a physicalOrVideoMemoryGiB compatibility check with non-numeric value '$($compatibilityCheck.value)'."
                     }
                 }
                 default {
-                    throw "PackageModel release '$($release.id)' in '$($definition.id)' uses unsupported requirement kind '$($requirementCheck.kind)'."
+                    throw "PackageModel release '$($release.id)' in '$($definition.id)' uses unsupported compatibility kind '$($compatibilityCheck.kind)'."
                 }
             }
         }
@@ -1034,6 +1140,14 @@ Assert-PackageModelDefinitionSchema -DefinitionDocumentInfo $definitionInfo -Def
             'expandArchive' {
                 $requiresPackageFile = $true
                 $requiresAcquisitionCandidates = $true
+            }
+            'placePackageFile' {
+                $requiresPackageFile = $true
+                $requiresAcquisitionCandidates = $true
+                if ($effectiveRelease.install.PSObject.Properties['targetRelativePath'] -and
+                    [string]::IsNullOrWhiteSpace([string]$effectiveRelease.install.targetRelativePath)) {
+                    throw "PackageModel release '$($release.id)' in '$($definition.id)' defines install.targetRelativePath without a value."
+                }
             }
             'runInstaller' {
                 if (-not $effectiveRelease.install.PSObject.Properties['commandPath'] -or [string]::IsNullOrWhiteSpace([string]$effectiveRelease.install.commandPath)) {
@@ -1095,11 +1209,45 @@ Assert-PackageModelDefinitionSchema -DefinitionDocumentInfo $definitionInfo -Def
                 switch -Exact ([string]$candidate.kind) {
                     'packageDepot' { }
                     'download' {
-                        if (-not $candidate.PSObject.Properties['sourcePath'] -or [string]::IsNullOrWhiteSpace([string]$candidate.sourcePath)) {
-                            throw "PackageModel release '$($release.id)' in '$($definition.id)' has a download acquisition candidate without sourcePath."
-                        }
                         if (-not $candidate.PSObject.Properties['sourceId'] -or [string]::IsNullOrWhiteSpace([string]$candidate.sourceId)) {
                             throw "PackageModel release '$($release.id)' in '$($definition.id)' has a download acquisition candidate without sourceId."
+                        }
+
+                        $downloadSource = $null
+                        foreach ($upstreamSourceProperty in @($definition.upstreamSources.PSObject.Properties)) {
+                            if ([string]::Equals([string]$upstreamSourceProperty.Name, [string]$candidate.sourceId, [System.StringComparison]::OrdinalIgnoreCase)) {
+                                $downloadSource = $upstreamSourceProperty.Value
+                                break
+                            }
+                        }
+                        if (-not $downloadSource) {
+                            throw "PackageModel release '$($release.id)' in '$($definition.id)' references unknown download sourceId '$($candidate.sourceId)'."
+                        }
+
+                        $downloadSourceKind = if ($downloadSource.PSObject.Properties['kind']) { [string]$downloadSource.kind } else { $null }
+                        switch -Exact ($downloadSourceKind) {
+                            'download' {
+                                if (-not $candidate.PSObject.Properties['sourcePath'] -or [string]::IsNullOrWhiteSpace([string]$candidate.sourcePath)) {
+                                    throw "PackageModel release '$($release.id)' in '$($definition.id)' has a download acquisition candidate without sourcePath."
+                                }
+                            }
+                            'githubRelease' {
+                                if ($candidate.PSObject.Properties['sourcePath'] -and -not [string]::IsNullOrWhiteSpace([string]$candidate.sourcePath)) {
+                                    throw "PackageModel release '$($release.id)' in '$($definition.id)' must not define sourcePath for GitHub release source '$($candidate.sourceId)'."
+                                }
+                                if (-not $effectiveRelease.PSObject.Properties['releaseTag'] -or [string]::IsNullOrWhiteSpace([string]$effectiveRelease.releaseTag)) {
+                                    throw "PackageModel release '$($release.id)' in '$($definition.id)' requires releaseTag when download source '$($candidate.sourceId)' is a GitHub release source."
+                                }
+                                if (-not $effectiveRelease.PSObject.Properties['packageFile'] -or
+                                    $null -eq $effectiveRelease.packageFile -or
+                                    -not $effectiveRelease.packageFile.PSObject.Properties['fileName'] -or
+                                    [string]::IsNullOrWhiteSpace([string]$effectiveRelease.packageFile.fileName)) {
+                                    throw "PackageModel release '$($release.id)' in '$($definition.id)' requires packageFile.fileName when download source '$($candidate.sourceId)' is a GitHub release source."
+                                }
+                            }
+                            default {
+                                throw "PackageModel release '$($release.id)' in '$($definition.id)' references unsupported download source kind '$downloadSourceKind' for sourceId '$($candidate.sourceId)'."
+                            }
                         }
                     }
                     'filesystem' {
@@ -1175,7 +1323,7 @@ Resolve-PackageModelEffectiveRelease -Definition $definition -Release $release
     )
 
     $effectiveRelease = ConvertTo-PackageModelObject -InputObject $Release
-    foreach ($propertyName in @('requirements', 'install', 'validation', 'existingInstallDiscovery', 'existingInstallPolicy')) {
+    foreach ($propertyName in @('compatibility', 'install', 'validation', 'existingInstallDiscovery', 'existingInstallPolicy')) {
         if (-not $effectiveRelease.PSObject.Properties[$propertyName] -and $Definition.releaseDefaults.PSObject.Properties[$propertyName]) {
             $effectiveRelease | Add-Member -MemberType NoteProperty -Name $propertyName -Value (ConvertTo-PackageModelObject -InputObject $Definition.releaseDefaults.$propertyName)
         }
@@ -1427,7 +1575,7 @@ New-PackageModelResult -CommandName Invoke-PackageModel-VSCodeRuntime -PackageMo
         EffectiveRelease                 = $null
         PackageId                        = $null
         PackageVersion                   = $null
-        Requirements                     = @()
+        Compatibility                    = @()
         InstallWorkspaceDirectory        = $null
         InstallDirectory                 = $null
         PackageFileRelativeDirectory     = $null

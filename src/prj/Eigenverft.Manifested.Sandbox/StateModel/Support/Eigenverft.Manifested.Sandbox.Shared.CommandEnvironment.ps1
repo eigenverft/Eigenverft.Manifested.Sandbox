@@ -343,35 +343,10 @@ function Get-ManifestedCommandEnvironmentSpec {
                 $expectedCommandPaths['qwen.cmd'] = $qwenCommandPath
             }
         }
-        'Initialize-GHCliRuntime' {
-            if (-not [string]::IsNullOrWhiteSpace($executablePath)) {
-                $desiredCommandDirectory = Split-Path -Parent $executablePath
-                $expectedCommandPaths['gh'] = (Get-ManifestedFullPath -Path $executablePath)
-                $expectedCommandPaths['gh.exe'] = (Get-ManifestedFullPath -Path $executablePath)
-            }
-        }
         'Initialize-Ps7Runtime' {
             if (-not [string]::IsNullOrWhiteSpace($executablePath)) {
                 $desiredCommandDirectory = Split-Path -Parent $executablePath
                 $expectedCommandPaths['pwsh.exe'] = (Get-ManifestedFullPath -Path $executablePath)
-            }
-        }
-        'Initialize-GitRuntime' {
-            if (-not [string]::IsNullOrWhiteSpace($executablePath)) {
-                $desiredCommandDirectory = Split-Path -Parent $executablePath
-                $expectedCommandPaths['git.exe'] = (Get-ManifestedFullPath -Path $executablePath)
-            }
-        }
-        'Initialize-VSCodeRuntime' {
-            if (-not [string]::IsNullOrWhiteSpace($cliCommandPath)) {
-                $desiredCommandDirectory = Split-Path -Parent $cliCommandPath
-                $expectedCommandPaths['code'] = (Get-ManifestedFullPath -Path $cliCommandPath)
-                $expectedCommandPaths['code.cmd'] = (Get-ManifestedFullPath -Path $cliCommandPath)
-            }
-            elseif (-not [string]::IsNullOrWhiteSpace($runtimeHome)) {
-                $desiredCommandDirectory = Join-Path $runtimeHome 'bin'
-                $expectedCommandPaths['code'] = (Get-ManifestedFullPath -Path (Join-Path $desiredCommandDirectory 'code.cmd'))
-                $expectedCommandPaths['code.cmd'] = (Get-ManifestedFullPath -Path (Join-Path $desiredCommandDirectory 'code.cmd'))
             }
         }
     }

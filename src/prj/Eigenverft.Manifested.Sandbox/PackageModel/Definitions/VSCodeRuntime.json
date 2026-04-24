@@ -31,7 +31,7 @@
     ]
   },
   "releaseDefaults": {
-    "requirements": {
+    "compatibility": {
       "checks": [
         {
           "kind": "osVersion",

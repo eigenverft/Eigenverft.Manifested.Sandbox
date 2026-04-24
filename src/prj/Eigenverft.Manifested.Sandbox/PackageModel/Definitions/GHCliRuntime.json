@@ -1,0 +1,171 @@
+{
+  "schemaVersion": "1.0",
+  "id": "GHCliRuntime",
+  "display": {
+    "default": {
+      "name": "GitHub CLI",
+      "publisher": "GitHub",
+      "corporation": "GitHub, Inc.",
+      "summary": "GitHub command-line interface"
+    },
+    "localizations": {}
+  },
+  "upstreamSources": {
+    "ghCliGitHub": {
+      "kind": "githubRelease",
+      "repositoryOwner": "cli",
+      "repositoryName": "cli"
+    }
+  },
+  "providedTools": {
+    "commands": [
+      {
+        "name": "gh",
+        "relativePath": "bin/gh.exe"
+      }
+    ],
+    "apps": []
+  },
+  "releaseDefaults": {
+    "compatibility": {
+      "checks": [
+        {
+          "kind": "osVersion",
+          "operator": ">=",
+          "value": "10.0"
+        }
+      ]
+    },
+    "install": {
+      "kind": "expandArchive",
+      "installDirectory": "gh-cli-runtime/{releaseTrack}/{version}/{flavor}",
+      "pathRegistration": {
+        "mode": "user",
+        "source": {
+          "kind": "commandEntryPoint",
+          "value": "gh"
+        }
+      },
+      "expandedRoot": "auto",
+      "createDirectories": []
+    },
+    "validation": {
+      "files": [
+        "bin/gh.exe"
+      ],
+      "directories": [
+        "bin"
+      ],
+      "commandChecks": [
+        {
+          "entryPoint": "gh",
+          "arguments": [
+            "--version"
+          ],
+          "outputPattern": "(?im)^gh version\\s+(?<value>\\d+\\.\\d+\\.\\d+)\\b",
+          "expectedValue": "{version}"
+        }
+      ],
+      "metadataFiles": [],
+      "signatures": [],
+      "fileDetails": [],
+      "registryChecks": []
+    },
+    "existingInstallDiscovery": {
+      "enableDetection": false,
+      "searchLocations": [],
+      "installRootRules": []
+    },
+    "existingInstallPolicy": {
+      "allowAdoptExternal": false,
+      "upgradeAdoptedInstall": false,
+      "requirePackageModelOwnership": true
+    }
+  },
+  "releases": [
+    {
+      "id": "gh-cli-runtime-win-x64-stable",
+      "version": "2.91.0",
+      "releaseTag": "v2.91.0",
+      "releaseTrack": "stable",
+      "flavor": "windows_amd64",
+      "constraints": {
+        "os": [
+          "windows"
+        ],
+        "cpu": [
+          "x64"
+        ]
+      },
+      "packageFile": {
+        "fileName": "gh_2.91.0_windows_amd64.zip",
+        "format": "zip",
+        "portable": true,
+        "autoUpdateSupported": false,
+        "integrity": {
+          "algorithm": "sha256",
+          "sha256": "ced3e6f4bb5a9865056b594b7ad0cf42137dc92c494346f1ca705b5dbf14c88e"
+        }
+      },
+      "acquisitionCandidates": [
+        {
+          "kind": "packageDepot",
+          "priority": 250,
+          "verification": {
+            "mode": "optional"
+          }
+        },
+        {
+          "kind": "download",
+          "sourceId": "ghCliGitHub",
+          "priority": 200,
+          "verification": {
+            "mode": "required"
+          }
+        }
+      ]
+    },
+    {
+      "id": "gh-cli-runtime-win-arm64-stable",
+      "version": "2.91.0",
+      "releaseTag": "v2.91.0",
+      "releaseTrack": "stable",
+      "flavor": "windows_arm64",
+      "constraints": {
+        "os": [
+          "windows"
+        ],
+        "cpu": [
+          "arm64"
+        ]
+      },
+      "packageFile": {
+        "fileName": "gh_2.91.0_windows_arm64.zip",
+        "format": "zip",
+        "portable": true,
+        "autoUpdateSupported": false,
+        "integrity": {
+          "algorithm": "sha256",
+          "sha256": "ae0333d2f9b13fc28f785ca7379514f9a1cea382cd4726abb6e6f4d2a874dd15"
+        }
+      },
+      "acquisitionCandidates": [
+        {
+          "kind": "packageDepot",
+          "priority": 250,
+          "verification": {
+            "mode": "optional"
+          }
+        },
+        {
+          "kind": "download",
+          "sourceId": "ghCliGitHub",
+          "priority": 200,
+          "verification": {
+            "mode": "required"
+          }
+        }
+      ]
+    }
+  ]
+}

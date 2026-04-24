@@ -70,10 +70,7 @@ function Get-ManifestedRuntimeSnapshots {
         @{ Name = 'GeminiRuntime'; FunctionName = 'Get-GeminiRuntimeState'; PathProperty = 'RuntimeHome' },
         @{ Name = 'QwenRuntime'; FunctionName = 'Get-QwenRuntimeState'; PathProperty = 'RuntimeHome' },
         @{ Name = 'CodexRuntime'; FunctionName = 'Get-CodexRuntimeState'; PathProperty = 'RuntimeHome' },
-        @{ Name = 'GHCliRuntime'; FunctionName = 'Get-GHCliRuntimeState'; PathProperty = 'RuntimeHome' },
         @{ Name = 'Ps7Runtime'; FunctionName = 'Get-Ps7RuntimeState'; PathProperty = 'RuntimeHome' },
-        @{ Name = 'GitRuntime'; FunctionName = 'Get-GitRuntimeState'; PathProperty = 'RuntimeHome' },
-        @{ Name = 'VSCodeRuntime'; FunctionName = 'Get-VSCodeRuntimeState'; PathProperty = 'RuntimeHome' },
         @{ Name = 'VCRuntime'; FunctionName = 'Get-VCRuntimeState'; PathProperty = 'InstallerPath' }
     )
 

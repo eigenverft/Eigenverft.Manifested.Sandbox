@@ -107,7 +107,7 @@ Find-PackageModelExistingPackage -PackageModelResult $result
                 if (-not $searchLocation.PSObject.Properties['name'] -or [string]::IsNullOrWhiteSpace([string]$searchLocation.name)) {
                     throw "PackageModel existingInstallDiscovery search for release '$($package.id)' is missing command name."
                 }
-                $candidatePath = Get-ManifestedResolvedApplicationPath -CommandName ([string]$searchLocation.name)
+                $candidatePath = Get-ResolvedApplicationPath -CommandName ([string]$searchLocation.name)
             }
             'path' {
                 if (-not $searchLocation.PSObject.Properties['path'] -or [string]::IsNullOrWhiteSpace([string]$searchLocation.path)) {
@@ -350,7 +350,7 @@ Install-PackageModelArchive -PackageModelResult $result
     $install = $PackageModelResult.Package.install
     $stageInfo = $null
     try {
-        $stageInfo = Expand-ManifestedArchiveToStage -PackagePath $PackageModelResult.PackageFilePath -Prefix 'packagemodel'
+        $stageInfo = Expand-ArchiveToStage -ArchivePath $PackageModelResult.PackageFilePath -Prefix 'packagemodel'
         $expandedRoot = $stageInfo.ExpandedRoot
         if ($install.PSObject.Properties['expandedRoot'] -and
             -not [string]::IsNullOrWhiteSpace([string]$install.expandedRoot) -and
@@ -379,7 +379,7 @@ Install-PackageModelArchive -PackageModelResult $result
     }
     finally {
         if ($stageInfo) {
-            Remove-ManifestedPath -Path $stageInfo.StagePath | Out-Null
+            Remove-PathIfExists -Path $stageInfo.StagePath | Out-Null
         }
     }
 
@@ -387,6 +387,85 @@ Install-PackageModelArchive -PackageModelResult $result
         Status           = Get-PackageModelOwnedInstallStatus -PackageModelResult $PackageModelResult
         InstallKind      = 'expandArchive'
         InstallDirectory = $PackageModelResult.InstallDirectory
+        ReusedExisting   = $false
+    }
+}
+
+function Get-PackageModelInstalledFilePath {
+<#
+.SYNOPSIS
+Resolves the final installed file path for a single-file package install.
+
+.DESCRIPTION
+Uses install.targetRelativePath when present and otherwise falls back to the
+canonical packageFile.fileName so single-file resource packages can share one
+simple install model.
+#>
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [psobject]$PackageModelResult
+    )
+
+    $install = $PackageModelResult.Package.install
+    $targetRelativePath = $null
+    if ($install.PSObject.Properties['targetRelativePath'] -and
+        -not [string]::IsNullOrWhiteSpace([string]$install.targetRelativePath)) {
+        $targetRelativePath = ([string]$install.targetRelativePath) -replace '/', '\'
+    }
+    elseif ($PackageModelResult.Package -and
+        $PackageModelResult.Package.PSObject.Properties['packageFile'] -and
+        $PackageModelResult.Package.packageFile -and
+        $PackageModelResult.Package.packageFile.PSObject.Properties['fileName'] -and
+        -not [string]::IsNullOrWhiteSpace([string]$PackageModelResult.Package.packageFile.fileName)) {
+        $targetRelativePath = [string]$PackageModelResult.Package.packageFile.fileName
+    }
+    else {
+        throw "PackageModel single-file install for '$($PackageModelResult.PackageId)' requires install.targetRelativePath or packageFile.fileName."
+    }
+
+    return (Join-Path $PackageModelResult.InstallDirectory $targetRelativePath)
+}
+
+function Install-PackageModelPackageFile {
+<#
+.SYNOPSIS
+Installs a package by placing one saved package file into the install directory.
+
+.DESCRIPTION
+Creates or replaces the target install directory, then copies the verified
+saved package file into the configured target-relative path.
+#>
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [psobject]$PackageModelResult
+    )
+
+    if ([string]::IsNullOrWhiteSpace($PackageModelResult.PackageFilePath) -or -not (Test-Path -LiteralPath $PackageModelResult.PackageFilePath -PathType Leaf)) {
+        throw "PackageModel single-file install for '$($PackageModelResult.PackageId)' requires a saved package file."
+    }
+
+    $installedFilePath = Get-PackageModelInstalledFilePath -PackageModelResult $PackageModelResult
+    $targetDirectory = Split-Path -Parent $installedFilePath
+
+    $null = New-Item -ItemType Directory -Path (Split-Path -Parent $PackageModelResult.InstallDirectory) -Force
+    if (Test-Path -LiteralPath $PackageModelResult.InstallDirectory) {
+        Remove-PathIfExists -Path $PackageModelResult.InstallDirectory | Out-Null
+    }
+
+    $null = New-Item -ItemType Directory -Path $PackageModelResult.InstallDirectory -Force
+    if (-not [string]::IsNullOrWhiteSpace($targetDirectory)) {
+        $null = New-Item -ItemType Directory -Path $targetDirectory -Force
+    }
+
+    $null = Copy-FileToPath -SourcePath $PackageModelResult.PackageFilePath -TargetPath $installedFilePath -Overwrite
+
+    return [pscustomobject]@{
+        Status           = Get-PackageModelOwnedInstallStatus -PackageModelResult $PackageModelResult
+        InstallKind      = 'placePackageFile'
+        InstallDirectory = $PackageModelResult.InstallDirectory
+        InstalledFilePath = $installedFilePath
         ReusedExisting   = $false
     }
 }
@@ -609,6 +688,10 @@ Install-PackageModelPackage -PackageModelResult $result
         'expandArchive' {
             Write-PackageModelExecutionMessage -Message ("[ACTION] Installing package archive into '{0}'." -f $PackageModelResult.InstallDirectory)
             $PackageModelResult.Install = Install-PackageModelArchive -PackageModelResult $PackageModelResult
+        }
+        'placePackageFile' {
+            Write-PackageModelExecutionMessage -Message ("[ACTION] Placing package file into '{0}'." -f $PackageModelResult.InstallDirectory)
+            $PackageModelResult.Install = Install-PackageModelPackageFile -PackageModelResult $PackageModelResult
         }
         'runInstaller' {
             Write-PackageModelExecutionMessage -Message ("[ACTION] Running installer into '{0}'." -f $PackageModelResult.InstallDirectory)

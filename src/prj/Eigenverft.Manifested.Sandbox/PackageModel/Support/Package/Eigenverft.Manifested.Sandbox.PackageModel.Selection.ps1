@@ -85,10 +85,10 @@ Test-PackageModelConstraintSetMatch -Values @('windows') -ActualValue 'windows'
     return $false
 }
 
-function Test-PackageModelRequirementAllowedBlockedMatch {
+function Test-PackageModelCompatibilityAllowedBlockedMatch {
 <#
 .SYNOPSIS
-Checks allowed/blocked requirement lists against one actual value.
+Checks allowed/blocked compatibility lists against one actual value.
 
 .DESCRIPTION
 Treats empty allowed/blocked lists as unrestricted and otherwise enforces
@@ -137,20 +137,20 @@ The value to test.
     return $true
 }
 
-function Test-PackageModelRequirementChecks {
+function Test-PackageModelCompatibilityChecks {
 <#
 .SYNOPSIS
-Evaluates typed PackageModel requirement checks for one selected release.
+Evaluates typed PackageModel compatibility checks for one selected release.
 
 .DESCRIPTION
-Runs the current requirement kinds against the resolved runtime context and
-returns the normalized requirement results and overall acceptance state.
+Runs the current compatibility kinds against the resolved runtime context and
+returns the normalized compatibility results and acceptance state.
 
 .PARAMETER PackageModelConfig
 The resolved PackageModel config object.
 
-.PARAMETER Requirements
-The effective release requirements object.
+.PARAMETER Compatibility
+The effective release compatibility object.
 #>
     [CmdletBinding()]
     param(
@@ -158,12 +158,13 @@ The effective release requirements object.
         [psobject]$PackageModelConfig,
 
         [AllowNull()]
-        [psobject]$Requirements
+        [psobject]$Compatibility
     )
 
     $results = New-Object System.Collections.Generic.List[object]
     $allAccepted = $true
-    $checks = if ($Requirements -and $Requirements.PSObject.Properties['checks']) { @($Requirements.checks) } else { @() }
+    $blockingAccepted = $true
+    $checks = if ($Compatibility -and $Compatibility.PSObject.Properties['checks']) { @($Compatibility.checks) } else { @() }
 
     foreach ($check in @($checks)) {
         if ($null -eq $check) {
@@ -171,16 +172,60 @@ The effective release requirements object.
         }
 
         $kind = [string]$check.kind
+        $onFail = if ($check.PSObject.Properties['onFail'] -and -not [string]::IsNullOrWhiteSpace([string]$check.onFail)) {
+            ([string]$check.onFail).ToLowerInvariant()
+        }
+        else {
+            'fail'
+        }
         $accepted = $false
         $actualValue = $null
         $expectedSummary = $null
+        $testNumericValue = {
+            param(
+                [AllowNull()]
+                [object]$ActualNumericValue,
+
+                [Parameter(Mandatory = $true)]
+                [string]$Operator,
+
+                [Parameter(Mandatory = $true)]
+                [double]$ExpectedNumericValue
+            )
+
+            if ($null -eq $ActualNumericValue) {
+                return $false
+            }
+
+            $actualNumericComparisonValue = [double]$ActualNumericValue
+
+            switch -Exact ($Operator) {
+                '=' { return $actualNumericComparisonValue -eq $ExpectedNumericValue }
+                '==' { return $actualNumericComparisonValue -eq $ExpectedNumericValue }
+                '!=' { return $actualNumericComparisonValue -ne $ExpectedNumericValue }
+                '>' { return $actualNumericComparisonValue -gt $ExpectedNumericValue }
+                '>=' { return $actualNumericComparisonValue -ge $ExpectedNumericValue }
+                '<' { return $actualNumericComparisonValue -lt $ExpectedNumericValue }
+                '<=' { return $actualNumericComparisonValue -le $ExpectedNumericValue }
+                default { throw "Unsupported numeric compatibility operator '$Operator'." }
+            }
+        }
+        $formatMemoryValue = {
+            param([AllowNull()][object]$MemoryGiB)
+
+            if ($null -eq $MemoryGiB) {
+                return 'unknown'
+            }
+
+            return ('{0:N2} GiB' -f ([double]$MemoryGiB))
+        }
 
         switch -Exact ($kind) {
             'osFamily' {
                 $actualValue = [string]$PackageModelConfig.Platform
                 $allowedValues = if ($check.PSObject.Properties['allowed']) { @($check.allowed) } else { @() }
                 $blockedValues = if ($check.PSObject.Properties['blocked']) { @($check.blocked) } else { @() }
-                $accepted = Test-PackageModelRequirementAllowedBlockedMatch -Allowed $allowedValues -Blocked $blockedValues -ActualValue $actualValue
+                $accepted = Test-PackageModelCompatibilityAllowedBlockedMatch -Allowed $allowedValues -Blocked $blockedValues -ActualValue $actualValue
                 $expectedSummary = @(
                     if ($allowedValues.Count -gt 0) { 'allowed=' + (($allowedValues | ForEach-Object { [string]$_ }) -join ',') }
                     if ($blockedValues.Count -gt 0) { 'blocked=' + (($blockedValues | ForEach-Object { [string]$_ }) -join ',') }
@@ -190,7 +235,7 @@ The effective release requirements object.
                 $actualValue = [string]$PackageModelConfig.Architecture
                 $allowedValues = if ($check.PSObject.Properties['allowed']) { @($check.allowed) } else { @() }
                 $blockedValues = if ($check.PSObject.Properties['blocked']) { @($check.blocked) } else { @() }
-                $accepted = Test-PackageModelRequirementAllowedBlockedMatch -Allowed $allowedValues -Blocked $blockedValues -ActualValue $actualValue
+                $accepted = Test-PackageModelCompatibilityAllowedBlockedMatch -Allowed $allowedValues -Blocked $blockedValues -ActualValue $actualValue
                 $expectedSummary = @(
                     if ($allowedValues.Count -gt 0) { 'allowed=' + (($allowedValues | ForEach-Object { [string]$_ }) -join ',') }
                     if ($blockedValues.Count -gt 0) { 'blocked=' + (($blockedValues | ForEach-Object { [string]$_ }) -join ',') }
@@ -209,21 +254,49 @@ The effective release requirements object.
                     '>=' { $actualVersion -ge $expectedVersion }
                     '<' { $actualVersion -lt $expectedVersion }
                     '<=' { $actualVersion -le $expectedVersion }
-                    default { throw "Unsupported PackageModel osVersion requirement operator '$operator'." }
+                    default { throw "Unsupported PackageModel osVersion compatibility operator '$operator'." }
                 }
                 $expectedSummary = '{0} {1}' -f $operator, [string]$check.value
             }
+            'physicalMemoryGiB' {
+                $operator = [string]$check.operator
+                $expectedNumericValue = [double]([string]$check.value)
+                $observedMemoryGiB = Get-PhysicalMemoryGiB
+                $accepted = & $testNumericValue -ActualNumericValue $observedMemoryGiB -Operator $operator -ExpectedNumericValue $expectedNumericValue
+                $actualValue = & $formatMemoryValue $observedMemoryGiB
+                $expectedSummary = '{0} {1} GiB' -f $operator, [string]$check.value
+            }
+            'videoMemoryGiB' {
+                $operator = [string]$check.operator
+                $expectedNumericValue = [double]([string]$check.value)
+                $observedMemoryGiB = Get-VideoMemoryGiB
+                $accepted = & $testNumericValue -ActualNumericValue $observedMemoryGiB -Operator $operator -ExpectedNumericValue $expectedNumericValue
+                $actualValue = & $formatMemoryValue $observedMemoryGiB
+                $expectedSummary = '{0} {1} GiB' -f $operator, [string]$check.value
+            }
+            'physicalOrVideoMemoryGiB' {
+                $operator = [string]$check.operator
+                $expectedNumericValue = [double]([string]$check.value)
+                $memoryRequirementResult = Test-PhysicalOrVideoMemoryRequirement -Operator $operator -ValueGiB $expectedNumericValue
+                $accepted = [bool]$memoryRequirementResult.Accepted
+                $actualValue = 'physical={0}; video={1}' -f (& $formatMemoryValue $memoryRequirementResult.PhysicalMemoryGiB), (& $formatMemoryValue $memoryRequirementResult.VideoMemoryGiB)
+                $expectedSummary = '{0} {1} GiB' -f $operator, [string]$check.value
+            }
             default {
-                throw "Unsupported PackageModel requirement kind '$kind'."
+                throw "Unsupported PackageModel compatibility kind '$kind'."
             }
         }
 
         if (-not $accepted) {
             $allAccepted = $false
+            if ([string]::Equals($onFail, 'fail', [System.StringComparison]::OrdinalIgnoreCase)) {
+                $blockingAccepted = $false
+            }
         }
 
         $results.Add([pscustomobject]@{
             Kind     = $kind
+            OnFail   = $onFail
             Accepted = $accepted
             Actual   = $actualValue
             Expected = $expectedSummary
@@ -231,8 +304,9 @@ The effective release requirements object.
     }
 
     return [pscustomobject]@{
-        Accepted = $allAccepted
-        Checks   = @($results.ToArray())
+        Accepted         = $allAccepted
+        BlockingAccepted = $blockingAccepted
+        Checks           = @($results.ToArray())
     }
 }
 
@@ -300,28 +374,39 @@ Resolve-PackageModelPackage -PackageModelResult $result
     $PackageModelResult.EffectiveRelease = $selectedPackage
     $PackageModelResult.PackageId = [string]$selectedPackage.id
     $PackageModelResult.PackageVersion = [string]$selectedPackage.version
-    $requirementsEvaluation = Test-PackageModelRequirementChecks -PackageModelConfig $packageModelConfig -Requirements $selectedPackage.requirements
-    $PackageModelResult.Requirements = @($requirementsEvaluation.Checks)
-    if (-not $requirementsEvaluation.Accepted) {
-        $failedRequirementText = @(
-            foreach ($checkResult in @($requirementsEvaluation.Checks)) {
-                if (-not $checkResult.Accepted) {
-                    "{0} actual='{1}' expected='{2}'" -f $checkResult.Kind, [string]$checkResult.Actual, [string]$checkResult.Expected
+    $compatibilityEvaluation = Test-PackageModelCompatibilityChecks -PackageModelConfig $packageModelConfig -Compatibility $selectedPackage.compatibility
+    $PackageModelResult.Compatibility = @($compatibilityEvaluation.Checks)
+    if (-not $compatibilityEvaluation.BlockingAccepted) {
+        $failedCompatibilityText = @(
+            foreach ($checkResult in @($compatibilityEvaluation.Checks)) {
+                if (-not $checkResult.Accepted -and [string]::Equals([string]$checkResult.OnFail, 'fail', [System.StringComparison]::OrdinalIgnoreCase)) {
+                    "{0} actual='{1}' expected='{2}' onFail='{3}'" -f $checkResult.Kind, [string]$checkResult.Actual, [string]$checkResult.Expected, [string]$checkResult.OnFail
                 }
             }
         ) -join '; '
-        throw "PackageModel release '$($selectedPackage.id)' does not satisfy requirements.checks. $failedRequirementText"
+        throw "PackageModel release '$($selectedPackage.id)' does not satisfy compatibility.checks. $failedCompatibilityText"
     }
 
     $selectedFlavor = if ($selectedPackage.PSObject.Properties['flavor']) { [string]$selectedPackage.flavor } else { 'default' }
     Write-PackageModelExecutionMessage -Message ("[STATE] Selected release '{0}' version '{1}' for platform '{2}', architecture '{3}', releaseTrack '{4}', flavor '{5}'." -f $PackageModelResult.PackageId, $PackageModelResult.PackageVersion, $packageModelConfig.Platform, $packageModelConfig.Architecture, $effectiveReleaseTrack, $selectedFlavor)
-    if (@($requirementsEvaluation.Checks).Count -gt 0) {
-        $requirementSummary = @(
-            foreach ($checkResult in @($requirementsEvaluation.Checks)) {
-                "{0}={1}" -f $checkResult.Kind, $(if ($checkResult.Accepted) { 'accepted' } else { 'rejected' })
+    if (@($compatibilityEvaluation.Checks).Count -gt 0) {
+        $compatibilitySummary = @(
+            foreach ($checkResult in @($compatibilityEvaluation.Checks)) {
+                "{0}={1}({2})" -f $checkResult.Kind, $(if ($checkResult.Accepted) { 'accepted' } else { 'rejected' }), [string]$checkResult.OnFail
             }
         ) -join ', '
-        Write-PackageModelExecutionMessage -Message ("[STATE] Requirement checks accepted: {0}." -f $requirementSummary)
+        Write-PackageModelExecutionMessage -Message ("[STATE] Compatibility checks: {0}." -f $compatibilitySummary)
+    }
+
+    $compatibilityWarnings = @(
+        foreach ($checkResult in @($compatibilityEvaluation.Checks)) {
+            if (-not $checkResult.Accepted -and [string]::Equals([string]$checkResult.OnFail, 'warn', [System.StringComparison]::OrdinalIgnoreCase)) {
+                "{0} actual='{1}' expected='{2}'" -f $checkResult.Kind, [string]$checkResult.Actual, [string]$checkResult.Expected
+            }
+        }
+    )
+    if ($compatibilityWarnings.Count -gt 0) {
+        Write-PackageModelExecutionMessage -Message ("[WARN] Compatibility warnings: {0}." -f ($compatibilityWarnings -join '; '))
     }
 
     return $PackageModelResult

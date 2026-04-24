@@ -124,11 +124,5 @@ function Expand-ManifestedArchiveToStage {
         throw "Archive package '$PackagePath' was not found."
     }
 
-    $stagePath = New-ManifestedStageDirectory -Prefix $Prefix -Mode TemporaryShort
-    Expand-Archive -LiteralPath $PackagePath -DestinationPath $stagePath -Force
-
-    [pscustomobject]@{
-        StagePath    = $stagePath
-        ExpandedRoot = (Get-ManifestedExpandedArchiveRoot -StagePath $stagePath)
-    }
+    return (Expand-ArchiveToStage -ArchivePath $PackagePath -Prefix $Prefix)
 }

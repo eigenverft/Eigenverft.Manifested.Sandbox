@@ -1,0 +1,152 @@
+{
+  "schemaVersion": "1.0",
+  "id": "LlamaCppRuntime",
+  "display": {
+    "default": {
+      "name": "llama.cpp",
+      "publisher": "ggml-org",
+      "corporation": "ggml-org",
+      "summary": "Local LLM runtime and CLI tools"
+    },
+    "localizations": {}
+  },
+  "upstreamSources": {
+    "llamaCppGitHub": {
+      "kind": "githubRelease",
+      "repositoryOwner": "ggml-org",
+      "repositoryName": "llama.cpp"
+    }
+  },
+  "providedTools": {
+    "commands": [
+      {
+        "name": "llama-cli",
+        "relativePath": "llama-cli.exe"
+      },
+      {
+        "name": "llama-server",
+        "relativePath": "llama-server.exe"
+      },
+      {
+        "name": "llama-quantize",
+        "relativePath": "llama-quantize.exe"
+      },
+      {
+        "name": "llama-bench",
+        "relativePath": "llama-bench.exe"
+      },
+      {
+        "name": "llama-tokenize",
+        "relativePath": "llama-tokenize.exe"
+      }
+    ],
+    "apps": []
+  },
+  "releaseDefaults": {
+    "compatibility": {
+      "checks": [
+        {
+          "kind": "osVersion",
+          "operator": ">=",
+          "value": "10.0"
+        }
+      ]
+    },
+    "install": {
+      "kind": "expandArchive",
+      "installDirectory": "llama-cpp-runtime/{releaseTrack}/{version}/{flavor}",
+      "pathRegistration": {
+        "mode": "user",
+        "source": {
+          "kind": "installRelativeDirectory",
+          "value": "."
+        }
+      },
+      "expandedRoot": "auto",
+      "createDirectories": []
+    },
+    "validation": {
+      "files": [
+        "llama-cli.exe",
+        "llama-server.exe",
+        "llama-quantize.exe",
+        "llama-bench.exe",
+        "llama.dll",
+        "llama-common.dll",
+        "ggml.dll",
+        "ggml-base.dll",
+        "ggml-cpu-x64.dll",
+        "libomp140.x86_64.dll"
+      ],
+      "directories": [],
+      "commandChecks": [
+        {
+          "entryPoint": "llama-cli",
+          "arguments": [
+            "--version"
+          ],
+          "outputPattern": "(?im)^version:\\s*(?<value>\\d+)\\b",
+          "expectedValue": "{version}"
+        }
+      ],
+      "metadataFiles": [],
+      "signatures": [],
+      "fileDetails": [],
+      "registryChecks": []
+    },
+    "existingInstallDiscovery": {
+      "enableDetection": false,
+      "searchLocations": [],
+      "installRootRules": []
+    },
+    "existingInstallPolicy": {
+      "allowAdoptExternal": false,
+      "upgradeAdoptedInstall": false,
+      "requirePackageModelOwnership": false
+    }
+  },
+  "releases": [
+    {
+      "id": "llama-cpp-win-cpu-x64-stable",
+      "version": "8863",
+      "releaseTag": "b8863",
+      "releaseTrack": "stable",
+      "flavor": "win-cpu-x64",
+      "constraints": {
+        "os": [
+          "windows"
+        ],
+        "cpu": [
+          "x64"
+        ]
+      },
+      "packageFile": {
+        "fileName": "llama-b8863-bin-win-cpu-x64.zip",
+        "format": "zip",
+        "portable": true,
+        "autoUpdateSupported": false,
+        "integrity": {
+          "algorithm": "sha256",
+          "sha256": "5a0c3bbd25c29185116ca24a10e9f124c5e4fc170822be82634bd543d8e91c0e"
+        }
+      },
+      "acquisitionCandidates": [
+        {
+          "kind": "packageDepot",
+          "priority": 250,
+          "verification": {
+            "mode": "optional"
+          }
+        },
+        {
+          "kind": "download",
+          "sourceId": "llamaCppGitHub",
+          "priority": 200,
+          "verification": {
+            "mode": "required"
+          }
+        }
+      ]
+    }
+  ]
+}
