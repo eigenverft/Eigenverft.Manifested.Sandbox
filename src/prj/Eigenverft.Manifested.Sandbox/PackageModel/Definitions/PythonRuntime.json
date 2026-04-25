@@ -1,0 +1,181 @@
+{
+  "schemaVersion": "1.0",
+  "id": "PythonRuntime",
+  "display": {
+    "default": {
+      "name": "Python",
+      "publisher": "Python Software Foundation",
+      "corporation": "Python Software Foundation",
+      "summary": "Portable Python runtime from the official NuGet package"
+    },
+    "localizations": {}
+  },
+  "upstreamSources": {
+    "pythonNuGetPackage": {
+      "kind": "download",
+      "baseUri": "https://api.nuget.org/v3-flatcontainer/"
+    }
+  },
+  "providedTools": {
+    "commands": [
+      {
+        "name": "python",
+        "relativePath": "python.exe"
+      }
+    ],
+    "apps": []
+  },
+  "releaseDefaults": {
+    "compatibility": {
+      "checks": [
+        {
+          "kind": "osVersion",
+          "operator": ">=",
+          "value": "10.0"
+        }
+      ]
+    },
+    "install": {
+      "kind": "expandArchive",
+      "installDirectory": "python-runtime/{releaseTrack}/{version}/{flavor}",
+      "pathRegistration": {
+        "mode": "user",
+        "source": {
+          "kind": "commandEntryPoint",
+          "value": "python"
+        }
+      },
+      "expandedRoot": "tools",
+      "createDirectories": []
+    },
+    "validation": {
+      "files": [
+        "python.exe"
+      ],
+      "directories": [
+        "Lib/site-packages/pip"
+      ],
+      "commandChecks": [
+        {
+          "entryPoint": "python",
+          "arguments": [
+            "--version"
+          ],
+          "outputPattern": "(?m)^Python\\s+(?<value>\\d+\\.\\d+\\.\\d+)\\s*$",
+          "expectedValue": "{version}"
+        },
+        {
+          "entryPoint": "python",
+          "arguments": [
+            "-m",
+            "pip",
+            "--version"
+          ],
+          "outputPattern": "(?m)^pip\\s+(?<value>\\d+\\.\\d+(?:\\.\\d+)?(?:[-+][0-9A-Za-z.\\-]+)?)\\s+from\\s+.+$"
+        }
+      ],
+      "metadataFiles": [],
+      "signatures": [],
+      "fileDetails": [],
+      "registryChecks": []
+    },
+    "existingInstallDiscovery": {
+      "enableDetection": false,
+      "searchLocations": [],
+      "installRootRules": []
+    },
+    "existingInstallPolicy": {
+      "allowAdoptExternal": false,
+      "upgradeAdoptedInstall": false,
+      "requirePackageModelOwnership": true
+    }
+  },
+  "releases": [
+    {
+      "id": "python-runtime-win-x64-stable",
+      "version": "3.13.13",
+      "releaseTag": "3.13.13",
+      "releaseTrack": "stable",
+      "flavor": "win-x64",
+      "constraints": {
+        "os": [
+          "windows"
+        ],
+        "cpu": [
+          "x64"
+        ]
+      },
+      "packageFile": {
+        "fileName": "python.3.13.13.nupkg",
+        "format": "nupkg",
+        "portable": true,
+        "autoUpdateSupported": false,
+        "integrity": {
+          "algorithm": "sha256",
+          "sha256": "c2347c2975f661b2dafceacc94218dfe87781955a3cd309c633d343b8c8dac31"
+        }
+      },
+      "acquisitionCandidates": [
+        {
+          "kind": "packageDepot",
+          "priority": 250,
+          "verification": {
+            "mode": "optional"
+          }
+        },
+        {
+          "kind": "download",
+          "sourceId": "pythonNuGetPackage",
+          "sourcePath": "python/3.13.13/python.3.13.13.nupkg",
+          "priority": 200,
+          "verification": {
+            "mode": "required"
+          }
+        }
+      ]
+    },
+    {
+      "id": "python-runtime-win-arm64-stable",
+      "version": "3.13.13",
+      "releaseTag": "3.13.13",
+      "releaseTrack": "stable",
+      "flavor": "win-arm64",
+      "constraints": {
+        "os": [
+          "windows"
+        ],
+        "cpu": [
+          "arm64"
+        ]
+      },
+      "packageFile": {
+        "fileName": "pythonarm64.3.13.13.nupkg",
+        "format": "nupkg",
+        "portable": true,
+        "autoUpdateSupported": false,
+        "integrity": {
+          "algorithm": "sha256",
+          "sha256": "2a0406b834d4ff33414f70597b67797466ba2344baa534ab8f62c4eae1c3e599"
+        }
+      },
+      "acquisitionCandidates": [
+        {
+          "kind": "packageDepot",
+          "priority": 250,
+          "verification": {
+            "mode": "optional"
+          }
+        },
+        {
+          "kind": "download",
+          "sourceId": "pythonNuGetPackage",
+          "sourcePath": "pythonarm64/3.13.13/pythonarm64.3.13.13.nupkg",
+          "priority": 200,
+          "verification": {
+            "mode": "required"
+          }
+        }
+      ]
+    }
+  ]
+}

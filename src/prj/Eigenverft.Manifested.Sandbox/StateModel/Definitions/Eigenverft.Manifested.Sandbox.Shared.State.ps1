@@ -64,8 +64,6 @@ function Get-ManifestedRuntimeSnapshots {
 
     $layout = Get-ManifestedLayout -LocalRoot $LocalRoot
     $definitions = @(
-        @{ Name = 'PythonRuntime'; FunctionName = 'Get-PythonRuntimeState'; PathProperty = 'RuntimeHome' },
-        @{ Name = 'NodeRuntime'; FunctionName = 'Get-NodeRuntimeState'; PathProperty = 'RuntimeHome' },
         @{ Name = 'OpenCodeRuntime'; FunctionName = 'Get-OpenCodeRuntimeState'; PathProperty = 'RuntimeHome' },
         @{ Name = 'GeminiRuntime'; FunctionName = 'Get-GeminiRuntimeState'; PathProperty = 'RuntimeHome' },
         @{ Name = 'QwenRuntime'; FunctionName = 'Get-QwenRuntimeState'; PathProperty = 'RuntimeHome' },

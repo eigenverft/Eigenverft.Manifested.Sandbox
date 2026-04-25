@@ -87,26 +87,6 @@ function Get-ManifestedCommandElevationPlan {
     $requiresElevation = $false
     $requirementSource = $null
 
-    switch ($CommandName) {
-        'Initialize-VCRuntime' {
-            $installedRuntime = if ($Context.ContainsKey('InstalledRuntime')) { $Context['InstalledRuntime'] } else { $null }
-            $installerInfo = if ($Context.ContainsKey('InstallerInfo')) { $Context['InstallerInfo'] } else { $null }
-
-            if ($installedRuntime -and $installedRuntime.Installed) {
-                if ($installerInfo -and $installerInfo.VersionObject) {
-                    if (-not $installedRuntime.VersionObject -or $installedRuntime.VersionObject -lt $installerInfo.VersionObject) {
-                        $requiresElevation = $true
-                        $requirementSource = 'Install-VCRuntime'
-                    }
-                }
-            }
-            elseif (@($PlannedActions) -contains 'Install-VCRuntime') {
-                $requiresElevation = $true
-                $requirementSource = 'Install-VCRuntime'
-            }
-        }
-    }
-
     $processIsElevated = Test-ManifestedProcessElevation
 
     [pscustomobject]@{

@@ -541,6 +541,30 @@ Describe 'Eigenverft.Manifested.Sandbox PackageModel' {
         $publicParameterNames.Count | Should -Be 0
     }
 
+    It 'exports Invoke-PackageModel-NodeRuntime and keeps it parameterless' {
+        $module = Import-Module -Name $script:ModuleManifestPath -Force -PassThru
+        $command = Get-Command -Name 'Invoke-PackageModel-NodeRuntime'
+
+        $command | Should -Not -BeNullOrEmpty
+        $publicParameterNames = @($command.Parameters.Keys | Where-Object {
+                $_ -notin [System.Management.Automation.PSCmdlet]::CommonParameters -and
+                $_ -notin [System.Management.Automation.PSCmdlet]::OptionalCommonParameters
+        })
+        $publicParameterNames.Count | Should -Be 0
+    }
+
+    It 'exports Invoke-PackageModel-PythonRuntime and keeps it parameterless' {
+        $module = Import-Module -Name $script:ModuleManifestPath -Force -PassThru
+        $command = Get-Command -Name 'Invoke-PackageModel-PythonRuntime'
+
+        $command | Should -Not -BeNullOrEmpty
+        $publicParameterNames = @($command.Parameters.Keys | Where-Object {
+                $_ -notin [System.Management.Automation.PSCmdlet]::CommonParameters -and
+                $_ -notin [System.Management.Automation.PSCmdlet]::OptionalCommonParameters
+        })
+        $publicParameterNames.Count | Should -Be 0
+    }
+
     It 'exports Invoke-PackageModel-Ps7Runtime and keeps it parameterless' {
         $module = Import-Module -Name $script:ModuleManifestPath -Force -PassThru
         $command = Get-Command -Name 'Invoke-PackageModel-Ps7Runtime'
@@ -571,6 +595,10 @@ Describe 'Eigenverft.Manifested.Sandbox PackageModel' {
         Get-Command -Name 'Initialize-VSCodeRuntime' -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
         Get-Command -Name 'Initialize-GitRuntime' -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
         Get-Command -Name 'Initialize-GHCliRuntime' -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
+        Get-Command -Name 'Initialize-NodeRuntime' -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
+        Get-Command -Name 'Initialize-PythonRuntime' -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
+        Get-Command -Name 'Initialize-Ps7Runtime' -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
+        Get-Command -Name 'Initialize-VCRuntime' -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
     }
 
     It 'loads the shipped global config without baked-in environment sources' {
@@ -662,6 +690,70 @@ Describe 'Eigenverft.Manifested.Sandbox PackageModel' {
         $result.Package.packageFile.fileName | Should -Be $expectedFileName
         $result.Package.packageFile.integrity.sha256 | Should -Be $expectedSha256
         $result.Package.install.pathRegistration.source.value | Should -Be 'gh'
+    }
+
+    It 'loads the shipped NodeRuntime definition and selects the fixed Node.js archive release' {
+        [Environment]::SetEnvironmentVariable($script:SourceInventoryEnvVarName, (Join-Path $TestDrive 'missing-inventory.json'), 'Process')
+
+        $config = Get-PackageModelConfig -DefinitionId 'NodeRuntime'
+        $result = New-PackageModelResult -CommandName 'test' -PackageModelConfig $config
+        $result = Resolve-PackageModelPackage -PackageModelResult $result
+        $sourceDefinition = Get-PackageModelSourceDefinition -PackageModelConfig $config -SourceRef ([pscustomobject]@{ scope = 'definition'; id = 'nodeJsRelease' })
+
+        $expectedFileName = if ([string]::Equals([string]$config.Architecture, 'arm64', [System.StringComparison]::OrdinalIgnoreCase)) {
+            'node-v24.15.0-win-arm64.zip'
+        }
+        else {
+            'node-v24.15.0-win-x64.zip'
+        }
+        $expectedSha256 = if ([string]::Equals([string]$config.Architecture, 'arm64', [System.StringComparison]::OrdinalIgnoreCase)) {
+            'c9eb7402eda26e2ba7e44b6727fc85a8de56c5095b1f71ebd3062892211aa116'
+        }
+        else {
+            'cc5149eabd53779ce1e7bdc5401643622d0c7e6800ade18928a767e940bb0e62'
+        }
+
+        $config.DefinitionId | Should -Be 'NodeRuntime'
+        $sourceDefinition.Kind | Should -Be 'download'
+        $sourceDefinition.BaseUri | Should -Be 'https://nodejs.org/dist/v24.15.0/'
+        $result.Package.version | Should -Be '24.15.0'
+        $result.Package.releaseTag | Should -Be 'v24.15.0'
+        $result.Package.packageFile.fileName | Should -Be $expectedFileName
+        $result.Package.packageFile.integrity.sha256 | Should -Be $expectedSha256
+        $result.Package.install.pathRegistration.source.value | Should -Be 'node'
+    }
+
+    It 'loads the shipped PythonRuntime definition and selects the fixed NuGet package release' {
+        [Environment]::SetEnvironmentVariable($script:SourceInventoryEnvVarName, (Join-Path $TestDrive 'missing-inventory.json'), 'Process')
+
+        $config = Get-PackageModelConfig -DefinitionId 'PythonRuntime'
+        $result = New-PackageModelResult -CommandName 'test' -PackageModelConfig $config
+        $result = Resolve-PackageModelPackage -PackageModelResult $result
+        $sourceDefinition = Get-PackageModelSourceDefinition -PackageModelConfig $config -SourceRef ([pscustomobject]@{ scope = 'definition'; id = 'pythonNuGetPackage' })
+
+        $expectedFileName = if ([string]::Equals([string]$config.Architecture, 'arm64', [System.StringComparison]::OrdinalIgnoreCase)) {
+            'pythonarm64.3.13.13.nupkg'
+        }
+        else {
+            'python.3.13.13.nupkg'
+        }
+        $expectedSha256 = if ([string]::Equals([string]$config.Architecture, 'arm64', [System.StringComparison]::OrdinalIgnoreCase)) {
+            '2a0406b834d4ff33414f70597b67797466ba2344baa534ab8f62c4eae1c3e599'
+        }
+        else {
+            'c2347c2975f661b2dafceacc94218dfe87781955a3cd309c633d343b8c8dac31'
+        }
+
+        $config.DefinitionId | Should -Be 'PythonRuntime'
+        $sourceDefinition.Kind | Should -Be 'download'
+        $sourceDefinition.BaseUri | Should -Be 'https://api.nuget.org/v3-flatcontainer/'
+        $result.Package.version | Should -Be '3.13.13'
+        $result.Package.releaseTag | Should -Be '3.13.13'
+        $result.Package.packageFile.fileName | Should -Be $expectedFileName
+        $result.Package.packageFile.integrity.sha256 | Should -Be $expectedSha256
+        $result.Package.install.expandedRoot | Should -Be 'tools'
+        $result.Package.install.pathRegistration.source.value | Should -Be 'python'
+        $result.Package.validation.commandChecks[1].arguments | Should -Be @('-m', 'pip', '--version')
     }
 
     It 'loads the shipped Ps7Runtime definition and selects the fixed GitHub-backed release' {
@@ -1295,6 +1387,50 @@ Describe 'Eigenverft.Manifested.Sandbox PackageModel' {
 
         $packageModelResult.PathRegistration.Status | Should -Be 'Registered'
         $packageModelResult.PathRegistration.RegisteredPath | Should -Be $binDirectory
+    }
+
+    It 'resolves shipped NodeRuntime PATH registration to the install directory' {
+        [Environment]::SetEnvironmentVariable($script:SourceInventoryEnvVarName, (Join-Path $TestDrive 'missing-inventory.json'), 'Process')
+
+        $installRoot = Join-Path $TestDrive 'path-registration-shipped-node'
+        $null = New-Item -ItemType Directory -Path $installRoot -Force
+        Write-TestTextFile -Path (Join-Path $installRoot 'node.exe') -Content 'fake node'
+
+        $config = Get-PackageModelConfig -DefinitionId 'NodeRuntime'
+        $packageModelResult = New-PackageModelResult -CommandName 'test' -PackageModelConfig $config
+        $packageModelResult = Resolve-PackageModelPackage -PackageModelResult $packageModelResult
+        $packageModelResult.InstallDirectory = $installRoot
+        $packageModelResult.InstallOrigin = 'PackageModelInstalled'
+
+        Mock Get-EnvironmentVariableValue {}
+        Mock Set-EnvironmentVariableValue {}
+
+        $packageModelResult = Register-PackageModelPath -PackageModelResult $packageModelResult
+
+        $packageModelResult.PathRegistration.Status | Should -Be 'Registered'
+        $packageModelResult.PathRegistration.RegisteredPath | Should -Be $installRoot
+    }
+
+    It 'resolves shipped PythonRuntime PATH registration to the install directory' {
+        [Environment]::SetEnvironmentVariable($script:SourceInventoryEnvVarName, (Join-Path $TestDrive 'missing-inventory.json'), 'Process')
+
+        $installRoot = Join-Path $TestDrive 'path-registration-shipped-python'
+        $null = New-Item -ItemType Directory -Path $installRoot -Force
+        Write-TestTextFile -Path (Join-Path $installRoot 'python.exe') -Content 'fake python'
+
+        $config = Get-PackageModelConfig -DefinitionId 'PythonRuntime'
+        $packageModelResult = New-PackageModelResult -CommandName 'test' -PackageModelConfig $config
+        $packageModelResult = Resolve-PackageModelPackage -PackageModelResult $packageModelResult
+        $packageModelResult.InstallDirectory = $installRoot
+        $packageModelResult.InstallOrigin = 'PackageModelInstalled'
+
+        Mock Get-EnvironmentVariableValue {}
+        Mock Set-EnvironmentVariableValue {}
+
+        $packageModelResult = Register-PackageModelPath -PackageModelResult $packageModelResult
+
+        $packageModelResult.PathRegistration.Status | Should -Be 'Registered'
+        $packageModelResult.PathRegistration.RegisteredPath | Should -Be $installRoot
     }
 
     It 'resolves shipped Ps7Runtime PATH registration to the install directory' {
@@ -2180,6 +2316,39 @@ Describe 'Eigenverft.Manifested.Sandbox PackageModel' {
 
         $packageModelResult.Validation.Accepted | Should -BeTrue
         @($packageModelResult.Validation.Registry | ForEach-Object { $_.Status }) | Should -Be @('Ready', 'Ready')
+    }
+
+    It 'resolves registry values through the generic execution-engine helper' {
+        $registryPath = 'HKLM:\SOFTWARE\Vendor\Product'
+
+        Mock Test-Path { $true } -ParameterFilter { $LiteralPath -eq $registryPath }
+        Mock Get-ItemProperty {
+            [pscustomobject]@{
+                Version = '1.2.3'
+            }
+        } -ParameterFilter { $LiteralPath -eq $registryPath -and $Name -eq 'Version' }
+
+        $result = Resolve-RegistryValueFromPaths -Paths @($registryPath) -ValueName 'Version'
+
+        $result.Path | Should -Be $registryPath
+        $result.ActualValue | Should -Be '1.2.3'
+        $result.Status | Should -Be 'Ready'
+    }
+
+    It 'returns missing when no registry candidate path exists' {
+        $paths = @(
+            'HKLM:\SOFTWARE\Vendor\MissingA',
+            'HKLM:\SOFTWARE\Vendor\MissingB'
+        )
+
+        Mock Test-Path { $false }
+
+        $result = Resolve-RegistryValueFromPaths -Paths $paths -ValueName 'Version'
+
+        $result.Path | Should -Be $paths[0]
+        $result.Paths | Should -Be $paths
+        $result.ActualValue | Should -BeNullOrEmpty
+        $result.Status | Should -Be 'Missing'
     }
 
     It 'marks a satisfied machine prerequisite so acquisition and installer execution can be skipped' {

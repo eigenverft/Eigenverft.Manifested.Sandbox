@@ -218,47 +218,6 @@ function Get-ManifestedCommandEnvironmentSpec {
     $expectedCommandPaths = [ordered]@{}
 
     switch ($CommandName) {
-        'Initialize-PythonRuntime' {
-            if (-not [string]::IsNullOrWhiteSpace($runtimeHome)) {
-                $desiredCommandDirectory = $runtimeHome
-            }
-            elseif (-not [string]::IsNullOrWhiteSpace($executablePath)) {
-                $desiredCommandDirectory = Split-Path -Parent $executablePath
-            }
-
-            $pythonCommandPath = $null
-            if (-not [string]::IsNullOrWhiteSpace($executablePath)) {
-                $pythonCommandPath = (Get-ManifestedFullPath -Path $executablePath)
-            }
-            elseif (-not [string]::IsNullOrWhiteSpace($runtimeHome)) {
-                $pythonCommandPath = (Get-ManifestedFullPath -Path (Join-Path $runtimeHome 'python.exe'))
-            }
-
-            if (-not [string]::IsNullOrWhiteSpace($pythonCommandPath)) {
-                $expectedCommandPaths['python'] = $pythonCommandPath
-                $expectedCommandPaths['python.exe'] = $pythonCommandPath
-            }
-
-            if ($runtimeSource -eq 'Managed' -and -not [string]::IsNullOrWhiteSpace($runtimeHome)) {
-                $expectedCommandPaths['pip.cmd'] = (Get-ManifestedFullPath -Path (Join-Path $runtimeHome 'pip.cmd'))
-                $expectedCommandPaths['pip3.cmd'] = (Get-ManifestedFullPath -Path (Join-Path $runtimeHome 'pip3.cmd'))
-            }
-        }
-        'Initialize-NodeRuntime' {
-            if (-not [string]::IsNullOrWhiteSpace($runtimeHome)) {
-                $desiredCommandDirectory = $runtimeHome
-            }
-            elseif (-not [string]::IsNullOrWhiteSpace($executablePath)) {
-                $desiredCommandDirectory = Split-Path -Parent $executablePath
-            }
-
-            if (-not [string]::IsNullOrWhiteSpace($executablePath)) {
-                $expectedCommandPaths['node.exe'] = (Get-ManifestedFullPath -Path $executablePath)
-            }
-            if (-not [string]::IsNullOrWhiteSpace($runtimeHome)) {
-                $expectedCommandPaths['npm.cmd'] = (Get-ManifestedFullPath -Path (Join-Path $runtimeHome 'npm.cmd'))
-            }
-        }
         'Initialize-OpenCodeRuntime' {
             if (-not [string]::IsNullOrWhiteSpace($runtimeHome)) {
                 $desiredCommandDirectory = $runtimeHome
@@ -341,12 +300,6 @@ function Get-ManifestedCommandEnvironmentSpec {
             if (-not [string]::IsNullOrWhiteSpace($qwenCommandPath)) {
                 $expectedCommandPaths['qwen'] = $qwenCommandPath
                 $expectedCommandPaths['qwen.cmd'] = $qwenCommandPath
-            }
-        }
-        'Initialize-Ps7Runtime' {
-            if (-not [string]::IsNullOrWhiteSpace($executablePath)) {
-                $desiredCommandDirectory = Split-Path -Parent $executablePath
-                $expectedCommandPaths['pwsh.exe'] = (Get-ManifestedFullPath -Path $executablePath)
             }
         }
     }

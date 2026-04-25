@@ -41,53 +41,6 @@ function ConvertTo-QwenVersionObject {
     return [version]$match.Groups[1].Value
 }
 
-function Get-QwenRequiredNodeVersion {
-    [CmdletBinding()]
-    param()
-
-    return [version]'20.0.0'
-}
-
-function Test-QwenNodeRuntime {
-    [CmdletBinding()]
-    param(
-        [pscustomobject]$NodeState
-    )
-
-    $requiredVersion = Get-QwenRequiredNodeVersion
-    $currentVersion = $null
-    if ($NodeState -and $NodeState.PSObject.Properties['CurrentVersion']) {
-        $currentVersion = ConvertTo-NodeVersion -VersionText $NodeState.CurrentVersion
-    }
-
-    $npmCmd = $null
-    if ($NodeState -and $NodeState.PSObject.Properties['Runtime'] -and $NodeState.Runtime -and $NodeState.Runtime.PSObject.Properties['NpmCmd']) {
-        $npmCmd = $NodeState.Runtime.NpmCmd
-    }
-    if ([string]::IsNullOrWhiteSpace($npmCmd) -and $NodeState -and $NodeState.PSObject.Properties['RuntimeHome'] -and -not [string]::IsNullOrWhiteSpace($NodeState.RuntimeHome)) {
-        $candidateNpmCmd = Join-Path $NodeState.RuntimeHome 'npm.cmd'
-        if (Test-Path -LiteralPath $candidateNpmCmd) {
-            $npmCmd = $candidateNpmCmd
-        }
-    }
-
-    $isReady = ($NodeState -and $NodeState.PSObject.Properties['Status'] -and ($NodeState.Status -eq 'Ready'))
-    $hasCompatibleNode = ($currentVersion -and ($currentVersion -ge $requiredVersion))
-    $hasUsableNpm = (-not [string]::IsNullOrWhiteSpace($npmCmd)) -and (Test-Path -LiteralPath $npmCmd)
-    $needsRefresh = $isReady -and (-not $hasCompatibleNode)
-
-    [pscustomobject]@{
-        RequiredVersion   = ('v' + $requiredVersion.ToString())
-        CurrentVersion    = if ($currentVersion) { ('v' + $currentVersion.ToString()) } else { $null }
-        IsReady           = [bool]$isReady
-        HasCompatibleNode = [bool]$hasCompatibleNode
-        HasUsableNpm      = [bool]$hasUsableNpm
-        IsCompatible      = [bool]($isReady -and $hasCompatibleNode -and $hasUsableNpm)
-        NeedsRefresh      = [bool]$needsRefresh
-        NpmCmd            = $npmCmd
-    }
-}
-
 function Get-QwenRuntimePackageJsonPath {
     [CmdletBinding()]
     param(
@@ -504,11 +457,7 @@ function Initialize-QwenRuntime {
         $plannedActions.Add('Repair-QwenRuntime') | Out-Null
     }
     if ($needsInstall) {
-        $nodeRequirement = Test-QwenNodeRuntime -NodeState (Get-NodeRuntimeState -LocalRoot $LocalRoot)
-        if (-not $nodeRequirement.IsCompatible) {
-            $plannedActions.Add('Initialize-NodeRuntime') | Out-Null
-        }
-
+        $plannedActions.Add('Invoke-PackageModel-NodeRuntime') | Out-Null
         $plannedActions.Add('Install-QwenRuntime') | Out-Null
     }
     $plannedActions.Add('Sync-ManifestedCommandLineEnvironment') | Out-Null
@@ -562,27 +511,14 @@ function Initialize-QwenRuntime {
             }
         }
 
-        $nodeState = Get-NodeRuntimeState -LocalRoot $LocalRoot
-        $nodeRequirement = Test-QwenNodeRuntime -NodeState $nodeState
-        if (-not $nodeRequirement.IsCompatible) {
-            $nodeCommandParameters = @{}
-            if ($nodeRequirement.NeedsRefresh) {
-                $nodeCommandParameters['RefreshNode'] = $true
-            }
-
-            $nodeResult = Initialize-NodeRuntime @nodeCommandParameters
-            if (@(@($nodeResult.ActionTaken) | Where-Object { $_ -and $_ -ne 'None' }).Count -gt 0) {
-                $actionsTaken.Add('Initialize-NodeRuntime') | Out-Null
-            }
-
-            $nodeState = Get-NodeRuntimeState -LocalRoot $LocalRoot
-            $nodeRequirement = Test-QwenNodeRuntime -NodeState $nodeState
+        $nodeResult = Invoke-PackageModel-NodeRuntime
+        $npmCmd = Resolve-PackageModelNodeRuntimeNpmCommand -PackageModelResult $nodeResult
+        if ($nodeResult.Install -and $nodeResult.Install.Status -ne 'ReusedPackageModelOwned') {
+            $actionsTaken.Add('Invoke-PackageModel-NodeRuntime') | Out-Null
         }
 
-        $npmCmd = $nodeRequirement.NpmCmd
-
-        if (-not $nodeRequirement.IsCompatible -or [string]::IsNullOrWhiteSpace($npmCmd) -or -not (Test-Path -LiteralPath $npmCmd)) {
-            throw ('A Node.js runtime compatible with Qwen was not available after ensuring dependencies. Required: {0}. Current: {1}.' -f $nodeRequirement.RequiredVersion, $nodeRequirement.CurrentVersion)
+        if ($nodeResult.Status -ne 'Ready' -or [string]::IsNullOrWhiteSpace($npmCmd) -or -not (Test-Path -LiteralPath $npmCmd)) {
+            throw 'A Node.js runtime compatible with Qwen was not available after ensuring dependencies.'
         }
 
         $installResult = Install-QwenRuntime -NpmCmd $npmCmd -LocalRoot $LocalRoot

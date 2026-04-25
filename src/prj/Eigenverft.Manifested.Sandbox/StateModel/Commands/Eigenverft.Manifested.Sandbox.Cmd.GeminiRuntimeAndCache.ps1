@@ -41,53 +41,6 @@ function ConvertTo-GeminiVersionObject {
     return [version]$match.Groups[1].Value
 }
 
-function Get-GeminiRequiredNodeVersion {
-    [CmdletBinding()]
-    param()
-
-    return [version]'20.0.0'
-}
-
-function Test-GeminiNodeRuntime {
-    [CmdletBinding()]
-    param(
-        [pscustomobject]$NodeState
-    )
-
-    $requiredVersion = Get-GeminiRequiredNodeVersion
-    $currentVersion = $null
-    if ($NodeState -and $NodeState.PSObject.Properties['CurrentVersion']) {
-        $currentVersion = ConvertTo-NodeVersion -VersionText $NodeState.CurrentVersion
-    }
-
-    $npmCmd = $null
-    if ($NodeState -and $NodeState.PSObject.Properties['Runtime'] -and $NodeState.Runtime -and $NodeState.Runtime.PSObject.Properties['NpmCmd']) {
-        $npmCmd = $NodeState.Runtime.NpmCmd
-    }
-    if ([string]::IsNullOrWhiteSpace($npmCmd) -and $NodeState -and $NodeState.PSObject.Properties['RuntimeHome'] -and -not [string]::IsNullOrWhiteSpace($NodeState.RuntimeHome)) {
-        $candidateNpmCmd = Join-Path $NodeState.RuntimeHome 'npm.cmd'
-        if (Test-Path -LiteralPath $candidateNpmCmd) {
-            $npmCmd = $candidateNpmCmd
-        }
-    }
-
-    $isReady = ($NodeState -and $NodeState.PSObject.Properties['Status'] -and ($NodeState.Status -eq 'Ready'))
-    $hasCompatibleNode = ($currentVersion -and ($currentVersion -ge $requiredVersion))
-    $hasUsableNpm = (-not [string]::IsNullOrWhiteSpace($npmCmd)) -and (Test-Path -LiteralPath $npmCmd)
-    $needsRefresh = $isReady -and (-not $hasCompatibleNode)
-
-    [pscustomobject]@{
-        RequiredVersion = ('v' + $requiredVersion.ToString())
-        CurrentVersion  = if ($currentVersion) { ('v' + $currentVersion.ToString()) } else { $null }
-        IsReady         = [bool]$isReady
-        HasCompatibleNode = [bool]$hasCompatibleNode
-        HasUsableNpm    = [bool]$hasUsableNpm
-        IsCompatible    = [bool]($isReady -and $hasCompatibleNode -and $hasUsableNpm)
-        NeedsRefresh    = [bool]$needsRefresh
-        NpmCmd          = $npmCmd
-    }
-}
-
 function Get-GeminiRuntimePackageJsonPath {
     [CmdletBinding()]
     param(
@@ -525,11 +478,7 @@ Supports WhatIf and may trigger dependent runtime initialization steps.
         $plannedActions.Add('Repair-GeminiRuntime') | Out-Null
     }
     if ($needsInstall) {
-        $nodeRequirement = Test-GeminiNodeRuntime -NodeState (Get-NodeRuntimeState -LocalRoot $LocalRoot)
-        if (-not $nodeRequirement.IsCompatible) {
-            $plannedActions.Add('Initialize-NodeRuntime') | Out-Null
-        }
-
+        $plannedActions.Add('Invoke-PackageModel-NodeRuntime') | Out-Null
         $plannedActions.Add('Install-GeminiRuntime') | Out-Null
     }
     $plannedActions.Add('Sync-ManifestedCommandLineEnvironment') | Out-Null
@@ -583,27 +532,14 @@ Supports WhatIf and may trigger dependent runtime initialization steps.
             }
         }
 
-        $nodeState = Get-NodeRuntimeState -LocalRoot $LocalRoot
-        $nodeRequirement = Test-GeminiNodeRuntime -NodeState $nodeState
-        if (-not $nodeRequirement.IsCompatible) {
-            $nodeCommandParameters = @{}
-            if ($nodeRequirement.NeedsRefresh) {
-                $nodeCommandParameters['RefreshNode'] = $true
-            }
-
-            $nodeResult = Initialize-NodeRuntime @nodeCommandParameters
-            if (@(@($nodeResult.ActionTaken) | Where-Object { $_ -and $_ -ne 'None' }).Count -gt 0) {
-                $actionsTaken.Add('Initialize-NodeRuntime') | Out-Null
-            }
-
-            $nodeState = Get-NodeRuntimeState -LocalRoot $LocalRoot
-            $nodeRequirement = Test-GeminiNodeRuntime -NodeState $nodeState
+        $nodeResult = Invoke-PackageModel-NodeRuntime
+        $npmCmd = Resolve-PackageModelNodeRuntimeNpmCommand -PackageModelResult $nodeResult
+        if ($nodeResult.Install -and $nodeResult.Install.Status -ne 'ReusedPackageModelOwned') {
+            $actionsTaken.Add('Invoke-PackageModel-NodeRuntime') | Out-Null
         }
 
-        $npmCmd = $nodeRequirement.NpmCmd
-
-        if (-not $nodeRequirement.IsCompatible -or [string]::IsNullOrWhiteSpace($npmCmd) -or -not (Test-Path -LiteralPath $npmCmd)) {
-            throw ('A Node.js runtime compatible with Gemini was not available after ensuring dependencies. Required: {0}. Current: {1}.' -f $nodeRequirement.RequiredVersion, $nodeRequirement.CurrentVersion)
+        if ($nodeResult.Status -ne 'Ready' -or [string]::IsNullOrWhiteSpace($npmCmd) -or -not (Test-Path -LiteralPath $npmCmd)) {
+            throw 'A Node.js runtime compatible with Gemini was not available after ensuring dependencies.'
         }
 
         $installResult = Install-GeminiRuntime -NpmCmd $npmCmd -LocalRoot $LocalRoot

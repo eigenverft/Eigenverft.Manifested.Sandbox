@@ -668,12 +668,8 @@ Supports WhatIf and may trigger dependent runtime initialization steps.
         $plannedActions.Add('Repair-CodexRuntime') | Out-Null
     }
     if ($needsInstall) {
-        $plannedActions.Add('Initialize-VCRuntime') | Out-Null
-        $nodePlanState = Get-NodeRuntimeState -LocalRoot $LocalRoot
-        if ($nodePlanState.Status -ne 'Ready') {
-            $plannedActions.Add('Initialize-NodeRuntime') | Out-Null
-        }
-
+        $plannedActions.Add('Invoke-PackageModel-VCRuntime') | Out-Null
+        $plannedActions.Add('Invoke-PackageModel-NodeRuntime') | Out-Null
         $plannedActions.Add('Install-CodexRuntime') | Out-Null
     }
     $plannedActions.Add('Sync-ManifestedCommandLineEnvironment') | Out-Null
@@ -727,30 +723,18 @@ Supports WhatIf and may trigger dependent runtime initialization steps.
             }
         }
 
-        $vcResult = Initialize-VCRuntime
-        if (@(@($vcResult.ActionTaken) | Where-Object { $_ -and $_ -ne 'None' }).Count -gt 0) {
-            $actionsTaken.Add('Initialize-VCRuntime') | Out-Null
+        $vcResult = Invoke-PackageModel-VCRuntime
+        if ($vcResult -and $vcResult.Install -and $vcResult.Install.Status -ne 'AlreadySatisfied') {
+            $actionsTaken.Add('Invoke-PackageModel-VCRuntime') | Out-Null
         }
 
-        $nodeState = Get-NodeRuntimeState -LocalRoot $LocalRoot
-        if ($nodeState.Status -ne 'Ready') {
-            $nodeResult = Initialize-NodeRuntime
-            if (@(@($nodeResult.ActionTaken) | Where-Object { $_ -and $_ -ne 'None' }).Count -gt 0) {
-                $actionsTaken.Add('Initialize-NodeRuntime') | Out-Null
-            }
-
-            $nodeState = Get-NodeRuntimeState -LocalRoot $LocalRoot
+        $nodeResult = Invoke-PackageModel-NodeRuntime
+        $npmCmd = Resolve-PackageModelNodeRuntimeNpmCommand -PackageModelResult $nodeResult
+        if ($nodeResult.Install -and $nodeResult.Install.Status -ne 'ReusedPackageModelOwned') {
+            $actionsTaken.Add('Invoke-PackageModel-NodeRuntime') | Out-Null
         }
 
-        $npmCmd = $null
-        if ($nodeState.Runtime -and $nodeState.Runtime.PSObject.Properties['NpmCmd']) {
-            $npmCmd = $nodeState.Runtime.NpmCmd
-        }
-        if ([string]::IsNullOrWhiteSpace($npmCmd) -and -not [string]::IsNullOrWhiteSpace($nodeState.RuntimeHome)) {
-            $npmCmd = Join-Path $nodeState.RuntimeHome 'npm.cmd'
-        }
-
-        if ($nodeState.Status -ne 'Ready' -or [string]::IsNullOrWhiteSpace($npmCmd) -or -not (Test-Path -LiteralPath $npmCmd)) {
+        if ($nodeResult.Status -ne 'Ready' -or [string]::IsNullOrWhiteSpace($npmCmd) -or -not (Test-Path -LiteralPath $npmCmd)) {
             throw 'A usable npm command was not available after ensuring Codex dependencies.'
         }
 
