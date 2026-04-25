@@ -1,0 +1,113 @@
+{
+  "schemaVersion": "1.0",
+  "id": "QwenCliRuntime",
+  "display": {
+    "default": {
+      "name": "Qwen CLI",
+      "publisher": "Alibaba Cloud",
+      "corporation": "Alibaba Cloud",
+      "summary": "Pinned Qwen CLI npm runtime"
+    },
+    "localizations": {}
+  },
+  "upstreamSources": {},
+  "providedTools": {
+    "commands": [
+      {
+        "name": "qwen",
+        "relativePath": "qwen.cmd"
+      }
+    ],
+    "apps": []
+  },
+  "releaseDefaults": {
+    "compatibility": {
+      "checks": [
+        {
+          "kind": "osVersion",
+          "operator": ">=",
+          "value": "10.0"
+        }
+      ]
+    },
+    "install": {
+      "kind": "packageManagerInstall",
+      "managerKind": "npm",
+      "managerDependency": {
+        "definitionId": "NodeRuntime",
+        "command": "npm"
+      },
+      "packageSpec": "@qwen-code/qwen-code@{version}",
+      "installDirectory": "qwen-cli-runtime/{releaseTrack}/{version}/{flavor}",
+      "pathRegistration": {
+        "mode": "user",
+        "source": {
+          "kind": "commandEntryPoint",
+          "value": "qwen"
+        }
+      }
+    },
+    "validation": {
+      "files": [
+        "qwen.cmd",
+        "node_modules/@qwen-code/qwen-code/package.json"
+      ],
+      "directories": [
+        "node_modules"
+      ],
+      "commandChecks": [
+        {
+          "entryPoint": "qwen",
+          "arguments": [
+            "--version"
+          ],
+          "outputPattern": "(?m)^(?<value>.+\\S.*)$"
+        }
+      ],
+      "metadataFiles": [],
+      "signatures": [],
+      "fileDetails": [],
+      "registryChecks": []
+    },
+    "existingInstallDiscovery": {
+      "enableDetection": false,
+      "searchLocations": [],
+      "installRootRules": []
+    },
+    "existingInstallPolicy": {
+      "allowAdoptExternal": false,
+      "upgradeAdoptedInstall": false,
+      "requirePackageModelOwnership": true
+    }
+  },
+  "releases": [
+    {
+      "id": "qwen-cli-runtime-win32-x64-stable",
+      "version": "0.15.2",
+      "releaseTrack": "stable",
+      "flavor": "win32-x64",
+      "constraints": {
+        "os": [
+          "windows"
+        ],
+        "cpu": [
+          "x64"
+        ]
+      }
+    },
+    {
+      "id": "qwen-cli-runtime-win32-arm64-stable",
+      "version": "0.15.2",
+      "releaseTrack": "stable",
+      "flavor": "win32-arm64",
+      "constraints": {
+        "os": [
+          "windows"
+        ],
+        "cpu": [
+          "arm64"
+        ]
+      }
+    }
+  ]
+}

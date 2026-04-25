@@ -1,0 +1,26 @@
+{
+  "packageModel": {
+    "preferredTargetInstallDirectory": "%LOCALAPPDATA%/Eigenverft.Manifested.Sandbox/Installs",
+    "acquisitionEnvironment": {
+      "stores": {
+        "installWorkspaceDirectory": "%LOCALAPPDATA%/Eigenverft.Manifested.Sandbox/InstallWorkspace",
+        "defaultPackageDepotDirectory": "%LOCALAPPDATA%/Eigenverft.Manifested.Sandbox/DefaultPackageDepot"
+      },
+      "defaults": {
+        "allowFallback": true,
+        "mirrorDownloadedArtifactsToDefaultPackageDepot": true
+      },
+      "tracking": {
+        "artifactIndexFilePath": "%LOCALAPPDATA%/Eigenverft.Manifested.Sandbox/artifact-index.json"
+      }
+    },
+    "ownershipTracking": {
+      "indexFilePath": "%LOCALAPPDATA%/Eigenverft.Manifested.Sandbox/ownership-index.json"
+    },
+    "selectionDefaults": {
+      "releaseTrack": "stable",
+      "strategy": "latestByVersion"
+    }
+  }
+}
+

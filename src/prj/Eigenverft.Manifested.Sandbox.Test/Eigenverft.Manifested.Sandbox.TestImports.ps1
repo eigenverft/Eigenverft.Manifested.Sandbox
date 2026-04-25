@@ -9,59 +9,48 @@ $moduleProjectRoot = Join-Path (Split-Path -Parent $PSScriptRoot) 'Eigenverft.Ma
 . "$moduleProjectRoot\Eigenverft.Manifested.Sandbox.ps1"
 
 # Generic ExecutionEngine support
-. "$moduleProjectRoot\PackageModel\Support\ExecutionEngine\Eigenverft.Manifested.Sandbox.PackageModel.ExecutionEngine.StandardMessage.ps1"
-. "$moduleProjectRoot\PackageModel\Support\ExecutionEngine\Eigenverft.Manifested.Sandbox.PackageModel.ExecutionEngine.Archive.ps1"
-. "$moduleProjectRoot\PackageModel\Support\ExecutionEngine\Eigenverft.Manifested.Sandbox.PackageModel.ExecutionEngine.CommandResolution.ps1"
-. "$moduleProjectRoot\PackageModel\Support\ExecutionEngine\Eigenverft.Manifested.Sandbox.PackageModel.ExecutionEngine.FileSystem.ps1"
-. "$moduleProjectRoot\PackageModel\Support\ExecutionEngine\Eigenverft.Manifested.Sandbox.PackageModel.ExecutionEngine.Registry.ps1"
-. "$moduleProjectRoot\PackageModel\Support\ExecutionEngine\Eigenverft.Manifested.Sandbox.PackageModel.ExecutionEngine.SystemResources.ps1"
-. "$moduleProjectRoot\PackageModel\Support\ExecutionEngine\Eigenverft.Manifested.Sandbox.PackageModel.ExecutionEngine.Elevation.ps1"
-. "$moduleProjectRoot\PackageModel\Support\ExecutionEngine\Eigenverft.Manifested.Sandbox.PackageModel.ExecutionEngine.PathRegistration.ps1"
+. "$moduleProjectRoot\Support\ExecutionEngine\Eigenverft.Manifested.Sandbox.ExecutionEngine.StandardMessage.ps1"
+. "$moduleProjectRoot\Support\ExecutionEngine\Eigenverft.Manifested.Sandbox.ExecutionEngine.Archive.ps1"
+. "$moduleProjectRoot\Support\ExecutionEngine\Eigenverft.Manifested.Sandbox.ExecutionEngine.CommandResolution.ps1"
+. "$moduleProjectRoot\Support\ExecutionEngine\Eigenverft.Manifested.Sandbox.ExecutionEngine.FileSystem.ps1"
+. "$moduleProjectRoot\Support\ExecutionEngine\Eigenverft.Manifested.Sandbox.ExecutionEngine.Registry.ps1"
+. "$moduleProjectRoot\Support\ExecutionEngine\Eigenverft.Manifested.Sandbox.ExecutionEngine.SystemResources.ps1"
+. "$moduleProjectRoot\Support\ExecutionEngine\Eigenverft.Manifested.Sandbox.ExecutionEngine.Elevation.ps1"
+. "$moduleProjectRoot\Support\ExecutionEngine\Eigenverft.Manifested.Sandbox.ExecutionEngine.PathRegistration.ps1"
+. "$moduleProjectRoot\Support\ExecutionEngine\Eigenverft.Manifested.Sandbox.ExecutionEngine.Npm.ps1"
+. "$moduleProjectRoot\Support\ExecutionEngine\Eigenverft.Manifested.Sandbox.ExecutionEngine.InitializeProxyAccessProfile.ps1"
 
-# StateModel support
-. "$moduleProjectRoot\StateModel\Support\Eigenverft.Manifested.Sandbox.Base.Invoke-WebRequestEx.ps1"
-. "$moduleProjectRoot\StateModel\Support\Eigenverft.Manifested.Sandbox.Shared.Elevation.ps1"
-. "$moduleProjectRoot\StateModel\Support\Eigenverft.Manifested.Sandbox.Shared.GitHubReleases.ps1"
-. "$moduleProjectRoot\StateModel\Support\Eigenverft.Manifested.Sandbox.Shared.Paths.ps1"
-. "$moduleProjectRoot\StateModel\Support\Eigenverft.Manifested.Sandbox.Shared.Cache.ps1"
-. "$moduleProjectRoot\StateModel\Support\Eigenverft.Manifested.Sandbox.Shared.Extraction.ps1"
-. "$moduleProjectRoot\StateModel\Support\Eigenverft.Manifested.Sandbox.Shared.Npm.ps1"
-. "$moduleProjectRoot\StateModel\Support\Eigenverft.Manifested.Sandbox.Shared.CommandEnvironment.ps1"
+# Package support
+. "$moduleProjectRoot\Support\ExecutionEngine\Eigenverft.Manifested.Sandbox.ExecutionEngine.InvokeWebRequestEx.ps1"
+. "$moduleProjectRoot\Support\Upstream\Eigenverft.Manifested.Sandbox.Upstream.GitHubRelease.ps1"
+. "$moduleProjectRoot\Support\Package\Eigenverft.Manifested.Sandbox.Package.ExecutionMessage.ps1"
+. "$moduleProjectRoot\Support\Package\Eigenverft.Manifested.Sandbox.Package.Bootstrap.ps1"
+. "$moduleProjectRoot\Support\Package\Eigenverft.Manifested.Sandbox.Package.Config.ps1"
+. "$moduleProjectRoot\Support\Package\Eigenverft.Manifested.Sandbox.Package.Selection.ps1"
+. "$moduleProjectRoot\Support\Package\Eigenverft.Manifested.Sandbox.Package.Source.ps1"
+. "$moduleProjectRoot\Support\Package\Eigenverft.Manifested.Sandbox.Package.Ownership.ps1"
+. "$moduleProjectRoot\Support\Package\Eigenverft.Manifested.Sandbox.Package.Validation.ps1"
+. "$moduleProjectRoot\Support\Package\Eigenverft.Manifested.Sandbox.Package.Npm.ps1"
+. "$moduleProjectRoot\Support\Package\Eigenverft.Manifested.Sandbox.Package.Install.ps1"
+. "$moduleProjectRoot\Support\Package\Eigenverft.Manifested.Sandbox.Package.EntryPoints.ps1"
+. "$moduleProjectRoot\Support\Package\Eigenverft.Manifested.Sandbox.Package.PathRegistration.ps1"
+. "$moduleProjectRoot\Support\Package\Eigenverft.Manifested.Sandbox.Package.CommandFlow.ps1"
 
-# StateModel definitions
-. "$moduleProjectRoot\StateModel\Definitions\Eigenverft.Manifested.Sandbox.Shared.State.ps1"
+# Package definitions
+# Package definitions are JSON-only.
 
-# StateModel commands
-. "$moduleProjectRoot\StateModel\Commands\Eigenverft.Manifested.Sandbox.Cmd.OpenCodeRuntimeAndCache.ps1"
-. "$moduleProjectRoot\StateModel\Commands\Eigenverft.Manifested.Sandbox.Cmd.GeminiRuntimeAndCache.ps1"
-. "$moduleProjectRoot\StateModel\Commands\Eigenverft.Manifested.Sandbox.Cmd.QwenRuntimeAndCache.ps1"
-. "$moduleProjectRoot\StateModel\Commands\Eigenverft.Manifested.Sandbox.Cmd.CodexRuntimeAndCache.ps1"
+# Package commands
+. "$moduleProjectRoot\Commands\Eigenverft.Manifested.Sandbox.Cmd.Qwen35_2B_Q6K.ps1"
+. "$moduleProjectRoot\Commands\Eigenverft.Manifested.Sandbox.Cmd.LlamaCppRuntime.ps1"
+. "$moduleProjectRoot\Commands\Eigenverft.Manifested.Sandbox.Cmd.VCRuntime.ps1"
+. "$moduleProjectRoot\Commands\Eigenverft.Manifested.Sandbox.Cmd.Ps7Runtime.ps1"
+. "$moduleProjectRoot\Commands\Eigenverft.Manifested.Sandbox.Cmd.PythonRuntime.ps1"
+. "$moduleProjectRoot\Commands\Eigenverft.Manifested.Sandbox.Cmd.NodeRuntime.ps1"
+. "$moduleProjectRoot\Commands\Eigenverft.Manifested.Sandbox.Cmd.CodexRuntime.ps1"
+. "$moduleProjectRoot\Commands\Eigenverft.Manifested.Sandbox.Cmd.GeminiRuntime.ps1"
+. "$moduleProjectRoot\Commands\Eigenverft.Manifested.Sandbox.Cmd.OpenCodeRuntime.ps1"
+. "$moduleProjectRoot\Commands\Eigenverft.Manifested.Sandbox.Cmd.QwenCliRuntime.ps1"
+. "$moduleProjectRoot\Commands\Eigenverft.Manifested.Sandbox.Cmd.GHCliRuntime.ps1"
+. "$moduleProjectRoot\Commands\Eigenverft.Manifested.Sandbox.Cmd.GitRuntime.ps1"
+. "$moduleProjectRoot\Commands\Eigenverft.Manifested.Sandbox.Cmd.VSCodeRuntime.ps1"
 
-# PackageModel support
-. "$moduleProjectRoot\PackageModel\Support\ExecutionEngine\Eigenverft.Manifested.Sandbox.PackageModel.ExecutionEngine.InvokeWebRequestEx.ps1"
-. "$moduleProjectRoot\PackageModel\Support\Upstream\Eigenverft.Manifested.Sandbox.PackageModel.Upstream.GitHubRelease.ps1"
-. "$moduleProjectRoot\PackageModel\Support\Package\Eigenverft.Manifested.Sandbox.PackageModel.ExecutionMessage.ps1"
-. "$moduleProjectRoot\PackageModel\Support\Package\Eigenverft.Manifested.Sandbox.PackageModel.Bootstrap.ps1"
-. "$moduleProjectRoot\PackageModel\Support\Package\Eigenverft.Manifested.Sandbox.PackageModel.Config.ps1"
-. "$moduleProjectRoot\PackageModel\Support\Package\Eigenverft.Manifested.Sandbox.PackageModel.Selection.ps1"
-. "$moduleProjectRoot\PackageModel\Support\Package\Eigenverft.Manifested.Sandbox.PackageModel.Source.ps1"
-. "$moduleProjectRoot\PackageModel\Support\Package\Eigenverft.Manifested.Sandbox.PackageModel.Ownership.ps1"
-. "$moduleProjectRoot\PackageModel\Support\Package\Eigenverft.Manifested.Sandbox.PackageModel.Validation.ps1"
-. "$moduleProjectRoot\PackageModel\Support\Package\Eigenverft.Manifested.Sandbox.PackageModel.Install.ps1"
-. "$moduleProjectRoot\PackageModel\Support\Package\Eigenverft.Manifested.Sandbox.PackageModel.EntryPoints.ps1"
-. "$moduleProjectRoot\PackageModel\Support\Package\Eigenverft.Manifested.Sandbox.PackageModel.PathRegistration.ps1"
-. "$moduleProjectRoot\PackageModel\Support\Package\Eigenverft.Manifested.Sandbox.PackageModel.CommandFlow.ps1"
-
-# PackageModel definitions
-# PackageModel definitions are JSON-only in this package-definition pass.
-
-# PackageModel commands
-. "$moduleProjectRoot\PackageModel\Commands\Eigenverft.Manifested.Sandbox.PackageModel.Cmd.Qwen35_2B_Q6K.ps1"
-. "$moduleProjectRoot\PackageModel\Commands\Eigenverft.Manifested.Sandbox.PackageModel.Cmd.LlamaCppRuntime.ps1"
-. "$moduleProjectRoot\PackageModel\Commands\Eigenverft.Manifested.Sandbox.PackageModel.Cmd.VCRuntime.ps1"
-. "$moduleProjectRoot\PackageModel\Commands\Eigenverft.Manifested.Sandbox.PackageModel.Cmd.Ps7Runtime.ps1"
-. "$moduleProjectRoot\PackageModel\Commands\Eigenverft.Manifested.Sandbox.PackageModel.Cmd.PythonRuntime.ps1"
-. "$moduleProjectRoot\PackageModel\Commands\Eigenverft.Manifested.Sandbox.PackageModel.Cmd.NodeRuntime.ps1"
-. "$moduleProjectRoot\PackageModel\Commands\Eigenverft.Manifested.Sandbox.PackageModel.Cmd.GHCliRuntime.ps1"
-. "$moduleProjectRoot\PackageModel\Commands\Eigenverft.Manifested.Sandbox.PackageModel.Cmd.GitRuntime.ps1"
-. "$moduleProjectRoot\PackageModel\Commands\Eigenverft.Manifested.Sandbox.PackageModel.Cmd.VSCodeRuntime.ps1"

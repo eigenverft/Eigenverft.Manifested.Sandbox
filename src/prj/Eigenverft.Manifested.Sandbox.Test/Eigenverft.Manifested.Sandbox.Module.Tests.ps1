@@ -127,15 +127,15 @@ function global:New-TestPackageModelGlobalDocument {
 
     $acquisitionEnvironment = @{
         stores = @{
-            installWorkspaceDirectory = if ($PSBoundParameters.ContainsKey('InstallWorkspaceDirectory')) { $InstallWorkspaceDirectory } else { '%LOCALAPPDATA%/Eigenverft.Manifested.Sandbox/PackageModel/InstallWorkspace' }
-            defaultPackageDepotDirectory = if ($PSBoundParameters.ContainsKey('DefaultPackageDepotDirectory')) { $DefaultPackageDepotDirectory } else { '%LOCALAPPDATA%/Eigenverft.Manifested.Sandbox/PackageModel/DefaultPackageDepot' }
+            installWorkspaceDirectory = if ($PSBoundParameters.ContainsKey('InstallWorkspaceDirectory')) { $InstallWorkspaceDirectory } else { '%LOCALAPPDATA%/Eigenverft.Manifested.Sandbox/InstallWorkspace' }
+            defaultPackageDepotDirectory = if ($PSBoundParameters.ContainsKey('DefaultPackageDepotDirectory')) { $DefaultPackageDepotDirectory } else { '%LOCALAPPDATA%/Eigenverft.Manifested.Sandbox/DefaultPackageDepot' }
         }
         defaults = @{
             allowFallback = $AllowFallback
             mirrorDownloadedArtifactsToDefaultPackageDepot = $MirrorDownloadedArtifactsToDefaultPackageDepot
         }
         tracking = @{
-            artifactIndexFilePath = if ($PSBoundParameters.ContainsKey('ArtifactIndexFilePath')) { $ArtifactIndexFilePath } else { '%LOCALAPPDATA%/Eigenverft.Manifested.Sandbox/PackageModel/artifact-index.json' }
+            artifactIndexFilePath = if ($PSBoundParameters.ContainsKey('ArtifactIndexFilePath')) { $ArtifactIndexFilePath } else { '%LOCALAPPDATA%/Eigenverft.Manifested.Sandbox/artifact-index.json' }
         }
     }
     if ($PSBoundParameters.ContainsKey('EnvironmentSources') -and $null -ne $EnvironmentSources) {
@@ -144,10 +144,10 @@ function global:New-TestPackageModelGlobalDocument {
 
     return @{
         packageModel = @{
-            preferredTargetInstallDirectory = if ($PSBoundParameters.ContainsKey('PreferredTargetInstallDirectory')) { $PreferredTargetInstallDirectory } else { '%LOCALAPPDATA%/Eigenverft.Manifested.Sandbox/PackageModel/Installs' }
+            preferredTargetInstallDirectory = if ($PSBoundParameters.ContainsKey('PreferredTargetInstallDirectory')) { $PreferredTargetInstallDirectory } else { '%LOCALAPPDATA%/Eigenverft.Manifested.Sandbox/Installs' }
             acquisitionEnvironment = $acquisitionEnvironment
             ownershipTracking = @{
-                indexFilePath = if ($PSBoundParameters.ContainsKey('OwnershipIndexFilePath')) { $OwnershipIndexFilePath } else { '%LOCALAPPDATA%/Eigenverft.Manifested.Sandbox/PackageModel/ownership-index.json' }
+                indexFilePath = if ($PSBoundParameters.ContainsKey('OwnershipIndexFilePath')) { $OwnershipIndexFilePath } else { '%LOCALAPPDATA%/Eigenverft.Manifested.Sandbox/ownership-index.json' }
             }
             selectionDefaults = @{
                 releaseTrack = $ReleaseTrack
@@ -445,7 +445,7 @@ function global:Write-TestPackageModelDocuments {
         [object]$SourceInventoryDocument
     )
 
-    $globalConfigPath = Join-Path $RootPath 'PackageModel.Global.json'
+    $globalConfigPath = Join-Path $RootPath 'Global.json'
     $definitionPath = Join-Path $RootPath "$($DefinitionDocument.id).json"
     Write-TestJsonDocument -Path $globalConfigPath -Document $GlobalDocument
     Write-TestJsonDocument -Path $definitionPath -Document $DefinitionDocument
@@ -481,9 +481,9 @@ Describe 'Eigenverft.Manifested.Sandbox PackageModel' {
         [Environment]::SetEnvironmentVariable($script:SiteCodeEnvVarName, $script:OriginalSiteCode, 'Process')
     }
 
-    It 'exports Invoke-PackageModel-VSCodeRuntime and keeps it parameterless' {
+    It 'exports Invoke-VSCodeRuntime and keeps it parameterless' {
         $module = Import-Module -Name $script:ModuleManifestPath -Force -PassThru
-        $command = Get-Command -Name 'Invoke-PackageModel-VSCodeRuntime'
+        $command = Get-Command -Name 'Invoke-VSCodeRuntime'
 
         $command | Should -Not -BeNullOrEmpty
         $publicParameterNames = @($command.Parameters.Keys | Where-Object {
@@ -493,9 +493,9 @@ Describe 'Eigenverft.Manifested.Sandbox PackageModel' {
         $publicParameterNames.Count | Should -Be 0
     }
 
-    It 'exports Invoke-PackageModel-LlamaCppRuntime and keeps it parameterless' {
+    It 'exports Invoke-LlamaCppRuntime and keeps it parameterless' {
         $module = Import-Module -Name $script:ModuleManifestPath -Force -PassThru
-        $command = Get-Command -Name 'Invoke-PackageModel-LlamaCppRuntime'
+        $command = Get-Command -Name 'Invoke-LlamaCppRuntime'
 
         $command | Should -Not -BeNullOrEmpty
         $publicParameterNames = @($command.Parameters.Keys | Where-Object {
@@ -505,9 +505,9 @@ Describe 'Eigenverft.Manifested.Sandbox PackageModel' {
         $publicParameterNames.Count | Should -Be 0
     }
 
-    It 'exports Invoke-PackageModel-Qwen35-2B-Q6K and keeps it parameterless' {
+    It 'exports Invoke-Qwen35-2B-Q6K and keeps it parameterless' {
         $module = Import-Module -Name $script:ModuleManifestPath -Force -PassThru
-        $command = Get-Command -Name 'Invoke-PackageModel-Qwen35-2B-Q6K'
+        $command = Get-Command -Name 'Invoke-Qwen35-2B-Q6K'
 
         $command | Should -Not -BeNullOrEmpty
         $publicParameterNames = @($command.Parameters.Keys | Where-Object {
@@ -517,9 +517,9 @@ Describe 'Eigenverft.Manifested.Sandbox PackageModel' {
         $publicParameterNames.Count | Should -Be 0
     }
 
-    It 'exports Invoke-PackageModel-GitRuntime and keeps it parameterless' {
+    It 'exports Invoke-GitRuntime and keeps it parameterless' {
         $module = Import-Module -Name $script:ModuleManifestPath -Force -PassThru
-        $command = Get-Command -Name 'Invoke-PackageModel-GitRuntime'
+        $command = Get-Command -Name 'Invoke-GitRuntime'
 
         $command | Should -Not -BeNullOrEmpty
         $publicParameterNames = @($command.Parameters.Keys | Where-Object {
@@ -529,9 +529,9 @@ Describe 'Eigenverft.Manifested.Sandbox PackageModel' {
         $publicParameterNames.Count | Should -Be 0
     }
 
-    It 'exports Invoke-PackageModel-GHCliRuntime and keeps it parameterless' {
+    It 'exports Invoke-GHCliRuntime and keeps it parameterless' {
         $module = Import-Module -Name $script:ModuleManifestPath -Force -PassThru
-        $command = Get-Command -Name 'Invoke-PackageModel-GHCliRuntime'
+        $command = Get-Command -Name 'Invoke-GHCliRuntime'
 
         $command | Should -Not -BeNullOrEmpty
         $publicParameterNames = @($command.Parameters.Keys | Where-Object {
@@ -541,9 +541,9 @@ Describe 'Eigenverft.Manifested.Sandbox PackageModel' {
         $publicParameterNames.Count | Should -Be 0
     }
 
-    It 'exports Invoke-PackageModel-NodeRuntime and keeps it parameterless' {
+    It 'exports Invoke-NodeRuntime and keeps it parameterless' {
         $module = Import-Module -Name $script:ModuleManifestPath -Force -PassThru
-        $command = Get-Command -Name 'Invoke-PackageModel-NodeRuntime'
+        $command = Get-Command -Name 'Invoke-NodeRuntime'
 
         $command | Should -Not -BeNullOrEmpty
         $publicParameterNames = @($command.Parameters.Keys | Where-Object {
@@ -553,9 +553,28 @@ Describe 'Eigenverft.Manifested.Sandbox PackageModel' {
         $publicParameterNames.Count | Should -Be 0
     }
 
-    It 'exports Invoke-PackageModel-PythonRuntime and keeps it parameterless' {
+    It 'exports npm-backed PackageModel CLI runtime commands and keeps them parameterless' {
         $module = Import-Module -Name $script:ModuleManifestPath -Force -PassThru
-        $command = Get-Command -Name 'Invoke-PackageModel-PythonRuntime'
+
+        foreach ($commandName in @(
+                'Invoke-CodexRuntime'
+                'Invoke-GeminiRuntime'
+                'Invoke-OpenCodeRuntime'
+                'Invoke-QwenCliRuntime'
+            )) {
+            $command = Get-Command -Name $commandName
+            $command | Should -Not -BeNullOrEmpty
+            $publicParameterNames = @($command.Parameters.Keys | Where-Object {
+                    $_ -notin [System.Management.Automation.PSCmdlet]::CommonParameters -and
+                    $_ -notin [System.Management.Automation.PSCmdlet]::OptionalCommonParameters
+            })
+            $publicParameterNames.Count | Should -Be 0
+        }
+    }
+
+    It 'exports Invoke-PythonRuntime and keeps it parameterless' {
+        $module = Import-Module -Name $script:ModuleManifestPath -Force -PassThru
+        $command = Get-Command -Name 'Invoke-PythonRuntime'
 
         $command | Should -Not -BeNullOrEmpty
         $publicParameterNames = @($command.Parameters.Keys | Where-Object {
@@ -565,9 +584,9 @@ Describe 'Eigenverft.Manifested.Sandbox PackageModel' {
         $publicParameterNames.Count | Should -Be 0
     }
 
-    It 'exports Invoke-PackageModel-Ps7Runtime and keeps it parameterless' {
+    It 'exports Invoke-Ps7Runtime and keeps it parameterless' {
         $module = Import-Module -Name $script:ModuleManifestPath -Force -PassThru
-        $command = Get-Command -Name 'Invoke-PackageModel-Ps7Runtime'
+        $command = Get-Command -Name 'Invoke-Ps7Runtime'
 
         $command | Should -Not -BeNullOrEmpty
         $publicParameterNames = @($command.Parameters.Keys | Where-Object {
@@ -577,9 +596,9 @@ Describe 'Eigenverft.Manifested.Sandbox PackageModel' {
         $publicParameterNames.Count | Should -Be 0
     }
 
-    It 'exports Invoke-PackageModel-VCRuntime and keeps it parameterless' {
+    It 'exports Invoke-VCRuntime and keeps it parameterless' {
         $module = Import-Module -Name $script:ModuleManifestPath -Force -PassThru
-        $command = Get-Command -Name 'Invoke-PackageModel-VCRuntime'
+        $command = Get-Command -Name 'Invoke-VCRuntime'
 
         $command | Should -Not -BeNullOrEmpty
         $publicParameterNames = @($command.Parameters.Keys | Where-Object {
@@ -589,9 +608,10 @@ Describe 'Eigenverft.Manifested.Sandbox PackageModel' {
         $publicParameterNames.Count | Should -Be 0
     }
 
-    It 'does not export migrated StateModel runtime commands' {
+    It 'does not export migrated legacy runtime commands' {
         $module = Import-Module -Name $script:ModuleManifestPath -Force -PassThru
 
+        Get-Command -Name 'Get-SandboxState' -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
         Get-Command -Name 'Initialize-VSCodeRuntime' -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
         Get-Command -Name 'Initialize-GitRuntime' -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
         Get-Command -Name 'Initialize-GHCliRuntime' -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
@@ -599,6 +619,23 @@ Describe 'Eigenverft.Manifested.Sandbox PackageModel' {
         Get-Command -Name 'Initialize-PythonRuntime' -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
         Get-Command -Name 'Initialize-Ps7Runtime' -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
         Get-Command -Name 'Initialize-VCRuntime' -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
+        Get-Command -Name 'Initialize-CodexRuntime' -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
+        Get-Command -Name 'Initialize-GeminiRuntime' -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
+        Get-Command -Name 'Initialize-OpenCodeRuntime' -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
+        Get-Command -Name 'Initialize-QwenRuntime' -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
+        Get-Command -Name 'Invoke-PackageModel-VSCodeRuntime' -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
+        Get-Command -Name 'Invoke-PackageModel-GitRuntime' -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
+        Get-Command -Name 'Invoke-PackageModel-GHCliRuntime' -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
+        Get-Command -Name 'Invoke-PackageModel-NodeRuntime' -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
+        Get-Command -Name 'Invoke-PackageModel-PythonRuntime' -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
+        Get-Command -Name 'Invoke-PackageModel-Ps7Runtime' -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
+        Get-Command -Name 'Invoke-PackageModel-VCRuntime' -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
+        Get-Command -Name 'Invoke-PackageModel-CodexRuntime' -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
+        Get-Command -Name 'Invoke-PackageModel-GeminiRuntime' -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
+        Get-Command -Name 'Invoke-PackageModel-OpenCodeRuntime' -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
+        Get-Command -Name 'Invoke-PackageModel-QwenCliRuntime' -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
+        Get-Command -Name 'Invoke-PackageModel-Qwen35-2B-Q6K' -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
+        Get-Command -Name 'Invoke-PackageModel-LlamaCppRuntime' -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
     }
 
     It 'loads the shipped global config without baked-in environment sources' {
@@ -723,6 +760,38 @@ Describe 'Eigenverft.Manifested.Sandbox PackageModel' {
         $result.Package.install.pathRegistration.source.value | Should -Be 'node'
     }
 
+    It 'loads the shipped npm-backed CLI runtime definitions without package-file acquisition' {
+        [Environment]::SetEnvironmentVariable($script:SourceInventoryEnvVarName, (Join-Path $TestDrive 'missing-inventory.json'), 'Process')
+
+        $cases = @(
+            [pscustomobject]@{ DefinitionId = 'CodexRuntime'; PackageSpec = '@openai/codex@{version}'; Version = '0.125.0'; Command = 'codex'; RelativePath = 'codex.cmd' }
+            [pscustomobject]@{ DefinitionId = 'GeminiRuntime'; PackageSpec = '@google/gemini-cli@{version}'; Version = '0.39.1'; Command = 'gemini'; RelativePath = 'gemini.cmd' }
+            [pscustomobject]@{ DefinitionId = 'OpenCodeRuntime'; PackageSpec = 'opencode-ai@{version}'; Version = '1.14.24'; Command = 'opencode'; RelativePath = 'opencode.cmd' }
+            [pscustomobject]@{ DefinitionId = 'QwenCliRuntime'; PackageSpec = '@qwen-code/qwen-code@{version}'; Version = '0.15.2'; Command = 'qwen'; RelativePath = 'qwen.cmd' }
+        )
+
+        foreach ($case in $cases) {
+            $config = Get-PackageModelConfig -DefinitionId $case.DefinitionId
+            $result = New-PackageModelResult -CommandName 'test' -PackageModelConfig $config
+            $result = Resolve-PackageModelPackage -PackageModelResult $result
+            $result = Resolve-PackageModelPaths -PackageModelResult $result
+            $result = Build-PackageModelAcquisitionPlan -PackageModelResult $result
+
+            $config.DefinitionId | Should -Be $case.DefinitionId
+            $result.Package.version | Should -Be $case.Version
+            $result.Package.install.kind | Should -Be 'packageManagerInstall'
+            $result.Package.install.managerKind | Should -Be 'npm'
+            $result.Package.install.managerDependency.definitionId | Should -Be 'NodeRuntime'
+            $result.Package.install.managerDependency.command | Should -Be 'npm'
+            $result.Package.install.packageSpec | Should -Be $case.PackageSpec
+            $result.Package.install.pathRegistration.source.value | Should -Be $case.Command
+            $config.Definition.providedTools.commands[0].relativePath | Should -Be $case.RelativePath
+            $result.Package.PSObject.Properties['packageFile'] | Should -BeNullOrEmpty
+            $result.AcquisitionPlan.PackageFileRequired | Should -BeFalse
+            @($result.AcquisitionPlan.Candidates).Count | Should -Be 0
+        }
+    }
+
     It 'loads the shipped PythonRuntime definition and selects the fixed NuGet package release' {
         [Environment]::SetEnvironmentVariable($script:SourceInventoryEnvVarName, (Join-Path $TestDrive 'missing-inventory.json'), 'Process')
 
@@ -834,7 +903,7 @@ Describe 'Eigenverft.Manifested.Sandbox PackageModel' {
     }
 
     It 'fails clearly when the shipped global config still defines vsCodeUpdateService as an environment source' {
-        $globalConfigPath = Join-Path $TestDrive 'PackageModel.Global.json'
+        $globalConfigPath = Join-Path $TestDrive 'Global.json'
         $badGlobal = New-TestPackageModelGlobalDocument -EnvironmentSources @{
             vsCodeUpdateService = @{ kind = 'download'; baseUri = 'https://example.invalid/' }
         }
@@ -1409,6 +1478,37 @@ Describe 'Eigenverft.Manifested.Sandbox PackageModel' {
 
         $packageModelResult.PathRegistration.Status | Should -Be 'Registered'
         $packageModelResult.PathRegistration.RegisteredPath | Should -Be $installRoot
+    }
+
+    It 'resolves shipped npm-backed CLI PATH registrations to the install directory' {
+        [Environment]::SetEnvironmentVariable($script:SourceInventoryEnvVarName, (Join-Path $TestDrive 'missing-inventory.json'), 'Process')
+
+        $cases = @(
+            [pscustomobject]@{ DefinitionId = 'CodexRuntime'; CommandFile = 'codex.cmd' }
+            [pscustomobject]@{ DefinitionId = 'GeminiRuntime'; CommandFile = 'gemini.cmd' }
+            [pscustomobject]@{ DefinitionId = 'OpenCodeRuntime'; CommandFile = 'opencode.cmd' }
+            [pscustomobject]@{ DefinitionId = 'QwenCliRuntime'; CommandFile = 'qwen.cmd' }
+        )
+
+        foreach ($case in $cases) {
+            $installRoot = Join-Path $TestDrive ("path-registration-shipped-" + $case.DefinitionId)
+            $null = New-Item -ItemType Directory -Path $installRoot -Force
+            Write-TestTextFile -Path (Join-Path $installRoot $case.CommandFile) -Content '@echo off'
+
+            $config = Get-PackageModelConfig -DefinitionId $case.DefinitionId
+            $packageModelResult = New-PackageModelResult -CommandName 'test' -PackageModelConfig $config
+            $packageModelResult = Resolve-PackageModelPackage -PackageModelResult $packageModelResult
+            $packageModelResult.InstallDirectory = $installRoot
+            $packageModelResult.InstallOrigin = 'PackageModelInstalled'
+
+            Mock Get-EnvironmentVariableValue {}
+            Mock Set-EnvironmentVariableValue {}
+
+            $packageModelResult = Register-PackageModelPath -PackageModelResult $packageModelResult
+
+            $packageModelResult.PathRegistration.Status | Should -Be 'Registered'
+            $packageModelResult.PathRegistration.RegisteredPath | Should -Be $installRoot
+        }
     }
 
     It 'resolves shipped PythonRuntime PATH registration to the install directory' {
@@ -2022,16 +2122,14 @@ Describe 'Eigenverft.Manifested.Sandbox PackageModel' {
         $writeStandardMessage = Get-Command Write-StandardMessage -CommandType Function
         $packageModelExecutionMessage = Get-Command Write-PackageModelExecutionMessage -CommandType Function
 
-        $writeStandardMessage.ScriptBlock.File | Should -Match 'PackageModel\\Support\\ExecutionEngine\\.*StandardMessage\.ps1$'
-        $packageModelExecutionMessage.ScriptBlock.File | Should -Match 'PackageModel\\Support\\Package\\.*ExecutionMessage\.ps1$'
+        $writeStandardMessage.ScriptBlock.File | Should -Match 'Support\\ExecutionEngine\\.*StandardMessage\.ps1$'
+        $packageModelExecutionMessage.ScriptBlock.File | Should -Match 'Support\\Package\\.*ExecutionMessage\.ps1$'
     }
 
-    It 'loads archive helpers from ExecutionEngine and keeps the StateModel extraction wrapper in place' {
+    It 'loads archive helpers from ExecutionEngine' {
         $expandArchiveToStage = Get-Command Expand-ArchiveToStage -CommandType Function
-        $expandManifestedArchiveToStage = Get-Command Expand-ManifestedArchiveToStage -CommandType Function
 
-        $expandArchiveToStage.ScriptBlock.File | Should -Match 'PackageModel\\Support\\ExecutionEngine\\.*Archive\.ps1$'
-        $expandManifestedArchiveToStage.ScriptBlock.File | Should -Match 'StateModel\\Support\\.*Shared\.Extraction\.ps1$'
+        $expandArchiveToStage.ScriptBlock.File | Should -Match 'Support\\ExecutionEngine\\.*Archive\.ps1$'
     }
 
     It 'loads command resolution and filesystem helpers from ExecutionEngine' {
@@ -2039,9 +2137,19 @@ Describe 'Eigenverft.Manifested.Sandbox PackageModel' {
         $removePathIfExists = Get-Command Remove-PathIfExists -CommandType Function
         $copyFileToPath = Get-Command Copy-FileToPath -CommandType Function
 
-        $getResolvedApplicationPath.ScriptBlock.File | Should -Match 'PackageModel\\Support\\ExecutionEngine\\.*CommandResolution\.ps1$'
-        $removePathIfExists.ScriptBlock.File | Should -Match 'PackageModel\\Support\\ExecutionEngine\\.*FileSystem\.ps1$'
-        $copyFileToPath.ScriptBlock.File | Should -Match 'PackageModel\\Support\\ExecutionEngine\\.*FileSystem\.ps1$'
+        $getResolvedApplicationPath.ScriptBlock.File | Should -Match 'Support\\ExecutionEngine\\.*CommandResolution\.ps1$'
+        $removePathIfExists.ScriptBlock.File | Should -Match 'Support\\ExecutionEngine\\.*FileSystem\.ps1$'
+        $copyFileToPath.ScriptBlock.File | Should -Match 'Support\\ExecutionEngine\\.*FileSystem\.ps1$'
+    }
+
+    It 'loads generic npm helpers from ExecutionEngine and the PackageModel npm adapter from Support Package' {
+        $getNpmRegistryUri = Get-Command Get-NpmRegistryUri -CommandType Function
+        $getNpmGlobalConfigArguments = Get-Command Get-NpmGlobalConfigArguments -CommandType Function
+        $installPackageModelNpmPackage = Get-Command Install-PackageModelNpmPackage -CommandType Function
+
+        $getNpmRegistryUri.ScriptBlock.File | Should -Match 'Support\\ExecutionEngine\\.*Npm\.ps1$'
+        $getNpmGlobalConfigArguments.ScriptBlock.File | Should -Match 'Support\\ExecutionEngine\\.*Npm\.ps1$'
+        $installPackageModelNpmPackage.ScriptBlock.File | Should -Match 'Support\\Package\\.*Npm\.ps1$'
     }
 
     It 'returns null when Get-ResolvedApplicationPath cannot resolve a command' {
@@ -2212,13 +2320,7 @@ Describe 'Eigenverft.Manifested.Sandbox PackageModel' {
                 ExpandedRoot = $expandedRoot
             }
         }
-        Mock Expand-ManifestedArchiveToStage {
-            throw 'legacy extraction path should not be used'
-        }
         Mock Remove-PathIfExists { return $true }
-        Mock Remove-ManifestedPath {
-            throw 'legacy cleanup path should not be used'
-        }
 
         $packageModelResult = [pscustomobject]@{
             PackageId        = 'VSCodeRuntime'
@@ -2237,12 +2339,180 @@ Describe 'Eigenverft.Manifested.Sandbox PackageModel' {
         $installResult = Install-PackageModelArchive -PackageModelResult $packageModelResult
 
         Assert-MockCalled Expand-ArchiveToStage -Times 1
-        Assert-MockCalled Expand-ManifestedArchiveToStage -Times 0
         Assert-MockCalled Remove-PathIfExists -Times 1 -ParameterFilter { $Path -eq $stagePath }
-        Assert-MockCalled Remove-ManifestedPath -Times 0
         $installResult.InstallKind | Should -Be 'expandArchive'
         Test-Path -LiteralPath (Join-Path $installDirectory 'Code.exe') -PathType Leaf | Should -BeTrue
         Test-Path -LiteralPath (Join-Path $installDirectory 'data') -PathType Container | Should -BeTrue
+    }
+
+    It 'keeps packageManagerInstall generic behavior when managerKind is omitted' {
+        $rootPath = Join-Path $TestDrive 'generic-package-manager-install'
+        $managerCommandPath = Join-Path $rootPath 'manager.cmd'
+        $installDirectory = Join-Path $rootPath 'install'
+        Write-TestTextFile -Path $managerCommandPath -Content "@echo off`r`nexit /b 0`r`n"
+
+        $packageModelResult = [pscustomobject]@{
+            PackageId                 = 'GenericPackageManagerRuntime'
+            DefinitionId              = 'GenericPackageManagerRuntime'
+            PackageFilePath           = $null
+            InstallWorkspaceDirectory = Join-Path $rootPath 'workspace'
+            InstallDirectory          = $installDirectory
+            ExistingPackage           = $null
+            PackageModelConfig        = [pscustomobject]@{
+                DefinitionId = 'GenericPackageManagerRuntime'
+            }
+            Package                   = [pscustomobject]@{
+                id      = 'generic-package-manager-runtime-win32-x64-stable'
+                version = '1.0.0'
+                flavor  = 'win32-x64'
+                install = [pscustomobject]@{
+                    kind               = 'packageManagerInstall'
+                    managerCommandPath = $managerCommandPath
+                    commandArguments   = @('--example', '{version}')
+                }
+            }
+        }
+
+        $installResult = Install-PackageModelPackageManagerPackage -PackageModelResult $packageModelResult
+
+        $installResult.InstallKind | Should -Be 'packageManagerInstall'
+        $installResult.PSObject.Properties['ManagerKind'] | Should -BeNullOrEmpty
+        $installResult.CommandPath | Should -Be ([System.IO.Path]::GetFullPath($managerCommandPath))
+        $installResult.CommandArguments | Should -Be @('--example', '1.0.0')
+        Test-Path -LiteralPath $installDirectory -PathType Container | Should -BeTrue
+    }
+
+    It 'installs npm packageManagerInstall through PackageModel-owned Node into a staged prefix' {
+        $rootPath = Join-Path $TestDrive 'npm-package-manager-install'
+        $fakeNpmPath = Join-Path $rootPath 'node\npm.cmd'
+        $installDirectory = Join-Path $rootPath 'install'
+        $workspaceDirectory = Join-Path $rootPath 'workspace'
+        $ownershipIndexPath = Join-Path $rootPath 'ownership-index.json'
+        Write-TestTextFile -Path $fakeNpmPath -Content @"
+@echo off
+set PREFIX=
+:loop
+if "%~1"=="" goto done
+if "%~1"=="--prefix" (
+  set PREFIX=%~2
+  shift
+)
+shift
+goto loop
+:done
+if "%PREFIX%"=="" exit /b 2
+mkdir "%PREFIX%\node_modules\@openai\codex" >nul 2>nul
+echo @echo off>"%PREFIX%\codex.cmd"
+echo {"name":"@openai/codex"}>"%PREFIX%\node_modules\@openai\codex\package.json"
+exit /b 0
+"@
+        Mock Invoke-PackageModelDefinitionCommand {
+            [pscustomobject]@{
+                Status      = 'Ready'
+                EntryPoints = [pscustomobject]@{
+                    Commands = @(
+                        [pscustomobject]@{
+                            Name = 'npm'
+                            Path = $fakeNpmPath
+                        }
+                    )
+                }
+            }
+        } -ParameterFilter { $DefinitionId -eq 'NodeRuntime' }
+
+        $packageModelResult = [pscustomobject]@{
+            PackageId              = 'codex-runtime-win32-x64-stable'
+            DefinitionId           = 'CodexRuntime'
+            InstallDirectory       = $installDirectory
+            ExistingPackage        = $null
+            PackageModelConfig     = [pscustomobject]@{
+                DefinitionId                  = 'CodexRuntime'
+                InstallWorkspaceRootDirectory = $workspaceDirectory
+                OwnershipIndexFilePath        = $ownershipIndexPath
+            }
+            Package                = [pscustomobject]@{
+                id           = 'codex-runtime-win32-x64-stable'
+                version      = '0.125.0'
+                releaseTrack = 'stable'
+                flavor       = 'win32-x64'
+                install      = [pscustomobject]@{
+                    kind              = 'packageManagerInstall'
+                    managerKind       = 'npm'
+                    managerDependency = [pscustomobject]@{
+                        definitionId = 'NodeRuntime'
+                        command      = 'npm'
+                    }
+                    packageSpec       = '@openai/codex@{version}'
+                }
+            }
+        }
+
+        $installResult = Install-PackageModelPackageManagerPackage -PackageModelResult $packageModelResult
+
+        Assert-MockCalled Invoke-PackageModelDefinitionCommand -Times 1 -ParameterFilter { $DefinitionId -eq 'NodeRuntime' }
+        $installResult.ManagerKind | Should -Be 'npm'
+        $installResult.PackageSpec | Should -Be '@openai/codex@0.125.0'
+        $installResult.Dependency.DefinitionId | Should -Be 'NodeRuntime'
+        $installResult.Dependency.CommandPath | Should -Be ([System.IO.Path]::GetFullPath($fakeNpmPath))
+        $installResult.CacheDirectory | Should -Match 'npm-cache'
+        $installResult.GlobalConfigPath | Should -Match 'npm\\npmrc$'
+        Test-Path -LiteralPath (Join-Path $installDirectory 'codex.cmd') -PathType Leaf | Should -BeTrue
+        Test-Path -LiteralPath (Join-Path $installDirectory 'node_modules\@openai\codex\package.json') -PathType Leaf | Should -BeTrue
+        Test-Path -LiteralPath $installResult.StagePath | Should -BeFalse
+    }
+
+    It 'does not replace the final install when npm packageManagerInstall fails' {
+        $rootPath = Join-Path $TestDrive 'npm-package-manager-install-fail'
+        $fakeNpmPath = Join-Path $rootPath 'node\npm.cmd'
+        $installDirectory = Join-Path $rootPath 'install'
+        $workspaceDirectory = Join-Path $rootPath 'workspace'
+        $ownershipIndexPath = Join-Path $rootPath 'ownership-index.json'
+        Write-TestTextFile -Path $fakeNpmPath -Content "@echo off`r`nexit /b 7`r`n"
+        Write-TestTextFile -Path (Join-Path $installDirectory 'sentinel.txt') -Content 'keep-me'
+
+        Mock Invoke-PackageModelDefinitionCommand {
+            [pscustomobject]@{
+                Status      = 'Ready'
+                EntryPoints = [pscustomobject]@{
+                    Commands = @(
+                        [pscustomobject]@{
+                            Name = 'npm'
+                            Path = $fakeNpmPath
+                        }
+                    )
+                }
+            }
+        } -ParameterFilter { $DefinitionId -eq 'NodeRuntime' }
+
+        $packageModelResult = [pscustomobject]@{
+            PackageId              = 'codex-runtime-win32-x64-stable'
+            DefinitionId           = 'CodexRuntime'
+            InstallDirectory       = $installDirectory
+            ExistingPackage        = $null
+            PackageModelConfig     = [pscustomobject]@{
+                DefinitionId                  = 'CodexRuntime'
+                InstallWorkspaceRootDirectory = $workspaceDirectory
+                OwnershipIndexFilePath        = $ownershipIndexPath
+            }
+            Package                = [pscustomobject]@{
+                id           = 'codex-runtime-win32-x64-stable'
+                version      = '0.125.0'
+                releaseTrack = 'stable'
+                flavor       = 'win32-x64'
+                install      = [pscustomobject]@{
+                    kind              = 'packageManagerInstall'
+                    managerKind       = 'npm'
+                    managerDependency = [pscustomobject]@{
+                        definitionId = 'NodeRuntime'
+                        command      = 'npm'
+                    }
+                    packageSpec       = '@openai/codex@{version}'
+                }
+            }
+        }
+
+        { Install-PackageModelPackageManagerPackage -PackageModelResult $packageModelResult } | Should -Throw '*exit code 7*'
+        Test-Path -LiteralPath (Join-Path $installDirectory 'sentinel.txt') -PathType Leaf | Should -BeTrue
     }
 
     It 'accepts package-file Authenticode verification without a SHA256 hash' {
@@ -2637,14 +2907,10 @@ Describe 'Eigenverft.Manifested.Sandbox PackageModel' {
         }
 
         Mock Get-ResolvedApplicationPath { $commandPath } -ParameterFilter { $CommandName -eq 'code' }
-        Mock Get-ManifestedResolvedApplicationPath {
-            throw 'legacy command resolution path should not be used'
-        }
 
         $packageModelResult = Find-PackageModelExistingPackage -PackageModelResult $packageModelResult
 
         Assert-MockCalled Get-ResolvedApplicationPath -Times 1 -ParameterFilter { $CommandName -eq 'code' }
-        Assert-MockCalled Get-ManifestedResolvedApplicationPath -Times 0
         $packageModelResult.ExistingPackage.SearchKind | Should -Be 'command'
         $packageModelResult.ExistingPackage.CandidatePath | Should -Be $commandPath
         $packageModelResult.ExistingPackage.InstallDirectory | Should -Be ([System.IO.Path]::GetFullPath($installRoot))
@@ -2661,23 +2927,6 @@ Describe 'Eigenverft.Manifested.Sandbox PackageModel' {
 
         Assert-MockCalled Copy-FileToPath -Times 1 -ParameterFilter { $SourcePath -eq $sourcePath -and $TargetPath -eq $targetPath -and $Overwrite }
         $resolvedPath | Should -Be $targetPath
-    }
-
-    It 'keeps Expand-ManifestedArchiveToStage as a compatibility wrapper over the generic archive helper' {
-        $packagePath = Join-Path $TestDrive 'compat-package.zip'
-        Write-TestTextFile -Path $packagePath -Content 'placeholder'
-        Mock Expand-ArchiveToStage {
-            [pscustomobject]@{
-                StagePath    = 'C:\temp\stage'
-                ExpandedRoot = 'C:\temp\stage\payload'
-            }
-        }
-
-        $stageInfo = Expand-ManifestedArchiveToStage -PackagePath $packagePath -Prefix 'compat'
-
-        Assert-MockCalled Expand-ArchiveToStage -Times 1 -ParameterFilter { $ArchivePath -eq $packagePath -and $Prefix -eq 'compat' }
-        $stageInfo.StagePath | Should -Be 'C:\temp\stage'
-        $stageInfo.ExpandedRoot | Should -Be 'C:\temp\stage\payload'
     }
 
     It 'returns physical memory GiB from Win32_ComputerSystem' {
@@ -2833,3 +3082,7 @@ Describe 'Eigenverft.Manifested.Sandbox PackageModel' {
         @($config.EnvironmentSources.PSObject.Properties.Name) | Should -Be @('defaultPackageDepot')
     }
 }
+
+
+
+
