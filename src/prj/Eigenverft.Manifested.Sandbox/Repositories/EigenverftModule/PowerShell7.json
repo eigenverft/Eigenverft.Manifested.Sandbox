@@ -1,6 +1,6 @@
 {
   "schemaVersion": "1.0",
-  "id": "Ps7Runtime",
+  "id": "PowerShell7",
   "display": {
     "default": {
       "name": "PowerShell 7",

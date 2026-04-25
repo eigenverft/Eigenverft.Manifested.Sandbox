@@ -136,15 +136,7 @@ Get-PackageModelDefaultInstallWorkspaceDirectory
     [CmdletBinding()]
     param()
 
-    $localApplicationData = [Environment]::GetFolderPath('LocalApplicationData')
-    if ([string]::IsNullOrWhiteSpace($localApplicationData)) {
-        $localApplicationData = $env:LOCALAPPDATA
-    }
-    if ([string]::IsNullOrWhiteSpace($localApplicationData)) {
-        throw 'Could not resolve the LocalApplicationData directory for the PackageModel install workspace.'
-    }
-
-    return [System.IO.Path]::GetFullPath((Join-Path $localApplicationData 'Eigenverft.Manifested.Sandbox\InstallWorkspace'))
+    return [System.IO.Path]::GetFullPath((Join-Path (Get-PackageModelLocalRoot) 'InstallWorkspace'))
 }
 
 function Get-PackageModelDefaultPreferredTargetInstallDirectory {
@@ -162,15 +154,7 @@ Get-PackageModelDefaultPreferredTargetInstallDirectory
     [CmdletBinding()]
     param()
 
-    $localApplicationData = [Environment]::GetFolderPath('LocalApplicationData')
-    if ([string]::IsNullOrWhiteSpace($localApplicationData)) {
-        $localApplicationData = $env:LOCALAPPDATA
-    }
-    if ([string]::IsNullOrWhiteSpace($localApplicationData)) {
-        throw 'Could not resolve the LocalApplicationData directory for the PackageModel preferred target-install root.'
-    }
-
-    return [System.IO.Path]::GetFullPath((Join-Path $localApplicationData 'Eigenverft.Manifested.Sandbox\Installs'))
+    return [System.IO.Path]::GetFullPath((Join-Path (Get-PackageModelLocalRoot) 'Installs'))
 }
 
 function Get-PackageModelDefaultPackageDepotDirectory {
@@ -188,67 +172,61 @@ Get-PackageModelDefaultPackageDepotDirectory
     [CmdletBinding()]
     param()
 
-    $localApplicationData = [Environment]::GetFolderPath('LocalApplicationData')
-    if ([string]::IsNullOrWhiteSpace($localApplicationData)) {
-        $localApplicationData = $env:LOCALAPPDATA
-    }
-    if ([string]::IsNullOrWhiteSpace($localApplicationData)) {
-        throw 'Could not resolve the LocalApplicationData directory for the PackageModel default package depot.'
-    }
-
-    return [System.IO.Path]::GetFullPath((Join-Path $localApplicationData 'Eigenverft.Manifested.Sandbox\DefaultPackageDepot'))
+    return [System.IO.Path]::GetFullPath((Join-Path (Get-PackageModelLocalRoot) 'DefaultPackageDepot'))
 }
 
-function Get-PackageModelDefaultArtifactIndexFilePath {
+function Get-PackageModelDefaultPackageFileIndexFilePath {
 <#
 .SYNOPSIS
-Returns the default PackageModel artifact-index path.
+Returns the default PackageModel package-file index path.
 
 .DESCRIPTION
-Builds the fallback local artifact index file path when the PackageModel
+Builds the fallback local package-file index file path when the PackageModel
 acquisition environment does not define one explicitly.
 
 .EXAMPLE
-Get-PackageModelDefaultArtifactIndexFilePath
+Get-PackageModelDefaultPackageFileIndexFilePath
 #>
     [CmdletBinding()]
     param()
 
-    $localApplicationData = [Environment]::GetFolderPath('LocalApplicationData')
-    if ([string]::IsNullOrWhiteSpace($localApplicationData)) {
-        $localApplicationData = $env:LOCALAPPDATA
-    }
-    if ([string]::IsNullOrWhiteSpace($localApplicationData)) {
-        throw 'Could not resolve the LocalApplicationData directory for the PackageModel artifact index.'
-    }
-
-    return [System.IO.Path]::GetFullPath((Join-Path $localApplicationData 'Eigenverft.Manifested.Sandbox\artifact-index.json'))
+    return [System.IO.Path]::GetFullPath((Join-Path (Get-PackageModelLocalRoot) 'package-file-index.json'))
 }
 
-function Get-PackageModelDefaultOwnershipIndexFilePath {
+function Get-PackageModelDefaultPackageStateIndexFilePath {
 <#
 .SYNOPSIS
-Returns the default PackageModel ownership index path.
+Returns the default PackageModel package-state index path.
 
 .DESCRIPTION
-Builds the fallback local ownership index file path when the PackageModel
+Builds the fallback local package-state index file path when the PackageModel
 global document does not define one explicitly.
 
 .EXAMPLE
-Get-PackageModelDefaultOwnershipIndexFilePath
+Get-PackageModelDefaultPackageStateIndexFilePath
 #>
     [CmdletBinding()]
     param()
 
-    $localApplicationData = [Environment]::GetFolderPath('LocalApplicationData')
-    if ([string]::IsNullOrWhiteSpace($localApplicationData)) {
-        $localApplicationData = $env:LOCALAPPDATA
-    }
-    if ([string]::IsNullOrWhiteSpace($localApplicationData)) {
-        throw 'Could not resolve the LocalApplicationData directory for the PackageModel ownership index.'
-    }
+    return [System.IO.Path]::GetFullPath((Join-Path (Get-PackageModelLocalRoot) 'package-state-index.json'))
+}
 
-    return [System.IO.Path]::GetFullPath((Join-Path $localApplicationData 'Eigenverft.Manifested.Sandbox\ownership-index.json'))
+function Get-PackageModelDefaultLocalRepositoryRoot {
+<#
+.SYNOPSIS
+Returns the default PackageModel local repository root.
+
+.DESCRIPTION
+Builds the fallback local repository-copy root for package definitions that
+have been used successfully.
+
+.EXAMPLE
+Get-PackageModelDefaultLocalRepositoryRoot
+#>
+    [CmdletBinding()]
+    param()
+
+    return [System.IO.Path]::GetFullPath((Join-Path (Get-PackageModelLocalRoot) 'PackageRepositories'))
 }
 
 function Get-PackageModelDefaultSourceInventoryPath {
@@ -266,15 +244,7 @@ Get-PackageModelDefaultSourceInventoryPath
     [CmdletBinding()]
     param()
 
-    $localApplicationData = [Environment]::GetFolderPath('LocalApplicationData')
-    if ([string]::IsNullOrWhiteSpace($localApplicationData)) {
-        $localApplicationData = $env:LOCALAPPDATA
-    }
-    if ([string]::IsNullOrWhiteSpace($localApplicationData)) {
-        throw 'Could not resolve the LocalApplicationData directory for the PackageModel source inventory.'
-    }
-
-    return [System.IO.Path]::GetFullPath((Join-Path $localApplicationData 'Eigenverft.Manifested.Sandbox\SourceInventory.json'))
+    return [System.IO.Path]::GetFullPath((Join-Path (Get-PackageModelLocalRoot) 'SourceInventory.json'))
 }
 
 function Resolve-PackageModelTemplateText {
@@ -679,13 +649,13 @@ Assert-PackageModelGlobalConfigSchema -GlobalDocumentInfo $globalInfo
     }
 
     $packageModel = $GlobalDocumentInfo.Document.packageModel
-    foreach ($retiredProperty in @('managedStorageRoots', 'acquisitionDefaults', 'sourceBindings', 'downloadRootDirectory', 'installRootDirectory', 'allowSourceFallback', 'packageSelection')) {
+    foreach ($retiredProperty in @('managedStorageRoots', 'acquisitionDefaults', 'sourceBindings', 'downloadRootDirectory', 'installRootDirectory', 'allowSourceFallback', 'packageSelection', 'ownershipTracking')) {
         if ($packageModel.PSObject.Properties[$retiredProperty]) {
             throw "PackageModel global config '$($GlobalDocumentInfo.Path)' still uses retired property '$retiredProperty'."
         }
     }
 
-    foreach ($requiredProperty in @('preferredTargetInstallDirectory', 'acquisitionEnvironment', 'ownershipTracking', 'selectionDefaults')) {
+    foreach ($requiredProperty in @('preferredTargetInstallDirectory', 'repositorySources', 'localRepositoryRoot', 'acquisitionEnvironment', 'packageState', 'selectionDefaults')) {
         if (-not $packageModel.PSObject.Properties[$requiredProperty]) {
             throw "PackageModel global config '$($GlobalDocumentInfo.Path)' is missing required property '$requiredProperty'."
         }
@@ -717,14 +687,27 @@ Assert-PackageModelGlobalConfigSchema -GlobalDocumentInfo $globalInfo
         }
     }
 
-    if (-not $packageModel.acquisitionEnvironment.tracking.PSObject.Properties['artifactIndexFilePath']) {
-        throw "PackageModel global config '$($GlobalDocumentInfo.Path)' is missing acquisitionEnvironment.tracking.artifactIndexFilePath."
+    if ($packageModel.acquisitionEnvironment.tracking.PSObject.Properties['artifactIndexFilePath']) {
+        throw "PackageModel global config '$($GlobalDocumentInfo.Path)' still uses retired property 'acquisitionEnvironment.tracking.artifactIndexFilePath'. Use 'acquisitionEnvironment.tracking.packageFileIndexFilePath'."
     }
-    if (-not $packageModel.ownershipTracking.PSObject.Properties['indexFilePath']) {
-        throw "PackageModel global config '$($GlobalDocumentInfo.Path)' is missing ownershipTracking.indexFilePath."
+    if (-not $packageModel.acquisitionEnvironment.tracking.PSObject.Properties['packageFileIndexFilePath']) {
+        throw "PackageModel global config '$($GlobalDocumentInfo.Path)' is missing acquisitionEnvironment.tracking.packageFileIndexFilePath."
+    }
+    if (-not $packageModel.packageState.PSObject.Properties['indexFilePath']) {
+        throw "PackageModel global config '$($GlobalDocumentInfo.Path)' is missing packageState.indexFilePath."
     }
     if (-not $packageModel.selectionDefaults.PSObject.Properties['releaseTrack']) {
         throw "PackageModel global config '$($GlobalDocumentInfo.Path)' is missing selectionDefaults.releaseTrack."
+    }
+
+    foreach ($repositoryProperty in @($packageModel.repositorySources.PSObject.Properties)) {
+        $repositorySource = $repositoryProperty.Value
+        if (-not $repositorySource.PSObject.Properties['kind'] -or [string]::IsNullOrWhiteSpace([string]$repositorySource.kind)) {
+            throw "PackageModel global config '$($GlobalDocumentInfo.Path)' repositorySources.$($repositoryProperty.Name) is missing kind."
+        }
+        if (-not $repositorySource.PSObject.Properties['definitionRoot'] -or [string]::IsNullOrWhiteSpace([string]$repositorySource.definitionRoot)) {
+            throw "PackageModel global config '$($GlobalDocumentInfo.Path)' repositorySources.$($repositoryProperty.Name) is missing definitionRoot."
+        }
     }
 
     if ($packageModel.acquisitionEnvironment.PSObject.Properties['environmentSources'] -and $null -ne $packageModel.acquisitionEnvironment.environmentSources) {
@@ -843,12 +826,12 @@ Resolve-PackageModelEffectiveAcquisitionEnvironment -GlobalConfiguration $global
         Get-PackageModelDefaultPackageDepotDirectory
     }
 
-    $artifactIndexFilePath = if ($acquisitionEnvironment.tracking.PSObject.Properties['artifactIndexFilePath'] -and
-        -not [string]::IsNullOrWhiteSpace([string]$acquisitionEnvironment.tracking.artifactIndexFilePath)) {
-        Resolve-PackageModelPathValue -PathValue ([string]$acquisitionEnvironment.tracking.artifactIndexFilePath)
+    $packageFileIndexFilePath = if ($acquisitionEnvironment.tracking.PSObject.Properties['packageFileIndexFilePath'] -and
+        -not [string]::IsNullOrWhiteSpace([string]$acquisitionEnvironment.tracking.packageFileIndexFilePath)) {
+        Resolve-PackageModelPathValue -PathValue ([string]$acquisitionEnvironment.tracking.packageFileIndexFilePath)
     }
     else {
-        Get-PackageModelDefaultArtifactIndexFilePath
+        Get-PackageModelDefaultPackageFileIndexFilePath
     }
 
     $allowFallback = $true
@@ -881,7 +864,7 @@ Resolve-PackageModelEffectiveAcquisitionEnvironment -GlobalConfiguration $global
         }
         EnvironmentSources  = $environmentSources
         Tracking            = [pscustomobject]@{
-            ArtifactIndexFilePath = $artifactIndexFilePath
+            PackageFileIndexFilePath = $packageFileIndexFilePath
         }
     }
 }
@@ -1452,13 +1435,24 @@ Get-PackageModelConfig -DefinitionId VSCodeRuntime
         Get-PackageModelDefaultPreferredTargetInstallDirectory
     }
 
-    $ownershipIndexFilePath = if ($packageModelGlobalConfig.ownershipTracking.PSObject.Properties['indexFilePath'] -and
-        -not [string]::IsNullOrWhiteSpace([string]$packageModelGlobalConfig.ownershipTracking.indexFilePath)) {
-        Resolve-PackageModelPathValue -PathValue ([string]$packageModelGlobalConfig.ownershipTracking.indexFilePath)
+    $packageStateIndexFilePath = if ($packageModelGlobalConfig.packageState.PSObject.Properties['indexFilePath'] -and
+        -not [string]::IsNullOrWhiteSpace([string]$packageModelGlobalConfig.packageState.indexFilePath)) {
+        Resolve-PackageModelPathValue -PathValue ([string]$packageModelGlobalConfig.packageState.indexFilePath)
     }
     else {
-        Get-PackageModelDefaultOwnershipIndexFilePath
+        Get-PackageModelDefaultPackageStateIndexFilePath
     }
+
+    $localRepositoryRoot = if ($packageModelGlobalConfig.PSObject.Properties['localRepositoryRoot'] -and
+        -not [string]::IsNullOrWhiteSpace([string]$packageModelGlobalConfig.localRepositoryRoot)) {
+        Resolve-PackageModelPathValue -PathValue ([string]$packageModelGlobalConfig.localRepositoryRoot)
+    }
+    else {
+        Get-PackageModelDefaultLocalRepositoryRoot
+    }
+
+    $definitionRepositoryId = Get-PackageModelDefaultRepositoryId
+    $definitionFileName = Split-Path -Leaf $definitionDocumentInfo.Path
 
     $display = if ($definition.display -and $definition.display.PSObject.Properties['default'] -and $null -ne $definition.display.default) {
         $definition.display.default
@@ -1476,6 +1470,8 @@ Get-PackageModelConfig -DefinitionId VSCodeRuntime
         DefinitionPath                     = $definitionDocumentInfo.Path
         Definition                         = $definition
         DefinitionId                       = [string]$definition.id
+        DefinitionRepositoryId             = $definitionRepositoryId
+        DefinitionFileName                 = $definitionFileName
         DefinitionUpstreamSources          = $definition.upstreamSources
         Display                            = $display
         SchemaVersion                      = [string]$definition.schemaVersion
@@ -1487,8 +1483,9 @@ Get-PackageModelConfig -DefinitionId VSCodeRuntime
         InstallWorkspaceRootDirectory      = $effectiveAcquisitionEnvironment.Stores.InstallWorkspaceDirectory
         DefaultPackageDepotDirectory       = $effectiveAcquisitionEnvironment.Stores.DefaultPackageDepotDirectory
         PreferredTargetInstallRootDirectory = $preferredTargetInstallDirectory
-        ArtifactIndexFilePath              = $effectiveAcquisitionEnvironment.Tracking.ArtifactIndexFilePath
-        OwnershipIndexFilePath             = $ownershipIndexFilePath
+        LocalRepositoryRoot                = $localRepositoryRoot
+        PackageFileIndexFilePath           = $effectiveAcquisitionEnvironment.Tracking.PackageFileIndexFilePath
+        PackageStateIndexFilePath          = $packageStateIndexFilePath
         AllowAcquisitionFallback           = $effectiveAcquisitionEnvironment.Defaults.AllowFallback
         MirrorDownloadedArtifactsToDefaultPackageDepot = $effectiveAcquisitionEnvironment.Defaults.MirrorDownloadedArtifactsToDefaultPackageDepot
         EnvironmentSources                 = $effectiveAcquisitionEnvironment.EnvironmentSources
@@ -1631,6 +1628,8 @@ New-PackageModelResult -CommandName Invoke-VSCodeRuntime -PackageModelConfig $co
         ErrorMessage                     = $null
         CurrentStep                      = 'Pending'
         DefinitionId                     = $PackageModelConfig.DefinitionId
+        DefinitionRepositoryId           = $PackageModelConfig.DefinitionRepositoryId
+        DefinitionFileName               = $PackageModelConfig.DefinitionFileName
         Display                          = $PackageModelConfig.Display
         Platform                         = $PackageModelConfig.Platform
         Architecture                     = $PackageModelConfig.Architecture
@@ -1640,8 +1639,9 @@ New-PackageModelResult -CommandName Invoke-VSCodeRuntime -PackageModelConfig $co
         InstallWorkspaceRootDirectory    = $PackageModelConfig.InstallWorkspaceRootDirectory
         DefaultPackageDepotDirectory     = $PackageModelConfig.DefaultPackageDepotDirectory
         PreferredTargetInstallRootDirectory = $PackageModelConfig.PreferredTargetInstallRootDirectory
-        ArtifactIndexFilePath            = $PackageModelConfig.ArtifactIndexFilePath
-        OwnershipIndexFilePath           = $PackageModelConfig.OwnershipIndexFilePath
+        LocalRepositoryRoot              = $PackageModelConfig.LocalRepositoryRoot
+        PackageFileIndexFilePath         = $PackageModelConfig.PackageFileIndexFilePath
+        PackageStateIndexFilePath        = $PackageModelConfig.PackageStateIndexFilePath
         Package                          = $null
         EffectiveRelease                 = $null
         PackageId                        = $null

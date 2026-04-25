@@ -1,6 +1,6 @@
 {
   "schemaVersion": "1.0",
-  "id": "VCRuntime",
+  "id": "VisualCppRedistributable",
   "display": {
     "default": {
       "name": "Microsoft Visual C++ Redistributable",

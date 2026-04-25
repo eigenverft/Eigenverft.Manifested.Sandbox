@@ -1,12 +1,12 @@
 {
   "schemaVersion": "1.0",
-  "id": "QwenCliRuntime",
+  "id": "GeminiCli",
   "display": {
     "default": {
-      "name": "Qwen CLI",
-      "publisher": "Alibaba Cloud",
-      "corporation": "Alibaba Cloud",
-      "summary": "Pinned Qwen CLI npm runtime"
+      "name": "Gemini CLI",
+      "publisher": "Google",
+      "corporation": "Google",
+      "summary": "Pinned Gemini CLI npm runtime"
     },
     "localizations": {}
   },
@@ -14,8 +14,8 @@
   "providedTools": {
     "commands": [
       {
-        "name": "qwen",
-        "relativePath": "qwen.cmd"
+        "name": "gemini",
+        "relativePath": "gemini.cmd"
       }
     ],
     "apps": []
@@ -37,27 +37,27 @@
         "definitionId": "NodeRuntime",
         "command": "npm"
       },
-      "packageSpec": "@qwen-code/qwen-code@{version}",
-      "installDirectory": "qwen-cli-runtime/{releaseTrack}/{version}/{flavor}",
+      "packageSpec": "@google/gemini-cli@{version}",
+      "installDirectory": "gemini-runtime/{releaseTrack}/{version}/{flavor}",
       "pathRegistration": {
         "mode": "user",
         "source": {
           "kind": "commandEntryPoint",
-          "value": "qwen"
+          "value": "gemini"
         }
       }
     },
     "validation": {
       "files": [
-        "qwen.cmd",
-        "node_modules/@qwen-code/qwen-code/package.json"
+        "gemini.cmd",
+        "node_modules/@google/gemini-cli/package.json"
       ],
       "directories": [
         "node_modules"
       ],
       "commandChecks": [
         {
-          "entryPoint": "qwen",
+          "entryPoint": "gemini",
           "arguments": [
             "--version"
           ],
@@ -82,8 +82,8 @@
   },
   "releases": [
     {
-      "id": "qwen-cli-runtime-win32-x64-stable",
-      "version": "0.15.2",
+      "id": "gemini-runtime-win32-x64-stable",
+      "version": "0.39.1",
       "releaseTrack": "stable",
       "flavor": "win32-x64",
       "constraints": {
@@ -96,8 +96,8 @@
       }
     },
     {
-      "id": "qwen-cli-runtime-win32-arm64-stable",
-      "version": "0.15.2",
+      "id": "gemini-runtime-win32-arm64-stable",
+      "version": "0.39.1",
       "releaseTrack": "stable",
       "flavor": "win32-arm64",
       "constraints": {

@@ -9,7 +9,7 @@ Builds the logical PackageModel install-slot id for a result.
 
 .DESCRIPTION
 Combines the definition id, release track, and flavor into the stable install
-slot identity used by the ownership index.
+slot identity used by the package-state index.
 
 .PARAMETER PackageModelResult
 The current PackageModel result object.
@@ -29,20 +29,20 @@ Get-PackageModelInstallSlotId -PackageModelResult $result
     return ('{0}:{1}:{2}' -f $definitionId, $releaseTrack, $flavor)
 }
 
-function Get-PackageModelOwnershipIndex {
+function Get-PackageModelPackageStateIndex {
 <#
 .SYNOPSIS
-Loads the PackageModel ownership index.
+Loads the PackageModel package-state index.
 
 .DESCRIPTION
-Returns the configured central ownership index document, or an empty record set
+Returns the configured package-state index document, or an empty record set
 when the index file does not exist yet.
 
 .PARAMETER PackageModelConfig
 The resolved PackageModel config object.
 
 .EXAMPLE
-Get-PackageModelOwnershipIndex -PackageModelConfig $config
+Get-PackageModelPackageStateIndex -PackageModelConfig $config
 #>
     [CmdletBinding()]
     param(
@@ -50,9 +50,9 @@ Get-PackageModelOwnershipIndex -PackageModelConfig $config
         [psobject]$PackageModelConfig
     )
 
-    $indexPath = $PackageModelConfig.OwnershipIndexFilePath
+    $indexPath = $PackageModelConfig.PackageStateIndexFilePath
     if ([string]::IsNullOrWhiteSpace($indexPath)) {
-        throw 'PackageModel ownership index path is not configured.'
+        throw 'PackageModel package-state index path is not configured.'
     }
 
     if (-not (Test-Path -LiteralPath $indexPath -PathType Leaf)) {
@@ -70,22 +70,22 @@ Get-PackageModelOwnershipIndex -PackageModelConfig $config
     }
 }
 
-function Save-PackageModelOwnershipIndex {
+function Save-PackageModelPackageStateIndex {
 <#
 .SYNOPSIS
-Writes the PackageModel ownership index to disk.
+Writes the PackageModel package-state index to disk.
 
 .DESCRIPTION
-Persists the normalized ownership index document to the configured index path.
+Persists the normalized package-state index document to the configured index path.
 
 .PARAMETER IndexPath
 The target index file path.
 
 .PARAMETER Records
-The ownership records to persist.
+The package-state records to persist.
 
 .EXAMPLE
-Save-PackageModelOwnershipIndex -IndexPath $path -Records $records
+Save-PackageModelPackageStateIndex -IndexPath $path -Records $records
 #>
     [CmdletBinding()]
     param(
@@ -102,8 +102,74 @@ Save-PackageModelOwnershipIndex -IndexPath $path -Records $records
     }
 
     [ordered]@{
+        schemaVersion = 1
         records = @($Records)
     } | ConvertTo-Json -Depth 20 | Set-Content -LiteralPath $IndexPath -Encoding UTF8
+}
+
+function Copy-PackageModelDefinitionToLocalRepository {
+<#
+.SYNOPSIS
+Copies the loaded PackageModel definition into the local repository cache.
+
+.DESCRIPTION
+Stores the original definition JSON file under the configured local repository
+root using the source repository id and original filename. The copy stays a
+plain package definition document.
+
+.PARAMETER PackageModelResult
+The current PackageModel result object.
+
+.EXAMPLE
+Copy-PackageModelDefinitionToLocalRepository -PackageModelResult $result
+#>
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [psobject]$PackageModelResult
+    )
+
+    $config = $PackageModelResult.PackageModelConfig
+    $sourcePath = [string]$config.DefinitionPath
+    if ([string]::IsNullOrWhiteSpace($sourcePath) -or -not (Test-Path -LiteralPath $sourcePath -PathType Leaf)) {
+        throw "PackageModel definition source path '$sourcePath' is not available for local repository copy."
+    }
+
+    $repositoryId = if ($config.PSObject.Properties['DefinitionRepositoryId'] -and
+        -not [string]::IsNullOrWhiteSpace([string]$config.DefinitionRepositoryId)) {
+        [string]$config.DefinitionRepositoryId
+    }
+    else {
+        Get-PackageModelDefaultRepositoryId
+    }
+
+    $definitionFileName = if ($config.PSObject.Properties['DefinitionFileName'] -and
+        -not [string]::IsNullOrWhiteSpace([string]$config.DefinitionFileName)) {
+        [string]$config.DefinitionFileName
+    }
+    else {
+        Split-Path -Leaf $sourcePath
+    }
+
+    $localRepositoryRoot = if ($config.PSObject.Properties['LocalRepositoryRoot'] -and
+        -not [string]::IsNullOrWhiteSpace([string]$config.LocalRepositoryRoot)) {
+        [string]$config.LocalRepositoryRoot
+    }
+    else {
+        Get-PackageModelDefaultLocalRepositoryRoot
+    }
+
+    $repositoryDirectory = [System.IO.Path]::GetFullPath((Join-Path $localRepositoryRoot $repositoryId))
+    $null = New-Item -ItemType Directory -Path $repositoryDirectory -Force
+    $localDefinitionPath = [System.IO.Path]::GetFullPath((Join-Path $repositoryDirectory $definitionFileName))
+    Copy-FileToPath -SourcePath $sourcePath -TargetPath $localDefinitionPath -Overwrite | Out-Null
+
+    return [pscustomobject]@{
+        RepositoryId = $repositoryId
+        FileName     = $definitionFileName
+        SourcePath   = [System.IO.Path]::GetFullPath($sourcePath)
+        LocalPath    = $localDefinitionPath
+    }
 }
 
 function Get-PackageModelOwnershipRecord {
@@ -132,7 +198,7 @@ Get-PackageModelOwnershipRecord -PackageModelResult $result
         return $null
     }
 
-    $index = Get-PackageModelOwnershipIndex -PackageModelConfig $PackageModelResult.PackageModelConfig
+    $index = Get-PackageModelPackageStateIndex -PackageModelConfig $PackageModelResult.PackageModelConfig
     $installSlotId = Get-PackageModelInstallSlotId -PackageModelResult $PackageModelResult
     $normalizedInstallDirectory = [System.IO.Path]::GetFullPath($existingPackage.InstallDirectory)
     foreach ($record in @($index.Records)) {
@@ -162,11 +228,12 @@ function Resolve-PackageModelOwnershipKindText {
 function Classify-PackageModelExistingPackage {
 <#
 .SYNOPSIS
-Classifies a discovered existing install against the ownership index.
+Classifies a discovered existing install against the package-state index.
 
 .DESCRIPTION
-Attaches ownership classification data to the current existing install so later
-helpers can decide whether the install is PackageModel-owned, adopted, or external.
+Attaches ownership classification data from the package-state index to the
+current existing install so later helpers can decide whether the install is
+PackageModel-owned, adopted, or external.
 
 .PARAMETER PackageModelResult
 The PackageModel result object to enrich.
@@ -182,7 +249,7 @@ Classify-PackageModelExistingPackage -PackageModelResult $result
 
     if (-not $PackageModelResult.ExistingPackage) {
         $PackageModelResult.Ownership = [pscustomobject]@{
-            IndexPath       = $PackageModelResult.PackageModelConfig.OwnershipIndexFilePath
+            IndexPath       = $PackageModelResult.PackageModelConfig.PackageStateIndexFilePath
             InstallSlotId   = Get-PackageModelInstallSlotId -PackageModelResult $PackageModelResult
             Classification  = 'NotFound'
             OwnershipRecord = $null
@@ -199,7 +266,7 @@ Classify-PackageModelExistingPackage -PackageModelResult $result
     }
     $installSlotId = Get-PackageModelInstallSlotId -PackageModelResult $PackageModelResult
     $PackageModelResult.Ownership = [pscustomobject]@{
-        IndexPath       = $PackageModelResult.PackageModelConfig.OwnershipIndexFilePath
+        IndexPath       = $PackageModelResult.PackageModelConfig.PackageStateIndexFilePath
         InstallSlotId   = $installSlotId
         Classification  = $classification
         OwnershipRecord = $record
@@ -220,12 +287,12 @@ Classify-PackageModelExistingPackage -PackageModelResult $result
 function Update-PackageModelOwnershipRecord {
 <#
 .SYNOPSIS
-Updates the central ownership record after a PackageModel run.
+Updates the package-state record after a PackageModel run.
 
 .DESCRIPTION
-Writes or refreshes the ownership record for PackageModel-owned installs,
+Writes or refreshes the package-state record for PackageModel-owned installs,
 PackageModel-owned reuse, and adopted external installs. External installs that were ignored are not
-written to the central index.
+written to the package-state index.
 
 .PARAMETER PackageModelResult
 The finalized PackageModel result object.
@@ -255,7 +322,7 @@ Update-PackageModelOwnershipRecord -PackageModelResult $result
         return $PackageModelResult
     }
 
-    $index = Get-PackageModelOwnershipIndex -PackageModelConfig $PackageModelResult.PackageModelConfig
+    $index = Get-PackageModelPackageStateIndex -PackageModelConfig $PackageModelResult.PackageModelConfig
     $normalizedInstallDirectory = if ([string]::IsNullOrWhiteSpace([string]$PackageModelResult.InstallDirectory)) {
         $null
     }
@@ -263,6 +330,7 @@ Update-PackageModelOwnershipRecord -PackageModelResult $result
         [System.IO.Path]::GetFullPath($PackageModelResult.InstallDirectory)
     }
     $installSlotId = Get-PackageModelInstallSlotId -PackageModelResult $PackageModelResult
+    $definitionCopy = Copy-PackageModelDefinitionToLocalRepository -PackageModelResult $PackageModelResult
     $records = @(
         foreach ($record in @($index.Records)) {
             $sameInstallSlot = [string]::Equals([string]$record.installSlotId, $installSlotId, [System.StringComparison]::OrdinalIgnoreCase)
@@ -277,6 +345,10 @@ Update-PackageModelOwnershipRecord -PackageModelResult $result
     $newRecord = [pscustomobject]@{
         installSlotId   = $installSlotId
         definitionId    = $PackageModelResult.DefinitionId
+        definitionRepositoryId = $definitionCopy.RepositoryId
+        definitionFileName = $definitionCopy.FileName
+        definitionSourcePath = $definitionCopy.SourcePath
+        definitionLocalPath = $definitionCopy.LocalPath
         releaseTrack    = if ($PackageModelResult.Package -and $PackageModelResult.Package.PSObject.Properties['releaseTrack']) { [string]$PackageModelResult.Package.releaseTrack } else { [string]$PackageModelResult.ReleaseTrack }
         flavor          = if ($PackageModelResult.Package -and $PackageModelResult.Package.PSObject.Properties['flavor']) { [string]$PackageModelResult.Package.flavor } else { $null }
         currentReleaseId = $PackageModelResult.PackageId
@@ -287,7 +359,7 @@ Update-PackageModelOwnershipRecord -PackageModelResult $result
     }
     $records += $newRecord
 
-    Save-PackageModelOwnershipIndex -IndexPath $index.Path -Records $records
+    Save-PackageModelPackageStateIndex -IndexPath $index.Path -Records $records
 
     $PackageModelResult.Ownership = [pscustomobject]@{
         IndexPath       = $index.Path
@@ -296,7 +368,7 @@ Update-PackageModelOwnershipRecord -PackageModelResult $result
         OwnershipRecord = $newRecord
     }
 
-    Write-PackageModelExecutionMessage -Message ("[STATE] Updated ownership record for installSlotId '{0}' with ownershipKind='{1}' at '{2}'." -f $installSlotId, $ownershipKind, $index.Path)
+    Write-PackageModelExecutionMessage -Message ("[STATE] Updated package-state record for installSlotId '{0}' with ownershipKind='{1}' at '{2}'." -f $installSlotId, $ownershipKind, $index.Path)
 
     return $PackageModelResult
 }

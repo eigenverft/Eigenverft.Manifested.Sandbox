@@ -1,11 +1,11 @@
 <#
-    Eigenverft.Manifested.Sandbox.Cmd.GHCliRuntime
+    Eigenverft.Manifested.Sandbox.Cmd.GitHubCli
 #>
 
-function Invoke-GHCliRuntime {
+function Invoke-GitHubCli {
 <#
 .SYNOPSIS
-Ensures the configured GitHub CLI runtime is available through PackageModel.
+Ensures the configured GitHub CLI package is available through PackageModel.
 
 .DESCRIPTION
 Loads the shipped PackageModel JSON documents through the neutral PackageModel
@@ -15,11 +15,11 @@ package, validates the installed package, applies PATH registration, updates
 the ownership index, and returns the resolved entry points.
 
 .EXAMPLE
-Invoke-GHCliRuntime
+Invoke-GitHubCli
 #>
     [CmdletBinding()]
     param()
 
-    return (Invoke-PackageModelDefinitionCommand -DefinitionId 'GHCliRuntime' -CommandName 'Invoke-GHCliRuntime')
+    return (Invoke-PackageModelDefinitionCommand -DefinitionId 'GitHubCli' -CommandName 'Invoke-GitHubCli')
 }
 

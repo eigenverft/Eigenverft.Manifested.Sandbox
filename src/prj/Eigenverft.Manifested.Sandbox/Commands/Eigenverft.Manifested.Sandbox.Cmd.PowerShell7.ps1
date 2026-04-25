@@ -1,8 +1,8 @@
 <#
-    Eigenverft.Manifested.Sandbox.Cmd.Ps7Runtime
+    Eigenverft.Manifested.Sandbox.Cmd.PowerShell7
 #>
 
-function Invoke-Ps7Runtime {
+function Invoke-PowerShell7 {
 <#
 .SYNOPSIS
 Ensures the configured PowerShell 7 runtime is available through PackageModel.
@@ -14,11 +14,11 @@ when needed, installs or reuses the package, validates pwsh, applies user PATH
 registration, updates ownership tracking, and returns resolved entry points.
 
 .EXAMPLE
-Invoke-Ps7Runtime
+Invoke-PowerShell7
 #>
     [CmdletBinding()]
     param()
 
-    return (Invoke-PackageModelDefinitionCommand -DefinitionId 'Ps7Runtime' -CommandName 'Invoke-Ps7Runtime')
+    return (Invoke-PackageModelDefinitionCommand -DefinitionId 'PowerShell7' -CommandName 'Invoke-PowerShell7')
 }
 

@@ -1,6 +1,6 @@
 {
   "schemaVersion": "1.0",
-  "id": "GHCliRuntime",
+  "id": "GitHubCli",
   "display": {
     "default": {
       "name": "GitHub CLI",

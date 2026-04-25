@@ -9,7 +9,7 @@ function Get-PackageModelNpmGlobalConfigPath {
         [psobject]$PackageModelResult
     )
 
-    $packageModelRoot = Split-Path -Parent ([string]$PackageModelResult.PackageModelConfig.OwnershipIndexFilePath)
+    $packageModelRoot = Split-Path -Parent ([string]$PackageModelResult.PackageModelConfig.PackageStateIndexFilePath)
     return ([System.IO.Path]::GetFullPath((Join-Path $packageModelRoot 'npm\npmrc')))
 }
 

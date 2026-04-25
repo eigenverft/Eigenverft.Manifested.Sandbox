@@ -1,6 +1,6 @@
 {
   "schemaVersion": "1.0",
-  "id": "CodexRuntime",
+  "id": "CodexCli",
   "display": {
     "default": {
       "name": "Codex CLI",

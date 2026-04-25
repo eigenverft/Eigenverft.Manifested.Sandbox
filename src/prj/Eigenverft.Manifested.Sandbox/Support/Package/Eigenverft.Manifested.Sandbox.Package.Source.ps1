@@ -2,20 +2,20 @@
     Eigenverft.Manifested.Sandbox.Package.Source
 #>
 
-function Get-PackageModelArtifactIndex {
+function Get-PackageModelPackageFileIndex {
 <#
 .SYNOPSIS
-Loads the PackageModel artifact index.
+Loads the PackageModel package-file index.
 
 .DESCRIPTION
-Returns the configured artifact index document, or an empty record set when
+Returns the configured package-file index document, or an empty record set when
 the index file does not exist yet.
 
 .PARAMETER PackageModelConfig
 The resolved PackageModel config object.
 
 .EXAMPLE
-Get-PackageModelArtifactIndex -PackageModelConfig $config
+Get-PackageModelPackageFileIndex -PackageModelConfig $config
 #>
     [CmdletBinding()]
     param(
@@ -23,9 +23,9 @@ Get-PackageModelArtifactIndex -PackageModelConfig $config
         [psobject]$PackageModelConfig
     )
 
-    $indexPath = $PackageModelConfig.ArtifactIndexFilePath
+    $indexPath = $PackageModelConfig.PackageFileIndexFilePath
     if ([string]::IsNullOrWhiteSpace($indexPath)) {
-        throw 'PackageModel artifact index path is not configured.'
+        throw 'PackageModel package-file index path is not configured.'
     }
 
     if (-not (Test-Path -LiteralPath $indexPath -PathType Leaf)) {
@@ -43,22 +43,22 @@ Get-PackageModelArtifactIndex -PackageModelConfig $config
     }
 }
 
-function Save-PackageModelArtifactIndex {
+function Save-PackageModelPackageFileIndex {
 <#
 .SYNOPSIS
-Writes the PackageModel artifact index to disk.
+Writes the PackageModel package-file index to disk.
 
 .DESCRIPTION
-Persists the normalized artifact index document to the configured index path.
+Persists the normalized package-file index document to the configured index path.
 
 .PARAMETER IndexPath
 The target index file path.
 
 .PARAMETER Records
-The artifact records to persist.
+The package-file records to persist.
 
 .EXAMPLE
-Save-PackageModelArtifactIndex -IndexPath $path -Records $records
+Save-PackageModelPackageFileIndex -IndexPath $path -Records $records
 #>
     [CmdletBinding()]
     param(
@@ -75,24 +75,25 @@ Save-PackageModelArtifactIndex -IndexPath $path -Records $records
     }
 
     [ordered]@{
+        schemaVersion = 1
         records = @($Records)
     } | ConvertTo-Json -Depth 20 | Set-Content -LiteralPath $IndexPath -Encoding UTF8
 }
 
-function Update-PackageModelArtifactIndexRecord {
+function Update-PackageModelPackageFileIndexRecord {
 <#
 .SYNOPSIS
-Updates the PackageModel artifact index for one resolved artifact path.
+Updates the PackageModel package-file index for one resolved package file path.
 
 .DESCRIPTION
-Refreshes the tracked source and package metadata for an artifact path in the
-central artifact index.
+Refreshes the tracked source and package metadata for a package-file path in
+the package-file index.
 
 .PARAMETER PackageModelResult
 The current PackageModel result object.
 
-.PARAMETER ArtifactPath
-The artifact path to write into the index.
+.PARAMETER PackageFilePath
+The package-file path to write into the index.
 
 .PARAMETER SourceScope
 The source scope that produced the artifact.
@@ -101,7 +102,7 @@ The source scope that produced the artifact.
 The source id that produced the artifact.
 
 .EXAMPLE
-Update-PackageModelArtifactIndexRecord -PackageModelResult $result -ArtifactPath $path -SourceScope environment -SourceId defaultPackageDepot
+Update-PackageModelPackageFileIndexRecord -PackageModelResult $result -PackageFilePath $path -SourceScope environment -SourceId defaultPackageDepot
 #>
     [CmdletBinding()]
     param(
@@ -109,7 +110,7 @@ Update-PackageModelArtifactIndexRecord -PackageModelResult $result -ArtifactPath
         [psobject]$PackageModelResult,
 
         [Parameter(Mandatory = $true)]
-        [string]$ArtifactPath,
+        [string]$PackageFilePath,
 
         [AllowNull()]
         [string]$SourceScope,
@@ -118,22 +119,22 @@ Update-PackageModelArtifactIndexRecord -PackageModelResult $result -ArtifactPath
         [string]$SourceId
     )
 
-    if ([string]::IsNullOrWhiteSpace($ArtifactPath)) {
+    if ([string]::IsNullOrWhiteSpace($PackageFilePath)) {
         return
     }
 
-    $normalizedArtifactPath = [System.IO.Path]::GetFullPath($ArtifactPath)
-    $index = Get-PackageModelArtifactIndex -PackageModelConfig $PackageModelResult.PackageModelConfig
+    $normalizedPackageFilePath = [System.IO.Path]::GetFullPath($PackageFilePath)
+    $index = Get-PackageModelPackageFileIndex -PackageModelConfig $PackageModelResult.PackageModelConfig
     $records = @(
         foreach ($record in @($index.Records)) {
-            if (-not [string]::Equals([string]$record.path, $normalizedArtifactPath, [System.StringComparison]::OrdinalIgnoreCase)) {
+            if (-not [string]::Equals([string]$record.path, $normalizedPackageFilePath, [System.StringComparison]::OrdinalIgnoreCase)) {
                 $record
             }
         }
     )
 
     $records += [pscustomobject]@{
-        path         = $normalizedArtifactPath
+        path         = $normalizedPackageFilePath
         definitionId = $PackageModelResult.DefinitionId
         releaseId    = $PackageModelResult.PackageId
         releaseTrack = $PackageModelResult.ReleaseTrack
@@ -144,7 +145,7 @@ Update-PackageModelArtifactIndexRecord -PackageModelResult $result -ArtifactPath
         updatedAtUtc = [DateTime]::UtcNow.ToString('o')
     }
 
-    Save-PackageModelArtifactIndex -IndexPath $index.Path -Records $records
+    Save-PackageModelPackageFileIndex -IndexPath $index.Path -Records $records
 }
 
 function Get-PackageModelSourceDefinition {
@@ -992,7 +993,7 @@ Save-PackageModelPackageFile -PackageModelResult $result
         }) | Out-Null
 
         if ($verification.Accepted) {
-            Update-PackageModelArtifactIndexRecord -PackageModelResult $PackageModelResult -ArtifactPath $PackageModelResult.PackageFilePath -SourceScope 'installWorkspace' -SourceId 'installWorkspace'
+            Update-PackageModelPackageFileIndexRecord -PackageModelResult $PackageModelResult -PackageFilePath $PackageModelResult.PackageFilePath -SourceScope 'installWorkspace' -SourceId 'installWorkspace'
             $PackageModelResult.PackageFileSave = [pscustomobject]@{
                 Success         = $true
                 Status          = 'ReusedPackageFile'
@@ -1030,8 +1031,8 @@ Save-PackageModelPackageFile -PackageModelResult $result
         if ($verification.Accepted) {
             $null = New-Item -ItemType Directory -Path $PackageModelResult.InstallWorkspaceDirectory -Force
             $null = Copy-FileToPath -SourcePath $PackageModelResult.DefaultPackageDepotFilePath -TargetPath $PackageModelResult.PackageFilePath -Overwrite
-            Update-PackageModelArtifactIndexRecord -PackageModelResult $PackageModelResult -ArtifactPath $PackageModelResult.DefaultPackageDepotFilePath -SourceScope 'environment' -SourceId 'defaultPackageDepot'
-            Update-PackageModelArtifactIndexRecord -PackageModelResult $PackageModelResult -ArtifactPath $PackageModelResult.PackageFilePath -SourceScope 'environment' -SourceId 'defaultPackageDepot'
+            Update-PackageModelPackageFileIndexRecord -PackageModelResult $PackageModelResult -PackageFilePath $PackageModelResult.DefaultPackageDepotFilePath -SourceScope 'environment' -SourceId 'defaultPackageDepot'
+            Update-PackageModelPackageFileIndexRecord -PackageModelResult $PackageModelResult -PackageFilePath $PackageModelResult.PackageFilePath -SourceScope 'environment' -SourceId 'defaultPackageDepot'
             $PackageModelResult.PackageFileSave = [pscustomobject]@{
                 Success         = $true
                 Status          = 'HydratedFromDefaultPackageDepot'
@@ -1118,19 +1119,19 @@ Save-PackageModelPackageFile -PackageModelResult $result
                 Remove-Item -LiteralPath $PackageModelResult.PackageFilePath -Force
             }
             Move-Item -LiteralPath $stagingPath -Destination $PackageModelResult.PackageFilePath -Force
-            Update-PackageModelArtifactIndexRecord -PackageModelResult $PackageModelResult -ArtifactPath $PackageModelResult.PackageFilePath -SourceScope $sourceDefinition.Scope -SourceId $sourceDefinition.Id
+            Update-PackageModelPackageFileIndexRecord -PackageModelResult $PackageModelResult -PackageFilePath $PackageModelResult.PackageFilePath -SourceScope $sourceDefinition.Scope -SourceId $sourceDefinition.Id
 
             if ([string]::Equals([string]$resolvedSource.Kind, 'download', [System.StringComparison]::OrdinalIgnoreCase) -and
                 $packageModelConfig.MirrorDownloadedArtifactsToDefaultPackageDepot -and
                 -not [string]::IsNullOrWhiteSpace($PackageModelResult.DefaultPackageDepotFilePath)) {
                 $null = New-Item -ItemType Directory -Path (Split-Path -Parent $PackageModelResult.DefaultPackageDepotFilePath) -Force
                 $null = Copy-FileToPath -SourcePath $PackageModelResult.PackageFilePath -TargetPath $PackageModelResult.DefaultPackageDepotFilePath -Overwrite
-                Update-PackageModelArtifactIndexRecord -PackageModelResult $PackageModelResult -ArtifactPath $PackageModelResult.DefaultPackageDepotFilePath -SourceScope $sourceDefinition.Scope -SourceId $sourceDefinition.Id
+                Update-PackageModelPackageFileIndexRecord -PackageModelResult $PackageModelResult -PackageFilePath $PackageModelResult.DefaultPackageDepotFilePath -SourceScope $sourceDefinition.Scope -SourceId $sourceDefinition.Id
             }
             elseif ([string]::Equals([string]$sourceDefinition.Scope, 'environment', [System.StringComparison]::OrdinalIgnoreCase) -and
                 [string]::Equals([string]$sourceDefinition.Id, 'defaultPackageDepot', [System.StringComparison]::OrdinalIgnoreCase) -and
                 -not [string]::IsNullOrWhiteSpace($PackageModelResult.DefaultPackageDepotFilePath)) {
-                Update-PackageModelArtifactIndexRecord -PackageModelResult $PackageModelResult -ArtifactPath $PackageModelResult.DefaultPackageDepotFilePath -SourceScope 'environment' -SourceId 'defaultPackageDepot'
+                Update-PackageModelPackageFileIndexRecord -PackageModelResult $PackageModelResult -PackageFilePath $PackageModelResult.DefaultPackageDepotFilePath -SourceScope 'environment' -SourceId 'defaultPackageDepot'
             }
 
             $attempts.Add([pscustomobject]@{

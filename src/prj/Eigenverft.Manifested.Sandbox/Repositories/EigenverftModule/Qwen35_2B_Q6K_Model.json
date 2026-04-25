@@ -1,6 +1,6 @@
 {
   "schemaVersion": "1.0",
-  "id": "Qwen35_2B_Q6K",
+  "id": "Qwen35_2B_Q6K_Model",
   "display": {
     "default": {
       "name": "Qwen 3.5 2B Q6_K",
