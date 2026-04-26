@@ -27,6 +27,7 @@ $moduleProjectRoot = Join-Path (Split-Path -Parent $PSScriptRoot) 'Eigenverft.Ma
 . "$moduleProjectRoot\Support\Package\Eigenverft.Manifested.Sandbox.Package.Bootstrap.ps1"
 . "$moduleProjectRoot\Support\Package\Eigenverft.Manifested.Sandbox.Package.Config.ps1"
 . "$moduleProjectRoot\Support\Package\Eigenverft.Manifested.Sandbox.Package.Selection.ps1"
+. "$moduleProjectRoot\Support\Package\Eigenverft.Manifested.Sandbox.Package.Dependencies.ps1"
 . "$moduleProjectRoot\Support\Package\Eigenverft.Manifested.Sandbox.Package.Source.ps1"
 . "$moduleProjectRoot\Support\Package\Eigenverft.Manifested.Sandbox.Package.Ownership.ps1"
 . "$moduleProjectRoot\Support\Package\Eigenverft.Manifested.Sandbox.Package.State.ps1"

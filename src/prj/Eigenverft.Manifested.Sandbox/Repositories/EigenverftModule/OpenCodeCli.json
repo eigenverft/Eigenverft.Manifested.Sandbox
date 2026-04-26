@@ -11,6 +11,11 @@
     "localizations": {}
   },
   "upstreamSources": {},
+  "dependencies": [
+    {
+      "definitionId": "NodeRuntime"
+    }
+  ],
   "providedTools": {
     "commands": [
       {
@@ -31,12 +36,8 @@
       ]
     },
     "install": {
-      "kind": "packageManagerInstall",
-      "managerKind": "npm",
-      "managerDependency": {
-        "definitionId": "NodeRuntime",
-        "command": "npm"
-      },
+      "kind": "npmGlobalPackage",
+      "installerCommand": "npm",
       "packageSpec": "opencode-ai@{version}",
       "installDirectory": "opencode-runtime/{releaseTrack}/{version}/{flavor}",
       "pathRegistration": {

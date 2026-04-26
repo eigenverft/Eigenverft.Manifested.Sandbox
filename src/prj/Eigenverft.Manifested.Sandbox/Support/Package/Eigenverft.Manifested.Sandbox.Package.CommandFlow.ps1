@@ -57,6 +57,7 @@ function Get-PackageModelCommandFailureReason {
 
     switch -Exact ($CurrentStep) {
         'ResolvePackage' { return 'PackageSelectionFailed' }
+        'ResolveDependencies' { return 'PackageDependencyFailed' }
         'ResolvePaths' { return 'PackagePathResolutionFailed' }
         'ResolvePreInstallSatisfaction' { return 'PreInstallSatisfactionCheckFailed' }
         'BuildAcquisitionPlan' { return 'AcquisitionPlanBuildFailed' }
@@ -82,13 +83,16 @@ function Invoke-PackageModelDefinitionCommand {
 
         [Parameter(Mandatory = $true)]
         [ValidateNotNullOrEmpty()]
-        [string]$CommandName
+        [string]$CommandName,
+
+        [object[]]$DependencyStack = @()
     )
 
     $packageModelConfig = Get-PackageModelConfig -DefinitionId $DefinitionId
     $result = New-PackageModelResult -CommandName $CommandName -PackageModelConfig $packageModelConfig
     $steps = @(
         [pscustomobject]@{ Name = 'ResolvePackage'; Message = '[STEP] Resolving package selection.'; Action = { param($r) Resolve-PackageModelPackage -PackageModelResult $r } },
+        [pscustomobject]@{ Name = 'ResolveDependencies'; Message = '[STEP] Ensuring package dependencies.'; Action = { param($r) Resolve-PackageModelDependencies -PackageModelResult $r -DependencyStack $DependencyStack } },
         [pscustomobject]@{ Name = 'ResolvePaths'; Message = '[STEP] Resolving package paths.'; Action = { param($r) Resolve-PackageModelPaths -PackageModelResult $r } },
         [pscustomobject]@{ Name = 'ResolvePreInstallSatisfaction'; Message = '[STEP] Checking pre-install satisfaction.'; Action = { param($r) Resolve-PackageModelPreInstallSatisfaction -PackageModelResult $r } },
         [pscustomobject]@{ Name = 'BuildAcquisitionPlan'; Message = '[STEP] Building acquisition plan.'; Action = { param($r) Build-PackageModelAcquisitionPlan -PackageModelResult $r } },

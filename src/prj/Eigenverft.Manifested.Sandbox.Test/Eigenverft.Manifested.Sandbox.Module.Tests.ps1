@@ -453,7 +453,7 @@ function global:Write-TestPackageModelDocuments {
         [object]$SourceInventoryDocument
     )
 
-    $globalConfigPath = Join-Path $RootPath 'Global.json'
+    $globalConfigPath = Join-Path $RootPath 'Configuration\Internal\Config.json'
     $definitionPath = Join-Path $RootPath "$($DefinitionDocument.id).json"
     Write-TestJsonDocument -Path $globalConfigPath -Document $GlobalDocument
     Write-TestJsonDocument -Path $definitionPath -Document $DefinitionDocument
@@ -634,7 +634,7 @@ Describe 'Eigenverft.Manifested.Sandbox PackageModel' {
     It 'returns an empty package state when durable indexes and local directories are absent' {
         $root = Join-Path $TestDrive 'empty-package-state'
         $config = [pscustomobject]@{
-            LocalConfigurationPath              = Join-Path $root 'Global.json'
+            LocalConfigurationPath              = Join-Path $root 'Configuration\Internal\Config.json'
             PreferredTargetInstallRootDirectory = Join-Path $root 'Installs'
             InstallWorkspaceRootDirectory       = Join-Path $root 'InstallWorkspace'
             DefaultPackageDepotDirectory        = Join-Path $root 'DefaultPackageDepot'
@@ -670,7 +670,7 @@ Describe 'Eigenverft.Manifested.Sandbox PackageModel' {
     It 'gets package state without loading a package definition config' {
         $root = Join-Path $TestDrive 'definition-free-package-state'
         $config = [pscustomobject]@{
-            LocalConfigurationPath              = Join-Path $root 'Global.json'
+            LocalConfigurationPath              = Join-Path $root 'Configuration\Internal\Config.json'
             PreferredTargetInstallRootDirectory = Join-Path $root 'Installs'
             InstallWorkspaceRootDirectory       = Join-Path $root 'InstallWorkspace'
             DefaultPackageDepotDirectory        = Join-Path $root 'DefaultPackageDepot'
@@ -710,7 +710,7 @@ Describe 'Eigenverft.Manifested.Sandbox PackageModel' {
         Write-TestJsonDocument -Path $sourceInventoryPath -Document @{ inventoryVersion = 1; global = @{}; sites = @{} }
 
         $config = [pscustomobject]@{
-            LocalConfigurationPath              = Join-Path $root 'Global.json'
+            LocalConfigurationPath              = Join-Path $root 'Configuration\Internal\Config.json'
             PreferredTargetInstallRootDirectory = $installRoot
             InstallWorkspaceRootDirectory       = $workspaceRoot
             DefaultPackageDepotDirectory        = $depotRoot
@@ -776,7 +776,7 @@ Describe 'Eigenverft.Manifested.Sandbox PackageModel' {
     It 'returns the resolved raw package state on request' {
         $root = Join-Path $TestDrive 'raw-package-state'
         $config = [pscustomobject]@{
-            LocalConfigurationPath              = Join-Path $root 'Global.json'
+            LocalConfigurationPath              = Join-Path $root 'Configuration\Internal\Config.json'
             PreferredTargetInstallRootDirectory = Join-Path $root 'Installs'
             InstallWorkspaceRootDirectory       = Join-Path $root 'InstallWorkspace'
             DefaultPackageDepotDirectory        = Join-Path $root 'DefaultPackageDepot'
@@ -855,7 +855,7 @@ Describe 'Eigenverft.Manifested.Sandbox PackageModel' {
         $globalInfo.Document.packageModel.acquisitionEnvironment.PSObject.Properties['environmentSources'] | Should -BeNullOrEmpty
     }
 
-    It 'creates the local Global.json copy from shipped configuration when missing' {
+    It 'creates the local Config.json copy from shipped configuration when missing' {
         $localGlobalPath = Get-PackageModelLocalGlobalConfigPath
         if (Test-Path -LiteralPath $localGlobalPath -PathType Leaf) {
             Remove-Item -LiteralPath $localGlobalPath -Force
@@ -1024,17 +1024,80 @@ Describe 'Eigenverft.Manifested.Sandbox PackageModel' {
 
             $config.DefinitionId | Should -Be $case.DefinitionId
             $result.Package.version | Should -Be $case.Version
-            $result.Package.install.kind | Should -Be 'packageManagerInstall'
-            $result.Package.install.managerKind | Should -Be 'npm'
-            $result.Package.install.managerDependency.definitionId | Should -Be 'NodeRuntime'
-            $result.Package.install.managerDependency.command | Should -Be 'npm'
+            $result.Package.install.kind | Should -Be 'npmGlobalPackage'
+            $result.Package.install.installerCommand | Should -Be 'npm'
             $result.Package.install.packageSpec | Should -Be $case.PackageSpec
             $result.Package.install.pathRegistration.source.value | Should -Be $case.Command
             $config.Definition.providedTools.commands[0].relativePath | Should -Be $case.RelativePath
+            if ($case.DefinitionId -eq 'CodexCli') {
+                @($config.Definition.dependencies.definitionId) | Should -Be @('VisualCppRedistributable', 'NodeRuntime')
+            }
+            else {
+                @($config.Definition.dependencies.definitionId) | Should -Be @('NodeRuntime')
+            }
             $result.Package.PSObject.Properties['packageFile'] | Should -BeNullOrEmpty
             $result.AcquisitionPlan.PackageFileRequired | Should -BeFalse
             @($result.AcquisitionPlan.Candidates).Count | Should -Be 0
         }
+    }
+
+    It 'ensures direct package dependencies before package-specific install flow continues' {
+        $definition = [pscustomobject]@{
+            id           = 'CodexCli'
+            dependencies = @(
+                [pscustomobject]@{ definitionId = 'VisualCppRedistributable' }
+                [pscustomobject]@{ definitionId = 'NodeRuntime' }
+            )
+        }
+        $result = [pscustomobject]@{
+            DefinitionId       = 'CodexCli'
+            PackageModelConfig = [pscustomobject]@{
+                Definition = $definition
+            }
+            Dependencies       = @()
+        }
+
+        Mock Invoke-PackageModelDefinitionCommand {
+            [pscustomobject]@{
+                Status        = 'Ready'
+                InstallOrigin = 'PackageModelReused'
+            Install       = [pscustomobject]@{ Status = 'ReusedPackageModelOwned' }
+            EntryPoints   = [pscustomobject]@{
+                Commands = @(
+                    [pscustomobject]@{
+                        Name = if ($DefinitionId -eq 'NodeRuntime') { 'npm' } else { 'vc-runtime' }
+                        Path = Join-Path $TestDrive "$DefinitionId.cmd"
+                    }
+                )
+            }
+        }
+    }
+
+        $resolved = Resolve-PackageModelDependencies -PackageModelResult $result
+
+        Assert-MockCalled Invoke-PackageModelDefinitionCommand -Times 1 -ParameterFilter { $DefinitionId -eq 'VisualCppRedistributable' }
+        Assert-MockCalled Invoke-PackageModelDefinitionCommand -Times 1 -ParameterFilter { $DefinitionId -eq 'NodeRuntime' }
+        @($resolved.Dependencies.DefinitionId) | Should -Be @('VisualCppRedistributable', 'NodeRuntime')
+        @($resolved.Dependencies.Status) | Should -Be @('Ready', 'Ready')
+        @($resolved.Dependencies[1].Commands.Name) | Should -Be @('npm')
+    }
+
+    It 'fails clearly when direct package dependencies contain a cycle' {
+        $definition = [pscustomobject]@{
+            id           = 'CodexCli'
+            dependencies = @(
+                [pscustomobject]@{ definitionId = 'NodeRuntime' }
+            )
+        }
+        $result = [pscustomobject]@{
+            DefinitionId       = 'CodexCli'
+            PackageModelConfig = [pscustomobject]@{
+                Definition = $definition
+            }
+            Dependencies       = @()
+        }
+
+        { Resolve-PackageModelDependencies -PackageModelResult $result -DependencyStack @('CodexCli', 'NodeRuntime') } | Should -Throw '*dependency cycle*'
     }
 
     It 'loads the shipped PythonRuntime definition and selects the fixed NuGet package release' {
@@ -1148,7 +1211,7 @@ Describe 'Eigenverft.Manifested.Sandbox PackageModel' {
     }
 
     It 'fails clearly when the shipped global config still defines vsCodeUpdateService as an environment source' {
-        $globalConfigPath = Join-Path $TestDrive 'Global.json'
+        $globalConfigPath = Join-Path $TestDrive 'Config.json'
         $badGlobal = New-TestPackageModelGlobalDocument -EnvironmentSources @{
             vsCodeUpdateService = @{ kind = 'download'; baseUri = 'https://example.invalid/' }
         }
@@ -1170,6 +1233,25 @@ Describe 'Eigenverft.Manifested.Sandbox PackageModel' {
 
         $definitionInfo = Read-PackageModelJsonDocument -Path $documents.DefinitionPath
         { Assert-PackageModelDefinitionSchema -DefinitionDocumentInfo $definitionInfo -DefinitionId 'VSCodeRuntime' } | Should -Throw '*requireManagedOwnership*'
+    }
+
+    It 'fails clearly when npm install definitions use retired managerDependency fields' {
+        $release = New-TestPackageModelRelease -Id 'cli-win-x64-stable' -Version '1.0.0' -Architecture 'x64' -Flavor 'win32-x64' -Install @{
+            kind              = 'npmGlobalPackage'
+            installerCommand  = 'npm'
+            packageSpec       = 'example@{version}'
+            managerDependency = @{
+                definitionId = 'NodeRuntime'
+                command      = 'npm'
+            }
+        } -Validation (New-TestValidation -Version '1.0.0')
+        $definitionDocument = New-TestVSCodeDefinitionDocument -Releases @($release) -ReleaseDefaultsValidation (New-TestValidation -Version '1.0.0')
+        $definitionInfo = [pscustomobject]@{
+            Path     = Join-Path $TestDrive 'VSCodeRuntime.json'
+            Document = ConvertTo-TestPsObject -InputObject $definitionDocument
+        }
+
+        { Assert-PackageModelDefinitionSchema -DefinitionDocumentInfo $definitionInfo -DefinitionId 'VSCodeRuntime' } | Should -Throw '*install.managerDependency*'
     }
 
     It 'fails clearly when a definition is missing schemaVersion' {
@@ -2590,44 +2672,7 @@ Describe 'Eigenverft.Manifested.Sandbox PackageModel' {
         Test-Path -LiteralPath (Join-Path $installDirectory 'data') -PathType Container | Should -BeTrue
     }
 
-    It 'keeps packageManagerInstall generic behavior when managerKind is omitted' {
-        $rootPath = Join-Path $TestDrive 'generic-package-manager-install'
-        $managerCommandPath = Join-Path $rootPath 'manager.cmd'
-        $installDirectory = Join-Path $rootPath 'install'
-        Write-TestTextFile -Path $managerCommandPath -Content "@echo off`r`nexit /b 0`r`n"
-
-        $packageModelResult = [pscustomobject]@{
-            PackageId                 = 'GenericPackageManagerRuntime'
-            DefinitionId              = 'GenericPackageManagerRuntime'
-            PackageFilePath           = $null
-            InstallWorkspaceDirectory = Join-Path $rootPath 'workspace'
-            InstallDirectory          = $installDirectory
-            ExistingPackage           = $null
-            PackageModelConfig        = [pscustomobject]@{
-                DefinitionId = 'GenericPackageManagerRuntime'
-            }
-            Package                   = [pscustomobject]@{
-                id      = 'generic-package-manager-runtime-win32-x64-stable'
-                version = '1.0.0'
-                flavor  = 'win32-x64'
-                install = [pscustomobject]@{
-                    kind               = 'packageManagerInstall'
-                    managerCommandPath = $managerCommandPath
-                    commandArguments   = @('--example', '{version}')
-                }
-            }
-        }
-
-        $installResult = Install-PackageModelPackageManagerPackage -PackageModelResult $packageModelResult
-
-        $installResult.InstallKind | Should -Be 'packageManagerInstall'
-        $installResult.PSObject.Properties['ManagerKind'] | Should -BeNullOrEmpty
-        $installResult.CommandPath | Should -Be ([System.IO.Path]::GetFullPath($managerCommandPath))
-        $installResult.CommandArguments | Should -Be @('--example', '1.0.0')
-        Test-Path -LiteralPath $installDirectory -PathType Container | Should -BeTrue
-    }
-
-    It 'installs npm packageManagerInstall through PackageModel-owned Node into a staged prefix' {
+    It 'installs npmGlobalPackage through a ready dependency command into a staged prefix' {
         $rootPath = Join-Path $TestDrive 'npm-package-manager-install'
         $fakeNpmPath = Join-Path $rootPath 'node\npm.cmd'
         $installDirectory = Join-Path $rootPath 'install'
@@ -2651,20 +2696,6 @@ echo @echo off>"%PREFIX%\codex.cmd"
 echo {"name":"@openai/codex"}>"%PREFIX%\node_modules\@openai\codex\package.json"
 exit /b 0
 "@
-        Mock Invoke-PackageModelDefinitionCommand {
-            [pscustomobject]@{
-                Status      = 'Ready'
-                EntryPoints = [pscustomobject]@{
-                    Commands = @(
-                        [pscustomobject]@{
-                            Name = 'npm'
-                            Path = $fakeNpmPath
-                        }
-                    )
-                }
-            }
-        } -ParameterFilter { $DefinitionId -eq 'NodeRuntime' }
-
         $packageModelResult = [pscustomobject]@{
             PackageId              = 'codex-runtime-win32-x64-stable'
             DefinitionId           = 'CodexCli'
@@ -2675,38 +2706,52 @@ exit /b 0
                 InstallWorkspaceRootDirectory = $workspaceDirectory
                 PackageStateIndexFilePath     = $packageStateIndexPath
             }
+            Dependencies           = @(
+                [pscustomobject]@{
+                    DefinitionId = 'NodeRuntime'
+                    Commands     = @(
+                        [pscustomobject]@{
+                            Name = 'npm'
+                            Path = $fakeNpmPath
+                        }
+                    )
+                    EntryPoints  = [pscustomobject]@{
+                        Commands = @(
+                            [pscustomobject]@{
+                                Name = 'npm'
+                                Path = $fakeNpmPath
+                            }
+                        )
+                    }
+                }
+            )
             Package                = [pscustomobject]@{
                 id           = 'codex-runtime-win32-x64-stable'
                 version      = '0.125.0'
                 releaseTrack = 'stable'
                 flavor       = 'win32-x64'
                 install      = [pscustomobject]@{
-                    kind              = 'packageManagerInstall'
-                    managerKind       = 'npm'
-                    managerDependency = [pscustomobject]@{
-                        definitionId = 'NodeRuntime'
-                        command      = 'npm'
-                    }
+                    kind              = 'npmGlobalPackage'
+                    installerCommand  = 'npm'
                     packageSpec       = '@openai/codex@{version}'
                 }
             }
         }
 
-        $installResult = Install-PackageModelPackageManagerPackage -PackageModelResult $packageModelResult
+        $installResult = Install-PackageModelNpmPackage -PackageModelResult $packageModelResult
 
-        Assert-MockCalled Invoke-PackageModelDefinitionCommand -Times 1 -ParameterFilter { $DefinitionId -eq 'NodeRuntime' }
-        $installResult.ManagerKind | Should -Be 'npm'
+        $installResult.InstallKind | Should -Be 'npmGlobalPackage'
+        $installResult.InstallerCommand | Should -Be 'npm'
+        $installResult.InstallerCommandPath | Should -Be ([System.IO.Path]::GetFullPath($fakeNpmPath))
         $installResult.PackageSpec | Should -Be '@openai/codex@0.125.0'
-        $installResult.Dependency.DefinitionId | Should -Be 'NodeRuntime'
-        $installResult.Dependency.CommandPath | Should -Be ([System.IO.Path]::GetFullPath($fakeNpmPath))
         $installResult.CacheDirectory | Should -Match 'npm-cache'
-        $installResult.GlobalConfigPath | Should -Match 'npm\\npmrc$'
+        $installResult.GlobalConfigPath | Should -Match 'External\\npm\\npmrc$'
         Test-Path -LiteralPath (Join-Path $installDirectory 'codex.cmd') -PathType Leaf | Should -BeTrue
         Test-Path -LiteralPath (Join-Path $installDirectory 'node_modules\@openai\codex\package.json') -PathType Leaf | Should -BeTrue
         Test-Path -LiteralPath $installResult.StagePath | Should -BeFalse
     }
 
-    It 'does not replace the final install when npm packageManagerInstall fails' {
+    It 'does not replace the final install when npmGlobalPackage fails' {
         $rootPath = Join-Path $TestDrive 'npm-package-manager-install-fail'
         $fakeNpmPath = Join-Path $rootPath 'node\npm.cmd'
         $installDirectory = Join-Path $rootPath 'install'
@@ -2715,20 +2760,6 @@ exit /b 0
         Write-TestTextFile -Path $fakeNpmPath -Content "@echo off`r`nexit /b 7`r`n"
         Write-TestTextFile -Path (Join-Path $installDirectory 'sentinel.txt') -Content 'keep-me'
 
-        Mock Invoke-PackageModelDefinitionCommand {
-            [pscustomobject]@{
-                Status      = 'Ready'
-                EntryPoints = [pscustomobject]@{
-                    Commands = @(
-                        [pscustomobject]@{
-                            Name = 'npm'
-                            Path = $fakeNpmPath
-                        }
-                    )
-                }
-            }
-        } -ParameterFilter { $DefinitionId -eq 'NodeRuntime' }
-
         $packageModelResult = [pscustomobject]@{
             PackageId              = 'codex-runtime-win32-x64-stable'
             DefinitionId           = 'CodexCli'
@@ -2739,25 +2770,66 @@ exit /b 0
                 InstallWorkspaceRootDirectory = $workspaceDirectory
                 PackageStateIndexFilePath     = $packageStateIndexPath
             }
+            Dependencies           = @(
+                [pscustomobject]@{
+                    DefinitionId = 'NodeRuntime'
+                    Commands     = @(
+                        [pscustomobject]@{
+                            Name = 'npm'
+                            Path = $fakeNpmPath
+                        }
+                    )
+                }
+            )
             Package                = [pscustomobject]@{
                 id           = 'codex-runtime-win32-x64-stable'
                 version      = '0.125.0'
                 releaseTrack = 'stable'
                 flavor       = 'win32-x64'
                 install      = [pscustomobject]@{
-                    kind              = 'packageManagerInstall'
-                    managerKind       = 'npm'
-                    managerDependency = [pscustomobject]@{
-                        definitionId = 'NodeRuntime'
-                        command      = 'npm'
-                    }
+                    kind              = 'npmGlobalPackage'
+                    installerCommand  = 'npm'
                     packageSpec       = '@openai/codex@{version}'
                 }
             }
         }
 
-        { Install-PackageModelPackageManagerPackage -PackageModelResult $packageModelResult } | Should -Throw '*exit code 7*'
+        { Install-PackageModelNpmPackage -PackageModelResult $packageModelResult } | Should -Throw '*exit code 7*'
         Test-Path -LiteralPath (Join-Path $installDirectory 'sentinel.txt') -PathType Leaf | Should -BeTrue
+    }
+
+    It 'fails npmGlobalPackage clearly when no ready dependency exposes the installer command' {
+        $rootPath = Join-Path $TestDrive 'npm-missing-installer-command'
+        $packageModelResult = [pscustomobject]@{
+            PackageId              = 'codex-runtime-win32-x64-stable'
+            DefinitionId           = 'CodexCli'
+            InstallDirectory       = Join-Path $rootPath 'install'
+            ExistingPackage        = $null
+            PackageModelConfig     = [pscustomobject]@{
+                DefinitionId                  = 'CodexCli'
+                InstallWorkspaceRootDirectory = Join-Path $rootPath 'workspace'
+                PackageStateIndexFilePath     = Join-Path $rootPath 'package-state-index.json'
+            }
+            Dependencies           = @(
+                [pscustomobject]@{
+                    DefinitionId = 'NodeRuntime'
+                    Commands     = @()
+                }
+            )
+            Package                = [pscustomobject]@{
+                id           = 'codex-runtime-win32-x64-stable'
+                version      = '0.125.0'
+                releaseTrack = 'stable'
+                flavor       = 'win32-x64'
+                install      = [pscustomobject]@{
+                    kind              = 'npmGlobalPackage'
+                    installerCommand  = 'npm'
+                    packageSpec       = '@openai/codex@{version}'
+                }
+            }
+        }
+
+        { Install-PackageModelNpmPackage -PackageModelResult $packageModelResult } | Should -Throw '*no ready dependency exposes that command*'
     }
 
     It 'accepts package-file Authenticode verification without a SHA256 hash' {

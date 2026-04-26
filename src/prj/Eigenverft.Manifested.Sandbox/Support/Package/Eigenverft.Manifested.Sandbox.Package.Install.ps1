@@ -711,84 +711,6 @@ Invoke-PackageModelInstallerProcess -PackageModelResult $result
     }
 }
 
-function Install-PackageModelPackageManagerPackage {
-<#
-.SYNOPSIS
-Installs a package through a package-manager command.
-
-.DESCRIPTION
-Runs the configured package-manager command with tokenized arguments and uses
-the install directory as the default working directory.
-
-.PARAMETER PackageModelResult
-The PackageModel result object to install.
-
-.EXAMPLE
-Install-PackageModelPackageManagerPackage -PackageModelResult $result
-#>
-    [CmdletBinding()]
-    param(
-        [Parameter(Mandatory = $true)]
-        [psobject]$PackageModelResult
-    )
-
-    $install = $PackageModelResult.Package.install
-    $managerKind = if ($install.PSObject.Properties['managerKind'] -and -not [string]::IsNullOrWhiteSpace([string]$install.managerKind)) {
-        ([string]$install.managerKind).ToLowerInvariant()
-    }
-    else {
-        $null
-    }
-
-    if ([string]::Equals($managerKind, 'npm', [System.StringComparison]::OrdinalIgnoreCase)) {
-        return (Install-PackageModelNpmPackage -PackageModelResult $PackageModelResult)
-    }
-
-    if (-not $install.PSObject.Properties['managerCommandPath'] -or [string]::IsNullOrWhiteSpace([string]$install.managerCommandPath)) {
-        throw "PackageModel package-manager install for '$($PackageModelResult.PackageId)' requires install.managerCommandPath."
-    }
-
-    $managerCommandPath = Resolve-PackageModelTemplateText -Text ([string]$install.managerCommandPath) -PackageModelConfig $PackageModelResult.PackageModelConfig -Package $PackageModelResult.Package
-    $commandArguments = @()
-    foreach ($argument in @($install.commandArguments)) {
-        $commandArguments += (Resolve-PackageModelTemplateText -Text ([string]$argument) -PackageModelConfig $PackageModelResult.PackageModelConfig -Package $PackageModelResult.Package -ExtraTokens @{
-                packageSpec      = if ($install.PSObject.Properties['packageSpec']) { [string]$install.packageSpec } else { $null }
-                packageFilePath  = $PackageModelResult.PackageFilePath
-                installDirectory = $PackageModelResult.InstallDirectory
-                installWorkspaceDirectory = $PackageModelResult.InstallWorkspaceDirectory
-                downloadDirectory = $PackageModelResult.InstallWorkspaceDirectory
-            })
-    }
-
-    $null = New-Item -ItemType Directory -Path $PackageModelResult.InstallDirectory -Force
-    Push-Location $PackageModelResult.InstallDirectory
-    try {
-        & $managerCommandPath @commandArguments
-        $exitCode = $LASTEXITCODE
-        if ($null -eq $exitCode) {
-            $exitCode = 0
-        }
-    }
-    finally {
-        Pop-Location
-    }
-
-    $successExitCodes = if ($install.PSObject.Properties['successExitCodes']) { @($install.successExitCodes | ForEach-Object { [int]$_ }) } else { @(0) }
-    if ($exitCode -notin $successExitCodes) {
-        throw "PackageModel package-manager install failed with exit code $exitCode."
-    }
-
-    return [pscustomobject]@{
-        Status           = Get-PackageModelOwnedInstallStatus -PackageModelResult $PackageModelResult
-        InstallKind      = 'packageManagerInstall'
-        InstallDirectory = $PackageModelResult.InstallDirectory
-        ReusedExisting   = $false
-        CommandPath      = $managerCommandPath
-        CommandArguments = @($commandArguments)
-        ExitCode         = $exitCode
-    }
-}
-
 function Install-PackageModelPackage {
 <#
 .SYNOPSIS
@@ -883,9 +805,9 @@ Install-PackageModelPackage -PackageModelResult $result
                 Installer        = $installerResult
             }
         }
-        'packageManagerInstall' {
-            Write-PackageModelExecutionMessage -Message ("[ACTION] Running package-manager install into '{0}'." -f $PackageModelResult.InstallDirectory)
-            $PackageModelResult.Install = Install-PackageModelPackageManagerPackage -PackageModelResult $PackageModelResult
+        'npmGlobalPackage' {
+            Write-PackageModelExecutionMessage -Message ("[ACTION] Installing npm global package into '{0}'." -f $PackageModelResult.InstallDirectory)
+            $PackageModelResult.Install = Install-PackageModelNpmPackage -PackageModelResult $PackageModelResult
         }
         default {
             throw "Unsupported PackageModel install kind '$($install.kind)'."

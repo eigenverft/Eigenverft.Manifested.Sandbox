@@ -11,6 +11,14 @@
     "localizations": {}
   },
   "upstreamSources": {},
+  "dependencies": [
+    {
+      "definitionId": "VisualCppRedistributable"
+    },
+    {
+      "definitionId": "NodeRuntime"
+    }
+  ],
   "providedTools": {
     "commands": [
       {
@@ -31,12 +39,8 @@
       ]
     },
     "install": {
-      "kind": "packageManagerInstall",
-      "managerKind": "npm",
-      "managerDependency": {
-        "definitionId": "NodeRuntime",
-        "command": "npm"
-      },
+      "kind": "npmGlobalPackage",
+      "installerCommand": "npm",
       "packageSpec": "@openai/codex@{version}",
       "installDirectory": "codex-runtime/{releaseTrack}/{version}/{flavor}",
       "pathRegistration": {

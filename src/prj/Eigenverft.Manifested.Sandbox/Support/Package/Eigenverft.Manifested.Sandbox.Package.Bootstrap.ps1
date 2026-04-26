@@ -65,11 +65,11 @@ Get-PackageModelDefaultRepositoryId
 function Get-PackageModelShippedGlobalConfigPath {
 <#
 .SYNOPSIS
-Returns the shipped PackageModel global config path.
+Returns the shipped PackageModel config path.
 
 .DESCRIPTION
 Builds the module-relative path to the JSON document that defines PackageModel
-global defaults.
+defaults.
 
 .EXAMPLE
 Get-PackageModelShippedGlobalConfigPath
@@ -77,7 +77,7 @@ Get-PackageModelShippedGlobalConfigPath
     [CmdletBinding()]
     param()
 
-    return (Join-Path (Get-PackageModelConfigurationRoot) 'Global.json')
+    return (Join-Path (Join-Path (Get-PackageModelConfigurationRoot) 'Internal') 'Config.json')
 }
 
 function Get-PackageModelLocalRoot {
@@ -109,10 +109,10 @@ Get-PackageModelLocalRoot
 function Get-PackageModelLocalGlobalConfigPath {
 <#
 .SYNOPSIS
-Returns the local PackageModel global config path.
+Returns the local PackageModel config path.
 
 .DESCRIPTION
-Builds the local copy path for Global.json. The local file can later be edited
+Builds the local copy path for Config.json. The local file can later be edited
 or refreshed independently of the module installation.
 
 .EXAMPLE
@@ -121,16 +121,16 @@ Get-PackageModelLocalGlobalConfigPath
     [CmdletBinding()]
     param()
 
-    return [System.IO.Path]::GetFullPath((Join-Path (Get-PackageModelLocalRoot) 'Global.json'))
+    return [System.IO.Path]::GetFullPath((Join-Path (Join-Path (Get-PackageModelLocalRoot) 'Configuration\Internal') 'Config.json'))
 }
 
 function Get-PackageModelGlobalConfigPath {
 <#
 .SYNOPSIS
-Returns the active PackageModel global config path.
+Returns the active PackageModel config path.
 
 .DESCRIPTION
-Returns the local Global.json path, creating it from the shipped module
+Returns the local Config.json path, creating it from the shipped module
 configuration when the local copy does not exist yet.
 
 .EXAMPLE

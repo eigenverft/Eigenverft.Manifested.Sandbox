@@ -15,7 +15,7 @@ returns the resolved path together with the parsed document object.
 Path to the JSON file that should be loaded.
 
 .EXAMPLE
-Read-PackageModelJsonDocument -Path .\Global.json
+Read-PackageModelJsonDocument -Path .\Configuration\Internal\Config.json
 #>
     [CmdletBinding()]
     param(
@@ -919,6 +919,17 @@ Assert-PackageModelDefinitionSchema -DefinitionDocumentInfo $definitionInfo -Def
         throw "PackageModel definition id '$($definition.id)' does not match requested definition id '$DefinitionId'."
     }
 
+    if ($definition.PSObject.Properties['dependencies']) {
+        foreach ($dependency in @($definition.dependencies)) {
+            if (-not $dependency.PSObject.Properties['definitionId'] -or [string]::IsNullOrWhiteSpace([string]$dependency.definitionId)) {
+                throw "PackageModel definition '$($definition.id)' has dependency without definitionId."
+            }
+            if ([string]::Equals([string]$dependency.definitionId, [string]$definition.id, [System.StringComparison]::OrdinalIgnoreCase)) {
+                throw "PackageModel definition '$($definition.id)' cannot depend on itself."
+            }
+        }
+    }
+
     foreach ($upstreamSourceProperty in @($definition.upstreamSources.PSObject.Properties)) {
         $upstreamSource = $upstreamSourceProperty.Value
         if (-not $upstreamSource.PSObject.Properties['kind'] -or [string]::IsNullOrWhiteSpace([string]$upstreamSource.kind)) {
@@ -961,7 +972,7 @@ Assert-PackageModelDefinitionSchema -DefinitionDocumentInfo $definitionInfo -Def
     }
 
     foreach ($release in @($definition.releases)) {
-        foreach ($retiredProperty in @('artifact', 'acquisitions', 'dependencies', 'sourceOptions', 'reuse', 'channel')) {
+        foreach ($retiredProperty in @('artifact', 'acquisitions', 'sourceOptions', 'reuse', 'channel')) {
             if ($release.PSObject.Properties[$retiredProperty]) {
                 throw "PackageModel release '$($release.id)' in '$($definition.id)' still uses retired property '$retiredProperty'."
             }
@@ -1087,8 +1098,14 @@ Assert-PackageModelDefinitionSchema -DefinitionDocumentInfo $definitionInfo -Def
             throw "PackageModel release '$($release.id)' in '$($definition.id)' is missing install.kind."
         }
 
-        if ($installKind -notin @('expandArchive', 'placePackageFile', 'runInstaller', 'packageManagerInstall', 'reuseExisting')) {
+        if ($installKind -notin @('expandArchive', 'placePackageFile', 'runInstaller', 'npmGlobalPackage', 'reuseExisting')) {
             throw "PackageModel release '$($release.id)' in '$($definition.id)' uses unsupported install.kind '$installKind'."
+        }
+
+        foreach ($retiredInstallProperty in @('managerKind', 'managerDependency')) {
+            if ($effectiveRelease.install.PSObject.Properties[$retiredInstallProperty]) {
+                throw "PackageModel release '$($release.id)' in '$($definition.id)' still uses retired property 'install.$retiredInstallProperty'. Use install.kind 'npmGlobalPackage' with install.installerCommand."
+            }
         }
 
         if ($effectiveRelease.install.PSObject.Properties['targetKind'] -and
@@ -1103,31 +1120,12 @@ Assert-PackageModelDefinitionSchema -DefinitionDocumentInfo $definitionInfo -Def
             throw "PackageModel release '$($release.id)' in '$($definition.id)' uses unsupported install.elevation '$($effectiveRelease.install.elevation)'."
         }
 
-        if ([string]::Equals($installKind, 'packageManagerInstall', [System.StringComparison]::OrdinalIgnoreCase)) {
-            $managerKind = if ($effectiveRelease.install.PSObject.Properties['managerKind'] -and -not [string]::IsNullOrWhiteSpace([string]$effectiveRelease.install.managerKind)) {
-                ([string]$effectiveRelease.install.managerKind).ToLowerInvariant()
+        if ([string]::Equals($installKind, 'npmGlobalPackage', [System.StringComparison]::OrdinalIgnoreCase)) {
+            if (-not $effectiveRelease.install.PSObject.Properties['packageSpec'] -or [string]::IsNullOrWhiteSpace([string]$effectiveRelease.install.packageSpec)) {
+                throw "PackageModel release '$($release.id)' in '$($definition.id)' uses install.kind 'npmGlobalPackage' without install.packageSpec."
             }
-            else {
-                $null
-            }
-
-            if (-not [string]::IsNullOrWhiteSpace($managerKind) -and $managerKind -notin @('npm')) {
-                throw "PackageModel release '$($release.id)' in '$($definition.id)' uses unsupported install.managerKind '$($effectiveRelease.install.managerKind)'."
-            }
-
-            if ([string]::Equals($managerKind, 'npm', [System.StringComparison]::OrdinalIgnoreCase)) {
-                if (-not $effectiveRelease.install.PSObject.Properties['packageSpec'] -or [string]::IsNullOrWhiteSpace([string]$effectiveRelease.install.packageSpec)) {
-                    throw "PackageModel release '$($release.id)' in '$($definition.id)' uses install.managerKind 'npm' without install.packageSpec."
-                }
-                if (-not $effectiveRelease.install.PSObject.Properties['managerDependency'] -or $null -eq $effectiveRelease.install.managerDependency) {
-                    throw "PackageModel release '$($release.id)' in '$($definition.id)' uses install.managerKind 'npm' without install.managerDependency."
-                }
-                if (-not $effectiveRelease.install.managerDependency.PSObject.Properties['definitionId'] -or [string]::IsNullOrWhiteSpace([string]$effectiveRelease.install.managerDependency.definitionId)) {
-                    throw "PackageModel release '$($release.id)' in '$($definition.id)' uses install.managerKind 'npm' without install.managerDependency.definitionId."
-                }
-                if (-not $effectiveRelease.install.managerDependency.PSObject.Properties['command'] -or [string]::IsNullOrWhiteSpace([string]$effectiveRelease.install.managerDependency.command)) {
-                    throw "PackageModel release '$($release.id)' in '$($definition.id)' uses install.managerKind 'npm' without install.managerDependency.command."
-                }
+            if (-not $effectiveRelease.install.PSObject.Properties['installerCommand'] -or [string]::IsNullOrWhiteSpace([string]$effectiveRelease.install.installerCommand)) {
+                throw "PackageModel release '$($release.id)' in '$($definition.id)' uses install.kind 'npmGlobalPackage' without install.installerCommand."
             }
         }
 
@@ -1657,7 +1655,7 @@ New-PackageModelResult -CommandName Invoke-VSCodeRuntime -PackageModelConfig $co
         Ownership                        = $null
         InstallOrigin                    = $null
         PackageFileSave                  = $null
-        PackageManagerDependency         = $null
+        Dependencies                     = @()
         Install                          = $null
         Validation                       = $null
         EntryPoints                      = $null
