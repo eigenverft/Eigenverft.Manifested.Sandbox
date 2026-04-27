@@ -1,9 +1,9 @@
 {
   "schemaVersion": "1.0",
-  "id": "Qwen35_2B_Q6K_Model",
+  "id": "Qwen35_2B_Q8_0_Model",
   "display": {
     "default": {
-      "name": "Qwen 3.5 2B Q6_K",
+      "name": "Qwen 3.5 2B Q8_0",
       "publisher": "Unsloth",
       "corporation": "Unsloth AI",
       "summary": "Quantized GGUF model resource for llama.cpp-compatible runtimes"
@@ -26,7 +26,7 @@
         {
           "kind": "physicalOrVideoMemoryGiB",
           "operator": ">=",
-          "value": 4,
+          "value": 8,
           "onFail": "warn"
         }
       ]
@@ -34,14 +34,14 @@
     "install": {
       "kind": "placePackageFile",
       "installDirectory": "qwen35-2b/{releaseTrack}/{version}/{flavor}",
-      "targetRelativePath": "Qwen3.5-2B-Q6_K.gguf",
+      "targetRelativePath": "Qwen3.5-2B-Q8_0.gguf",
       "pathRegistration": {
         "mode": "none"
       }
     },
     "validation": {
       "files": [
-        "Qwen3.5-2B-Q6_K.gguf"
+        "Qwen3.5-2B-Q8_0.gguf"
       ],
       "directories": [],
       "commandChecks": [],
@@ -63,10 +63,10 @@
   },
   "releases": [
     {
-      "id": "qwen35-2b-q6-k-stable",
+      "id": "qwen35-2b-q8-0-stable",
       "version": "3.5.0",
       "releaseTrack": "stable",
-      "flavor": "q6-k",
+      "flavor": "q8-0",
       "constraints": {
         "os": [
           "windows"
@@ -76,13 +76,13 @@
         ]
       },
       "packageFile": {
-        "fileName": "Qwen3.5-2B-Q6_K.gguf",
+        "fileName": "Qwen3.5-2B-Q8_0.gguf",
         "format": "gguf",
         "portable": true,
         "autoUpdateSupported": false,
         "integrity": {
           "algorithm": "sha256",
-          "sha256": "fc90339420b4298887aafb307a4291c55440b730133bbffe6ba9630503dcb548"
+          "sha256": "1b04acba824817554f4ce23639bc8495ff70453b8fcb047900c731521021f2c1"
         }
       },
       "acquisitionCandidates": [
@@ -97,7 +97,7 @@
           "kind": "download",
           "sourceId": "huggingFaceDownload",
           "priority": 200,
-          "sourcePath": "Qwen3.5-2B-Q6_K.gguf",
+          "sourcePath": "Qwen3.5-2B-Q8_0.gguf",
           "verification": {
             "mode": "none"
           }

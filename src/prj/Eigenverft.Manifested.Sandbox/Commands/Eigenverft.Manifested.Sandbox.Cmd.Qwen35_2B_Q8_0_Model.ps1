@@ -1,11 +1,11 @@
 <#
-    Eigenverft.Manifested.Sandbox.Cmd.Qwen35_2B_Q6K_Model
+    Eigenverft.Manifested.Sandbox.Cmd.Qwen35_2B_Q8_0_Model
 #>
 
-function Invoke-Qwen35-2B-Q6K-Model {
+function Invoke-Qwen35-2B-Q8-0-Model {
 <#
 .SYNOPSIS
-Ensures the configured Qwen 3.5 2B Q6_K GGUF model is available through Package.
+Ensures the configured Qwen 3.5 2B Q8_0 GGUF model is available through Package.
 
 .DESCRIPTION
 Loads the shipped Package JSON documents through the neutral Package
@@ -16,11 +16,11 @@ the installed resource, updates the ownership index, and returns the resolved
 result object.
 
 .EXAMPLE
-Invoke-Qwen35-2B-Q6K-Model
+Invoke-Qwen35-2B-Q8-0-Model
 #>
     [CmdletBinding()]
     param()
 
-    return (Invoke-PackageDefinitionCommand -DefinitionId 'Qwen35_2B_Q6K_Model' -CommandName 'Invoke-Qwen35-2B-Q6K-Model')
+    return (Invoke-PackageDefinitionCommand -DefinitionId 'Qwen35_2B_Q8_0_Model' -CommandName 'Invoke-Qwen35-2B-Q8-0-Model')
 }
 

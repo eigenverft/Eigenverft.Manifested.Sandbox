@@ -559,9 +559,9 @@ Describe 'Eigenverft.Manifested.Sandbox Package' {
         $publicParameterNames.Count | Should -Be 0
     }
 
-    It 'exports Invoke-Qwen35-2B-Q6K-Model and keeps it parameterless' {
+    It 'exports Invoke-Qwen35-2B-Q8-0-Model and keeps it parameterless' {
         $module = Import-Module -Name $script:ModuleManifestPath -Force -PassThru
-        $command = Get-Command -Name 'Invoke-Qwen35-2B-Q6K-Model'
+        $command = Get-Command -Name 'Invoke-Qwen35-2B-Q8-0-Model'
 
         $command | Should -Not -BeNullOrEmpty
         $publicParameterNames = @($command.Parameters.Keys | Where-Object {
@@ -868,6 +868,7 @@ Describe 'Eigenverft.Manifested.Sandbox Package' {
         Get-Command -Name 'Invoke-QwenCliRuntime' -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
         Get-Command -Name 'Invoke-GHCliRuntime' -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
         Get-Command -Name 'Invoke-Qwen35-2B-Q6K' -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
+        Get-Command -Name 'Invoke-Qwen35-2B-Q6K-Model' -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
         Get-Command -Name 'Invoke-VCRuntime' -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
         Get-Command -Name 'Invoke-Ps7Runtime' -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
         Get-Command -Name 'Invoke-Package-VSCodeRuntime' -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
@@ -1244,24 +1245,24 @@ Describe 'Eigenverft.Manifested.Sandbox Package' {
         $result.Package.packageFile.authenticode.subjectContains | Should -Be 'Microsoft Corporation'
     }
 
-    It 'loads the shipped Qwen35_2B_Q6K_Model definition and selects the fixed Hugging Face-backed resource release' {
+    It 'loads the shipped Qwen35_2B_Q8_0_Model definition and selects the fixed Hugging Face-backed resource release' {
         [Environment]::SetEnvironmentVariable($script:SourceInventoryEnvVarName, (Join-Path $TestDrive 'missing-inventory.json'), 'Process')
         Mock Get-PhysicalMemoryGiB { 2.0 }
         Mock Get-VideoMemoryGiB { 1.0 }
 
-        $config = Get-PackageConfig -DefinitionId 'Qwen35_2B_Q6K_Model'
+        $config = Get-PackageConfig -DefinitionId 'Qwen35_2B_Q8_0_Model'
         $result = New-PackageResult -CommandName 'test' -PackageConfig $config
         $result = Resolve-PackagePackage -PackageResult $result
         $sourceDefinition = Get-PackageSourceDefinition -PackageConfig $config -SourceRef ([pscustomobject]@{ scope = 'definition'; id = 'huggingFaceDownload' })
 
-        $config.DefinitionId | Should -Be 'Qwen35_2B_Q6K_Model'
+        $config.DefinitionId | Should -Be 'Qwen35_2B_Q8_0_Model'
         $sourceDefinition.Kind | Should -Be 'download'
         $sourceDefinition.BaseUri | Should -Be 'https://huggingface.co/unsloth/Qwen3.5-2B-GGUF/resolve/main/'
-        $result.PackageId | Should -Be 'qwen35-2b-q6-k-stable'
+        $result.PackageId | Should -Be 'qwen35-2b-q8-0-stable'
         $result.Package.version | Should -Be '3.5.0'
-        $result.Package.packageFile.fileName | Should -Be 'Qwen3.5-2B-Q6_K.gguf'
+        $result.Package.packageFile.fileName | Should -Be 'Qwen3.5-2B-Q8_0.gguf'
         $result.Package.packageFile.integrity.algorithm | Should -Be 'sha256'
-        $result.Package.packageFile.integrity.sha256 | Should -Be 'fc90339420b4298887aafb307a4291c55440b730133bbffe6ba9630503dcb548'
+        $result.Package.packageFile.integrity.sha256 | Should -Be '1b04acba824817554f4ce23639bc8495ff70453b8fcb047900c731521021f2c1'
         $result.Package.install.kind | Should -Be 'placePackageFile'
         $result.Compatibility.Count | Should -Be 1
         $result.Compatibility[0].Kind | Should -Be 'physicalOrVideoMemoryGiB'
@@ -3162,21 +3163,21 @@ exit /b 0
 
     It 'installs a single package file into the configured target-relative path' {
         $rootPath = Join-Path $TestDrive 'package-install-file-route'
-        $packageFilePath = Join-Path $rootPath 'package\Qwen3.5-2B-Q6_K.gguf'
+        $packageFilePath = Join-Path $rootPath 'package\Qwen3.5-2B-Q8_0.gguf'
         $installDirectory = Join-Path $rootPath 'install'
         Write-TestTextFile -Path $packageFilePath -Content 'gguf-binary'
 
         $packageResult = [pscustomobject]@{
-            PackageId        = 'Qwen35_2B_Q6K_Model'
+            PackageId        = 'Qwen35_2B_Q8_0_Model'
             PackageFilePath  = $packageFilePath
             InstallDirectory = $installDirectory
             Package          = [pscustomobject]@{
                 packageFile = [pscustomobject]@{
-                    fileName = 'Qwen3.5-2B-Q6_K.gguf'
+                    fileName = 'Qwen3.5-2B-Q8_0.gguf'
                 }
                 install = [pscustomobject]@{
                     kind               = 'placePackageFile'
-                    targetRelativePath = 'models/Qwen3.5-2B-Q6_K.gguf'
+                    targetRelativePath = 'models/Qwen3.5-2B-Q8_0.gguf'
                 }
             }
             ExistingPackage = $null
@@ -3185,7 +3186,7 @@ exit /b 0
         $installResult = Install-PackagePackageFile -PackageResult $packageResult
 
         $installResult.InstallKind | Should -Be 'placePackageFile'
-        $installResult.InstalledFilePath | Should -Be (Join-Path $installDirectory 'models\Qwen3.5-2B-Q6_K.gguf')
+        $installResult.InstalledFilePath | Should -Be (Join-Path $installDirectory 'models\Qwen3.5-2B-Q8_0.gguf')
         Test-Path -LiteralPath $installResult.InstalledFilePath -PathType Leaf | Should -BeTrue
         (Get-Content -LiteralPath $installResult.InstalledFilePath -Raw) | Should -Be 'gguf-binary'
     }
@@ -3198,10 +3199,10 @@ exit /b 0
         $packageStateIndexFilePath = Join-Path $rootPath 'package-state.json'
         $definitionDocument = @{
             schemaVersion = '1.0'
-            id = 'Qwen35_2B_Q6K_Model'
+            id = 'Qwen35_2B_Q8_0_Model'
             display = @{
                 default = @{
-                    name = 'Qwen 3.5 2B Q6_K'
+                    name = 'Qwen 3.5 2B Q8_0'
                     publisher = 'Unsloth'
                     corporation = 'Unsloth AI'
                     summary = 'Quantized GGUF model resource'
@@ -3232,13 +3233,13 @@ exit /b 0
                 install = @{
                     kind = 'placePackageFile'
                     installDirectory = 'qwen35-2b/{releaseTrack}/{version}/{flavor}'
-                    targetRelativePath = 'Qwen3.5-2B-Q6_K.gguf'
+                    targetRelativePath = 'Qwen3.5-2B-Q8_0.gguf'
                     pathRegistration = @{
                         mode = 'none'
                     }
                 }
                 validation = @{
-                    files = @('Qwen3.5-2B-Q6_K.gguf')
+                    files = @('Qwen3.5-2B-Q8_0.gguf')
                     directories = [object[]]@()
                     commandChecks = [object[]]@()
                     metadataFiles = [object[]]@()
@@ -3259,16 +3260,16 @@ exit /b 0
             }
             releases = @(
                 @{
-                    id = 'qwen35-2b-q6-k-stable'
+                    id = 'qwen35-2b-q8-0-stable'
                     version = '3.5.0'
                     releaseTrack = 'stable'
-                    flavor = 'q6-k'
+                    flavor = 'q8-0'
                     constraints = @{
                         os = @('windows')
                         cpu = @('x64')
                     }
                     packageFile = @{
-                        fileName = 'Qwen3.5-2B-Q6_K.gguf'
+                        fileName = 'Qwen3.5-2B-Q8_0.gguf'
                         format = 'gguf'
                         portable = $true
                         autoUpdateSupported = $false
@@ -3291,7 +3292,7 @@ exit /b 0
         Mock Get-PackageGlobalConfigPath { $documents.GlobalConfigPath }
         Mock Get-PackageDefinitionPath { param($DefinitionId) $documents.DefinitionPath }
 
-        $config = Get-PackageConfig -DefinitionId 'Qwen35_2B_Q6K_Model'
+        $config = Get-PackageConfig -DefinitionId 'Qwen35_2B_Q8_0_Model'
         $result = New-PackageResult -CommandName 'test' -PackageConfig $config
         $result = Resolve-PackagePackage -PackageResult $result
         $result = Resolve-PackagePaths -PackageResult $result
@@ -3306,7 +3307,7 @@ exit /b 0
 
         $result.PackageFileSave.Status | Should -Be 'HydratedFromDefaultPackageDepot'
         $result.Install.InstallKind | Should -Be 'placePackageFile'
-        $result.Install.InstalledFilePath | Should -Be (Join-Path $result.InstallDirectory 'Qwen3.5-2B-Q6_K.gguf')
+        $result.Install.InstalledFilePath | Should -Be (Join-Path $result.InstallDirectory 'Qwen3.5-2B-Q8_0.gguf')
         Test-Path -LiteralPath $result.Install.InstalledFilePath -PathType Leaf | Should -BeTrue
         $result.Validation.Accepted | Should -BeTrue
     }

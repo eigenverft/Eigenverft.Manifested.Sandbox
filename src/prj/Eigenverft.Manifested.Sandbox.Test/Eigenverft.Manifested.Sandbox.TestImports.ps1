@@ -42,7 +42,7 @@ $moduleProjectRoot = Join-Path (Split-Path -Parent $PSScriptRoot) 'Eigenverft.Ma
 # Package definitions are JSON-only.
 
 # Package commands
-. "$moduleProjectRoot\Commands\Eigenverft.Manifested.Sandbox.Cmd.Qwen35_2B_Q6K_Model.ps1"
+. "$moduleProjectRoot\Commands\Eigenverft.Manifested.Sandbox.Cmd.Qwen35_2B_Q8_0_Model.ps1"
 . "$moduleProjectRoot\Commands\Eigenverft.Manifested.Sandbox.Cmd.LlamaCppRuntime.ps1"
 . "$moduleProjectRoot\Commands\Eigenverft.Manifested.Sandbox.Cmd.VisualCppRedistributable.ps1"
 . "$moduleProjectRoot\Commands\Eigenverft.Manifested.Sandbox.Cmd.PowerShell7.ps1"
