@@ -2,7 +2,7 @@
     Eigenverft.Manifested.Sandbox.Package.Install
 #>
 
-function Resolve-PackageModelExistingInstallRoot {
+function Resolve-PackageExistingInstallRoot {
 <#
 .SYNOPSIS
 Resolves an install directory from a discovered existing-install candidate path.
@@ -18,7 +18,7 @@ The existing-install discovery definition object.
 The discovered file or directory path.
 
 .EXAMPLE
-Resolve-PackageModelExistingInstallRoot -ExistingInstallDiscovery $package.existingInstallDiscovery -CandidatePath $candidatePath
+Resolve-PackageExistingInstallRoot -ExistingInstallDiscovery $package.existingInstallDiscovery -CandidatePath $candidatePath
 #>
     [CmdletBinding()]
     param(
@@ -52,7 +52,7 @@ Resolve-PackageModelExistingInstallRoot -ExistingInstallDiscovery $package.exist
     return (Split-Path -Parent $CandidatePath)
 }
 
-function Find-PackageModelExistingPackage {
+function Find-PackageExistingPackage {
 <#
 .SYNOPSIS
 Finds an existing package install that may be reused or adopted.
@@ -60,44 +60,44 @@ Finds an existing package install that may be reused or adopted.
 .DESCRIPTION
 Searches command, path, and directory candidates from the release
 existingInstallDiscovery block and attaches the first matching install
-directory to the PackageModel result.
+directory to the Package result.
 
-.PARAMETER PackageModelResult
-The PackageModel result object to enrich.
+.PARAMETER PackageResult
+The Package result object to enrich.
 
 .EXAMPLE
-Find-PackageModelExistingPackage -PackageModelResult $result
+Find-PackageExistingPackage -PackageResult $result
 #>
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true)]
-        [psobject]$PackageModelResult
+        [psobject]$PackageResult
     )
 
-    if (-not [string]::IsNullOrWhiteSpace([string]$PackageModelResult.InstallDirectory) -and
-        (Test-Path -LiteralPath $PackageModelResult.InstallDirectory -PathType Container)) {
-        $resolvedPackageModelOwnedInstallDirectory = [System.IO.Path]::GetFullPath([string]$PackageModelResult.InstallDirectory)
-        $PackageModelResult.ExistingPackage = [pscustomobject]@{
-            SearchKind       = 'packageModelTargetInstallPath'
-            CandidatePath    = $resolvedPackageModelOwnedInstallDirectory
-            InstallDirectory = $resolvedPackageModelOwnedInstallDirectory
+    if (-not [string]::IsNullOrWhiteSpace([string]$PackageResult.InstallDirectory) -and
+        (Test-Path -LiteralPath $PackageResult.InstallDirectory -PathType Container)) {
+        $resolvedPackageOwnedInstallDirectory = [System.IO.Path]::GetFullPath([string]$PackageResult.InstallDirectory)
+        $PackageResult.ExistingPackage = [pscustomobject]@{
+            SearchKind       = 'packageTargetInstallPath'
+            CandidatePath    = $resolvedPackageOwnedInstallDirectory
+            InstallDirectory = $resolvedPackageOwnedInstallDirectory
             Decision         = 'Pending'
             Validation       = $null
             Classification   = $null
             OwnershipRecord  = $null
         }
-        Write-PackageModelExecutionMessage -Message ("[DISCOVERY] Found PackageModel target install directory '{0}'." -f $resolvedPackageModelOwnedInstallDirectory)
-        return $PackageModelResult
+        Write-PackageExecutionMessage -Message ("[DISCOVERY] Found Package target install directory '{0}'." -f $resolvedPackageOwnedInstallDirectory)
+        return $PackageResult
     }
 
-    $package = $PackageModelResult.Package
+    $package = $PackageResult.Package
     if (-not $package -or -not $package.PSObject.Properties['existingInstallDiscovery'] -or $null -eq $package.existingInstallDiscovery) {
-        return $PackageModelResult
+        return $PackageResult
     }
 
     $existingInstallDiscovery = $package.existingInstallDiscovery
     if ($existingInstallDiscovery.PSObject.Properties['enableDetection'] -and (-not [bool]$existingInstallDiscovery.enableDetection)) {
-        return $PackageModelResult
+        return $PackageResult
     }
 
     foreach ($searchLocation in @($existingInstallDiscovery.searchLocations)) {
@@ -105,30 +105,30 @@ Find-PackageModelExistingPackage -PackageModelResult $result
         switch -Exact ([string]$searchLocation.kind) {
             'command' {
                 if (-not $searchLocation.PSObject.Properties['name'] -or [string]::IsNullOrWhiteSpace([string]$searchLocation.name)) {
-                    throw "PackageModel existingInstallDiscovery search for release '$($package.id)' is missing command name."
+                    throw "Package existingInstallDiscovery search for release '$($package.id)' is missing command name."
                 }
                 $candidatePath = Get-ResolvedApplicationPath -CommandName ([string]$searchLocation.name)
             }
             'path' {
                 if (-not $searchLocation.PSObject.Properties['path'] -or [string]::IsNullOrWhiteSpace([string]$searchLocation.path)) {
-                    throw "PackageModel existingInstallDiscovery search for release '$($package.id)' is missing path."
+                    throw "Package existingInstallDiscovery search for release '$($package.id)' is missing path."
                 }
-                $resolvedPath = Resolve-PackageModelPathValue -PathValue ([string]$searchLocation.path)
+                $resolvedPath = Resolve-PackagePathValue -PathValue ([string]$searchLocation.path)
                 if (Test-Path -LiteralPath $resolvedPath) {
                     $candidatePath = $resolvedPath
                 }
             }
             'directory' {
                 if (-not $searchLocation.PSObject.Properties['path'] -or [string]::IsNullOrWhiteSpace([string]$searchLocation.path)) {
-                    throw "PackageModel existingInstallDiscovery search for release '$($package.id)' is missing directory path."
+                    throw "Package existingInstallDiscovery search for release '$($package.id)' is missing directory path."
                 }
-                $resolvedPath = Resolve-PackageModelPathValue -PathValue ([string]$searchLocation.path)
+                $resolvedPath = Resolve-PackagePathValue -PathValue ([string]$searchLocation.path)
                 if (Test-Path -LiteralPath $resolvedPath -PathType Container) {
                     $candidatePath = $resolvedPath
                 }
             }
             default {
-                throw "Unsupported PackageModel existingInstallDiscovery search kind '$($searchLocation.kind)'."
+                throw "Unsupported Package existingInstallDiscovery search kind '$($searchLocation.kind)'."
             }
         }
 
@@ -136,12 +136,12 @@ Find-PackageModelExistingPackage -PackageModelResult $result
             continue
         }
 
-        $installDirectory = Resolve-PackageModelExistingInstallRoot -ExistingInstallDiscovery $existingInstallDiscovery -CandidatePath $candidatePath
+        $installDirectory = Resolve-PackageExistingInstallRoot -ExistingInstallDiscovery $existingInstallDiscovery -CandidatePath $candidatePath
         if (-not (Test-Path -LiteralPath $installDirectory -PathType Container)) {
             continue
         }
 
-        $PackageModelResult.ExistingPackage = [pscustomobject]@{
+        $PackageResult.ExistingPackage = [pscustomobject]@{
             SearchKind       = $searchLocation.kind
             CandidatePath    = $candidatePath
             InstallDirectory = $installDirectory
@@ -150,62 +150,62 @@ Find-PackageModelExistingPackage -PackageModelResult $result
             Classification   = $null
             OwnershipRecord  = $null
         }
-        Write-PackageModelExecutionMessage -Message ("[DISCOVERY] Found existing package candidate '{0}' via '{1}'." -f $candidatePath, $searchLocation.kind)
-        return $PackageModelResult
+        Write-PackageExecutionMessage -Message ("[DISCOVERY] Found existing package candidate '{0}' via '{1}'." -f $candidatePath, $searchLocation.kind)
+        return $PackageResult
     }
 
-    return $PackageModelResult
+    return $PackageResult
 }
 
-function Resolve-PackageModelExistingPackageDecision {
+function Resolve-PackageExistingPackageDecision {
 <#
 .SYNOPSIS
-Evaluates how PackageModel should react to a discovered existing install.
+Evaluates how Package should react to a discovered existing install.
 
 .DESCRIPTION
 Validates the discovered install, combines the result with ownership
 classification and release-specific policy switches, and records whether the
 current run should reuse, adopt, ignore, or replace the install.
 
-.PARAMETER PackageModelResult
-The PackageModel result object to enrich.
+.PARAMETER PackageResult
+The Package result object to enrich.
 
 .EXAMPLE
-Resolve-PackageModelExistingPackageDecision -PackageModelResult $result
+Resolve-PackageExistingPackageDecision -PackageResult $result
 #>
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true)]
-        [psobject]$PackageModelResult
+        [psobject]$PackageResult
     )
 
-    if (-not $PackageModelResult.ExistingPackage) {
-        return $PackageModelResult
+    if (-not $PackageResult.ExistingPackage) {
+        return $PackageResult
     }
 
-    $package = $PackageModelResult.Package
+    $package = $PackageResult.Package
     $existingInstallPolicy = if ($package.PSObject.Properties['existingInstallPolicy']) { $package.existingInstallPolicy } else { [pscustomobject]@{} }
-    $originalInstallDirectory = $PackageModelResult.InstallDirectory
-    $PackageModelResult.InstallDirectory = $PackageModelResult.ExistingPackage.InstallDirectory
-    $PackageModelResult = Test-PackageModelInstalledPackage -PackageModelResult $PackageModelResult
-    $PackageModelResult.ExistingPackage.Validation = $PackageModelResult.Validation
+    $originalInstallDirectory = $PackageResult.InstallDirectory
+    $PackageResult.InstallDirectory = $PackageResult.ExistingPackage.InstallDirectory
+    $PackageResult = Test-PackageInstalledPackage -PackageResult $PackageResult
+    $PackageResult.ExistingPackage.Validation = $PackageResult.Validation
 
-    if (-not $PackageModelResult.Validation.Accepted) {
-        $PackageModelResult.ExistingPackage.Decision = 'ExistingInstallValidationFailed'
-        $PackageModelResult.InstallDirectory = $originalInstallDirectory
-        $PackageModelResult.Validation = $null
-        return $PackageModelResult
+    if (-not $PackageResult.Validation.Accepted) {
+        $PackageResult.ExistingPackage.Decision = 'ExistingInstallValidationFailed'
+        $PackageResult.InstallDirectory = $originalInstallDirectory
+        $PackageResult.Validation = $null
+        return $PackageResult
     }
 
-    $ownershipRecord = if ($PackageModelResult.Ownership -and $PackageModelResult.Ownership.OwnershipRecord) {
-        $PackageModelResult.Ownership.OwnershipRecord
+    $ownershipRecord = if ($PackageResult.Ownership -and $PackageResult.Ownership.OwnershipRecord) {
+        $PackageResult.Ownership.OwnershipRecord
     }
     else {
         $null
     }
 
-    $classification = if ($PackageModelResult.Ownership -and $PackageModelResult.Ownership.Classification) {
-        [string]$PackageModelResult.Ownership.Classification
+    $classification = if ($PackageResult.Ownership -and $PackageResult.Ownership.Classification) {
+        [string]$PackageResult.Ownership.Classification
     }
     else {
         'ExternalInstall'
@@ -221,99 +221,99 @@ Resolve-PackageModelExistingPackageDecision -PackageModelResult $result
         $upgradeAdoptedInstall = [bool]$existingInstallPolicy.upgradeAdoptedInstall
     }
 
-    $requirePackageModelOwnership = $false
-    if ($existingInstallPolicy.PSObject.Properties['requirePackageModelOwnership']) {
-        $requirePackageModelOwnership = [bool]$existingInstallPolicy.requirePackageModelOwnership
+    $requirePackageOwnership = $false
+    if ($existingInstallPolicy.PSObject.Properties['requirePackageOwnership']) {
+        $requirePackageOwnership = [bool]$existingInstallPolicy.requirePackageOwnership
     }
 
     $sameRelease = $false
     if ($ownershipRecord) {
-        $sameRelease = [string]::Equals([string]$ownershipRecord.currentReleaseId, [string]$PackageModelResult.PackageId, [System.StringComparison]::OrdinalIgnoreCase) -and
-            [string]::Equals([string]$ownershipRecord.currentVersion, [string]$PackageModelResult.PackageVersion, [System.StringComparison]::OrdinalIgnoreCase)
+        $sameRelease = [string]::Equals([string]$ownershipRecord.currentReleaseId, [string]$PackageResult.PackageId, [System.StringComparison]::OrdinalIgnoreCase) -and
+            [string]::Equals([string]$ownershipRecord.currentVersion, [string]$PackageResult.PackageVersion, [System.StringComparison]::OrdinalIgnoreCase)
     }
 
-    if ([string]::Equals($classification, 'PackageModelOwned', [System.StringComparison]::OrdinalIgnoreCase) -and -not $ownershipRecord) {
-        $PackageModelResult.ExistingPackage.Decision = 'ReusePackageModelOwned'
-        $PackageModelResult.InstallOrigin = 'PackageModelReused'
-        Write-PackageModelExecutionMessage -Message ("[DECISION] Reusing PackageModel-owned target install '{0}'." -f $PackageModelResult.ExistingPackage.InstallDirectory)
-        Write-PackageModelExecutionMessage -Message ("[STATE] Existing install decision resolved to '{0}' with installOrigin='{1}'." -f $PackageModelResult.ExistingPackage.Decision, $PackageModelResult.InstallOrigin)
-        return $PackageModelResult
+    if ([string]::Equals($classification, 'PackageOwned', [System.StringComparison]::OrdinalIgnoreCase) -and -not $ownershipRecord) {
+        $PackageResult.ExistingPackage.Decision = 'ReusePackageOwned'
+        $PackageResult.InstallOrigin = 'PackageReused'
+        Write-PackageExecutionMessage -Message ("[DECISION] Reusing Package-owned target install '{0}'." -f $PackageResult.ExistingPackage.InstallDirectory)
+        Write-PackageExecutionMessage -Message ("[STATE] Existing install decision resolved to '{0}' with installOrigin='{1}'." -f $PackageResult.ExistingPackage.Decision, $PackageResult.InstallOrigin)
+        return $PackageResult
     }
 
-    if ([string]::Equals($classification, 'PackageModelOwned', [System.StringComparison]::OrdinalIgnoreCase) -and $ownershipRecord) {
+    if ([string]::Equals($classification, 'PackageOwned', [System.StringComparison]::OrdinalIgnoreCase) -and $ownershipRecord) {
         if ([string]::Equals([string]$ownershipRecord.ownershipKind, 'AdoptedExternal', [System.StringComparison]::OrdinalIgnoreCase)) {
             if ($sameRelease -or (-not $upgradeAdoptedInstall)) {
-                $PackageModelResult.ExistingPackage.Decision = 'AdoptExternal'
-                $PackageModelResult.InstallOrigin = 'AdoptedExternal'
-                Write-PackageModelExecutionMessage -Message ("[DECISION] Reusing adopted external install '{0}'." -f $PackageModelResult.ExistingPackage.InstallDirectory)
-                Write-PackageModelExecutionMessage -Message ("[STATE] Existing install decision resolved to '{0}' with installOrigin='{1}'." -f $PackageModelResult.ExistingPackage.Decision, $PackageModelResult.InstallOrigin)
-                return $PackageModelResult
+                $PackageResult.ExistingPackage.Decision = 'AdoptExternal'
+                $PackageResult.InstallOrigin = 'AdoptedExternal'
+                Write-PackageExecutionMessage -Message ("[DECISION] Reusing adopted external install '{0}'." -f $PackageResult.ExistingPackage.InstallDirectory)
+                Write-PackageExecutionMessage -Message ("[STATE] Existing install decision resolved to '{0}' with installOrigin='{1}'." -f $PackageResult.ExistingPackage.Decision, $PackageResult.InstallOrigin)
+                return $PackageResult
             }
 
-            $PackageModelResult.ExistingPackage.Decision = 'UpgradeAdoptedInstall'
-            $PackageModelResult.InstallDirectory = $originalInstallDirectory
-            $PackageModelResult.Validation = $null
-            Write-PackageModelExecutionMessage -Level 'WRN' -Message ("[DECISION] Replacing adopted install at '{0}' with a PackageModel-owned install." -f $PackageModelResult.ExistingPackage.InstallDirectory)
-            Write-PackageModelExecutionMessage -Message ("[STATE] Existing install decision resolved to '{0}'." -f $PackageModelResult.ExistingPackage.Decision)
-            return $PackageModelResult
+            $PackageResult.ExistingPackage.Decision = 'UpgradeAdoptedInstall'
+            $PackageResult.InstallDirectory = $originalInstallDirectory
+            $PackageResult.Validation = $null
+            Write-PackageExecutionMessage -Level 'WRN' -Message ("[DECISION] Replacing adopted install at '{0}' with a Package-owned install." -f $PackageResult.ExistingPackage.InstallDirectory)
+            Write-PackageExecutionMessage -Message ("[STATE] Existing install decision resolved to '{0}'." -f $PackageResult.ExistingPackage.Decision)
+            return $PackageResult
         }
 
         if ($sameRelease) {
-            $PackageModelResult.ExistingPackage.Decision = 'ReusePackageModelOwned'
-            $PackageModelResult.InstallOrigin = 'PackageModelReused'
-            Write-PackageModelExecutionMessage -Message ("[DECISION] Reusing PackageModel-owned install '{0}'." -f $PackageModelResult.ExistingPackage.InstallDirectory)
-            Write-PackageModelExecutionMessage -Message ("[STATE] Existing install decision resolved to '{0}' with installOrigin='{1}'." -f $PackageModelResult.ExistingPackage.Decision, $PackageModelResult.InstallOrigin)
-            return $PackageModelResult
+            $PackageResult.ExistingPackage.Decision = 'ReusePackageOwned'
+            $PackageResult.InstallOrigin = 'PackageReused'
+            Write-PackageExecutionMessage -Message ("[DECISION] Reusing Package-owned install '{0}'." -f $PackageResult.ExistingPackage.InstallDirectory)
+            Write-PackageExecutionMessage -Message ("[STATE] Existing install decision resolved to '{0}' with installOrigin='{1}'." -f $PackageResult.ExistingPackage.Decision, $PackageResult.InstallOrigin)
+            return $PackageResult
         }
 
-        $PackageModelResult.ExistingPackage.Decision = 'ReplacePackageModelOwnedInstall'
-        $PackageModelResult.InstallDirectory = $originalInstallDirectory
-        $PackageModelResult.Validation = $null
-        Write-PackageModelExecutionMessage -Level 'WRN' -Message ("[DECISION] Replacing outdated PackageModel-owned install at '{0}'." -f $PackageModelResult.ExistingPackage.InstallDirectory)
-        Write-PackageModelExecutionMessage -Message ("[STATE] Existing install decision resolved to '{0}'." -f $PackageModelResult.ExistingPackage.Decision)
-        return $PackageModelResult
+        $PackageResult.ExistingPackage.Decision = 'ReplacePackageOwnedInstall'
+        $PackageResult.InstallDirectory = $originalInstallDirectory
+        $PackageResult.Validation = $null
+        Write-PackageExecutionMessage -Level 'WRN' -Message ("[DECISION] Replacing outdated Package-owned install at '{0}'." -f $PackageResult.ExistingPackage.InstallDirectory)
+        Write-PackageExecutionMessage -Message ("[STATE] Existing install decision resolved to '{0}'." -f $PackageResult.ExistingPackage.Decision)
+        return $PackageResult
     }
 
-    if ($requirePackageModelOwnership) {
-        $PackageModelResult.ExistingPackage.Decision = 'ExternalIgnored'
-        $PackageModelResult.InstallDirectory = $originalInstallDirectory
-        $PackageModelResult.Validation = $null
-        Write-PackageModelExecutionMessage -Level 'WRN' -Message ("[DECISION] Ignoring external install '{0}' because PackageModel ownership is required." -f $PackageModelResult.ExistingPackage.InstallDirectory)
-        Write-PackageModelExecutionMessage -Message ("[STATE] Existing install decision resolved to '{0}'." -f $PackageModelResult.ExistingPackage.Decision)
-        return $PackageModelResult
+    if ($requirePackageOwnership) {
+        $PackageResult.ExistingPackage.Decision = 'ExternalIgnored'
+        $PackageResult.InstallDirectory = $originalInstallDirectory
+        $PackageResult.Validation = $null
+        Write-PackageExecutionMessage -Level 'WRN' -Message ("[DECISION] Ignoring external install '{0}' because Package ownership is required." -f $PackageResult.ExistingPackage.InstallDirectory)
+        Write-PackageExecutionMessage -Message ("[STATE] Existing install decision resolved to '{0}'." -f $PackageResult.ExistingPackage.Decision)
+        return $PackageResult
     }
 
     if ($allowAdoptExternal) {
-        $PackageModelResult.ExistingPackage.Decision = 'AdoptExternal'
-        $PackageModelResult.InstallOrigin = 'AdoptedExternal'
-        Write-PackageModelExecutionMessage -Message ("[DECISION] Adopting external install '{0}'." -f $PackageModelResult.ExistingPackage.InstallDirectory)
-        Write-PackageModelExecutionMessage -Message ("[STATE] Existing install decision resolved to '{0}' with installOrigin='{1}'." -f $PackageModelResult.ExistingPackage.Decision, $PackageModelResult.InstallOrigin)
-        return $PackageModelResult
+        $PackageResult.ExistingPackage.Decision = 'AdoptExternal'
+        $PackageResult.InstallOrigin = 'AdoptedExternal'
+        Write-PackageExecutionMessage -Message ("[DECISION] Adopting external install '{0}'." -f $PackageResult.ExistingPackage.InstallDirectory)
+        Write-PackageExecutionMessage -Message ("[STATE] Existing install decision resolved to '{0}' with installOrigin='{1}'." -f $PackageResult.ExistingPackage.Decision, $PackageResult.InstallOrigin)
+        return $PackageResult
     }
 
-    $PackageModelResult.ExistingPackage.Decision = 'ExternalIgnored'
-    $PackageModelResult.InstallDirectory = $originalInstallDirectory
-    $PackageModelResult.Validation = $null
-    Write-PackageModelExecutionMessage -Level 'WRN' -Message ("[DECISION] Ignoring external install '{0}'." -f $PackageModelResult.ExistingPackage.InstallDirectory)
-    Write-PackageModelExecutionMessage -Message ("[STATE] Existing install decision resolved to '{0}'." -f $PackageModelResult.ExistingPackage.Decision)
-    return $PackageModelResult
+    $PackageResult.ExistingPackage.Decision = 'ExternalIgnored'
+    $PackageResult.InstallDirectory = $originalInstallDirectory
+    $PackageResult.Validation = $null
+    Write-PackageExecutionMessage -Level 'WRN' -Message ("[DECISION] Ignoring external install '{0}'." -f $PackageResult.ExistingPackage.InstallDirectory)
+    Write-PackageExecutionMessage -Message ("[STATE] Existing install decision resolved to '{0}'." -f $PackageResult.ExistingPackage.Decision)
+    return $PackageResult
 }
 
-function Get-PackageModelOwnedInstallStatus {
+function Get-PackageOwnedInstallStatus {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true)]
-        [psobject]$PackageModelResult
+        [psobject]$PackageResult
     )
 
-    if ($PackageModelResult.ExistingPackage) {
-        switch -Exact ([string]$PackageModelResult.ExistingPackage.Decision) {
+    if ($PackageResult.ExistingPackage) {
+        switch -Exact ([string]$PackageResult.ExistingPackage.Decision) {
             'ExistingInstallValidationFailed' {
-                if ([string]::Equals([string]$PackageModelResult.ExistingPackage.SearchKind, 'packageModelTargetInstallPath', [System.StringComparison]::OrdinalIgnoreCase)) {
-                    return 'RepairedPackageModelOwnedInstall'
+                if ([string]::Equals([string]$PackageResult.ExistingPackage.SearchKind, 'packageTargetInstallPath', [System.StringComparison]::OrdinalIgnoreCase)) {
+                    return 'RepairedPackageOwnedInstall'
                 }
             }
-            'ReplacePackageModelOwnedInstall' { return 'ReplacedPackageModelOwnedInstall' }
+            'ReplacePackageOwnedInstall' { return 'ReplacedPackageOwnedInstall' }
             'UpgradeAdoptedInstall' { return 'ReplacedAdoptedInstall' }
         }
     }
@@ -321,7 +321,7 @@ function Get-PackageModelOwnedInstallStatus {
     return 'Installed'
 }
 
-function Get-PackageModelInstallTargetKind {
+function Get-PackageInstallTargetKind {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true)]
@@ -336,14 +336,14 @@ function Get-PackageModelInstallTargetKind {
     return 'directory'
 }
 
-function Get-PackageModelInstallerElevationPlan {
+function Get-PackageInstallerElevationPlan {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true)]
-        [psobject]$PackageModelResult
+        [psobject]$PackageResult
     )
 
-    $install = $PackageModelResult.Package.install
+    $install = $PackageResult.Package.install
     $mode = if ($install.PSObject.Properties['elevation'] -and -not [string]::IsNullOrWhiteSpace([string]$install.elevation)) {
         ([string]$install.elevation).ToLowerInvariant()
     }
@@ -360,7 +360,7 @@ function Get-PackageModelInstallerElevationPlan {
     }
 }
 
-function Resolve-PackageModelPreInstallSatisfaction {
+function Resolve-PackagePreInstallSatisfaction {
 <#
 .SYNOPSIS
 Checks whether a machine-prerequisite package is already satisfied.
@@ -370,66 +370,66 @@ Runs validation before acquisition/install for prerequisite-style packages that
 do not own an install directory. When validation succeeds, later acquisition
 and installer steps are skipped.
 
-.PARAMETER PackageModelResult
-The PackageModel result object to enrich.
+.PARAMETER PackageResult
+The Package result object to enrich.
 
 .EXAMPLE
-Resolve-PackageModelPreInstallSatisfaction -PackageModelResult $result
+Resolve-PackagePreInstallSatisfaction -PackageResult $result
 #>
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true)]
-        [psobject]$PackageModelResult
+        [psobject]$PackageResult
     )
 
-    $package = $PackageModelResult.Package
+    $package = $PackageResult.Package
     if (-not $package -or -not $package.install) {
-        return $PackageModelResult
+        return $PackageResult
     }
 
     $installKind = if ($package.install.PSObject.Properties['kind']) { [string]$package.install.kind } else { $null }
-    $targetKind = Get-PackageModelInstallTargetKind -Package $package
+    $targetKind = Get-PackageInstallTargetKind -Package $package
     if (-not [string]::Equals($installKind, 'runInstaller', [System.StringComparison]::OrdinalIgnoreCase) -or
         -not [string]::Equals($targetKind, 'machinePrerequisite', [System.StringComparison]::OrdinalIgnoreCase)) {
-        return $PackageModelResult
+        return $PackageResult
     }
 
-    $PackageModelResult = Test-PackageModelInstalledPackage -PackageModelResult $PackageModelResult
-    if ($PackageModelResult.Validation -and $PackageModelResult.Validation.Accepted) {
-        $PackageModelResult.InstallOrigin = 'AlreadySatisfied'
-        $PackageModelResult.Install = [pscustomobject]@{
+    $PackageResult = Test-PackageInstalledPackage -PackageResult $PackageResult
+    if ($PackageResult.Validation -and $PackageResult.Validation.Accepted) {
+        $PackageResult.InstallOrigin = 'AlreadySatisfied'
+        $PackageResult.Install = [pscustomobject]@{
             Status           = 'AlreadySatisfied'
             InstallKind      = 'runInstaller'
             TargetKind       = 'machinePrerequisite'
             InstallDirectory = $null
             ReusedExisting   = $true
         }
-        Write-PackageModelExecutionMessage -Message "[DECISION] Machine prerequisite is already satisfied; skipping acquisition and installer execution."
+        Write-PackageExecutionMessage -Message "[DECISION] Machine prerequisite is already satisfied; skipping acquisition and installer execution."
     }
     else {
-        $failedCount = if ($PackageModelResult.Validation) {
+        $failedCount = if ($PackageResult.Validation) {
             @(
-                @($PackageModelResult.Validation.Files) +
-                @($PackageModelResult.Validation.Directories) +
-                @($PackageModelResult.Validation.Commands) +
-                @($PackageModelResult.Validation.MetadataFiles) +
-                @($PackageModelResult.Validation.Signatures) +
-                @($PackageModelResult.Validation.FileDetails) +
-                @($PackageModelResult.Validation.Registry) |
+                @($PackageResult.Validation.Files) +
+                @($PackageResult.Validation.Directories) +
+                @($PackageResult.Validation.Commands) +
+                @($PackageResult.Validation.MetadataFiles) +
+                @($PackageResult.Validation.Signatures) +
+                @($PackageResult.Validation.FileDetails) +
+                @($PackageResult.Validation.Registry) |
                     Where-Object { $_.Status -ne 'Ready' }
             ).Count
         }
         else {
             0
         }
-        Write-PackageModelExecutionMessage -Message ("[STATE] Machine prerequisite is not satisfied yet; failedChecks={0}." -f $failedCount)
-        $PackageModelResult.Validation = $null
+        Write-PackageExecutionMessage -Message ("[STATE] Machine prerequisite is not satisfied yet; failedChecks={0}." -f $failedCount)
+        $PackageResult.Validation = $null
     }
 
-    return $PackageModelResult
+    return $PackageResult
 }
 
-function Install-PackageModelArchive {
+function Install-PackageArchive {
 <#
 .SYNOPSIS
 Installs a package by expanding an archive into the install directory.
@@ -439,26 +439,26 @@ Expands the saved package file into a stage directory, promotes the expanded
 root into the final install directory, and creates any extra directories that
 the install block requests.
 
-.PARAMETER PackageModelResult
-The PackageModel result object to install.
+.PARAMETER PackageResult
+The Package result object to install.
 
 .EXAMPLE
-Install-PackageModelArchive -PackageModelResult $result
+Install-PackageArchive -PackageResult $result
 #>
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true)]
-        [psobject]$PackageModelResult
+        [psobject]$PackageResult
     )
 
-    if ([string]::IsNullOrWhiteSpace($PackageModelResult.PackageFilePath) -or -not (Test-Path -LiteralPath $PackageModelResult.PackageFilePath)) {
-        throw "PackageModel archive install for '$($PackageModelResult.PackageId)' requires a saved package file."
+    if ([string]::IsNullOrWhiteSpace($PackageResult.PackageFilePath) -or -not (Test-Path -LiteralPath $PackageResult.PackageFilePath)) {
+        throw "Package archive install for '$($PackageResult.PackageId)' requires a saved package file."
     }
 
-    $install = $PackageModelResult.Package.install
+    $install = $PackageResult.Package.install
     $stageInfo = $null
     try {
-        $stageInfo = Expand-ArchiveToStage -ArchivePath $PackageModelResult.PackageFilePath -Prefix 'packagemodel'
+        $stageInfo = Expand-ArchiveToStage -ArchivePath $PackageResult.PackageFilePath -Prefix 'package'
         $expandedRoot = $stageInfo.ExpandedRoot
         if ($install.PSObject.Properties['expandedRoot'] -and
             -not [string]::IsNullOrWhiteSpace([string]$install.expandedRoot) -and
@@ -467,21 +467,21 @@ Install-PackageModelArchive -PackageModelResult $result
         }
 
         if (-not (Test-Path -LiteralPath $expandedRoot -PathType Container)) {
-            throw "Expanded package root '$expandedRoot' was not found for '$($PackageModelResult.PackageId)'."
+            throw "Expanded package root '$expandedRoot' was not found for '$($PackageResult.PackageId)'."
         }
 
-        $null = New-Item -ItemType Directory -Path (Split-Path -Parent $PackageModelResult.InstallDirectory) -Force
-        if (Test-Path -LiteralPath $PackageModelResult.InstallDirectory) {
-            Remove-Item -LiteralPath $PackageModelResult.InstallDirectory -Recurse -Force
+        $null = New-Item -ItemType Directory -Path (Split-Path -Parent $PackageResult.InstallDirectory) -Force
+        if (Test-Path -LiteralPath $PackageResult.InstallDirectory) {
+            Remove-Item -LiteralPath $PackageResult.InstallDirectory -Recurse -Force
         }
 
-        New-Item -ItemType Directory -Path $PackageModelResult.InstallDirectory -Force | Out-Null
+        New-Item -ItemType Directory -Path $PackageResult.InstallDirectory -Force | Out-Null
         Get-ChildItem -LiteralPath $expandedRoot -Force | ForEach-Object {
-            Move-Item -LiteralPath $_.FullName -Destination $PackageModelResult.InstallDirectory -Force
+            Move-Item -LiteralPath $_.FullName -Destination $PackageResult.InstallDirectory -Force
         }
 
         foreach ($relativePath in @($install.createDirectories)) {
-            $targetDirectory = Join-Path $PackageModelResult.InstallDirectory (([string]$relativePath) -replace '/', '\')
+            $targetDirectory = Join-Path $PackageResult.InstallDirectory (([string]$relativePath) -replace '/', '\')
             New-Item -ItemType Directory -Path $targetDirectory -Force | Out-Null
         }
     }
@@ -492,14 +492,14 @@ Install-PackageModelArchive -PackageModelResult $result
     }
 
     return [pscustomobject]@{
-        Status           = Get-PackageModelOwnedInstallStatus -PackageModelResult $PackageModelResult
+        Status           = Get-PackageOwnedInstallStatus -PackageResult $PackageResult
         InstallKind      = 'expandArchive'
-        InstallDirectory = $PackageModelResult.InstallDirectory
+        InstallDirectory = $PackageResult.InstallDirectory
         ReusedExisting   = $false
     }
 }
 
-function Get-PackageModelInstalledFilePath {
+function Get-PackageInstalledFilePath {
 <#
 .SYNOPSIS
 Resolves the final installed file path for a single-file package install.
@@ -512,30 +512,30 @@ simple install model.
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true)]
-        [psobject]$PackageModelResult
+        [psobject]$PackageResult
     )
 
-    $install = $PackageModelResult.Package.install
+    $install = $PackageResult.Package.install
     $targetRelativePath = $null
     if ($install.PSObject.Properties['targetRelativePath'] -and
         -not [string]::IsNullOrWhiteSpace([string]$install.targetRelativePath)) {
         $targetRelativePath = ([string]$install.targetRelativePath) -replace '/', '\'
     }
-    elseif ($PackageModelResult.Package -and
-        $PackageModelResult.Package.PSObject.Properties['packageFile'] -and
-        $PackageModelResult.Package.packageFile -and
-        $PackageModelResult.Package.packageFile.PSObject.Properties['fileName'] -and
-        -not [string]::IsNullOrWhiteSpace([string]$PackageModelResult.Package.packageFile.fileName)) {
-        $targetRelativePath = [string]$PackageModelResult.Package.packageFile.fileName
+    elseif ($PackageResult.Package -and
+        $PackageResult.Package.PSObject.Properties['packageFile'] -and
+        $PackageResult.Package.packageFile -and
+        $PackageResult.Package.packageFile.PSObject.Properties['fileName'] -and
+        -not [string]::IsNullOrWhiteSpace([string]$PackageResult.Package.packageFile.fileName)) {
+        $targetRelativePath = [string]$PackageResult.Package.packageFile.fileName
     }
     else {
-        throw "PackageModel single-file install for '$($PackageModelResult.PackageId)' requires install.targetRelativePath or packageFile.fileName."
+        throw "Package single-file install for '$($PackageResult.PackageId)' requires install.targetRelativePath or packageFile.fileName."
     }
 
-    return (Join-Path $PackageModelResult.InstallDirectory $targetRelativePath)
+    return (Join-Path $PackageResult.InstallDirectory $targetRelativePath)
 }
 
-function Install-PackageModelPackageFile {
+function Install-PackagePackageFile {
 <#
 .SYNOPSIS
 Installs a package by placing one saved package file into the install directory.
@@ -547,38 +547,38 @@ saved package file into the configured target-relative path.
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true)]
-        [psobject]$PackageModelResult
+        [psobject]$PackageResult
     )
 
-    if ([string]::IsNullOrWhiteSpace($PackageModelResult.PackageFilePath) -or -not (Test-Path -LiteralPath $PackageModelResult.PackageFilePath -PathType Leaf)) {
-        throw "PackageModel single-file install for '$($PackageModelResult.PackageId)' requires a saved package file."
+    if ([string]::IsNullOrWhiteSpace($PackageResult.PackageFilePath) -or -not (Test-Path -LiteralPath $PackageResult.PackageFilePath -PathType Leaf)) {
+        throw "Package single-file install for '$($PackageResult.PackageId)' requires a saved package file."
     }
 
-    $installedFilePath = Get-PackageModelInstalledFilePath -PackageModelResult $PackageModelResult
+    $installedFilePath = Get-PackageInstalledFilePath -PackageResult $PackageResult
     $targetDirectory = Split-Path -Parent $installedFilePath
 
-    $null = New-Item -ItemType Directory -Path (Split-Path -Parent $PackageModelResult.InstallDirectory) -Force
-    if (Test-Path -LiteralPath $PackageModelResult.InstallDirectory) {
-        Remove-PathIfExists -Path $PackageModelResult.InstallDirectory | Out-Null
+    $null = New-Item -ItemType Directory -Path (Split-Path -Parent $PackageResult.InstallDirectory) -Force
+    if (Test-Path -LiteralPath $PackageResult.InstallDirectory) {
+        Remove-PathIfExists -Path $PackageResult.InstallDirectory | Out-Null
     }
 
-    $null = New-Item -ItemType Directory -Path $PackageModelResult.InstallDirectory -Force
+    $null = New-Item -ItemType Directory -Path $PackageResult.InstallDirectory -Force
     if (-not [string]::IsNullOrWhiteSpace($targetDirectory)) {
         $null = New-Item -ItemType Directory -Path $targetDirectory -Force
     }
 
-    $null = Copy-FileToPath -SourcePath $PackageModelResult.PackageFilePath -TargetPath $installedFilePath -Overwrite
+    $null = Copy-FileToPath -SourcePath $PackageResult.PackageFilePath -TargetPath $installedFilePath -Overwrite
 
     return [pscustomobject]@{
-        Status           = Get-PackageModelOwnedInstallStatus -PackageModelResult $PackageModelResult
+        Status           = Get-PackageOwnedInstallStatus -PackageResult $PackageResult
         InstallKind      = 'placePackageFile'
-        InstallDirectory = $PackageModelResult.InstallDirectory
+        InstallDirectory = $PackageResult.InstallDirectory
         InstalledFilePath = $installedFilePath
         ReusedExisting   = $false
     }
 }
 
-function Format-PackageModelProcessArgument {
+function Format-PackageProcessArgument {
     [CmdletBinding()]
     param(
         [AllowNull()]
@@ -600,7 +600,7 @@ function Format-PackageModelProcessArgument {
     return '"' + ($text -replace '"', '\"') + '"'
 }
 
-function Invoke-PackageModelInstallerProcess {
+function Invoke-PackageInstallerProcess {
 <#
 .SYNOPSIS
 Runs an installer-style package command and waits for completion.
@@ -609,66 +609,68 @@ Runs an installer-style package command and waits for completion.
 Starts the configured installer command, applies timeout and exit-code rules,
 and returns the install log path and restart flag when configured.
 
-.PARAMETER PackageModelResult
-The PackageModel result object that owns the install.
+.PARAMETER PackageResult
+The Package result object that owns the install.
 
 .EXAMPLE
-Invoke-PackageModelInstallerProcess -PackageModelResult $result
+Invoke-PackageInstallerProcess -PackageResult $result
 #>
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true)]
-        [psobject]$PackageModelResult
+        [psobject]$PackageResult
     )
 
-    $install = $PackageModelResult.Package.install
+    $install = $PackageResult.Package.install
     $commandPath = if ($install.PSObject.Properties['commandPath'] -and -not [string]::IsNullOrWhiteSpace([string]$install.commandPath)) {
-        Resolve-PackageModelTemplateText -Text ([string]$install.commandPath) -PackageModelConfig $PackageModelResult.PackageModelConfig -Package $PackageModelResult.Package
+        Resolve-PackageTemplateText -Text ([string]$install.commandPath) -PackageConfig $PackageResult.PackageConfig -Package $PackageResult.Package
     }
     else {
-        $PackageModelResult.PackageFilePath
+        $PackageResult.PackageFilePath
     }
 
     $timestamp = (Get-Date -Format 'yyyyMMdd-HHmmss')
     $logPath = $null
     if ($install.PSObject.Properties['logRelativePath'] -and -not [string]::IsNullOrWhiteSpace([string]$install.logRelativePath)) {
-        $logRelativePath = Resolve-PackageModelTemplateText -Text ([string]$install.logRelativePath) -PackageModelConfig $PackageModelResult.PackageModelConfig -Package $PackageModelResult.Package -ExtraTokens @{ timestamp = $timestamp }
-        $logPath = [System.IO.Path]::GetFullPath((Join-Path $PackageModelResult.PackageModelConfig.PreferredTargetInstallRootDirectory ($logRelativePath -replace '/', '\')))
+        $logRelativePath = Resolve-PackageTemplateText -Text ([string]$install.logRelativePath) -PackageConfig $PackageResult.PackageConfig -Package $PackageResult.Package -ExtraTokens @{ timestamp = $timestamp }
+        $packageRoot = Get-PackageRootFromStateIndexPath -PackageStateIndexFilePath ([string]$PackageResult.PackageConfig.PackageStateIndexFilePath)
+        $logRoot = [System.IO.Path]::GetFullPath((Join-Path $packageRoot 'Logs'))
+        $logPath = [System.IO.Path]::GetFullPath((Join-Path $logRoot ($logRelativePath -replace '/', '\')))
         $null = New-Item -ItemType Directory -Path (Split-Path -Parent $logPath) -Force
     }
 
     $commandArguments = @()
     foreach ($argument in @($install.commandArguments)) {
-        $resolvedArgument = Resolve-PackageModelTemplateText -Text ([string]$argument) -PackageModelConfig $PackageModelResult.PackageModelConfig -Package $PackageModelResult.Package -ExtraTokens @{
-                packageFilePath   = $PackageModelResult.PackageFilePath
-                installDirectory  = $PackageModelResult.InstallDirectory
-                installWorkspaceDirectory = $PackageModelResult.InstallWorkspaceDirectory
-                downloadDirectory = $PackageModelResult.InstallWorkspaceDirectory
+        $resolvedArgument = Resolve-PackageTemplateText -Text ([string]$argument) -PackageConfig $PackageResult.PackageConfig -Package $PackageResult.Package -ExtraTokens @{
+                packageFilePath   = $PackageResult.PackageFilePath
+                installDirectory  = $PackageResult.InstallDirectory
+                installWorkspaceDirectory = $PackageResult.InstallWorkspaceDirectory
+                downloadDirectory = $PackageResult.InstallWorkspaceDirectory
                 logPath           = $logPath
                 timestamp         = $timestamp
             }
-        $commandArguments += (Format-PackageModelProcessArgument -Value $resolvedArgument)
+        $commandArguments += (Format-PackageProcessArgument -Value $resolvedArgument)
     }
 
     $timeoutSec = if ($install.PSObject.Properties['timeoutSec']) { [int]$install.timeoutSec } else { 300 }
     $successExitCodes = if ($install.PSObject.Properties['successExitCodes']) { @($install.successExitCodes | ForEach-Object { [int]$_ }) } else { @(0) }
     $restartExitCodes = if ($install.PSObject.Properties['restartExitCodes']) { @($install.restartExitCodes | ForEach-Object { [int]$_ }) } else { @() }
-    $targetKind = Get-PackageModelInstallTargetKind -Package $PackageModelResult.Package
-    $workingDirectory = if (-not [string]::IsNullOrWhiteSpace([string]$PackageModelResult.InstallDirectory)) {
-        $null = New-Item -ItemType Directory -Path $PackageModelResult.InstallDirectory -Force
-        $PackageModelResult.InstallDirectory
+    $targetKind = Get-PackageInstallTargetKind -Package $PackageResult.Package
+    $workingDirectory = if (-not [string]::IsNullOrWhiteSpace([string]$PackageResult.InstallDirectory)) {
+        $null = New-Item -ItemType Directory -Path $PackageResult.InstallDirectory -Force
+        $PackageResult.InstallDirectory
     }
     else {
-        $PackageModelResult.InstallWorkspaceDirectory
+        $PackageResult.InstallWorkspaceDirectory
     }
     if (-not [string]::IsNullOrWhiteSpace([string]$workingDirectory)) {
         $null = New-Item -ItemType Directory -Path $workingDirectory -Force
     }
 
-    $elevationPlan = Get-PackageModelInstallerElevationPlan -PackageModelResult $PackageModelResult
+    $elevationPlan = Get-PackageInstallerElevationPlan -PackageResult $PackageResult
     $installerKind = if ($install.PSObject.Properties['installerKind'] -and -not [string]::IsNullOrWhiteSpace([string]$install.installerKind)) { [string]$install.installerKind } else { '<unspecified>' }
     $uiMode = if ($install.PSObject.Properties['uiMode'] -and -not [string]::IsNullOrWhiteSpace([string]$install.uiMode)) { [string]$install.uiMode } else { '<unspecified>' }
-    Write-PackageModelExecutionMessage -Message ("[STATE] Installer execution: targetKind='{0}', installerKind='{1}', uiMode='{2}', elevation='{3}', processIsElevated='{4}', willElevate='{5}'." -f $targetKind, $installerKind, $uiMode, $elevationPlan.Mode, $elevationPlan.ProcessIsElevated, $elevationPlan.ShouldElevate)
+    Write-PackageExecutionMessage -Message ("[STATE] Installer execution: targetKind='{0}', installerKind='{1}', uiMode='{2}', elevation='{3}', processIsElevated='{4}', willElevate='{5}'." -f $targetKind, $installerKind, $uiMode, $elevationPlan.Mode, $elevationPlan.ProcessIsElevated, $elevationPlan.ShouldElevate)
 
     $startProcessParameters = @{
         FilePath         = $commandPath
@@ -688,14 +690,14 @@ Invoke-PackageModelInstallerProcess -PackageModelResult $result
         catch {
         }
 
-        throw "PackageModel installer command exceeded the timeout of $timeoutSec seconds."
+        throw "Package installer command exceeded the timeout of $timeoutSec seconds."
     }
 
     $process.Refresh()
     $exitCode = [int]$process.ExitCode
     $acceptedExitCodes = @($successExitCodes) + @($restartExitCodes)
     if ($exitCode -notin $acceptedExitCodes) {
-        throw "PackageModel installer command failed with exit code $exitCode."
+        throw "Package installer command failed with exit code $exitCode."
     }
 
     return [pscustomobject]@{
@@ -711,7 +713,7 @@ Invoke-PackageModelInstallerProcess -PackageModelResult $result
     }
 }
 
-function Install-PackageModelPackage {
+function Install-PackagePackage {
 <#
 .SYNOPSIS
 Installs or reuses the selected package.
@@ -719,108 +721,108 @@ Installs or reuses the selected package.
 .DESCRIPTION
 Reuses or adopts a valid existing install when the earlier ownership/policy
 decision allows it, otherwise executes the configured install kind and attaches
-the install result to the PackageModel result object.
+the install result to the Package result object.
 
-.PARAMETER PackageModelResult
-The PackageModel result object to enrich.
+.PARAMETER PackageResult
+The Package result object to enrich.
 
 .EXAMPLE
-Install-PackageModelPackage -PackageModelResult $result
+Install-PackagePackage -PackageResult $result
 #>
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true)]
-        [psobject]$PackageModelResult
+        [psobject]$PackageResult
     )
 
-    $package = $PackageModelResult.Package
+    $package = $PackageResult.Package
     $install = $package.install
     if (-not $install -or -not $install.PSObject.Properties['kind']) {
-        throw "PackageModel release '$($package.id)' does not define install.kind."
+        throw "Package release '$($package.id)' does not define install.kind."
     }
 
-    if ([string]::Equals([string]$PackageModelResult.InstallOrigin, 'AlreadySatisfied', [System.StringComparison]::OrdinalIgnoreCase)) {
-        Write-PackageModelExecutionMessage -Message "[ACTION] Skipped installer because machine prerequisite is already satisfied."
-        return $PackageModelResult
+    if ([string]::Equals([string]$PackageResult.InstallOrigin, 'AlreadySatisfied', [System.StringComparison]::OrdinalIgnoreCase)) {
+        Write-PackageExecutionMessage -Message "[ACTION] Skipped installer because machine prerequisite is already satisfied."
+        return $PackageResult
     }
 
-    if ($PackageModelResult.ExistingPackage -and $PackageModelResult.ExistingPackage.Decision -eq 'ReusePackageModelOwned') {
-        $PackageModelResult.InstallDirectory = $PackageModelResult.ExistingPackage.InstallDirectory
-        $PackageModelResult.InstallOrigin = 'PackageModelReused'
-        $PackageModelResult.Install = [pscustomobject]@{
-            Status           = 'ReusedPackageModelOwned'
+    if ($PackageResult.ExistingPackage -and $PackageResult.ExistingPackage.Decision -eq 'ReusePackageOwned') {
+        $PackageResult.InstallDirectory = $PackageResult.ExistingPackage.InstallDirectory
+        $PackageResult.InstallOrigin = 'PackageReused'
+        $PackageResult.Install = [pscustomobject]@{
+            Status           = 'ReusedPackageOwned'
             InstallKind      = 'existingInstall'
-            InstallDirectory = $PackageModelResult.ExistingPackage.InstallDirectory
+            InstallDirectory = $PackageResult.ExistingPackage.InstallDirectory
             ReusedExisting   = $true
-            CandidatePath    = $PackageModelResult.ExistingPackage.CandidatePath
+            CandidatePath    = $PackageResult.ExistingPackage.CandidatePath
         }
-        $PackageModelResult.Validation = $PackageModelResult.ExistingPackage.Validation
-        Write-PackageModelExecutionMessage -Message ("[ACTION] Reused PackageModel-owned install '{0}'." -f $PackageModelResult.ExistingPackage.InstallDirectory)
-        return $PackageModelResult
+        $PackageResult.Validation = $PackageResult.ExistingPackage.Validation
+        Write-PackageExecutionMessage -Message ("[ACTION] Reused Package-owned install '{0}'." -f $PackageResult.ExistingPackage.InstallDirectory)
+        return $PackageResult
     }
 
-    if ($PackageModelResult.ExistingPackage -and $PackageModelResult.ExistingPackage.Decision -eq 'AdoptExternal') {
-        $PackageModelResult.InstallDirectory = $PackageModelResult.ExistingPackage.InstallDirectory
-        $PackageModelResult.InstallOrigin = 'AdoptedExternal'
-        $PackageModelResult.Install = [pscustomobject]@{
+    if ($PackageResult.ExistingPackage -and $PackageResult.ExistingPackage.Decision -eq 'AdoptExternal') {
+        $PackageResult.InstallDirectory = $PackageResult.ExistingPackage.InstallDirectory
+        $PackageResult.InstallOrigin = 'AdoptedExternal'
+        $PackageResult.Install = [pscustomobject]@{
             Status           = 'AdoptedExternal'
             InstallKind      = 'existingInstall'
-            InstallDirectory = $PackageModelResult.ExistingPackage.InstallDirectory
+            InstallDirectory = $PackageResult.ExistingPackage.InstallDirectory
             ReusedExisting   = $true
-            CandidatePath    = $PackageModelResult.ExistingPackage.CandidatePath
+            CandidatePath    = $PackageResult.ExistingPackage.CandidatePath
         }
-        $PackageModelResult.Validation = $PackageModelResult.ExistingPackage.Validation
-        Write-PackageModelExecutionMessage -Message ("[ACTION] Adopted external install '{0}'." -f $PackageModelResult.ExistingPackage.InstallDirectory)
-        return $PackageModelResult
+        $PackageResult.Validation = $PackageResult.ExistingPackage.Validation
+        Write-PackageExecutionMessage -Message ("[ACTION] Adopted external install '{0}'." -f $PackageResult.ExistingPackage.InstallDirectory)
+        return $PackageResult
     }
 
     if ([string]::Equals([string]$install.kind, 'reuseExisting', [System.StringComparison]::OrdinalIgnoreCase)) {
-        throw "PackageModel release '$($package.id)' requires an existing install, but no reusable install passed validation."
+        throw "Package release '$($package.id)' requires an existing install, but no reusable install passed validation."
     }
 
-    if ($PackageModelResult.PackageFileSave -and -not $PackageModelResult.PackageFileSave.Success) {
-        throw $PackageModelResult.PackageFileSave.ErrorMessage
+    if ($PackageResult.PackageFileSave -and -not $PackageResult.PackageFileSave.Success) {
+        throw $PackageResult.PackageFileSave.ErrorMessage
     }
 
     switch -Exact ([string]$install.kind) {
         'expandArchive' {
-            Write-PackageModelExecutionMessage -Message ("[ACTION] Installing package archive into '{0}'." -f $PackageModelResult.InstallDirectory)
-            $PackageModelResult.Install = Install-PackageModelArchive -PackageModelResult $PackageModelResult
+            Write-PackageExecutionMessage -Message ("[ACTION] Installing package archive into '{0}'." -f $PackageResult.InstallDirectory)
+            $PackageResult.Install = Install-PackageArchive -PackageResult $PackageResult
         }
         'placePackageFile' {
-            Write-PackageModelExecutionMessage -Message ("[ACTION] Placing package file into '{0}'." -f $PackageModelResult.InstallDirectory)
-            $PackageModelResult.Install = Install-PackageModelPackageFile -PackageModelResult $PackageModelResult
+            Write-PackageExecutionMessage -Message ("[ACTION] Placing package file into '{0}'." -f $PackageResult.InstallDirectory)
+            $PackageResult.Install = Install-PackagePackageFile -PackageResult $PackageResult
         }
         'runInstaller' {
-            $targetKind = Get-PackageModelInstallTargetKind -Package $package
-            $targetText = if ([string]::IsNullOrWhiteSpace([string]$PackageModelResult.InstallDirectory)) { '<machine prerequisite>' } else { [string]$PackageModelResult.InstallDirectory }
-            Write-PackageModelExecutionMessage -Message ("[ACTION] Running installer for target '{0}'." -f $targetText)
-            $installerResult = Invoke-PackageModelInstallerProcess -PackageModelResult $PackageModelResult
-            $PackageModelResult.Install = [pscustomobject]@{
-                Status           = Get-PackageModelOwnedInstallStatus -PackageModelResult $PackageModelResult
+            $targetKind = Get-PackageInstallTargetKind -Package $package
+            $targetText = if ([string]::IsNullOrWhiteSpace([string]$PackageResult.InstallDirectory)) { '<machine prerequisite>' } else { [string]$PackageResult.InstallDirectory }
+            Write-PackageExecutionMessage -Message ("[ACTION] Running installer for target '{0}'." -f $targetText)
+            $installerResult = Invoke-PackageInstallerProcess -PackageResult $PackageResult
+            $PackageResult.Install = [pscustomobject]@{
+                Status           = Get-PackageOwnedInstallStatus -PackageResult $PackageResult
                 InstallKind      = 'runInstaller'
                 TargetKind       = $targetKind
-                InstallDirectory = $PackageModelResult.InstallDirectory
+                InstallDirectory = $PackageResult.InstallDirectory
                 ReusedExisting   = $false
                 Installer        = $installerResult
             }
         }
         'npmGlobalPackage' {
-            Write-PackageModelExecutionMessage -Message ("[ACTION] Installing npm global package into '{0}'." -f $PackageModelResult.InstallDirectory)
-            $PackageModelResult.Install = Install-PackageModelNpmPackage -PackageModelResult $PackageModelResult
+            Write-PackageExecutionMessage -Message ("[ACTION] Installing npm global package into '{0}'." -f $PackageResult.InstallDirectory)
+            $PackageResult.Install = Install-PackageNpmPackage -PackageResult $PackageResult
         }
         default {
-            throw "Unsupported PackageModel install kind '$($install.kind)'."
+            throw "Unsupported Package install kind '$($install.kind)'."
         }
     }
 
-    $PackageModelResult.InstallOrigin = if ([string]::Equals((Get-PackageModelInstallTargetKind -Package $package), 'machinePrerequisite', [System.StringComparison]::OrdinalIgnoreCase)) {
-        'PackageModelApplied'
+    $PackageResult.InstallOrigin = if ([string]::Equals((Get-PackageInstallTargetKind -Package $package), 'machinePrerequisite', [System.StringComparison]::OrdinalIgnoreCase)) {
+        'PackageApplied'
     }
     else {
-        'PackageModelInstalled'
+        'PackageInstalled'
     }
-    Write-PackageModelExecutionMessage -Message ("[ACTION] Completed PackageModel-owned install with status '{0}'." -f $PackageModelResult.Install.Status)
-    return $PackageModelResult
+    Write-PackageExecutionMessage -Message ("[ACTION] Completed Package-owned install with status '{0}'." -f $PackageResult.Install.Status)
+    return $PackageResult
 }
 

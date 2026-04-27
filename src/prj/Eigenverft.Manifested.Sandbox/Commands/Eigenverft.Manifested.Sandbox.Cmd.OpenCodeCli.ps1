@@ -5,11 +5,11 @@
 function Invoke-OpenCodeCli {
 <#
 .SYNOPSIS
-Ensures the configured OpenCode CLI package is available through PackageModel.
+Ensures the configured OpenCode CLI package is available through Package.
 
 .DESCRIPTION
-Installs or reuses the pinned OpenCode CLI npm package through the PackageModel
-npm backend, using PackageModel-owned Node.js as the package-manager dependency.
+Installs or reuses the pinned OpenCode CLI npm package through the Package
+npm backend, using Package-owned Node.js as the package-manager dependency.
 
 .EXAMPLE
 Invoke-OpenCodeCli
@@ -17,6 +17,6 @@ Invoke-OpenCodeCli
     [CmdletBinding()]
     param()
 
-    return (Invoke-PackageModelDefinitionCommand -DefinitionId 'OpenCodeCli' -CommandName 'Invoke-OpenCodeCli')
+    return (Invoke-PackageDefinitionCommand -DefinitionId 'OpenCodeCli' -CommandName 'Invoke-OpenCodeCli')
 }
 

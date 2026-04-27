@@ -128,7 +128,7 @@
     "existingInstallPolicy": {
       "allowAdoptExternal": true,
       "upgradeAdoptedInstall": true,
-      "requirePackageModelOwnership": false
+      "requirePackageOwnership": false
     }
   },
   "releases": [

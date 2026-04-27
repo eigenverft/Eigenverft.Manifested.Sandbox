@@ -5,10 +5,10 @@
 function Invoke-LlamaCppRuntime {
 <#
 .SYNOPSIS
-Ensures the configured llama.cpp package is available through PackageModel.
+Ensures the configured llama.cpp package is available through Package.
 
 .DESCRIPTION
-Loads the shipped PackageModel JSON documents through the neutral PackageModel
+Loads the shipped Package JSON documents through the neutral Package
 config loader, resolves the effective llama.cpp release for the current
 runtime context, evaluates existing-install ownership and policy, saves the
 package file when needed, installs or reuses the package, validates the
@@ -21,6 +21,6 @@ Invoke-LlamaCppRuntime
     [CmdletBinding()]
     param()
 
-    return (Invoke-PackageModelDefinitionCommand -DefinitionId 'LlamaCppRuntime' -CommandName 'Invoke-LlamaCppRuntime')
+    return (Invoke-PackageDefinitionCommand -DefinitionId 'LlamaCppRuntime' -CommandName 'Invoke-LlamaCppRuntime')
 }
 

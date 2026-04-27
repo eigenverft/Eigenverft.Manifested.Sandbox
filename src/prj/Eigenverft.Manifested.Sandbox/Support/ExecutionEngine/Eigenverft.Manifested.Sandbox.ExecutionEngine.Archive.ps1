@@ -10,7 +10,7 @@ Expands an archive into a destination directory.
 .DESCRIPTION
 Ensures the destination directory exists, then extracts the archive into that
 directory. Overwrite behavior is controlled through the Overwrite switch so the
-archive backend can be replaced later without touching PackageModel flows.
+archive backend can be replaced later without touching Package flows.
 #>
     [CmdletBinding()]
     param(

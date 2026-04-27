@@ -5,10 +5,10 @@
 function Invoke-VSCodeRuntime {
 <#
 .SYNOPSIS
-Ensures the configured VS Code package is available through PackageModel.
+Ensures the configured VS Code package is available through Package.
 
 .DESCRIPTION
-Loads the shipped PackageModel JSON documents through the neutral PackageModel
+Loads the shipped Package JSON documents through the neutral Package
 config loader, resolves the effective VS Code release for the current runtime
 context, evaluates existing-install ownership and policy, saves the package
 file when needed, installs or reuses the package, validates the installed
@@ -20,6 +20,6 @@ Invoke-VSCodeRuntime
     [CmdletBinding()]
     param()
 
-    return (Invoke-PackageModelDefinitionCommand -DefinitionId 'VSCodeRuntime' -CommandName 'Invoke-VSCodeRuntime')
+    return (Invoke-PackageDefinitionCommand -DefinitionId 'VSCodeRuntime' -CommandName 'Invoke-VSCodeRuntime')
 }
 

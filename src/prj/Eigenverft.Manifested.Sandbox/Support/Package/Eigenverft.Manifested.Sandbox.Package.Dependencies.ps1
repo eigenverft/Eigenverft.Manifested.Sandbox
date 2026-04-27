@@ -2,7 +2,7 @@
     Eigenverft.Manifested.Sandbox.Package.Dependencies
 #>
 
-function Resolve-PackageModelDependencyStack {
+function Resolve-PackageDependencyStack {
     [CmdletBinding()]
     param(
         [AllowNull()]
@@ -16,7 +16,7 @@ function Resolve-PackageModelDependencyStack {
     return @()
 }
 
-function Resolve-PackageModelDependencyCommandEntryPoints {
+function Resolve-PackageDependencyCommandEntryPoints {
     [CmdletBinding()]
     param(
         [AllowNull()]
@@ -36,63 +36,63 @@ function Resolve-PackageModelDependencyCommandEntryPoints {
     return @($DependencyResult.EntryPoints.Commands)
 }
 
-function Resolve-PackageModelDependencies {
+function Resolve-PackageDependencies {
 <#
 .SYNOPSIS
-Ensures direct PackageModel dependencies for the selected definition.
+Ensures direct Package dependencies for the selected definition.
 
 .DESCRIPTION
 Runs definition-level dependencies before acquisition/install. This is a
 minimal direct dependency pass, not a general dependency graph solver.
 
-.PARAMETER PackageModelResult
-The current PackageModel result object.
+.PARAMETER PackageResult
+The current Package result object.
 
 .EXAMPLE
-Resolve-PackageModelDependencies -PackageModelResult $result
+Resolve-PackageDependencies -PackageResult $result
 #>
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true)]
-        [psobject]$PackageModelResult,
+        [psobject]$PackageResult,
 
         [object[]]$DependencyStack = @()
     )
 
-    $definition = $PackageModelResult.PackageModelConfig.Definition
+    $definition = $PackageResult.PackageConfig.Definition
     $dependencyRecords = New-Object System.Collections.Generic.List[object]
     $seenDependencyIds = New-Object 'System.Collections.Generic.HashSet[string]' ([System.StringComparer]::OrdinalIgnoreCase)
     if (-not $definition.PSObject.Properties['dependencies'] -or $null -eq $definition.dependencies) {
-        $PackageModelResult.Dependencies = @()
-        return $PackageModelResult
+        $PackageResult.Dependencies = @()
+        return $PackageResult
     }
 
-    $currentStack = @(Resolve-PackageModelDependencyStack -DependencyStack $DependencyStack)
+    $currentStack = @(Resolve-PackageDependencyStack -DependencyStack $DependencyStack)
     if (-not $currentStack) {
-        $currentStack = @([string]$PackageModelResult.DefinitionId)
+        $currentStack = @([string]$PackageResult.DefinitionId)
     }
 
     foreach ($dependency in @($definition.dependencies)) {
         if (-not $dependency.PSObject.Properties['definitionId'] -or [string]::IsNullOrWhiteSpace([string]$dependency.definitionId)) {
-            throw "PackageModel definition '$($definition.id)' has dependency without definitionId."
+            throw "Package definition '$($definition.id)' has dependency without definitionId."
         }
 
         $dependencyDefinitionId = [string]$dependency.definitionId
-        if ([string]::Equals($dependencyDefinitionId, [string]$PackageModelResult.DefinitionId, [System.StringComparison]::OrdinalIgnoreCase)) {
-            throw "PackageModel definition '$($PackageModelResult.DefinitionId)' cannot depend on itself."
+        if ([string]::Equals($dependencyDefinitionId, [string]$PackageResult.DefinitionId, [System.StringComparison]::OrdinalIgnoreCase)) {
+            throw "Package definition '$($PackageResult.DefinitionId)' cannot depend on itself."
         }
         if (-not $seenDependencyIds.Add($dependencyDefinitionId)) {
             continue
         }
         if ($currentStack -contains $dependencyDefinitionId) {
-            throw ("PackageModel dependency cycle detected: {0} -> {1}." -f (($currentStack -join ' -> ')), $dependencyDefinitionId)
+            throw ("Package dependency cycle detected: {0} -> {1}." -f (($currentStack -join ' -> ')), $dependencyDefinitionId)
         }
 
-        Write-PackageModelExecutionMessage -Message ("[STEP] Ensuring package dependency '{0}'." -f $dependencyDefinitionId)
-        $dependencyResult = Invoke-PackageModelDefinitionCommand -DefinitionId $dependencyDefinitionId -CommandName ("Invoke-{0}" -f $dependencyDefinitionId) -DependencyStack (@($currentStack) + $dependencyDefinitionId)
+        Write-PackageExecutionMessage -Message ("[STEP] Ensuring package dependency '{0}'." -f $dependencyDefinitionId)
+        $dependencyResult = Invoke-PackageDefinitionCommand -DefinitionId $dependencyDefinitionId -CommandName ("Invoke-{0}" -f $dependencyDefinitionId) -DependencyStack (@($currentStack) + $dependencyDefinitionId)
         $dependencyStatus = if ($dependencyResult) { [string]$dependencyResult.Status } else { '<none>' }
         if (-not $dependencyResult -or -not [string]::Equals($dependencyStatus, 'Ready', [System.StringComparison]::OrdinalIgnoreCase)) {
-            throw "PackageModel dependency '$dependencyDefinitionId' did not become ready. Status='$dependencyStatus'."
+            throw "Package dependency '$dependencyDefinitionId' did not become ready. Status='$dependencyStatus'."
         }
 
         $dependencyRecords.Add([pscustomobject]@{
@@ -101,30 +101,30 @@ Resolve-PackageModelDependencies -PackageModelResult $result
             InstallOrigin  = [string]$dependencyResult.InstallOrigin
             InstallStatus  = if ($dependencyResult.Install -and $dependencyResult.Install.PSObject.Properties['Status']) { [string]$dependencyResult.Install.Status } else { $null }
             EntryPoints    = if ($dependencyResult.PSObject.Properties['EntryPoints']) { $dependencyResult.EntryPoints } else { $null }
-            Commands       = @(Resolve-PackageModelDependencyCommandEntryPoints -DependencyResult $dependencyResult)
+            Commands       = @(Resolve-PackageDependencyCommandEntryPoints -DependencyResult $dependencyResult)
             Result         = $dependencyResult
         }) | Out-Null
 
-        Write-PackageModelExecutionMessage -Message ("[STATE] Package dependency ready: definition='{0}', installOrigin='{1}', installStatus='{2}'." -f $dependencyDefinitionId, [string]$dependencyResult.InstallOrigin, $(if ($dependencyResult.Install -and $dependencyResult.Install.PSObject.Properties['Status']) { [string]$dependencyResult.Install.Status } else { '<none>' }))
+        Write-PackageExecutionMessage -Message ("[STATE] Package dependency ready: definition='{0}', installOrigin='{1}', installStatus='{2}'." -f $dependencyDefinitionId, [string]$dependencyResult.InstallOrigin, $(if ($dependencyResult.Install -and $dependencyResult.Install.PSObject.Properties['Status']) { [string]$dependencyResult.Install.Status } else { '<none>' }))
     }
 
-    $PackageModelResult.Dependencies = @($dependencyRecords.ToArray())
-    return $PackageModelResult
+    $PackageResult.Dependencies = @($dependencyRecords.ToArray())
+    return $PackageResult
 }
 
-function Resolve-PackageModelDependencyCommandPath {
+function Resolve-PackageDependencyCommandPath {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true)]
-        [psobject]$PackageModelResult,
+        [psobject]$PackageResult,
 
         [Parameter(Mandatory = $true)]
         [ValidateNotNullOrEmpty()]
         [string]$CommandName
     )
 
-    foreach ($dependency in @($PackageModelResult.Dependencies)) {
-        foreach ($command in @(Resolve-PackageModelDependencyCommandEntryPoints -DependencyResult $dependency)) {
+    foreach ($dependency in @($PackageResult.Dependencies)) {
+        foreach ($command in @(Resolve-PackageDependencyCommandEntryPoints -DependencyResult $dependency)) {
             if ([string]::Equals([string]$command.Name, $CommandName, [System.StringComparison]::OrdinalIgnoreCase) -and
                 -not [string]::IsNullOrWhiteSpace([string]$command.Path) -and
                 (Test-Path -LiteralPath ([string]$command.Path) -PathType Leaf)) {
@@ -137,5 +137,5 @@ function Resolve-PackageModelDependencyCommandPath {
         }
     }
 
-    throw "PackageModel install for '$($PackageModelResult.PackageId)' requires installer command '$CommandName', but no ready dependency exposes that command."
+    throw "Package install for '$($PackageResult.PackageId)' requires installer command '$CommandName', but no ready dependency exposes that command."
 }

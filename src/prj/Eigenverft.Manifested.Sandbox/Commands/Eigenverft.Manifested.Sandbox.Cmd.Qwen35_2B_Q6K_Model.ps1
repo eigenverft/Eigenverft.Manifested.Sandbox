@@ -5,10 +5,10 @@
 function Invoke-Qwen35-2B-Q6K-Model {
 <#
 .SYNOPSIS
-Ensures the configured Qwen 3.5 2B Q6_K GGUF model is available through PackageModel.
+Ensures the configured Qwen 3.5 2B Q6_K GGUF model is available through Package.
 
 .DESCRIPTION
-Loads the shipped PackageModel JSON documents through the neutral PackageModel
+Loads the shipped Package JSON documents through the neutral Package
 config loader, resolves the effective Qwen model resource release for the
 current runtime context, evaluates existing-install ownership and policy,
 saves the package file when needed, installs or reuses the package, validates
@@ -21,6 +21,6 @@ Invoke-Qwen35-2B-Q6K-Model
     [CmdletBinding()]
     param()
 
-    return (Invoke-PackageModelDefinitionCommand -DefinitionId 'Qwen35_2B_Q6K_Model' -CommandName 'Invoke-Qwen35-2B-Q6K-Model')
+    return (Invoke-PackageDefinitionCommand -DefinitionId 'Qwen35_2B_Q6K_Model' -CommandName 'Invoke-Qwen35-2B-Q6K-Model')
 }
 

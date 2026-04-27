@@ -5,11 +5,11 @@
 function Invoke-QwenCli {
 <#
 .SYNOPSIS
-Ensures the configured Qwen CLI package is available through PackageModel.
+Ensures the configured Qwen CLI package is available through Package.
 
 .DESCRIPTION
-Installs or reuses the pinned Qwen CLI npm package through the PackageModel
-npm backend, using PackageModel-owned Node.js as the package-manager dependency.
+Installs or reuses the pinned Qwen CLI npm package through the Package
+npm backend, using Package-owned Node.js as the package-manager dependency.
 
 .EXAMPLE
 Invoke-QwenCli
@@ -17,6 +17,6 @@ Invoke-QwenCli
     [CmdletBinding()]
     param()
 
-    return (Invoke-PackageModelDefinitionCommand -DefinitionId 'QwenCli' -CommandName 'Invoke-QwenCli')
+    return (Invoke-PackageDefinitionCommand -DefinitionId 'QwenCli' -CommandName 'Invoke-QwenCli')
 }
 

@@ -2,30 +2,30 @@
     Eigenverft.Manifested.Sandbox.Package.Source
 #>
 
-function Get-PackageModelPackageFileIndex {
+function Get-PackagePackageFileIndex {
 <#
 .SYNOPSIS
-Loads the PackageModel package-file index.
+Loads the Package package-file index.
 
 .DESCRIPTION
 Returns the configured package-file index document, or an empty record set when
 the index file does not exist yet.
 
-.PARAMETER PackageModelConfig
-The resolved PackageModel config object.
+.PARAMETER PackageConfig
+The resolved Package config object.
 
 .EXAMPLE
-Get-PackageModelPackageFileIndex -PackageModelConfig $config
+Get-PackagePackageFileIndex -PackageConfig $config
 #>
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true)]
-        [psobject]$PackageModelConfig
+        [psobject]$PackageConfig
     )
 
-    $indexPath = $PackageModelConfig.PackageFileIndexFilePath
+    $indexPath = $PackageConfig.PackageFileIndexFilePath
     if ([string]::IsNullOrWhiteSpace($indexPath)) {
-        throw 'PackageModel package-file index path is not configured.'
+        throw 'Package package-file index path is not configured.'
     }
 
     if (-not (Test-Path -LiteralPath $indexPath -PathType Leaf)) {
@@ -35,7 +35,7 @@ Get-PackageModelPackageFileIndex -PackageModelConfig $config
         }
     }
 
-    $documentInfo = Read-PackageModelJsonDocument -Path $indexPath
+    $documentInfo = Read-PackageJsonDocument -Path $indexPath
     $records = if ($documentInfo.Document.PSObject.Properties['records']) { @($documentInfo.Document.records) } else { @() }
     return [pscustomobject]@{
         Path    = $documentInfo.Path
@@ -43,10 +43,10 @@ Get-PackageModelPackageFileIndex -PackageModelConfig $config
     }
 }
 
-function Save-PackageModelPackageFileIndex {
+function Save-PackagePackageFileIndex {
 <#
 .SYNOPSIS
-Writes the PackageModel package-file index to disk.
+Writes the Package package-file index to disk.
 
 .DESCRIPTION
 Persists the normalized package-file index document to the configured index path.
@@ -58,7 +58,7 @@ The target index file path.
 The package-file records to persist.
 
 .EXAMPLE
-Save-PackageModelPackageFileIndex -IndexPath $path -Records $records
+Save-PackagePackageFileIndex -IndexPath $path -Records $records
 #>
     [CmdletBinding()]
     param(
@@ -80,17 +80,17 @@ Save-PackageModelPackageFileIndex -IndexPath $path -Records $records
     } | ConvertTo-Json -Depth 20 | Set-Content -LiteralPath $IndexPath -Encoding UTF8
 }
 
-function Update-PackageModelPackageFileIndexRecord {
+function Update-PackagePackageFileIndexRecord {
 <#
 .SYNOPSIS
-Updates the PackageModel package-file index for one resolved package file path.
+Updates the Package package-file index for one resolved package file path.
 
 .DESCRIPTION
 Refreshes the tracked source and package metadata for a package-file path in
 the package-file index.
 
-.PARAMETER PackageModelResult
-The current PackageModel result object.
+.PARAMETER PackageResult
+The current Package result object.
 
 .PARAMETER PackageFilePath
 The package-file path to write into the index.
@@ -102,12 +102,12 @@ The source scope that produced the artifact.
 The source id that produced the artifact.
 
 .EXAMPLE
-Update-PackageModelPackageFileIndexRecord -PackageModelResult $result -PackageFilePath $path -SourceScope environment -SourceId defaultPackageDepot
+Update-PackagePackageFileIndexRecord -PackageResult $result -PackageFilePath $path -SourceScope environment -SourceId defaultPackageDepot
 #>
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true)]
-        [psobject]$PackageModelResult,
+        [psobject]$PackageResult,
 
         [Parameter(Mandatory = $true)]
         [string]$PackageFilePath,
@@ -124,7 +124,7 @@ Update-PackageModelPackageFileIndexRecord -PackageModelResult $result -PackageFi
     }
 
     $normalizedPackageFilePath = [System.IO.Path]::GetFullPath($PackageFilePath)
-    $index = Get-PackageModelPackageFileIndex -PackageModelConfig $PackageModelResult.PackageModelConfig
+    $index = Get-PackagePackageFileIndex -PackageConfig $PackageResult.PackageConfig
     $records = @(
         foreach ($record in @($index.Records)) {
             if (-not [string]::Equals([string]$record.path, $normalizedPackageFilePath, [System.StringComparison]::OrdinalIgnoreCase)) {
@@ -135,42 +135,42 @@ Update-PackageModelPackageFileIndexRecord -PackageModelResult $result -PackageFi
 
     $records += [pscustomobject]@{
         path         = $normalizedPackageFilePath
-        definitionId = $PackageModelResult.DefinitionId
-        releaseId    = $PackageModelResult.PackageId
-        releaseTrack = $PackageModelResult.ReleaseTrack
-        flavor       = if ($PackageModelResult.Package -and $PackageModelResult.Package.PSObject.Properties['flavor']) { [string]$PackageModelResult.Package.flavor } else { $null }
-        version      = $PackageModelResult.PackageVersion
+        definitionId = $PackageResult.DefinitionId
+        releaseId    = $PackageResult.PackageId
+        releaseTrack = $PackageResult.ReleaseTrack
+        flavor       = if ($PackageResult.Package -and $PackageResult.Package.PSObject.Properties['flavor']) { [string]$PackageResult.Package.flavor } else { $null }
+        version      = $PackageResult.PackageVersion
         sourceScope  = $SourceScope
         sourceId     = $SourceId
         updatedAtUtc = [DateTime]::UtcNow.ToString('o')
     }
 
-    Save-PackageModelPackageFileIndex -IndexPath $index.Path -Records $records
+    Save-PackagePackageFileIndex -IndexPath $index.Path -Records $records
 }
 
-function Get-PackageModelSourceDefinition {
+function Get-PackageSourceDefinition {
 <#
 .SYNOPSIS
-Returns a resolved PackageModel source definition by sourceRef.
+Returns a resolved Package source definition by sourceRef.
 
 .DESCRIPTION
 Looks up an acquisition source from the effective acquisition environment or
 from definition-local upstream sources and returns the normalized source
 definition with scope and id metadata.
 
-.PARAMETER PackageModelConfig
-The resolved PackageModel config object.
+.PARAMETER PackageConfig
+The resolved Package config object.
 
 .PARAMETER SourceRef
 The acquisition-candidate sourceRef object.
 
 .EXAMPLE
-Get-PackageModelSourceDefinition -PackageModelConfig $config -SourceRef $candidate.sourceRef
+Get-PackageSourceDefinition -PackageConfig $config -SourceRef $candidate.sourceRef
 #>
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true)]
-        [psobject]$PackageModelConfig,
+        [psobject]$PackageConfig,
 
         [Parameter(Mandatory = $true)]
         [psobject]$SourceRef
@@ -182,7 +182,7 @@ Get-PackageModelSourceDefinition -PackageModelConfig $config -SourceRef $candida
 
     switch -Exact ($scope) {
         'environment' {
-            foreach ($property in @($PackageModelConfig.EnvironmentSources.PSObject.Properties)) {
+            foreach ($property in @($PackageConfig.EnvironmentSources.PSObject.Properties)) {
                 if ([string]::Equals([string]$property.Name, $id, [System.StringComparison]::OrdinalIgnoreCase)) {
                     $sourceObject = $property.Value
                     $id = $property.Name
@@ -190,11 +190,11 @@ Get-PackageModelSourceDefinition -PackageModelConfig $config -SourceRef $candida
                 }
             }
             if (-not $sourceObject) {
-                throw "PackageModel environment source '$($SourceRef.id)' was not found in the effective acquisition environment."
+                throw "Package environment source '$($SourceRef.id)' was not found in the effective acquisition environment."
             }
         }
         'definition' {
-            foreach ($property in @($PackageModelConfig.DefinitionUpstreamSources.PSObject.Properties)) {
+            foreach ($property in @($PackageConfig.DefinitionUpstreamSources.PSObject.Properties)) {
                 if ([string]::Equals([string]$property.Name, $id, [System.StringComparison]::OrdinalIgnoreCase)) {
                     $sourceObject = $property.Value
                     $id = $property.Name
@@ -202,11 +202,11 @@ Get-PackageModelSourceDefinition -PackageModelConfig $config -SourceRef $candida
                 }
             }
             if (-not $sourceObject) {
-                throw "PackageModel definition source '$($SourceRef.id)' was not found in definition '$($PackageModelConfig.DefinitionId)'."
+                throw "Package definition source '$($SourceRef.id)' was not found in definition '$($PackageConfig.DefinitionId)'."
             }
         }
         default {
-            throw "Unsupported PackageModel sourceRef.scope '$scope'."
+            throw "Unsupported Package sourceRef.scope '$scope'."
         }
     }
 
@@ -221,7 +221,7 @@ Get-PackageModelSourceDefinition -PackageModelConfig $config -SourceRef $candida
     }
 }
 
-function Resolve-PackageModelSource {
+function Resolve-PackageSource {
 <#
 .SYNOPSIS
 Resolves a concrete source location from a source definition and acquisition candidate.
@@ -242,7 +242,7 @@ The selected effective release object. Required for source kinds that resolve
 through release metadata, such as GitHub release lookup by tag.
 
 .EXAMPLE
-Resolve-PackageModelSource -SourceDefinition $source -AcquisitionCandidate $candidate
+Resolve-PackageSource -SourceDefinition $source -AcquisitionCandidate $candidate
 #>
     [CmdletBinding()]
     param(
@@ -259,10 +259,10 @@ Resolve-PackageModelSource -SourceDefinition $source -AcquisitionCandidate $cand
     switch -Exact ([string]$SourceDefinition.Kind) {
         'download' {
             if ([string]::IsNullOrWhiteSpace([string]$SourceDefinition.BaseUri)) {
-                throw "PackageModel download source '$($SourceDefinition.Id)' does not define baseUri."
+                throw "Package download source '$($SourceDefinition.Id)' does not define baseUri."
             }
             if (-not $AcquisitionCandidate.PSObject.Properties['sourcePath'] -or [string]::IsNullOrWhiteSpace([string]$AcquisitionCandidate.sourcePath)) {
-                throw "PackageModel acquisition candidate for '$($SourceDefinition.Id)' does not define sourcePath."
+                throw "Package acquisition candidate for '$($SourceDefinition.Id)' does not define sourcePath."
             }
 
             $baseUriText = ([string]$SourceDefinition.BaseUri).TrimEnd('/') + '/'
@@ -274,22 +274,22 @@ Resolve-PackageModelSource -SourceDefinition $source -AcquisitionCandidate $cand
         }
         'githubRelease' {
             if (-not $Package) {
-                throw "PackageModel GitHub release source '$($SourceDefinition.Id)' requires the selected package release context."
+                throw "Package GitHub release source '$($SourceDefinition.Id)' requires the selected package release context."
             }
             if ([string]::IsNullOrWhiteSpace([string]$SourceDefinition.RepositoryOwner)) {
-                throw "PackageModel GitHub release source '$($SourceDefinition.Id)' does not define repositoryOwner."
+                throw "Package GitHub release source '$($SourceDefinition.Id)' does not define repositoryOwner."
             }
             if ([string]::IsNullOrWhiteSpace([string]$SourceDefinition.RepositoryName)) {
-                throw "PackageModel GitHub release source '$($SourceDefinition.Id)' does not define repositoryName."
+                throw "Package GitHub release source '$($SourceDefinition.Id)' does not define repositoryName."
             }
             if (-not $Package.PSObject.Properties['releaseTag'] -or [string]::IsNullOrWhiteSpace([string]$Package.releaseTag)) {
-                throw "PackageModel release '$($Package.id)' requires releaseTag when acquisition uses GitHub release source '$($SourceDefinition.Id)'."
+                throw "Package release '$($Package.id)' requires releaseTag when acquisition uses GitHub release source '$($SourceDefinition.Id)'."
             }
             if (-not $Package.PSObject.Properties['packageFile'] -or
                 $null -eq $Package.packageFile -or
                 -not $Package.packageFile.PSObject.Properties['fileName'] -or
                 [string]::IsNullOrWhiteSpace([string]$Package.packageFile.fileName)) {
-                throw "PackageModel release '$($Package.id)' requires packageFile.fileName when acquisition uses GitHub release source '$($SourceDefinition.Id)'."
+                throw "Package release '$($Package.id)' requires packageFile.fileName when acquisition uses GitHub release source '$($SourceDefinition.Id)'."
             }
 
             $release = Get-GitHubRelease -RepositoryOwner $SourceDefinition.RepositoryOwner -RepositoryName $SourceDefinition.RepositoryName -ReleaseTag ([string]$Package.releaseTag)
@@ -314,16 +314,16 @@ Resolve-PackageModelSource -SourceDefinition $source -AcquisitionCandidate $cand
         }
         'filesystem' {
             if (-not $AcquisitionCandidate.PSObject.Properties['sourcePath'] -or [string]::IsNullOrWhiteSpace([string]$AcquisitionCandidate.sourcePath)) {
-                throw "PackageModel acquisition candidate for '$($SourceDefinition.Id)' does not define sourcePath."
+                throw "Package acquisition candidate for '$($SourceDefinition.Id)' does not define sourcePath."
             }
 
             $sourcePath = ([string]$AcquisitionCandidate.sourcePath).Trim() -replace '/', '\'
             if ([System.IO.Path]::IsPathRooted($sourcePath)) {
-                $resolvedPath = Resolve-PackageModelPathValue -PathValue $sourcePath
+                $resolvedPath = Resolve-PackagePathValue -PathValue $sourcePath
             }
             else {
                 if ([string]::IsNullOrWhiteSpace([string]$SourceDefinition.BasePath)) {
-                    throw "PackageModel filesystem source '$($SourceDefinition.Id)' does not define basePath."
+                    throw "Package filesystem source '$($SourceDefinition.Id)' does not define basePath."
                 }
 
                 $resolvedPath = [System.IO.Path]::GetFullPath((Join-Path $SourceDefinition.BasePath $sourcePath))
@@ -335,12 +335,12 @@ Resolve-PackageModelSource -SourceDefinition $source -AcquisitionCandidate $cand
             }
         }
         default {
-            throw "Unsupported PackageModel source kind '$($SourceDefinition.Kind)'."
+            throw "Unsupported Package source kind '$($SourceDefinition.Kind)'."
         }
     }
 }
 
-function Test-PackageModelSavedFile {
+function Test-PackageSavedFile {
 <#
 .SYNOPSIS
 Evaluates a package file against a save-time verification policy.
@@ -357,7 +357,7 @@ The local file path to verify.
 The verification policy object from the acquisition candidate.
 
 .EXAMPLE
-Test-PackageModelSavedFile -Path .\package.zip -Verification $verification
+Test-PackageSavedFile -Path .\package.zip -Verification $verification
 #>
     [CmdletBinding()]
     param(
@@ -518,7 +518,7 @@ Test-PackageModelSavedFile -Path .\package.zip -Verification $verification
     }
 }
 
-function Save-PackageModelDownloadFile {
+function Save-PackageDownloadFile {
 <#
 .SYNOPSIS
 Downloads a package file to a local path.
@@ -534,7 +534,7 @@ The package download URI.
 The local staging path that should receive the file.
 
 .EXAMPLE
-Save-PackageModelDownloadFile -Uri https://example.org/package.zip -TargetPath C:\Temp\package.zip
+Save-PackageDownloadFile -Uri https://example.org/package.zip -TargetPath C:\Temp\package.zip
 #>
     [CmdletBinding()]
     param(
@@ -549,7 +549,7 @@ Save-PackageModelDownloadFile -Uri https://example.org/package.zip -TargetPath C
     return (Resolve-Path -LiteralPath $TargetPath -ErrorAction Stop).Path
 }
 
-function Save-PackageModelFilesystemFile {
+function Save-PackageFilesystemFile {
 <#
 .SYNOPSIS
 Copies a package file from a filesystem source.
@@ -565,7 +565,7 @@ The local or network path that contains the package file.
 The local staging path that should receive the copy.
 
 .EXAMPLE
-Save-PackageModelFilesystemFile -SourcePath \\server\share\package.zip -TargetPath C:\Temp\package.zip
+Save-PackageFilesystemFile -SourcePath \\server\share\package.zip -TargetPath C:\Temp\package.zip
 #>
     [CmdletBinding()]
     param(
@@ -577,13 +577,13 @@ Save-PackageModelFilesystemFile -SourcePath \\server\share\package.zip -TargetPa
     )
 
     if (-not (Test-Path -LiteralPath $SourcePath)) {
-        throw "PackageModel filesystem source '$SourcePath' does not exist."
+        throw "Package filesystem source '$SourcePath' does not exist."
     }
 
     return (Copy-FileToPath -SourcePath $SourcePath -TargetPath $TargetPath -Overwrite)
 }
 
-function Test-PackageModelPackageFileAcquisitionRequired {
+function Test-PackagePackageFileAcquisitionRequired {
 <#
 .SYNOPSIS
 Determines whether the selected release needs an acquired package file.
@@ -596,7 +596,7 @@ that do not consume a saved package file.
 The selected release object.
 
 .EXAMPLE
-Test-PackageModelPackageFileAcquisitionRequired -Package $package
+Test-PackagePackageFileAcquisitionRequired -Package $package
 #>
     [CmdletBinding()]
     [OutputType([bool])]
@@ -622,7 +622,7 @@ Test-PackageModelPackageFileAcquisitionRequired -Package $package
     }
 }
 
-function Get-PackageModelPreferredVerification {
+function Get-PackagePreferredVerification {
     [CmdletBinding()]
     param(
         [AllowNull()]
@@ -638,7 +638,7 @@ function Get-PackageModelPreferredVerification {
     return [pscustomobject]@{ mode = 'none' }
 }
 
-function Resolve-PackageModelAcquisitionCandidateVerification {
+function Resolve-PackageAcquisitionCandidateVerification {
 <#
 .SYNOPSIS
 Builds the effective verification policy for one acquisition candidate.
@@ -742,33 +742,25 @@ The raw acquisition candidate.
     return [pscustomobject]$verification
 }
 
-function Get-PackageModelPackageDepotSources {
+function Get-PackagePackageDepotSources {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true)]
-        [psobject]$PackageModelConfig
+        [psobject]$PackageConfig
     )
 
     $orderedSources = New-Object System.Collections.Generic.List[object]
 
-    foreach ($property in @($PackageModelConfig.EnvironmentSources.PSObject.Properties)) {
+    foreach ($property in @($PackageConfig.EnvironmentSources.PSObject.Properties)) {
         $source = $property.Value
         if (-not [string]::Equals([string]$source.kind, 'filesystem', [System.StringComparison]::OrdinalIgnoreCase)) {
             continue
         }
 
-        if ([string]::Equals([string]$property.Name, 'defaultPackageDepot', [System.StringComparison]::OrdinalIgnoreCase)) {
-            $orderedSources.Add([pscustomobject]@{
-                id       = $property.Name
-                priority = 0
-            }) | Out-Null
-        }
-        else {
-            $orderedSources.Add([pscustomobject]@{
-                id       = $property.Name
-                priority = 1000
-            }) | Out-Null
-        }
+        $orderedSources.Add([pscustomobject]@{
+            id       = $property.Name
+            priority = if ($source.PSObject.Properties['priority']) { [int]$source.priority } else { 1000 }
+        }) | Out-Null
     }
 
     return @(
@@ -777,56 +769,57 @@ function Get-PackageModelPackageDepotSources {
     )
 }
 
-function Build-PackageModelAcquisitionPlan {
+function Build-PackageAcquisitionPlan {
 <#
 .SYNOPSIS
-Builds the internal PackageModel acquisition plan for the selected release.
+Builds the internal Package acquisition plan for the selected release.
 
 .DESCRIPTION
 Normalizes the ordered acquisition candidates and captures the install-workspace
 and default-depot targets so later package-file save steps can execute linearly.
 
-.PARAMETER PackageModelResult
-The PackageModel result object to enrich.
+.PARAMETER PackageResult
+The Package result object to enrich.
 
 .EXAMPLE
-Build-PackageModelAcquisitionPlan -PackageModelResult $result
+Build-PackageAcquisitionPlan -PackageResult $result
 #>
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true)]
-        [psobject]$PackageModelResult
+        [psobject]$PackageResult
     )
 
-    $package = $PackageModelResult.Package
+    $package = $PackageResult.Package
     if (-not $package) {
-        throw 'Build-PackageModelAcquisitionPlan requires a selected release.'
+        throw 'Build-PackageAcquisitionPlan requires a selected release.'
     }
 
-    if ([string]::Equals([string]$PackageModelResult.InstallOrigin, 'AlreadySatisfied', [System.StringComparison]::OrdinalIgnoreCase)) {
-        $PackageModelResult.AcquisitionPlan = [pscustomobject]@{
+    if ([string]::Equals([string]$PackageResult.InstallOrigin, 'AlreadySatisfied', [System.StringComparison]::OrdinalIgnoreCase)) {
+        $PackageResult.AcquisitionPlan = [pscustomobject]@{
             PackageFileRequired      = $false
-            InstallWorkspaceFilePath = $PackageModelResult.PackageFilePath
+            InstallWorkspaceFilePath = $PackageResult.PackageFilePath
             Candidates               = @()
         }
-        Write-PackageModelExecutionMessage -Message '[STATE] Acquisition skipped because package target is already satisfied.'
-        return $PackageModelResult
+        Write-PackageExecutionMessage -Message '[STATE] Acquisition skipped because package target is already satisfied.'
+        return $PackageResult
     }
 
-    $requiresPackageFile = Test-PackageModelPackageFileAcquisitionRequired -Package $package
+    $requiresPackageFile = Test-PackagePackageFileAcquisitionRequired -Package $package
     $orderedCandidates = New-Object System.Collections.Generic.List[object]
     if ($requiresPackageFile -and $package.PSObject.Properties['acquisitionCandidates']) {
         foreach ($candidate in @($package.acquisitionCandidates | Sort-Object -Property @{
                     Expression = { if ($_.PSObject.Properties['priority']) { [int]$_.priority } else { [int]::MaxValue } }
                 })) {
-            $resolvedVerification = Resolve-PackageModelAcquisitionCandidateVerification -Package $package -AcquisitionCandidate $candidate
+            $resolvedVerification = Resolve-PackageAcquisitionCandidateVerification -Package $package -AcquisitionCandidate $candidate
             switch -Exact ([string]$candidate.kind) {
                 'packageDepot' {
-                    $resolvedDepotSourcePath = Join-Path $PackageModelResult.PackageFileRelativeDirectory ([string]$package.packageFile.fileName)
-                    foreach ($depotSource in @(Get-PackageModelPackageDepotSources -PackageModelConfig $PackageModelResult.PackageModelConfig)) {
+                    $resolvedDepotSourcePath = Join-Path $PackageResult.PackageFileRelativeDirectory ([string]$package.packageFile.fileName)
+                    foreach ($depotSource in @(Get-PackagePackageDepotSources -PackageConfig $PackageResult.PackageConfig)) {
                         $orderedCandidates.Add([pscustomobject]@{
                             kind         = 'packageDepot'
                             priority     = if ($candidate.PSObject.Properties['priority']) { [int]$candidate.priority } else { [int]::MaxValue }
+                            sourcePriority = [int]$depotSource.priority
                             sourceRef    = [pscustomobject]@{
                                 scope = 'environment'
                                 id    = $depotSource.id
@@ -840,6 +833,7 @@ Build-PackageModelAcquisitionPlan -PackageModelResult $result
                     $orderedCandidates.Add([pscustomobject]@{
                         kind         = 'download'
                         priority     = if ($candidate.PSObject.Properties['priority']) { [int]$candidate.priority } else { [int]::MaxValue }
+                        sourcePriority = 1000
                         sourceRef    = [pscustomobject]@{
                             scope = 'definition'
                             id    = [string]$candidate.sourceId
@@ -852,6 +846,7 @@ Build-PackageModelAcquisitionPlan -PackageModelResult $result
                     $orderedCandidates.Add([pscustomobject]@{
                         kind         = 'filesystem'
                         priority     = if ($candidate.PSObject.Properties['priority']) { [int]$candidate.priority } else { [int]::MaxValue }
+                        sourcePriority = 1000
                         sourceRef    = if ($candidate.PSObject.Properties['sourceId'] -and -not [string]::IsNullOrWhiteSpace([string]$candidate.sourceId)) {
                             [pscustomobject]@{
                                 scope = 'environment'
@@ -869,13 +864,13 @@ Build-PackageModelAcquisitionPlan -PackageModelResult $result
         }
     }
 
-    $PackageModelResult.AcquisitionPlan = [pscustomobject]@{
+    $PackageResult.AcquisitionPlan = [pscustomobject]@{
         PackageFileRequired    = $requiresPackageFile
-        InstallWorkspaceFilePath = $PackageModelResult.PackageFilePath
-        DefaultPackageDepotFilePath = $PackageModelResult.DefaultPackageDepotFilePath
+        InstallWorkspaceFilePath = $PackageResult.PackageFilePath
+        DefaultPackageDepotFilePath = $PackageResult.DefaultPackageDepotFilePath
         Candidates             = @(
             $orderedCandidates.ToArray() |
-                Sort-Object -Property priority, @{
+                Sort-Object -Property priority, sourcePriority, @{
                     Expression = {
                         if ($_.sourceRef) { [string]$_.sourceRef.id } else { [string]::Empty }
                     }
@@ -884,7 +879,7 @@ Build-PackageModelAcquisitionPlan -PackageModelResult $result
     }
 
     $candidateSummary = @(
-        foreach ($candidate in @($PackageModelResult.AcquisitionPlan.Candidates)) {
+        foreach ($candidate in @($PackageResult.AcquisitionPlan.Candidates)) {
             $sourceSummary = if ($candidate.sourceRef) {
                 '{0}:{1}' -f [string]$candidate.sourceRef.scope, [string]$candidate.sourceRef.id
             }
@@ -897,12 +892,12 @@ Build-PackageModelAcquisitionPlan -PackageModelResult $result
     if ([string]::IsNullOrWhiteSpace($candidateSummary)) {
         $candidateSummary = '<none>'
     }
-    Write-PackageModelExecutionMessage -Message ("[STATE] Acquisition plan packageFileRequired='{0}' with {1} candidate(s): {2}." -f $requiresPackageFile, @($PackageModelResult.AcquisitionPlan.Candidates).Count, $candidateSummary)
+    Write-PackageExecutionMessage -Message ("[STATE] Acquisition plan packageFileRequired='{0}' with {1} candidate(s): {2}." -f $requiresPackageFile, @($PackageResult.AcquisitionPlan.Candidates).Count, $candidateSummary)
 
-    return $PackageModelResult
+    return $PackageResult
 }
 
-function Save-PackageModelPackageFile {
+function Save-PackagePackageFile {
 <#
 .SYNOPSIS
 Ensures the selected package file is present in the install workspace.
@@ -912,158 +907,119 @@ Reuses an already-present verified package file when possible, then checks the
 default package depot, and otherwise attempts each configured acquisition
 candidate in priority order until one succeeds or all candidates fail.
 
-.PARAMETER PackageModelResult
-The PackageModel result object to enrich.
+.PARAMETER PackageResult
+The Package result object to enrich.
 
 .EXAMPLE
-Save-PackageModelPackageFile -PackageModelResult $result
+Save-PackagePackageFile -PackageResult $result
 #>
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true)]
-        [psobject]$PackageModelResult
+        [psobject]$PackageResult
     )
 
-    $package = $PackageModelResult.Package
-    $packageModelConfig = $PackageModelResult.PackageModelConfig
+    $package = $PackageResult.Package
+    $packageConfig = $PackageResult.PackageConfig
 
     if (-not $package -or -not $package.PSObject.Properties['install'] -or -not $package.install) {
-        throw 'Save-PackageModelPackageFile requires a selected release with install settings.'
+        throw 'Save-PackagePackageFile requires a selected release with install settings.'
     }
 
-    if ($PackageModelResult.ExistingPackage -and
-        $PackageModelResult.ExistingPackage.PSObject.Properties['Decision'] -and
-        $PackageModelResult.ExistingPackage.Decision -in @('ReusePackageModelOwned', 'AdoptExternal')) {
-        $PackageModelResult.PackageFileSave = [pscustomobject]@{
+    if ($PackageResult.ExistingPackage -and
+        $PackageResult.ExistingPackage.PSObject.Properties['Decision'] -and
+        $PackageResult.ExistingPackage.Decision -in @('ReusePackageOwned', 'AdoptExternal')) {
+        $PackageResult.PackageFileSave = [pscustomobject]@{
             Success         = $true
             Status          = 'Skipped'
-            PackageFilePath = $PackageModelResult.PackageFilePath
+            PackageFilePath = $PackageResult.PackageFilePath
             SelectedSource  = $null
             Verification    = $null
             Attempts        = @()
             FailureReason   = $null
             ErrorMessage    = $null
         }
-        Write-PackageModelExecutionMessage -Message ("[STATE] Package file step skipped because existing install decision is '{0}'." -f [string]$PackageModelResult.ExistingPackage.Decision)
-        return $PackageModelResult
+        Write-PackageExecutionMessage -Message ("[STATE] Package file step skipped because existing install decision is '{0}'." -f [string]$PackageResult.ExistingPackage.Decision)
+        return $PackageResult
     }
 
-    if (-not $PackageModelResult.AcquisitionPlan) {
-        $PackageModelResult = Build-PackageModelAcquisitionPlan -PackageModelResult $PackageModelResult
+    if (-not $PackageResult.AcquisitionPlan) {
+        $PackageResult = Build-PackageAcquisitionPlan -PackageResult $PackageResult
     }
 
-    if (-not $PackageModelResult.AcquisitionPlan.PackageFileRequired) {
-        $PackageModelResult.PackageFileSave = [pscustomobject]@{
+    if (-not $PackageResult.AcquisitionPlan.PackageFileRequired) {
+        $PackageResult.PackageFileSave = [pscustomobject]@{
             Success         = $true
             Status          = 'Skipped'
-            PackageFilePath = $PackageModelResult.PackageFilePath
+            PackageFilePath = $PackageResult.PackageFilePath
             SelectedSource  = $null
             Verification    = $null
             Attempts        = @()
             FailureReason   = $null
             ErrorMessage    = $null
         }
-        Write-PackageModelExecutionMessage -Message "[STATE] Package file step skipped because the selected install kind does not require a saved package file."
-        return $PackageModelResult
+        Write-PackageExecutionMessage -Message "[STATE] Package file step skipped because the selected install kind does not require a saved package file."
+        return $PackageResult
     }
 
-    if ([string]::IsNullOrWhiteSpace($PackageModelResult.PackageFilePath)) {
-        throw "PackageModel release '$($package.id)' does not define packageFile.fileName."
+    if ([string]::IsNullOrWhiteSpace($PackageResult.PackageFilePath)) {
+        throw "Package release '$($package.id)' does not define packageFile.fileName."
     }
 
-    $orderedCandidates = @($PackageModelResult.AcquisitionPlan.Candidates)
+    $orderedCandidates = @($PackageResult.AcquisitionPlan.Candidates)
     if (-not $orderedCandidates) {
-        throw "PackageModel release '$($package.id)' does not define any acquisition candidates."
+        throw "Package release '$($package.id)' does not define any acquisition candidates."
     }
 
     $attempts = New-Object System.Collections.Generic.List[object]
-    $preferredVerification = Get-PackageModelPreferredVerification -AcquisitionCandidates $orderedCandidates
+    $preferredVerification = Get-PackagePreferredVerification -AcquisitionCandidates $orderedCandidates
 
-    if (Test-Path -LiteralPath $PackageModelResult.PackageFilePath) {
-        $verification = Test-PackageModelSavedFile -Path $PackageModelResult.PackageFilePath -Verification $preferredVerification
+    if (Test-Path -LiteralPath $PackageResult.PackageFilePath) {
+        $verification = Test-PackageSavedFile -Path $PackageResult.PackageFilePath -Verification $preferredVerification
         $attempts.Add([pscustomobject]@{
             AttemptType        = 'ReuseCheck'
             Status             = if ($verification.Accepted) { 'ReusedPackageFile' } else { 'ReuseRejected' }
             SourceScope        = 'installWorkspace'
             SourceId           = 'installWorkspace'
             SourceKind         = 'filesystem'
-            ResolvedSource     = $PackageModelResult.PackageFilePath
+            ResolvedSource     = $PackageResult.PackageFilePath
             VerificationStatus = $verification.Status
             ErrorMessage       = if ($verification.Accepted) { $null } else { 'Existing install-workspace file did not satisfy verification.' }
         }) | Out-Null
 
         if ($verification.Accepted) {
-            Update-PackageModelPackageFileIndexRecord -PackageModelResult $PackageModelResult -PackageFilePath $PackageModelResult.PackageFilePath -SourceScope 'installWorkspace' -SourceId 'installWorkspace'
-            $PackageModelResult.PackageFileSave = [pscustomobject]@{
+            Update-PackagePackageFileIndexRecord -PackageResult $PackageResult -PackageFilePath $PackageResult.PackageFilePath -SourceScope 'installWorkspace' -SourceId 'installWorkspace'
+            $PackageResult.PackageFileSave = [pscustomobject]@{
                 Success         = $true
                 Status          = 'ReusedPackageFile'
-                PackageFilePath = $PackageModelResult.PackageFilePath
+                PackageFilePath = $PackageResult.PackageFilePath
                 SelectedSource  = [pscustomobject]@{
                     SourceScope = 'installWorkspace'
                     SourceId    = 'installWorkspace'
                     SourceKind  = 'filesystem'
-                    ResolvedSource = $PackageModelResult.PackageFilePath
+                    ResolvedSource = $PackageResult.PackageFilePath
                 }
                 Verification    = $verification
                 Attempts        = @($attempts.ToArray())
                 FailureReason   = $null
                 ErrorMessage    = $null
             }
-            Write-PackageModelExecutionMessage -Message ("[ACTION] Reused install workspace package file '{0}'." -f $PackageModelResult.PackageFilePath)
-            return $PackageModelResult
+            Write-PackageExecutionMessage -Message ("[ACTION] Reused install workspace package file '{0}'." -f $PackageResult.PackageFilePath)
+            return $PackageResult
         }
     }
 
-    if (-not [string]::IsNullOrWhiteSpace($PackageModelResult.DefaultPackageDepotFilePath) -and
-        (Test-Path -LiteralPath $PackageModelResult.DefaultPackageDepotFilePath)) {
-        $verification = Test-PackageModelSavedFile -Path $PackageModelResult.DefaultPackageDepotFilePath -Verification $preferredVerification
-        $attempts.Add([pscustomobject]@{
-            AttemptType        = 'DepotReuseCheck'
-            Status             = if ($verification.Accepted) { 'HydratedFromDefaultPackageDepot' } else { 'DefaultPackageDepotRejected' }
-            SourceScope        = 'environment'
-            SourceId           = 'defaultPackageDepot'
-            SourceKind         = 'filesystem'
-            ResolvedSource     = $PackageModelResult.DefaultPackageDepotFilePath
-            VerificationStatus = $verification.Status
-            ErrorMessage       = if ($verification.Accepted) { $null } else { 'Default package-depot artifact did not satisfy verification.' }
-        }) | Out-Null
-
-        if ($verification.Accepted) {
-            $null = New-Item -ItemType Directory -Path $PackageModelResult.InstallWorkspaceDirectory -Force
-            $null = Copy-FileToPath -SourcePath $PackageModelResult.DefaultPackageDepotFilePath -TargetPath $PackageModelResult.PackageFilePath -Overwrite
-            Update-PackageModelPackageFileIndexRecord -PackageModelResult $PackageModelResult -PackageFilePath $PackageModelResult.DefaultPackageDepotFilePath -SourceScope 'environment' -SourceId 'defaultPackageDepot'
-            Update-PackageModelPackageFileIndexRecord -PackageModelResult $PackageModelResult -PackageFilePath $PackageModelResult.PackageFilePath -SourceScope 'environment' -SourceId 'defaultPackageDepot'
-            $PackageModelResult.PackageFileSave = [pscustomobject]@{
-                Success         = $true
-                Status          = 'HydratedFromDefaultPackageDepot'
-                PackageFilePath = $PackageModelResult.PackageFilePath
-                SelectedSource  = [pscustomobject]@{
-                    SourceScope    = 'environment'
-                    SourceId       = 'defaultPackageDepot'
-                    SourceKind     = 'filesystem'
-                    ResolvedSource = $PackageModelResult.DefaultPackageDepotFilePath
-                }
-                Verification    = $verification
-                Attempts        = @($attempts.ToArray())
-                FailureReason   = $null
-                ErrorMessage    = $null
-            }
-            Write-PackageModelExecutionMessage -Message ("[ACTION] Hydrated install workspace package file from default package depot '{0}'." -f $PackageModelResult.DefaultPackageDepotFilePath)
-            return $PackageModelResult
-        }
-    }
-
-    $null = New-Item -ItemType Directory -Path $PackageModelResult.InstallWorkspaceDirectory -Force
+    $null = New-Item -ItemType Directory -Path $PackageResult.InstallWorkspaceDirectory -Force
 
     foreach ($candidate in $orderedCandidates) {
         $sourceDefinition = $null
         $resolvedSource = $null
         $verification = $null
-        $stagingPath = '{0}.{1}.partial' -f $PackageModelResult.PackageFilePath, ([guid]::NewGuid().ToString('N'))
+        $stagingPath = '{0}.{1}.partial' -f $PackageResult.PackageFilePath, ([guid]::NewGuid().ToString('N'))
 
         try {
             if ($candidate.sourceRef) {
-                $sourceDefinition = Get-PackageModelSourceDefinition -PackageModelConfig $packageModelConfig -SourceRef $candidate.sourceRef
+                $sourceDefinition = Get-PackageSourceDefinition -PackageConfig $packageConfig -SourceRef $candidate.sourceRef
             }
             elseif ([string]::Equals([string]$candidate.kind, 'filesystem', [System.StringComparison]::OrdinalIgnoreCase)) {
                 $sourceDefinition = [pscustomobject]@{
@@ -1075,23 +1031,23 @@ Save-PackageModelPackageFile -PackageModelResult $result
                 }
             }
             else {
-                throw "PackageModel acquisition candidate kind '$($candidate.kind)' could not be resolved to a source definition."
+                throw "Package acquisition candidate kind '$($candidate.kind)' could not be resolved to a source definition."
             }
-            $resolvedSource = Resolve-PackageModelSource -SourceDefinition $sourceDefinition -AcquisitionCandidate $candidate -Package $package
+            $resolvedSource = Resolve-PackageSource -SourceDefinition $sourceDefinition -AcquisitionCandidate $candidate -Package $package
 
             switch -Exact ([string]$resolvedSource.Kind) {
                 'download' {
-                    $null = Save-PackageModelDownloadFile -Uri $resolvedSource.ResolvedSource -TargetPath $stagingPath
+                    $null = Save-PackageDownloadFile -Uri $resolvedSource.ResolvedSource -TargetPath $stagingPath
                 }
                 'filesystem' {
-                    $null = Save-PackageModelFilesystemFile -SourcePath $resolvedSource.ResolvedSource -TargetPath $stagingPath
+                    $null = Save-PackageFilesystemFile -SourcePath $resolvedSource.ResolvedSource -TargetPath $stagingPath
                 }
                 default {
                     throw "Unsupported package-file source kind '$($resolvedSource.Kind)'."
                 }
             }
 
-            $verification = Test-PackageModelSavedFile -Path $stagingPath -Verification $candidate.verification
+            $verification = Test-PackageSavedFile -Path $stagingPath -Verification $candidate.verification
             if (-not $verification.Accepted) {
                 if (Test-Path -LiteralPath $stagingPath) {
                     Remove-Item -LiteralPath $stagingPath -Force -ErrorAction SilentlyContinue
@@ -1108,35 +1064,43 @@ Save-PackageModelPackageFile -PackageModelResult $result
                     ErrorMessage       = 'Saved package file did not satisfy verification.'
                 }) | Out-Null
 
-                if (-not $packageModelConfig.AllowAcquisitionFallback) {
+                if (-not $packageConfig.AllowAcquisitionFallback) {
                     break
                 }
 
                 continue
             }
 
-            if (Test-Path -LiteralPath $PackageModelResult.PackageFilePath) {
-                Remove-Item -LiteralPath $PackageModelResult.PackageFilePath -Force
+            if (Test-Path -LiteralPath $PackageResult.PackageFilePath) {
+                Remove-Item -LiteralPath $PackageResult.PackageFilePath -Force
             }
-            Move-Item -LiteralPath $stagingPath -Destination $PackageModelResult.PackageFilePath -Force
-            Update-PackageModelPackageFileIndexRecord -PackageModelResult $PackageModelResult -PackageFilePath $PackageModelResult.PackageFilePath -SourceScope $sourceDefinition.Scope -SourceId $sourceDefinition.Id
+            Move-Item -LiteralPath $stagingPath -Destination $PackageResult.PackageFilePath -Force
+            Update-PackagePackageFileIndexRecord -PackageResult $PackageResult -PackageFilePath $PackageResult.PackageFilePath -SourceScope $sourceDefinition.Scope -SourceId $sourceDefinition.Id
 
             if ([string]::Equals([string]$resolvedSource.Kind, 'download', [System.StringComparison]::OrdinalIgnoreCase) -and
-                $packageModelConfig.MirrorDownloadedArtifactsToDefaultPackageDepot -and
-                -not [string]::IsNullOrWhiteSpace($PackageModelResult.DefaultPackageDepotFilePath)) {
-                $null = New-Item -ItemType Directory -Path (Split-Path -Parent $PackageModelResult.DefaultPackageDepotFilePath) -Force
-                $null = Copy-FileToPath -SourcePath $PackageModelResult.PackageFilePath -TargetPath $PackageModelResult.DefaultPackageDepotFilePath -Overwrite
-                Update-PackageModelPackageFileIndexRecord -PackageModelResult $PackageModelResult -PackageFilePath $PackageModelResult.DefaultPackageDepotFilePath -SourceScope $sourceDefinition.Scope -SourceId $sourceDefinition.Id
+                $packageConfig.MirrorDownloadedArtifactsToDefaultPackageDepot -and
+                -not [string]::IsNullOrWhiteSpace($PackageResult.DefaultPackageDepotFilePath)) {
+                $null = New-Item -ItemType Directory -Path (Split-Path -Parent $PackageResult.DefaultPackageDepotFilePath) -Force
+                $null = Copy-FileToPath -SourcePath $PackageResult.PackageFilePath -TargetPath $PackageResult.DefaultPackageDepotFilePath -Overwrite
+                Update-PackagePackageFileIndexRecord -PackageResult $PackageResult -PackageFilePath $PackageResult.DefaultPackageDepotFilePath -SourceScope $sourceDefinition.Scope -SourceId $sourceDefinition.Id
             }
             elseif ([string]::Equals([string]$sourceDefinition.Scope, 'environment', [System.StringComparison]::OrdinalIgnoreCase) -and
                 [string]::Equals([string]$sourceDefinition.Id, 'defaultPackageDepot', [System.StringComparison]::OrdinalIgnoreCase) -and
-                -not [string]::IsNullOrWhiteSpace($PackageModelResult.DefaultPackageDepotFilePath)) {
-                Update-PackageModelPackageFileIndexRecord -PackageModelResult $PackageModelResult -PackageFilePath $PackageModelResult.DefaultPackageDepotFilePath -SourceScope 'environment' -SourceId 'defaultPackageDepot'
+                -not [string]::IsNullOrWhiteSpace($PackageResult.DefaultPackageDepotFilePath)) {
+                Update-PackagePackageFileIndexRecord -PackageResult $PackageResult -PackageFilePath $PackageResult.DefaultPackageDepotFilePath -SourceScope 'environment' -SourceId 'defaultPackageDepot'
+            }
+
+            $saveStatus = if ([string]::Equals([string]$sourceDefinition.Scope, 'environment', [System.StringComparison]::OrdinalIgnoreCase) -and
+                [string]::Equals([string]$sourceDefinition.Id, 'defaultPackageDepot', [System.StringComparison]::OrdinalIgnoreCase)) {
+                'HydratedFromDefaultPackageDepot'
+            }
+            else {
+                'SavedPackageFile'
             }
 
             $attempts.Add([pscustomobject]@{
                 AttemptType        = 'Save'
-                Status             = 'SavedPackageFile'
+                Status             = $saveStatus
                 SourceScope        = $sourceDefinition.Scope
                 SourceId           = $sourceDefinition.Id
                 SourceKind         = $resolvedSource.Kind
@@ -1145,10 +1109,10 @@ Save-PackageModelPackageFile -PackageModelResult $result
                 ErrorMessage       = $null
             }) | Out-Null
 
-            $PackageModelResult.PackageFileSave = [pscustomobject]@{
+            $PackageResult.PackageFileSave = [pscustomobject]@{
                 Success         = $true
-                Status          = 'SavedPackageFile'
-                PackageFilePath = $PackageModelResult.PackageFilePath
+                Status          = $saveStatus
+                PackageFilePath = $PackageResult.PackageFilePath
                 SelectedSource  = [pscustomobject]@{
                     SourceScope    = $sourceDefinition.Scope
                     SourceId       = $sourceDefinition.Id
@@ -1160,8 +1124,8 @@ Save-PackageModelPackageFile -PackageModelResult $result
                 FailureReason   = $null
                 ErrorMessage    = $null
             }
-            Write-PackageModelExecutionMessage -Message ("[ACTION] Saved package file from '{0}:{1}'." -f $sourceDefinition.Scope, $sourceDefinition.Id)
-            return $PackageModelResult
+            Write-PackageExecutionMessage -Message ("[ACTION] Saved package file from '{0}:{1}'." -f $sourceDefinition.Scope, $sourceDefinition.Id)
+            return $PackageResult
         }
         catch {
             if (Test-Path -LiteralPath $stagingPath) {
@@ -1179,25 +1143,25 @@ Save-PackageModelPackageFile -PackageModelResult $result
                 ErrorMessage       = $_.Exception.Message
             }) | Out-Null
 
-            if (-not $packageModelConfig.AllowAcquisitionFallback) {
+            if (-not $packageConfig.AllowAcquisitionFallback) {
                 break
             }
         }
     }
 
-    $PackageModelResult.PackageFileSave = [pscustomobject]@{
+    $PackageResult.PackageFileSave = [pscustomobject]@{
         Success         = $false
         Status          = 'Failed'
-        PackageFilePath = $PackageModelResult.PackageFilePath
+        PackageFilePath = $PackageResult.PackageFilePath
         SelectedSource  = $null
         Verification    = $null
         Attempts        = @($attempts.ToArray())
         FailureReason   = 'AllSourcesFailed'
-        ErrorMessage    = "All acquisition candidates failed for PackageModel release '$($package.id)'."
+        ErrorMessage    = "All acquisition candidates failed for Package release '$($package.id)'."
     }
 
-    Write-PackageModelExecutionMessage -Level 'ERR' -Message ("[ACTION] All acquisition candidates failed for release '{0}'." -f $package.id)
+    Write-PackageExecutionMessage -Level 'ERR' -Message ("[ACTION] All acquisition candidates failed for release '{0}'." -f $package.id)
 
-    return $PackageModelResult
+    return $PackageResult
 }
 

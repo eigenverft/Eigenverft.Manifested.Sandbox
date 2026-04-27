@@ -2,20 +2,20 @@
     Eigenverft.Manifested.Sandbox.Package.Selection
 #>
 
-function ConvertTo-PackageModelVersion {
+function ConvertTo-PackageVersion {
 <#
 .SYNOPSIS
 Converts a package version string to a sortable version object.
 
 .DESCRIPTION
-Normalizes version text so PackageModel release selection can sort exact
+Normalizes version text so Package release selection can sort exact
 version entries by semantic-like version ordering.
 
 .PARAMETER VersionText
 The version string to convert.
 
 .EXAMPLE
-ConvertTo-PackageModelVersion -VersionText '1.116.0'
+ConvertTo-PackageVersion -VersionText '1.116.0'
 #>
     [CmdletBinding()]
     param(
@@ -44,7 +44,7 @@ ConvertTo-PackageModelVersion -VersionText '1.116.0'
     return [version]'0.0.0'
 }
 
-function Test-PackageModelConstraintSetMatch {
+function Test-PackageConstraintSetMatch {
 <#
 .SYNOPSIS
 Checks whether a constraint set matches an actual value.
@@ -60,7 +60,7 @@ The configured constraint values.
 The effective value to test.
 
 .EXAMPLE
-Test-PackageModelConstraintSetMatch -Values @('windows') -ActualValue 'windows'
+Test-PackageConstraintSetMatch -Values @('windows') -ActualValue 'windows'
 #>
     [CmdletBinding()]
     [OutputType([bool])]
@@ -85,7 +85,7 @@ Test-PackageModelConstraintSetMatch -Values @('windows') -ActualValue 'windows'
     return $false
 }
 
-function Test-PackageModelCompatibilityAllowedBlockedMatch {
+function Test-PackageCompatibilityAllowedBlockedMatch {
 <#
 .SYNOPSIS
 Checks allowed/blocked compatibility lists against one actual value.
@@ -137,17 +137,17 @@ The value to test.
     return $true
 }
 
-function Test-PackageModelCompatibilityChecks {
+function Test-PackageCompatibilityChecks {
 <#
 .SYNOPSIS
-Evaluates typed PackageModel compatibility checks for one selected release.
+Evaluates typed Package compatibility checks for one selected release.
 
 .DESCRIPTION
 Runs the current compatibility kinds against the resolved runtime context and
 returns the normalized compatibility results and acceptance state.
 
-.PARAMETER PackageModelConfig
-The resolved PackageModel config object.
+.PARAMETER PackageConfig
+The resolved Package config object.
 
 .PARAMETER Compatibility
 The effective release compatibility object.
@@ -155,7 +155,7 @@ The effective release compatibility object.
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true)]
-        [psobject]$PackageModelConfig,
+        [psobject]$PackageConfig,
 
         [AllowNull()]
         [psobject]$Compatibility
@@ -222,29 +222,29 @@ The effective release compatibility object.
 
         switch -Exact ($kind) {
             'osFamily' {
-                $actualValue = [string]$PackageModelConfig.Platform
+                $actualValue = [string]$PackageConfig.Platform
                 $allowedValues = if ($check.PSObject.Properties['allowed']) { @($check.allowed) } else { @() }
                 $blockedValues = if ($check.PSObject.Properties['blocked']) { @($check.blocked) } else { @() }
-                $accepted = Test-PackageModelCompatibilityAllowedBlockedMatch -Allowed $allowedValues -Blocked $blockedValues -ActualValue $actualValue
+                $accepted = Test-PackageCompatibilityAllowedBlockedMatch -Allowed $allowedValues -Blocked $blockedValues -ActualValue $actualValue
                 $expectedSummary = @(
                     if ($allowedValues.Count -gt 0) { 'allowed=' + (($allowedValues | ForEach-Object { [string]$_ }) -join ',') }
                     if ($blockedValues.Count -gt 0) { 'blocked=' + (($blockedValues | ForEach-Object { [string]$_ }) -join ',') }
                 ) -join '; '
             }
             'cpuArchitecture' {
-                $actualValue = [string]$PackageModelConfig.Architecture
+                $actualValue = [string]$PackageConfig.Architecture
                 $allowedValues = if ($check.PSObject.Properties['allowed']) { @($check.allowed) } else { @() }
                 $blockedValues = if ($check.PSObject.Properties['blocked']) { @($check.blocked) } else { @() }
-                $accepted = Test-PackageModelCompatibilityAllowedBlockedMatch -Allowed $allowedValues -Blocked $blockedValues -ActualValue $actualValue
+                $accepted = Test-PackageCompatibilityAllowedBlockedMatch -Allowed $allowedValues -Blocked $blockedValues -ActualValue $actualValue
                 $expectedSummary = @(
                     if ($allowedValues.Count -gt 0) { 'allowed=' + (($allowedValues | ForEach-Object { [string]$_ }) -join ',') }
                     if ($blockedValues.Count -gt 0) { 'blocked=' + (($blockedValues | ForEach-Object { [string]$_ }) -join ',') }
                 ) -join '; '
             }
             'osVersion' {
-                $actualValue = [string]$PackageModelConfig.OSVersion
-                $expectedVersion = ConvertTo-PackageModelVersion -VersionText ([string]$check.value)
-                $actualVersion = ConvertTo-PackageModelVersion -VersionText $actualValue
+                $actualValue = [string]$PackageConfig.OSVersion
+                $expectedVersion = ConvertTo-PackageVersion -VersionText ([string]$check.value)
+                $actualVersion = ConvertTo-PackageVersion -VersionText $actualValue
                 $operator = [string]$check.operator
                 $accepted = switch -Exact ($operator) {
                     '=' { $actualVersion -eq $expectedVersion }
@@ -254,7 +254,7 @@ The effective release compatibility object.
                     '>=' { $actualVersion -ge $expectedVersion }
                     '<' { $actualVersion -lt $expectedVersion }
                     '<=' { $actualVersion -le $expectedVersion }
-                    default { throw "Unsupported PackageModel osVersion compatibility operator '$operator'." }
+                    default { throw "Unsupported Package osVersion compatibility operator '$operator'." }
                 }
                 $expectedSummary = '{0} {1}' -f $operator, [string]$check.value
             }
@@ -283,7 +283,7 @@ The effective release compatibility object.
                 $expectedSummary = '{0} {1} GiB' -f $operator, [string]$check.value
             }
             default {
-                throw "Unsupported PackageModel compatibility kind '$kind'."
+                throw "Unsupported Package compatibility kind '$kind'."
             }
         }
 
@@ -310,32 +310,32 @@ The effective release compatibility object.
     }
 }
 
-function Resolve-PackageModelPackage {
+function Resolve-PackagePackage {
 <#
 .SYNOPSIS
-Attaches the selected release to a PackageModel result.
+Attaches the selected release to a Package result.
 
 .DESCRIPTION
-Filters the definition releases from the resolved PackageModel config by
+Filters the definition releases from the resolved Package config by
 platform, architecture, and release track, selects the newest matching release,
 applies definition-level release defaults, and attaches the package-facing
 data to the result object.
 
-.PARAMETER PackageModelResult
-The PackageModel result object to enrich.
+.PARAMETER PackageResult
+The Package result object to enrich.
 
 .EXAMPLE
-Resolve-PackageModelPackage -PackageModelResult $result
+Resolve-PackagePackage -PackageResult $result
 #>
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true)]
-        [psobject]$PackageModelResult
+        [psobject]$PackageResult
     )
 
-    $packageModelConfig = $PackageModelResult.PackageModelConfig
-    $definition = $packageModelConfig.Definition
-    $effectiveReleaseTrack = if ([string]::IsNullOrWhiteSpace($packageModelConfig.ReleaseTrack)) { 'none' } else { [string]$packageModelConfig.ReleaseTrack }
+    $packageConfig = $PackageResult.PackageConfig
+    $definition = $packageConfig.Definition
+    $effectiveReleaseTrack = if ([string]::IsNullOrWhiteSpace($packageConfig.ReleaseTrack)) { 'none' } else { [string]$packageConfig.ReleaseTrack }
 
     $matchingPackages = @(
         foreach ($package in @($definition.releases)) {
@@ -350,32 +350,32 @@ Resolve-PackageModelPackage -PackageModelResult $result
             }
 
             if ([string]::Equals($packageReleaseTrack, $effectiveReleaseTrack, [System.StringComparison]::OrdinalIgnoreCase) -and
-                (Test-PackageModelConstraintSetMatch -Values $osConstraints -ActualValue $packageModelConfig.Platform) -and
-                (Test-PackageModelConstraintSetMatch -Values $cpuConstraints -ActualValue $packageModelConfig.Architecture)) {
+                (Test-PackageConstraintSetMatch -Values $osConstraints -ActualValue $packageConfig.Platform) -and
+                (Test-PackageConstraintSetMatch -Values $cpuConstraints -ActualValue $packageConfig.Architecture)) {
                 $package
             }
         }
     )
 
     if (-not $matchingPackages) {
-        throw "No PackageModel release matched platform '$($packageModelConfig.Platform)', architecture '$($packageModelConfig.Architecture)', and releaseTrack '$($packageModelConfig.ReleaseTrack)'."
+        throw "No Package release matched platform '$($packageConfig.Platform)', architecture '$($packageConfig.Architecture)', and releaseTrack '$($packageConfig.ReleaseTrack)'."
     }
 
-    if (-not [string]::Equals([string]$packageModelConfig.SelectionStrategy, 'latestByVersion', [System.StringComparison]::OrdinalIgnoreCase)) {
-        throw "Unsupported PackageModel selection strategy '$($packageModelConfig.SelectionStrategy)'."
+    if (-not [string]::Equals([string]$packageConfig.SelectionStrategy, 'latestByVersion', [System.StringComparison]::OrdinalIgnoreCase)) {
+        throw "Unsupported Package selection strategy '$($packageConfig.SelectionStrategy)'."
     }
 
     $selectedPackage = $matchingPackages |
-        Sort-Object -Descending -Property @{ Expression = { ConvertTo-PackageModelVersion -VersionText $_.version } } |
+        Sort-Object -Descending -Property @{ Expression = { ConvertTo-PackageVersion -VersionText $_.version } } |
         Select-Object -First 1
-    $selectedPackage = Resolve-PackageModelEffectiveRelease -Definition $definition -Release $selectedPackage
+    $selectedPackage = Resolve-PackageEffectiveRelease -Definition $definition -Release $selectedPackage
 
-    $PackageModelResult.Package = $selectedPackage
-    $PackageModelResult.EffectiveRelease = $selectedPackage
-    $PackageModelResult.PackageId = [string]$selectedPackage.id
-    $PackageModelResult.PackageVersion = [string]$selectedPackage.version
-    $compatibilityEvaluation = Test-PackageModelCompatibilityChecks -PackageModelConfig $packageModelConfig -Compatibility $selectedPackage.compatibility
-    $PackageModelResult.Compatibility = @($compatibilityEvaluation.Checks)
+    $PackageResult.Package = $selectedPackage
+    $PackageResult.EffectiveRelease = $selectedPackage
+    $PackageResult.PackageId = [string]$selectedPackage.id
+    $PackageResult.PackageVersion = [string]$selectedPackage.version
+    $compatibilityEvaluation = Test-PackageCompatibilityChecks -PackageConfig $packageConfig -Compatibility $selectedPackage.compatibility
+    $PackageResult.Compatibility = @($compatibilityEvaluation.Checks)
     if (-not $compatibilityEvaluation.BlockingAccepted) {
         $failedCompatibilityText = @(
             foreach ($checkResult in @($compatibilityEvaluation.Checks)) {
@@ -384,18 +384,18 @@ Resolve-PackageModelPackage -PackageModelResult $result
                 }
             }
         ) -join '; '
-        throw "PackageModel release '$($selectedPackage.id)' does not satisfy compatibility.checks. $failedCompatibilityText"
+        throw "Package release '$($selectedPackage.id)' does not satisfy compatibility.checks. $failedCompatibilityText"
     }
 
     $selectedFlavor = if ($selectedPackage.PSObject.Properties['flavor']) { [string]$selectedPackage.flavor } else { 'default' }
-    Write-PackageModelExecutionMessage -Message ("[STATE] Selected release '{0}' version '{1}' for platform '{2}', architecture '{3}', releaseTrack '{4}', flavor '{5}'." -f $PackageModelResult.PackageId, $PackageModelResult.PackageVersion, $packageModelConfig.Platform, $packageModelConfig.Architecture, $effectiveReleaseTrack, $selectedFlavor)
+    Write-PackageExecutionMessage -Message ("[STATE] Selected release '{0}' version '{1}' for platform '{2}', architecture '{3}', releaseTrack '{4}', flavor '{5}'." -f $PackageResult.PackageId, $PackageResult.PackageVersion, $packageConfig.Platform, $packageConfig.Architecture, $effectiveReleaseTrack, $selectedFlavor)
     if (@($compatibilityEvaluation.Checks).Count -gt 0) {
         $compatibilitySummary = @(
             foreach ($checkResult in @($compatibilityEvaluation.Checks)) {
                 "{0}={1}({2})" -f $checkResult.Kind, $(if ($checkResult.Accepted) { 'accepted' } else { 'rejected' }), [string]$checkResult.OnFail
             }
         ) -join ', '
-        Write-PackageModelExecutionMessage -Message ("[STATE] Compatibility checks: {0}." -f $compatibilitySummary)
+        Write-PackageExecutionMessage -Message ("[STATE] Compatibility checks: {0}." -f $compatibilitySummary)
     }
 
     $compatibilityWarnings = @(
@@ -406,9 +406,9 @@ Resolve-PackageModelPackage -PackageModelResult $result
         }
     )
     if ($compatibilityWarnings.Count -gt 0) {
-        Write-PackageModelExecutionMessage -Message ("[WARN] Compatibility warnings: {0}." -f ($compatibilityWarnings -join '; '))
+        Write-PackageExecutionMessage -Message ("[WARN] Compatibility warnings: {0}." -f ($compatibilityWarnings -join '; '))
     }
 
-    return $PackageModelResult
+    return $PackageResult
 }
 

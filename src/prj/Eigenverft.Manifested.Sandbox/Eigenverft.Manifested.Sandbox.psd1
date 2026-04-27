@@ -135,6 +135,7 @@ FileList = @(
     'Support\Package\Eigenverft.Manifested.Sandbox.Package.PathRegistration.ps1',
     'Support\Package\Eigenverft.Manifested.Sandbox.Package.CommandFlow.ps1',
     'Configuration\Internal\Config.json',
+    'Configuration\Internal\DepotInventory.json',
     'Repositories\EigenverftModule\Qwen35_2B_Q6K_Model.json',
     'Repositories\EigenverftModule\LlamaCppRuntime.json',
     'Repositories\EigenverftModule\VisualCppRedistributable.json',

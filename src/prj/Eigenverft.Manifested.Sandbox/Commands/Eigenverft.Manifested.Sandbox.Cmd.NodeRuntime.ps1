@@ -2,23 +2,23 @@
     Eigenverft.Manifested.Sandbox.Cmd.NodeRuntime
 #>
 
-function Resolve-PackageModelNodeRuntimeNpmCommand {
+function Resolve-PackageNodeRuntimeNpmCommand {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true)]
-        [psobject]$PackageModelResult
+        [psobject]$PackageResult
     )
 
     $npmEntryPoint = @(
-        $PackageModelResult.EntryPoints.Commands |
+        $PackageResult.EntryPoints.Commands |
             Where-Object { [string]::Equals([string]$_.Name, 'npm', [System.StringComparison]::OrdinalIgnoreCase) } |
             Select-Object -First 1
     )
     $npmCmd = if ($npmEntryPoint) {
         [string]$npmEntryPoint[0].Path
     }
-    elseif (-not [string]::IsNullOrWhiteSpace([string]$PackageModelResult.InstallDirectory)) {
-        Join-Path ([string]$PackageModelResult.InstallDirectory) 'npm.cmd'
+    elseif (-not [string]::IsNullOrWhiteSpace([string]$PackageResult.InstallDirectory)) {
+        Join-Path ([string]$PackageResult.InstallDirectory) 'npm.cmd'
     }
     else {
         $null
@@ -34,10 +34,10 @@ function Resolve-PackageModelNodeRuntimeNpmCommand {
 function Invoke-NodeRuntime {
 <#
 .SYNOPSIS
-Ensures the configured Node.js runtime is available through PackageModel.
+Ensures the configured Node.js runtime is available through Package.
 
 .DESCRIPTION
-Loads the shipped PackageModel JSON documents, resolves the effective Node.js
+Loads the shipped Package JSON documents, resolves the effective Node.js
 release for the current runtime context, saves the package file when needed,
 installs or reuses the package, validates node/npm/npx, applies user PATH
 registration, updates ownership tracking, and returns resolved entry points.
@@ -48,6 +48,6 @@ Invoke-NodeRuntime
     [CmdletBinding()]
     param()
 
-    return (Invoke-PackageModelDefinitionCommand -DefinitionId 'NodeRuntime' -CommandName 'Invoke-NodeRuntime')
+    return (Invoke-PackageDefinitionCommand -DefinitionId 'NodeRuntime' -CommandName 'Invoke-NodeRuntime')
 }
 

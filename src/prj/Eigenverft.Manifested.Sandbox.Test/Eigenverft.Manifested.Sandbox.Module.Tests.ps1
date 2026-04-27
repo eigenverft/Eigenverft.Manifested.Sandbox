@@ -1,5 +1,5 @@
 <#
-    PackageModel-focused Pester coverage for the module.
+    Package-focused Pester coverage for the module.
 #>
 
 function global:ConvertTo-TestPsObject {
@@ -111,7 +111,7 @@ function global:New-TestPackageArchiveInfo {
     }
 }
 
-function global:New-TestPackageModelGlobalDocument {
+function global:New-TestPackageGlobalDocument {
     param(
         [string]$InstallWorkspaceDirectory,
         [string]$DefaultPackageDepotDirectory,
@@ -129,14 +129,13 @@ function global:New-TestPackageModelGlobalDocument {
     $acquisitionEnvironment = @{
         stores = @{
             installWorkspaceDirectory = if ($PSBoundParameters.ContainsKey('InstallWorkspaceDirectory')) { $InstallWorkspaceDirectory } else { '%LOCALAPPDATA%/Eigenverft.Manifested.Sandbox/InstallWorkspace' }
-            defaultPackageDepotDirectory = if ($PSBoundParameters.ContainsKey('DefaultPackageDepotDirectory')) { $DefaultPackageDepotDirectory } else { '%LOCALAPPDATA%/Eigenverft.Manifested.Sandbox/DefaultPackageDepot' }
         }
         defaults = @{
             allowFallback = $AllowFallback
             mirrorDownloadedArtifactsToDefaultPackageDepot = $MirrorDownloadedArtifactsToDefaultPackageDepot
         }
         tracking = @{
-            packageFileIndexFilePath = if ($PSBoundParameters.ContainsKey('PackageFileIndexFilePath')) { $PackageFileIndexFilePath } else { '%LOCALAPPDATA%/Eigenverft.Manifested.Sandbox/package-file-index.json' }
+            packageFileIndexFilePath = if ($PSBoundParameters.ContainsKey('PackageFileIndexFilePath')) { $PackageFileIndexFilePath } else { '%LOCALAPPDATA%/Eigenverft.Manifested.Sandbox/State/package-file-index.json' }
         }
     }
     if ($PSBoundParameters.ContainsKey('EnvironmentSources') -and $null -ne $EnvironmentSources) {
@@ -144,8 +143,8 @@ function global:New-TestPackageModelGlobalDocument {
     }
 
     return @{
-        packageModel = @{
-            preferredTargetInstallDirectory = if ($PSBoundParameters.ContainsKey('PreferredTargetInstallDirectory')) { $PreferredTargetInstallDirectory } else { '%LOCALAPPDATA%/Eigenverft.Manifested.Sandbox/Installs' }
+        package = @{
+            preferredTargetInstallDirectory = if ($PSBoundParameters.ContainsKey('PreferredTargetInstallDirectory')) { $PreferredTargetInstallDirectory } else { '%LOCALAPPDATA%/Eigenverft.Manifested.Sandbox/Installed' }
             repositorySources = @{
                 EigenverftModule = @{
                     kind = 'moduleLocal'
@@ -155,12 +154,37 @@ function global:New-TestPackageModelGlobalDocument {
             localRepositoryRoot = if ($PSBoundParameters.ContainsKey('LocalRepositoryRoot')) { $LocalRepositoryRoot } else { '%LOCALAPPDATA%/Eigenverft.Manifested.Sandbox/PackageRepositories' }
             acquisitionEnvironment = $acquisitionEnvironment
             packageState = @{
-                indexFilePath = if ($PSBoundParameters.ContainsKey('PackageStateIndexFilePath')) { $PackageStateIndexFilePath } else { '%LOCALAPPDATA%/Eigenverft.Manifested.Sandbox/package-state-index.json' }
+                indexFilePath = if ($PSBoundParameters.ContainsKey('PackageStateIndexFilePath')) { $PackageStateIndexFilePath } else { '%LOCALAPPDATA%/Eigenverft.Manifested.Sandbox/State/package-state-index.json' }
             }
             selectionDefaults = @{
                 releaseTrack = $ReleaseTrack
                 strategy     = $Strategy
             }
+        }
+    }
+}
+
+function global:New-TestDepotInventoryDocument {
+    param(
+        [string]$DefaultPackageDepotDirectory,
+        [hashtable]$EnvironmentSources = @{}
+    )
+
+    $sources = @{}
+    $sources.defaultPackageDepot = @{
+        kind     = 'filesystem'
+        enabled  = $true
+        priority = 300
+        basePath = if ($PSBoundParameters.ContainsKey('DefaultPackageDepotDirectory')) { $DefaultPackageDepotDirectory } else { '%LOCALAPPDATA%/Eigenverft.Manifested.Sandbox/DefaultPackageDepot' }
+    }
+    foreach ($key in @($EnvironmentSources.Keys)) {
+        $sources[$key] = $EnvironmentSources[$key]
+    }
+
+    return @{
+        inventoryVersion = 1
+        acquisitionEnvironment = @{
+            environmentSources = $sources
         }
     }
 }
@@ -178,19 +202,29 @@ function global:New-TestSourceInventoryDocument {
     if ($SiteEnvironmentSources.Count -gt 0 -or $SiteDefaults.Count -gt 0) {
         $sites[$SiteCode] = @{}
         if ($SiteEnvironmentSources.Count -gt 0) {
-            $sites[$SiteCode].environmentSources = $SiteEnvironmentSources
+            $sites[$SiteCode].acquisitionEnvironment = @{
+                environmentSources = $SiteEnvironmentSources
+            }
         }
         if ($SiteDefaults.Count -gt 0) {
-            $sites[$SiteCode].defaults = $SiteDefaults
+            if (-not $sites[$SiteCode].ContainsKey('acquisitionEnvironment')) {
+                $sites[$SiteCode].acquisitionEnvironment = @{}
+            }
+            $sites[$SiteCode].acquisitionEnvironment.defaults = $SiteDefaults
         }
     }
 
     $global = @{}
     if ($GlobalEnvironmentSources.Count -gt 0) {
-        $global.environmentSources = $GlobalEnvironmentSources
+        $global.acquisitionEnvironment = @{
+            environmentSources = $GlobalEnvironmentSources
+        }
     }
     if ($GlobalDefaults.Count -gt 0) {
-        $global.defaults = $GlobalDefaults
+        if (-not $global.ContainsKey('acquisitionEnvironment')) {
+            $global.acquisitionEnvironment = @{}
+        }
+        $global.acquisitionEnvironment.defaults = $GlobalDefaults
     }
 
     return @{
@@ -247,17 +281,17 @@ function global:New-TestExistingInstallPolicy {
     param(
         [bool]$AllowAdoptExternal = $false,
         [bool]$UpgradeAdoptedInstall = $false,
-        [bool]$RequirePackageModelOwnership = $false
+        [bool]$RequirePackageOwnership = $false
     )
 
     return @{
         allowAdoptExternal    = $AllowAdoptExternal
         upgradeAdoptedInstall = $UpgradeAdoptedInstall
-        requirePackageModelOwnership = $RequirePackageModelOwnership
+        requirePackageOwnership = $RequirePackageOwnership
     }
 }
 
-function global:New-TestPackageModelRelease {
+function global:New-TestPackageRelease {
     param(
         [Parameter(Mandatory = $true)]
         [string]$Id,
@@ -438,7 +472,7 @@ function global:New-TestVSCodeDefinitionDocument {
     }
 }
 
-function global:Write-TestPackageModelDocuments {
+function global:Write-TestPackageDocuments {
     param(
         [Parameter(Mandatory = $true)]
         [string]$RootPath,
@@ -450,12 +484,20 @@ function global:Write-TestPackageModelDocuments {
         [object]$DefinitionDocument,
 
         [AllowNull()]
+        [object]$DepotInventoryDocument,
+
+        [AllowNull()]
         [object]$SourceInventoryDocument
     )
 
     $globalConfigPath = Join-Path $RootPath 'Configuration\Internal\Config.json'
+    $depotInventoryPath = Join-Path $RootPath 'Configuration\Internal\DepotInventory.json'
     $definitionPath = Join-Path $RootPath "$($DefinitionDocument.id).json"
     Write-TestJsonDocument -Path $globalConfigPath -Document $GlobalDocument
+    if (-not $PSBoundParameters.ContainsKey('DepotInventoryDocument') -or $null -eq $DepotInventoryDocument) {
+        $DepotInventoryDocument = New-TestDepotInventoryDocument -DefaultPackageDepotDirectory (Join-Path $RootPath 'DefaultPackageDepot')
+    }
+    Write-TestJsonDocument -Path $depotInventoryPath -Document $DepotInventoryDocument
     Write-TestJsonDocument -Path $definitionPath -Document $DefinitionDocument
 
     $sourceInventoryPath = $null
@@ -466,17 +508,18 @@ function global:Write-TestPackageModelDocuments {
 
     return [pscustomobject]@{
         GlobalConfigPath   = $globalConfigPath
+        DepotInventoryPath = $depotInventoryPath
         DefinitionPath     = $definitionPath
         SourceInventoryPath = $sourceInventoryPath
     }
 }
 
-Describe 'Eigenverft.Manifested.Sandbox PackageModel' {
+Describe 'Eigenverft.Manifested.Sandbox Package' {
     BeforeAll {
         . "$PSScriptRoot\Eigenverft.Manifested.Sandbox.TestImports.ps1"
         $script:ModuleManifestPath = Join-Path (Split-Path -Parent $PSScriptRoot) 'Eigenverft.Manifested.Sandbox\Eigenverft.Manifested.Sandbox.psd1'
-        $script:SourceInventoryEnvVarName = Get-PackageModelSourceInventoryPathEnvironmentVariableName
-        $script:SiteCodeEnvVarName = Get-PackageModelSiteCodeEnvironmentVariableName
+        $script:SourceInventoryEnvVarName = Get-PackageSourceInventoryPathEnvironmentVariableName
+        $script:SiteCodeEnvVarName = Get-PackageSiteCodeEnvironmentVariableName
     }
 
     BeforeEach {
@@ -564,7 +607,7 @@ Describe 'Eigenverft.Manifested.Sandbox PackageModel' {
         $publicParameterNames.Count | Should -Be 0
     }
 
-    It 'exports npm-backed PackageModel CLI runtime commands and keeps them parameterless' {
+    It 'exports npm-backed Package CLI runtime commands and keeps them parameterless' {
         $module = Import-Module -Name $script:ModuleManifestPath -Force -PassThru
 
         foreach ($commandName in @(
@@ -635,19 +678,19 @@ Describe 'Eigenverft.Manifested.Sandbox PackageModel' {
         $root = Join-Path $TestDrive 'empty-package-state'
         $config = [pscustomobject]@{
             LocalConfigurationPath              = Join-Path $root 'Configuration\Internal\Config.json'
-            PreferredTargetInstallRootDirectory = Join-Path $root 'Installs'
+            PreferredTargetInstallRootDirectory = Join-Path $root 'Installed'
             InstallWorkspaceRootDirectory       = Join-Path $root 'InstallWorkspace'
             DefaultPackageDepotDirectory        = Join-Path $root 'DefaultPackageDepot'
             LocalRepositoryRoot                 = Join-Path $root 'PackageRepositories'
-            PackageStateIndexFilePath           = Join-Path $root 'package-state-index.json'
-            PackageFileIndexFilePath            = Join-Path $root 'package-file-index.json'
+            PackageStateIndexFilePath           = Join-Path (Join-Path $root 'State') 'package-state-index.json'
+            PackageFileIndexFilePath            = Join-Path (Join-Path $root 'State') 'package-file-index.json'
         }
-        $sourceInventoryPath = Join-Path $root 'SourceInventory.json'
+        $sourceInventoryPath = Join-Path (Join-Path $root 'Configuration\External') 'SourceInventory.json'
 
-        Mock Get-PackageModelConfig { throw 'Get-PackageState must not load a package definition.' }
-        Mock Get-PackageModelStateConfig { return $config }
-        Mock Get-PackageModelPackageStateIndex { return [pscustomobject]@{ Path = $config.PackageStateIndexFilePath; Records = @() } }
-        Mock Get-PackageModelPackageFileIndex { return [pscustomobject]@{ Path = $config.PackageFileIndexFilePath; Records = @() } }
+        Mock Get-PackageConfig { throw 'Get-PackageState must not load a package definition.' }
+        Mock Get-PackageStateConfig { return $config }
+        Mock Get-PackagePackageStateIndex { return [pscustomobject]@{ Path = $config.PackageStateIndexFilePath; Records = @() } }
+        Mock Get-PackagePackageFileIndex { return [pscustomobject]@{ Path = $config.PackageFileIndexFilePath; Records = @() } }
         $config | Add-Member -MemberType NoteProperty -Name SourceInventoryInfo -Value ([pscustomobject]@{ Path = $sourceInventoryPath; Exists = $false; Document = $null })
 
         $state = Get-PackageState
@@ -661,7 +704,7 @@ Describe 'Eigenverft.Manifested.Sandbox PackageModel' {
         $state.PackageFileRecordCount | Should -Be 0
         $state.PackageRecords.Count | Should -Be 0
         $state.PackageFiles.Count | Should -Be 0
-        $state.Directories.Installs.Exists | Should -BeFalse
+        $state.Directories.Installed.Exists | Should -BeFalse
         $state.Directories.InstallWorkspace.Exists | Should -BeFalse
         $state.Directories.DefaultPackageDepot.Exists | Should -BeFalse
         $state.Directories.LocalRepositoryRoot.Exists | Should -BeFalse
@@ -671,41 +714,41 @@ Describe 'Eigenverft.Manifested.Sandbox PackageModel' {
         $root = Join-Path $TestDrive 'definition-free-package-state'
         $config = [pscustomobject]@{
             LocalConfigurationPath              = Join-Path $root 'Configuration\Internal\Config.json'
-            PreferredTargetInstallRootDirectory = Join-Path $root 'Installs'
+            PreferredTargetInstallRootDirectory = Join-Path $root 'Installed'
             InstallWorkspaceRootDirectory       = Join-Path $root 'InstallWorkspace'
             DefaultPackageDepotDirectory        = Join-Path $root 'DefaultPackageDepot'
             LocalRepositoryRoot                 = Join-Path $root 'PackageRepositories'
-            PackageStateIndexFilePath           = Join-Path $root 'package-state-index.json'
-            PackageFileIndexFilePath            = Join-Path $root 'package-file-index.json'
-            SourceInventoryInfo                 = [pscustomobject]@{ Path = (Join-Path $root 'SourceInventory.json'); Exists = $false; Document = $null }
+            PackageStateIndexFilePath           = Join-Path (Join-Path $root 'State') 'package-state-index.json'
+            PackageFileIndexFilePath            = Join-Path (Join-Path $root 'State') 'package-file-index.json'
+            SourceInventoryInfo                 = [pscustomobject]@{ Path = (Join-Path (Join-Path $root 'Configuration\External') 'SourceInventory.json'); Exists = $false; Document = $null }
         }
 
-        Mock Get-PackageModelConfig { throw 'VSCodeRuntime definition should not be required for state.' }
-        Mock Get-PackageModelStateConfig { return $config }
-        Mock Get-PackageModelPackageStateIndex { return [pscustomobject]@{ Path = $config.PackageStateIndexFilePath; Records = @() } }
-        Mock Get-PackageModelPackageFileIndex { return [pscustomobject]@{ Path = $config.PackageFileIndexFilePath; Records = @() } }
+        Mock Get-PackageConfig { throw 'VSCodeRuntime definition should not be required for state.' }
+        Mock Get-PackageStateConfig { return $config }
+        Mock Get-PackagePackageStateIndex { return [pscustomobject]@{ Path = $config.PackageStateIndexFilePath; Records = @() } }
+        Mock Get-PackagePackageFileIndex { return [pscustomobject]@{ Path = $config.PackageFileIndexFilePath; Records = @() } }
 
         { Get-PackageState } | Should -Not -Throw
-        Should -Invoke Get-PackageModelStateConfig -Times 1 -Exactly
-        Should -Invoke Get-PackageModelConfig -Times 0 -Exactly
+        Should -Invoke Get-PackageStateConfig -Times 1 -Exactly
+        Should -Invoke Get-PackageConfig -Times 0 -Exactly
     }
 
     It 'summarizes package ownership records, artifact records, and local directory state' {
         $root = Join-Path $TestDrive 'populated-package-state'
-        $installRoot = Join-Path $root 'Installs'
+        $installRoot = Join-Path $root 'Installed'
         $workspaceRoot = Join-Path $root 'InstallWorkspace'
         $depotRoot = Join-Path $root 'DefaultPackageDepot'
         $localRepositoryRoot = Join-Path $root 'PackageRepositories'
         $installDirectory = Join-Path $installRoot 'vscode-runtime\stable\1.0.0\win32-x64'
         $artifactPath = Join-Path $depotRoot 'packages\VSCodeRuntime\stable\1.0.0\win32-x64\package.zip'
         $definitionLocalPath = Join-Path $localRepositoryRoot 'EigenverftModule\VSCodeRuntime.json'
-        $sourceInventoryPath = Join-Path $root 'SourceInventory.json'
+        $sourceInventoryPath = Join-Path (Join-Path $root 'Configuration\External') 'SourceInventory.json'
 
         $null = New-Item -ItemType Directory -Path $installDirectory -Force
         $null = New-Item -ItemType Directory -Path $workspaceRoot -Force
         Write-TestTextFile -Path $artifactPath -Content 'fake-zip'
         Write-TestJsonDocument -Path $definitionLocalPath -Document (New-TestVSCodeDefinitionDocument -Releases @(
-                New-TestPackageModelRelease -Id 'vsCode-win-x64-stable' -Version '1.0.0' -Architecture 'x64' -Flavor 'win32-x64'
+                New-TestPackageRelease -Id 'vsCode-win-x64-stable' -Version '1.0.0' -Architecture 'x64' -Flavor 'win32-x64'
             ))
         Write-TestJsonDocument -Path $sourceInventoryPath -Document @{ inventoryVersion = 1; global = @{}; sites = @{} }
 
@@ -715,8 +758,8 @@ Describe 'Eigenverft.Manifested.Sandbox PackageModel' {
             InstallWorkspaceRootDirectory       = $workspaceRoot
             DefaultPackageDepotDirectory        = $depotRoot
             LocalRepositoryRoot                 = $localRepositoryRoot
-            PackageStateIndexFilePath           = Join-Path $root 'package-state-index.json'
-            PackageFileIndexFilePath            = Join-Path $root 'package-file-index.json'
+            PackageStateIndexFilePath           = Join-Path (Join-Path $root 'State') 'package-state-index.json'
+            PackageFileIndexFilePath            = Join-Path (Join-Path $root 'State') 'package-file-index.json'
         }
         Write-TestJsonDocument -Path $config.PackageStateIndexFilePath -Document @{ records = @() }
         Write-TestJsonDocument -Path $config.PackageFileIndexFilePath -Document @{ records = @() }
@@ -732,7 +775,7 @@ Describe 'Eigenverft.Manifested.Sandbox PackageModel' {
             currentReleaseId = 'vscode-test'
             currentVersion   = '1.0.0'
             installDirectory = $installDirectory
-            ownershipKind    = 'PackageModelInstalled'
+            ownershipKind    = 'PackageInstalled'
             updatedAtUtc     = '2026-04-25T12:00:00Z'
         }
         $artifactRecord = [pscustomobject]@{
@@ -749,10 +792,10 @@ Describe 'Eigenverft.Manifested.Sandbox PackageModel' {
 
         $config | Add-Member -MemberType NoteProperty -Name SourceInventoryInfo -Value ([pscustomobject]@{ Path = $sourceInventoryPath; Exists = $true; Document = @{ inventoryVersion = 1 } })
 
-        Mock Get-PackageModelConfig { throw 'Get-PackageState must not load a package definition.' }
-        Mock Get-PackageModelStateConfig { return $config }
-        Mock Get-PackageModelPackageStateIndex { return [pscustomobject]@{ Path = $config.PackageStateIndexFilePath; Records = @($ownershipRecord) } }
-        Mock Get-PackageModelPackageFileIndex { return [pscustomobject]@{ Path = $config.PackageFileIndexFilePath; Records = @($artifactRecord) } }
+        Mock Get-PackageConfig { throw 'Get-PackageState must not load a package definition.' }
+        Mock Get-PackageStateConfig { return $config }
+        Mock Get-PackagePackageStateIndex { return [pscustomobject]@{ Path = $config.PackageStateIndexFilePath; Records = @($ownershipRecord) } }
+        Mock Get-PackagePackageFileIndex { return [pscustomobject]@{ Path = $config.PackageFileIndexFilePath; Records = @($artifactRecord) } }
 
         $state = Get-PackageState
 
@@ -767,7 +810,7 @@ Describe 'Eigenverft.Manifested.Sandbox PackageModel' {
         $state.PackageRecords[0].InstallDirectoryExists | Should -BeTrue
         $state.PackageFiles[0].Path | Should -Be $artifactPath
         $state.PackageFiles[0].Exists | Should -BeTrue
-        $state.Directories.Installs.Exists | Should -BeTrue
+        $state.Directories.Installed.Exists | Should -BeTrue
         $state.Directories.InstallWorkspace.Exists | Should -BeTrue
         $state.Directories.DefaultPackageDepot.Exists | Should -BeTrue
         $state.Directories.LocalRepositoryRoot.Exists | Should -BeTrue
@@ -777,23 +820,23 @@ Describe 'Eigenverft.Manifested.Sandbox PackageModel' {
         $root = Join-Path $TestDrive 'raw-package-state'
         $config = [pscustomobject]@{
             LocalConfigurationPath              = Join-Path $root 'Configuration\Internal\Config.json'
-            PreferredTargetInstallRootDirectory = Join-Path $root 'Installs'
+            PreferredTargetInstallRootDirectory = Join-Path $root 'Installed'
             InstallWorkspaceRootDirectory       = Join-Path $root 'InstallWorkspace'
             DefaultPackageDepotDirectory        = Join-Path $root 'DefaultPackageDepot'
             LocalRepositoryRoot                 = Join-Path $root 'PackageRepositories'
-            PackageStateIndexFilePath           = Join-Path $root 'package-state-index.json'
-            PackageFileIndexFilePath            = Join-Path $root 'package-file-index.json'
+            PackageStateIndexFilePath           = Join-Path (Join-Path $root 'State') 'package-state-index.json'
+            PackageFileIndexFilePath            = Join-Path (Join-Path $root 'State') 'package-file-index.json'
         }
         $packageStateIndex = [pscustomobject]@{ Path = $config.PackageStateIndexFilePath; Records = @([pscustomobject]@{ definitionId = 'VSCodeRuntime' }) }
         $packageFileIndex = [pscustomobject]@{ Path = $config.PackageFileIndexFilePath; Records = @([pscustomobject]@{ definitionId = 'VSCodeRuntime' }) }
-        $sourceInventory = [pscustomobject]@{ Path = (Join-Path $root 'SourceInventory.json'); Exists = $false; Document = $null }
+        $sourceInventory = [pscustomobject]@{ Path = (Join-Path (Join-Path $root 'Configuration\External') 'SourceInventory.json'); Exists = $false; Document = $null }
 
         $config | Add-Member -MemberType NoteProperty -Name SourceInventoryInfo -Value $sourceInventory
 
-        Mock Get-PackageModelConfig { throw 'Get-PackageState must not load a package definition.' }
-        Mock Get-PackageModelStateConfig { return $config }
-        Mock Get-PackageModelPackageStateIndex { return $packageStateIndex }
-        Mock Get-PackageModelPackageFileIndex { return $packageFileIndex }
+        Mock Get-PackageConfig { throw 'Get-PackageState must not load a package definition.' }
+        Mock Get-PackageStateConfig { return $config }
+        Mock Get-PackagePackageStateIndex { return $packageStateIndex }
+        Mock Get-PackagePackageFileIndex { return $packageFileIndex }
 
         $state = Get-PackageState -Raw
 
@@ -801,7 +844,7 @@ Describe 'Eigenverft.Manifested.Sandbox PackageModel' {
         $state.PackageStateIndex | Should -Be $packageStateIndex
         $state.PackageFileIndex | Should -Be $packageFileIndex
         $state.SourceInventory | Should -Be $sourceInventory
-        $state.Directories.Installs.Path | Should -Be $config.PreferredTargetInstallRootDirectory
+        $state.Directories.Installed.Path | Should -Be $config.PreferredTargetInstallRootDirectory
     }
 
     It 'does not export migrated legacy runtime commands' {
@@ -827,78 +870,94 @@ Describe 'Eigenverft.Manifested.Sandbox PackageModel' {
         Get-Command -Name 'Invoke-Qwen35-2B-Q6K' -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
         Get-Command -Name 'Invoke-VCRuntime' -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
         Get-Command -Name 'Invoke-Ps7Runtime' -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
-        Get-Command -Name 'Invoke-PackageModel-VSCodeRuntime' -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
-        Get-Command -Name 'Invoke-PackageModel-GitRuntime' -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
-        Get-Command -Name 'Invoke-PackageModel-GHCliRuntime' -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
-        Get-Command -Name 'Invoke-PackageModel-NodeRuntime' -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
-        Get-Command -Name 'Invoke-PackageModel-PythonRuntime' -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
-        Get-Command -Name 'Invoke-PackageModel-Ps7Runtime' -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
-        Get-Command -Name 'Invoke-PackageModel-VCRuntime' -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
-        Get-Command -Name 'Invoke-PackageModel-CodexRuntime' -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
-        Get-Command -Name 'Invoke-PackageModel-GeminiRuntime' -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
-        Get-Command -Name 'Invoke-PackageModel-OpenCodeRuntime' -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
-        Get-Command -Name 'Invoke-PackageModel-QwenCliRuntime' -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
-        Get-Command -Name 'Invoke-PackageModel-Qwen35-2B-Q6K' -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
-        Get-Command -Name 'Invoke-PackageModel-LlamaCppRuntime' -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
+        Get-Command -Name 'Invoke-Package-VSCodeRuntime' -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
+        Get-Command -Name 'Invoke-Package-GitRuntime' -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
+        Get-Command -Name 'Invoke-Package-GHCliRuntime' -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
+        Get-Command -Name 'Invoke-Package-NodeRuntime' -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
+        Get-Command -Name 'Invoke-Package-PythonRuntime' -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
+        Get-Command -Name 'Invoke-Package-Ps7Runtime' -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
+        Get-Command -Name 'Invoke-Package-VCRuntime' -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
+        Get-Command -Name 'Invoke-Package-CodexRuntime' -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
+        Get-Command -Name 'Invoke-Package-GeminiRuntime' -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
+        Get-Command -Name 'Invoke-Package-OpenCodeRuntime' -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
+        Get-Command -Name 'Invoke-Package-QwenCliRuntime' -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
+        Get-Command -Name 'Invoke-Package-Qwen35-2B-Q6K' -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
+        Get-Command -Name 'Invoke-Package-LlamaCppRuntime' -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
     }
 
     It 'loads the shipped global config without baked-in environment sources' {
-        $globalInfo = Read-PackageModelJsonDocument -Path (Get-PackageModelShippedGlobalConfigPath)
+        $globalInfo = Read-PackageJsonDocument -Path (Get-PackageShippedGlobalConfigPath)
 
-        $globalInfo.Document.packageModel.PSObject.Properties.Name | Should -Contain 'preferredTargetInstallDirectory'
-        $globalInfo.Document.packageModel.PSObject.Properties.Name | Should -Contain 'repositorySources'
-        $globalInfo.Document.packageModel.PSObject.Properties.Name | Should -Contain 'localRepositoryRoot'
-        $globalInfo.Document.packageModel.PSObject.Properties.Name | Should -Contain 'packageState'
-        $globalInfo.Document.packageModel.acquisitionEnvironment.stores.PSObject.Properties.Name | Should -Contain 'installWorkspaceDirectory'
-        $globalInfo.Document.packageModel.acquisitionEnvironment.stores.PSObject.Properties.Name | Should -Contain 'defaultPackageDepotDirectory'
-        $globalInfo.Document.packageModel.acquisitionEnvironment.tracking.PSObject.Properties.Name | Should -Contain 'packageFileIndexFilePath'
-        $globalInfo.Document.packageModel.acquisitionEnvironment.PSObject.Properties['environmentSources'] | Should -BeNullOrEmpty
+        $globalInfo.Document.package.PSObject.Properties.Name | Should -Contain 'preferredTargetInstallDirectory'
+        $globalInfo.Document.package.PSObject.Properties.Name | Should -Contain 'repositorySources'
+        $globalInfo.Document.package.PSObject.Properties.Name | Should -Contain 'localRepositoryRoot'
+        $globalInfo.Document.package.PSObject.Properties.Name | Should -Contain 'packageState'
+        $globalInfo.Document.package.acquisitionEnvironment.stores.PSObject.Properties.Name | Should -Contain 'installWorkspaceDirectory'
+        $globalInfo.Document.package.acquisitionEnvironment.stores.PSObject.Properties.Name | Should -Not -Contain 'defaultPackageDepotDirectory'
+        $depotInfo = Read-PackageJsonDocument -Path (Get-PackageShippedDepotInventoryPath)
+        $depotInfo.Document.acquisitionEnvironment.environmentSources.PSObject.Properties.Name | Should -Contain 'defaultPackageDepot'
+        $globalInfo.Document.package.acquisitionEnvironment.tracking.PSObject.Properties.Name | Should -Contain 'packageFileIndexFilePath'
+        $globalInfo.Document.package.acquisitionEnvironment.PSObject.Properties['environmentSources'] | Should -BeNullOrEmpty
     }
 
     It 'creates the local Config.json copy from shipped configuration when missing' {
-        $localGlobalPath = Get-PackageModelLocalGlobalConfigPath
+        $localGlobalPath = Get-PackageLocalGlobalConfigPath
         if (Test-Path -LiteralPath $localGlobalPath -PathType Leaf) {
             Remove-Item -LiteralPath $localGlobalPath -Force
         }
 
-        $activeGlobalPath = Get-PackageModelGlobalConfigPath
-        $localInfo = Read-PackageModelJsonDocument -Path $localGlobalPath
+        $activeGlobalPath = Get-PackageGlobalConfigPath
+        $localInfo = Read-PackageJsonDocument -Path $localGlobalPath
 
         $activeGlobalPath | Should -Be $localGlobalPath
         Test-Path -LiteralPath $localGlobalPath -PathType Leaf | Should -BeTrue
-        $localInfo.Document.packageModel.repositorySources.EigenverftModule.kind | Should -Be 'moduleLocal'
+        $localInfo.Document.package.repositorySources.EigenverftModule.kind | Should -Be 'moduleLocal'
+    }
+
+    It 'creates the local DepotInventory.json copy from shipped configuration when missing' {
+        $localDepotInventoryPath = Get-PackageLocalDepotInventoryPath
+        if (Test-Path -LiteralPath $localDepotInventoryPath -PathType Leaf) {
+            Remove-Item -LiteralPath $localDepotInventoryPath -Force
+        }
+
+        $activeDepotInventoryPath = Get-PackageDepotInventoryPath
+        $localInfo = Read-PackageJsonDocument -Path $localDepotInventoryPath
+
+        $activeDepotInventoryPath | Should -Be $localDepotInventoryPath
+        Test-Path -LiteralPath $localDepotInventoryPath -PathType Leaf | Should -BeTrue
+        $localInfo.Document.acquisitionEnvironment.environmentSources.defaultPackageDepot.enabled | Should -BeTrue
     }
 
     It 'fails clearly when global config still uses retired ownershipTracking' {
         $globalConfigPath = Join-Path $TestDrive 'Global-old-ownership.json'
-        $badGlobal = New-TestPackageModelGlobalDocument
-        $badGlobal.packageModel.ownershipTracking = @{
+        $badGlobal = New-TestPackageGlobalDocument
+        $badGlobal.package.ownershipTracking = @{
             indexFilePath = Join-Path $TestDrive 'ownership-index.json'
         }
         Write-TestJsonDocument -Path $globalConfigPath -Document $badGlobal
 
-        $globalInfo = Read-PackageModelJsonDocument -Path $globalConfigPath
-        { Assert-PackageModelGlobalConfigSchema -GlobalDocumentInfo $globalInfo } | Should -Throw '*ownershipTracking*'
+        $globalInfo = Read-PackageJsonDocument -Path $globalConfigPath
+        { Assert-PackageGlobalConfigSchema -GlobalDocumentInfo $globalInfo } | Should -Throw '*ownershipTracking*'
     }
 
     It 'fails clearly when global config still uses retired artifactIndexFilePath' {
         $globalConfigPath = Join-Path $TestDrive 'Global-old-artifact.json'
-        $badGlobal = New-TestPackageModelGlobalDocument
-        $badGlobal.packageModel.acquisitionEnvironment.tracking.Remove('packageFileIndexFilePath')
-        $badGlobal.packageModel.acquisitionEnvironment.tracking.artifactIndexFilePath = Join-Path $TestDrive 'artifact-index.json'
+        $badGlobal = New-TestPackageGlobalDocument
+        $badGlobal.package.acquisitionEnvironment.tracking.Remove('packageFileIndexFilePath')
+        $badGlobal.package.acquisitionEnvironment.tracking.artifactIndexFilePath = Join-Path $TestDrive 'artifact-index.json'
         Write-TestJsonDocument -Path $globalConfigPath -Document $badGlobal
 
-        $globalInfo = Read-PackageModelJsonDocument -Path $globalConfigPath
-        { Assert-PackageModelGlobalConfigSchema -GlobalDocumentInfo $globalInfo } | Should -Throw '*artifactIndexFilePath*'
+        $globalInfo = Read-PackageJsonDocument -Path $globalConfigPath
+        { Assert-PackageGlobalConfigSchema -GlobalDocumentInfo $globalInfo } | Should -Throw '*artifactIndexFilePath*'
     }
 
     It 'loads the shipped LlamaCppRuntime definition and selects the fixed GitHub-backed release' {
         [Environment]::SetEnvironmentVariable($script:SourceInventoryEnvVarName, (Join-Path $TestDrive 'missing-inventory.json'), 'Process')
 
-        $config = Get-PackageModelConfig -DefinitionId 'LlamaCppRuntime'
-        $result = New-PackageModelResult -CommandName 'test' -PackageModelConfig $config
-        $result = Resolve-PackageModelPackage -PackageModelResult $result
-        $sourceDefinition = Get-PackageModelSourceDefinition -PackageModelConfig $config -SourceRef ([pscustomobject]@{ scope = 'definition'; id = 'llamaCppGitHub' })
+        $config = Get-PackageConfig -DefinitionId 'LlamaCppRuntime'
+        $result = New-PackageResult -CommandName 'test' -PackageConfig $config
+        $result = Resolve-PackagePackage -PackageResult $result
+        $sourceDefinition = Get-PackageSourceDefinition -PackageConfig $config -SourceRef ([pscustomobject]@{ scope = 'definition'; id = 'llamaCppGitHub' })
 
         $config.DefinitionId | Should -Be 'LlamaCppRuntime'
         $sourceDefinition.Kind | Should -Be 'githubRelease'
@@ -913,10 +972,10 @@ Describe 'Eigenverft.Manifested.Sandbox PackageModel' {
     It 'loads the shipped GitRuntime definition and selects the fixed GitHub-backed release' {
         [Environment]::SetEnvironmentVariable($script:SourceInventoryEnvVarName, (Join-Path $TestDrive 'missing-inventory.json'), 'Process')
 
-        $config = Get-PackageModelConfig -DefinitionId 'GitRuntime'
-        $result = New-PackageModelResult -CommandName 'test' -PackageModelConfig $config
-        $result = Resolve-PackageModelPackage -PackageModelResult $result
-        $sourceDefinition = Get-PackageModelSourceDefinition -PackageModelConfig $config -SourceRef ([pscustomobject]@{ scope = 'definition'; id = 'gitForWindowsGitHub' })
+        $config = Get-PackageConfig -DefinitionId 'GitRuntime'
+        $result = New-PackageResult -CommandName 'test' -PackageConfig $config
+        $result = Resolve-PackagePackage -PackageResult $result
+        $sourceDefinition = Get-PackageSourceDefinition -PackageConfig $config -SourceRef ([pscustomobject]@{ scope = 'definition'; id = 'gitForWindowsGitHub' })
 
         $expectedFileName = if ([string]::Equals([string]$config.Architecture, 'arm64', [System.StringComparison]::OrdinalIgnoreCase)) {
             'MinGit-2.54.0-arm64.zip'
@@ -945,10 +1004,10 @@ Describe 'Eigenverft.Manifested.Sandbox PackageModel' {
     It 'loads the shipped GitHubCli definition and selects the fixed GitHub-backed release' {
         [Environment]::SetEnvironmentVariable($script:SourceInventoryEnvVarName, (Join-Path $TestDrive 'missing-inventory.json'), 'Process')
 
-        $config = Get-PackageModelConfig -DefinitionId 'GitHubCli'
-        $result = New-PackageModelResult -CommandName 'test' -PackageModelConfig $config
-        $result = Resolve-PackageModelPackage -PackageModelResult $result
-        $sourceDefinition = Get-PackageModelSourceDefinition -PackageModelConfig $config -SourceRef ([pscustomobject]@{ scope = 'definition'; id = 'ghCliGitHub' })
+        $config = Get-PackageConfig -DefinitionId 'GitHubCli'
+        $result = New-PackageResult -CommandName 'test' -PackageConfig $config
+        $result = Resolve-PackagePackage -PackageResult $result
+        $sourceDefinition = Get-PackageSourceDefinition -PackageConfig $config -SourceRef ([pscustomobject]@{ scope = 'definition'; id = 'ghCliGitHub' })
 
         $expectedFileName = if ([string]::Equals([string]$config.Architecture, 'arm64', [System.StringComparison]::OrdinalIgnoreCase)) {
             'gh_2.91.0_windows_arm64.zip'
@@ -977,10 +1036,10 @@ Describe 'Eigenverft.Manifested.Sandbox PackageModel' {
     It 'loads the shipped NodeRuntime definition and selects the fixed Node.js archive release' {
         [Environment]::SetEnvironmentVariable($script:SourceInventoryEnvVarName, (Join-Path $TestDrive 'missing-inventory.json'), 'Process')
 
-        $config = Get-PackageModelConfig -DefinitionId 'NodeRuntime'
-        $result = New-PackageModelResult -CommandName 'test' -PackageModelConfig $config
-        $result = Resolve-PackageModelPackage -PackageModelResult $result
-        $sourceDefinition = Get-PackageModelSourceDefinition -PackageModelConfig $config -SourceRef ([pscustomobject]@{ scope = 'definition'; id = 'nodeJsRelease' })
+        $config = Get-PackageConfig -DefinitionId 'NodeRuntime'
+        $result = New-PackageResult -CommandName 'test' -PackageConfig $config
+        $result = Resolve-PackagePackage -PackageResult $result
+        $sourceDefinition = Get-PackageSourceDefinition -PackageConfig $config -SourceRef ([pscustomobject]@{ scope = 'definition'; id = 'nodeJsRelease' })
 
         $expectedFileName = if ([string]::Equals([string]$config.Architecture, 'arm64', [System.StringComparison]::OrdinalIgnoreCase)) {
             'node-v24.15.0-win-arm64.zip'
@@ -1016,11 +1075,11 @@ Describe 'Eigenverft.Manifested.Sandbox PackageModel' {
         )
 
         foreach ($case in $cases) {
-            $config = Get-PackageModelConfig -DefinitionId $case.DefinitionId
-            $result = New-PackageModelResult -CommandName 'test' -PackageModelConfig $config
-            $result = Resolve-PackageModelPackage -PackageModelResult $result
-            $result = Resolve-PackageModelPaths -PackageModelResult $result
-            $result = Build-PackageModelAcquisitionPlan -PackageModelResult $result
+            $config = Get-PackageConfig -DefinitionId $case.DefinitionId
+            $result = New-PackageResult -CommandName 'test' -PackageConfig $config
+            $result = Resolve-PackagePackage -PackageResult $result
+            $result = Resolve-PackagePaths -PackageResult $result
+            $result = Build-PackageAcquisitionPlan -PackageResult $result
 
             $config.DefinitionId | Should -Be $case.DefinitionId
             $result.Package.version | Should -Be $case.Version
@@ -1051,17 +1110,17 @@ Describe 'Eigenverft.Manifested.Sandbox PackageModel' {
         }
         $result = [pscustomobject]@{
             DefinitionId       = 'CodexCli'
-            PackageModelConfig = [pscustomobject]@{
+            PackageConfig = [pscustomobject]@{
                 Definition = $definition
             }
             Dependencies       = @()
         }
 
-        Mock Invoke-PackageModelDefinitionCommand {
+        Mock Invoke-PackageDefinitionCommand {
             [pscustomobject]@{
                 Status        = 'Ready'
-                InstallOrigin = 'PackageModelReused'
-            Install       = [pscustomobject]@{ Status = 'ReusedPackageModelOwned' }
+                InstallOrigin = 'PackageReused'
+            Install       = [pscustomobject]@{ Status = 'ReusedPackageOwned' }
             EntryPoints   = [pscustomobject]@{
                 Commands = @(
                     [pscustomobject]@{
@@ -1073,10 +1132,10 @@ Describe 'Eigenverft.Manifested.Sandbox PackageModel' {
         }
     }
 
-        $resolved = Resolve-PackageModelDependencies -PackageModelResult $result
+        $resolved = Resolve-PackageDependencies -PackageResult $result
 
-        Assert-MockCalled Invoke-PackageModelDefinitionCommand -Times 1 -ParameterFilter { $DefinitionId -eq 'VisualCppRedistributable' }
-        Assert-MockCalled Invoke-PackageModelDefinitionCommand -Times 1 -ParameterFilter { $DefinitionId -eq 'NodeRuntime' }
+        Assert-MockCalled Invoke-PackageDefinitionCommand -Times 1 -ParameterFilter { $DefinitionId -eq 'VisualCppRedistributable' }
+        Assert-MockCalled Invoke-PackageDefinitionCommand -Times 1 -ParameterFilter { $DefinitionId -eq 'NodeRuntime' }
         @($resolved.Dependencies.DefinitionId) | Should -Be @('VisualCppRedistributable', 'NodeRuntime')
         @($resolved.Dependencies.Status) | Should -Be @('Ready', 'Ready')
         @($resolved.Dependencies[1].Commands.Name) | Should -Be @('npm')
@@ -1091,22 +1150,22 @@ Describe 'Eigenverft.Manifested.Sandbox PackageModel' {
         }
         $result = [pscustomobject]@{
             DefinitionId       = 'CodexCli'
-            PackageModelConfig = [pscustomobject]@{
+            PackageConfig = [pscustomobject]@{
                 Definition = $definition
             }
             Dependencies       = @()
         }
 
-        { Resolve-PackageModelDependencies -PackageModelResult $result -DependencyStack @('CodexCli', 'NodeRuntime') } | Should -Throw '*dependency cycle*'
+        { Resolve-PackageDependencies -PackageResult $result -DependencyStack @('CodexCli', 'NodeRuntime') } | Should -Throw '*dependency cycle*'
     }
 
     It 'loads the shipped PythonRuntime definition and selects the fixed NuGet package release' {
         [Environment]::SetEnvironmentVariable($script:SourceInventoryEnvVarName, (Join-Path $TestDrive 'missing-inventory.json'), 'Process')
 
-        $config = Get-PackageModelConfig -DefinitionId 'PythonRuntime'
-        $result = New-PackageModelResult -CommandName 'test' -PackageModelConfig $config
-        $result = Resolve-PackageModelPackage -PackageModelResult $result
-        $sourceDefinition = Get-PackageModelSourceDefinition -PackageModelConfig $config -SourceRef ([pscustomobject]@{ scope = 'definition'; id = 'pythonNuGetPackage' })
+        $config = Get-PackageConfig -DefinitionId 'PythonRuntime'
+        $result = New-PackageResult -CommandName 'test' -PackageConfig $config
+        $result = Resolve-PackagePackage -PackageResult $result
+        $sourceDefinition = Get-PackageSourceDefinition -PackageConfig $config -SourceRef ([pscustomobject]@{ scope = 'definition'; id = 'pythonNuGetPackage' })
 
         $expectedFileName = if ([string]::Equals([string]$config.Architecture, 'arm64', [System.StringComparison]::OrdinalIgnoreCase)) {
             'pythonarm64.3.13.13.nupkg'
@@ -1136,10 +1195,10 @@ Describe 'Eigenverft.Manifested.Sandbox PackageModel' {
     It 'loads the shipped PowerShell7 definition and selects the fixed GitHub-backed release' {
         [Environment]::SetEnvironmentVariable($script:SourceInventoryEnvVarName, (Join-Path $TestDrive 'missing-inventory.json'), 'Process')
 
-        $config = Get-PackageModelConfig -DefinitionId 'PowerShell7'
-        $result = New-PackageModelResult -CommandName 'test' -PackageModelConfig $config
-        $result = Resolve-PackageModelPackage -PackageModelResult $result
-        $sourceDefinition = Get-PackageModelSourceDefinition -PackageModelConfig $config -SourceRef ([pscustomobject]@{ scope = 'definition'; id = 'powerShellGitHub' })
+        $config = Get-PackageConfig -DefinitionId 'PowerShell7'
+        $result = New-PackageResult -CommandName 'test' -PackageConfig $config
+        $result = Resolve-PackagePackage -PackageResult $result
+        $sourceDefinition = Get-PackageSourceDefinition -PackageConfig $config -SourceRef ([pscustomobject]@{ scope = 'definition'; id = 'powerShellGitHub' })
 
         $expectedFileName = if ([string]::Equals([string]$config.Architecture, 'arm64', [System.StringComparison]::OrdinalIgnoreCase)) {
             'PowerShell-7.6.1-win-arm64.zip'
@@ -1168,10 +1227,10 @@ Describe 'Eigenverft.Manifested.Sandbox PackageModel' {
     It 'loads the shipped VisualCppRedistributable definition as an elevated machine prerequisite' {
         [Environment]::SetEnvironmentVariable($script:SourceInventoryEnvVarName, (Join-Path $TestDrive 'missing-inventory.json'), 'Process')
 
-        $config = Get-PackageModelConfig -DefinitionId 'VisualCppRedistributable'
-        $result = New-PackageModelResult -CommandName 'test' -PackageModelConfig $config
-        $result = Resolve-PackageModelPackage -PackageModelResult $result
-        $sourceDefinition = Get-PackageModelSourceDefinition -PackageModelConfig $config -SourceRef ([pscustomobject]@{ scope = 'definition'; id = 'visualCppRedistributableDownload' })
+        $config = Get-PackageConfig -DefinitionId 'VisualCppRedistributable'
+        $result = New-PackageResult -CommandName 'test' -PackageConfig $config
+        $result = Resolve-PackagePackage -PackageResult $result
+        $sourceDefinition = Get-PackageSourceDefinition -PackageConfig $config -SourceRef ([pscustomobject]@{ scope = 'definition'; id = 'visualCppRedistributableDownload' })
 
         $config.DefinitionId | Should -Be 'VisualCppRedistributable'
         $sourceDefinition.Kind | Should -Be 'download'
@@ -1190,10 +1249,10 @@ Describe 'Eigenverft.Manifested.Sandbox PackageModel' {
         Mock Get-PhysicalMemoryGiB { 2.0 }
         Mock Get-VideoMemoryGiB { 1.0 }
 
-        $config = Get-PackageModelConfig -DefinitionId 'Qwen35_2B_Q6K_Model'
-        $result = New-PackageModelResult -CommandName 'test' -PackageModelConfig $config
-        $result = Resolve-PackageModelPackage -PackageModelResult $result
-        $sourceDefinition = Get-PackageModelSourceDefinition -PackageModelConfig $config -SourceRef ([pscustomobject]@{ scope = 'definition'; id = 'huggingFaceDownload' })
+        $config = Get-PackageConfig -DefinitionId 'Qwen35_2B_Q6K_Model'
+        $result = New-PackageResult -CommandName 'test' -PackageConfig $config
+        $result = Resolve-PackagePackage -PackageResult $result
+        $sourceDefinition = Get-PackageSourceDefinition -PackageConfig $config -SourceRef ([pscustomobject]@{ scope = 'definition'; id = 'huggingFaceDownload' })
 
         $config.DefinitionId | Should -Be 'Qwen35_2B_Q6K_Model'
         $sourceDefinition.Kind | Should -Be 'download'
@@ -1212,31 +1271,31 @@ Describe 'Eigenverft.Manifested.Sandbox PackageModel' {
 
     It 'fails clearly when the shipped global config still defines vsCodeUpdateService as an environment source' {
         $globalConfigPath = Join-Path $TestDrive 'Config.json'
-        $badGlobal = New-TestPackageModelGlobalDocument -EnvironmentSources @{
+        $badGlobal = New-TestPackageGlobalDocument -EnvironmentSources @{
             vsCodeUpdateService = @{ kind = 'download'; baseUri = 'https://example.invalid/' }
         }
         Write-TestJsonDocument -Path $globalConfigPath -Document $badGlobal
 
-        $globalInfo = Read-PackageModelJsonDocument -Path $globalConfigPath
-        { Assert-PackageModelGlobalConfigSchema -GlobalDocumentInfo $globalInfo } | Should -Throw '*vsCodeUpdateService*'
+        $globalInfo = Read-PackageJsonDocument -Path $globalConfigPath
+        { Assert-PackageGlobalConfigSchema -GlobalDocumentInfo $globalInfo } | Should -Throw '*vsCodeUpdateService*'
     }
 
     It 'fails clearly when a definition still uses requireManagedOwnership' {
         $rootPath = Join-Path $TestDrive 'retired-require-managed-ownership'
-        $release = New-TestPackageModelRelease -Id 'vsCode-win-x64-stable' -Version '2.0.0' -Architecture 'x64' -Flavor 'win32-x64' -Install @{ kind = 'reuseExisting' } -Validation (New-TestValidation -Version '2.0.0')
+        $release = New-TestPackageRelease -Id 'vsCode-win-x64-stable' -Version '2.0.0' -Architecture 'x64' -Flavor 'win32-x64' -Install @{ kind = 'reuseExisting' } -Validation (New-TestValidation -Version '2.0.0')
         $definitionDocument = New-TestVSCodeDefinitionDocument -Releases @($release) -ReleaseDefaultsValidation (New-TestValidation -Version '2.0.0') -ReleaseDefaultsExistingInstallPolicy @{
             allowAdoptExternal    = $false
             upgradeAdoptedInstall = $false
             requireManagedOwnership = $false
         }
-        $documents = Write-TestPackageModelDocuments -RootPath $rootPath -GlobalDocument (New-TestPackageModelGlobalDocument) -DefinitionDocument $definitionDocument
+        $documents = Write-TestPackageDocuments -RootPath $rootPath -GlobalDocument (New-TestPackageGlobalDocument) -DefinitionDocument $definitionDocument
 
-        $definitionInfo = Read-PackageModelJsonDocument -Path $documents.DefinitionPath
-        { Assert-PackageModelDefinitionSchema -DefinitionDocumentInfo $definitionInfo -DefinitionId 'VSCodeRuntime' } | Should -Throw '*requireManagedOwnership*'
+        $definitionInfo = Read-PackageJsonDocument -Path $documents.DefinitionPath
+        { Assert-PackageDefinitionSchema -DefinitionDocumentInfo $definitionInfo -DefinitionId 'VSCodeRuntime' } | Should -Throw '*requireManagedOwnership*'
     }
 
     It 'fails clearly when npm install definitions use retired managerDependency fields' {
-        $release = New-TestPackageModelRelease -Id 'cli-win-x64-stable' -Version '1.0.0' -Architecture 'x64' -Flavor 'win32-x64' -Install @{
+        $release = New-TestPackageRelease -Id 'cli-win-x64-stable' -Version '1.0.0' -Architecture 'x64' -Flavor 'win32-x64' -Install @{
             kind              = 'npmGlobalPackage'
             installerCommand  = 'npm'
             packageSpec       = 'example@{version}'
@@ -1251,42 +1310,42 @@ Describe 'Eigenverft.Manifested.Sandbox PackageModel' {
             Document = ConvertTo-TestPsObject -InputObject $definitionDocument
         }
 
-        { Assert-PackageModelDefinitionSchema -DefinitionDocumentInfo $definitionInfo -DefinitionId 'VSCodeRuntime' } | Should -Throw '*install.managerDependency*'
+        { Assert-PackageDefinitionSchema -DefinitionDocumentInfo $definitionInfo -DefinitionId 'VSCodeRuntime' } | Should -Throw '*install.managerDependency*'
     }
 
     It 'fails clearly when a definition is missing schemaVersion' {
         $rootPath = Join-Path $TestDrive 'missing-schema-version'
-        $release = New-TestPackageModelRelease -Id 'vsCode-win-x64-stable' -Version '2.0.0' -Architecture 'x64' -Flavor 'win32-x64' -Install @{ kind = 'reuseExisting' } -Validation (New-TestValidation -Version '2.0.0')
+        $release = New-TestPackageRelease -Id 'vsCode-win-x64-stable' -Version '2.0.0' -Architecture 'x64' -Flavor 'win32-x64' -Install @{ kind = 'reuseExisting' } -Validation (New-TestValidation -Version '2.0.0')
         $definitionDocument = New-TestVSCodeDefinitionDocument -Releases @($release)
         $null = $definitionDocument.Remove('schemaVersion')
-        $documents = Write-TestPackageModelDocuments -RootPath $rootPath -GlobalDocument (New-TestPackageModelGlobalDocument) -DefinitionDocument $definitionDocument
+        $documents = Write-TestPackageDocuments -RootPath $rootPath -GlobalDocument (New-TestPackageGlobalDocument) -DefinitionDocument $definitionDocument
 
-        $definitionInfo = Read-PackageModelJsonDocument -Path $documents.DefinitionPath
-        { Assert-PackageModelDefinitionSchema -DefinitionDocumentInfo $definitionInfo -DefinitionId 'VSCodeRuntime' } | Should -Throw '*schemaVersion*'
+        $definitionInfo = Read-PackageJsonDocument -Path $documents.DefinitionPath
+        { Assert-PackageDefinitionSchema -DefinitionDocumentInfo $definitionInfo -DefinitionId 'VSCodeRuntime' } | Should -Throw '*schemaVersion*'
     }
 
     It 'fails clearly when a definition still uses releaseDefaults.requirements' {
         $rootPath = Join-Path $TestDrive 'retired-requirements-packages'
-        $release = New-TestPackageModelRelease -Id 'vsCode-win-x64-stable' -Version '2.0.0' -Architecture 'x64' -Flavor 'win32-x64' -Install @{ kind = 'reuseExisting' } -Validation (New-TestValidation -Version '2.0.0')
+        $release = New-TestPackageRelease -Id 'vsCode-win-x64-stable' -Version '2.0.0' -Architecture 'x64' -Flavor 'win32-x64' -Install @{ kind = 'reuseExisting' } -Validation (New-TestValidation -Version '2.0.0')
         $definitionDocument = New-TestVSCodeDefinitionDocument -Releases @($release)
         $definitionDocument.releaseDefaults.requirements = @{
             checks = [object[]]@()
         }
-        $documents = Write-TestPackageModelDocuments -RootPath $rootPath -GlobalDocument (New-TestPackageModelGlobalDocument) -DefinitionDocument $definitionDocument
+        $documents = Write-TestPackageDocuments -RootPath $rootPath -GlobalDocument (New-TestPackageGlobalDocument) -DefinitionDocument $definitionDocument
 
-        $definitionInfo = Read-PackageModelJsonDocument -Path $documents.DefinitionPath
-        { Assert-PackageModelDefinitionSchema -DefinitionDocumentInfo $definitionInfo -DefinitionId 'VSCodeRuntime' } | Should -Throw '*releaseDefaults.requirements*'
+        $definitionInfo = Read-PackageJsonDocument -Path $documents.DefinitionPath
+        { Assert-PackageDefinitionSchema -DefinitionDocumentInfo $definitionInfo -DefinitionId 'VSCodeRuntime' } | Should -Throw '*releaseDefaults.requirements*'
     }
 
     It 'uses the default source inventory path when the env var is unset' {
         [Environment]::SetEnvironmentVariable($script:SourceInventoryEnvVarName, $null, 'Process')
-        (Get-PackageModelSourceInventoryPath) | Should -Be (Get-PackageModelDefaultSourceInventoryPath)
+        (Get-PackageSourceInventoryPath) | Should -Be (Get-PackageDefaultSourceInventoryPath)
     }
 
     It 'loads source inventory from the env-var path and applies the inventory global overlay when no site code is set' {
         $rootPath = Join-Path $TestDrive 'inventory-global'
-        $documents = Write-TestPackageModelDocuments -RootPath $rootPath -GlobalDocument (New-TestPackageModelGlobalDocument) -DefinitionDocument (New-TestVSCodeDefinitionDocument -Releases @(
-                New-TestPackageModelRelease -Id 'vsCode-win-x64-stable' -Version '2.0.0' -Architecture 'x64' -Flavor 'win32-x64' -FileName 'VSCode-win32-x64-2.0.0.zip' -AcquisitionCandidates @(
+        $documents = Write-TestPackageDocuments -RootPath $rootPath -GlobalDocument (New-TestPackageGlobalDocument) -DefinitionDocument (New-TestVSCodeDefinitionDocument -Releases @(
+                New-TestPackageRelease -Id 'vsCode-win-x64-stable' -Version '2.0.0' -Architecture 'x64' -Flavor 'win32-x64' -FileName 'VSCode-win32-x64-2.0.0.zip' -AcquisitionCandidates @(
                     @{
                         kind        = 'packageDepot'
                         priority    = 100
@@ -1303,10 +1362,10 @@ Describe 'Eigenverft.Manifested.Sandbox PackageModel' {
         [Environment]::SetEnvironmentVariable($script:SourceInventoryEnvVarName, $documents.SourceInventoryPath, 'Process')
         [Environment]::SetEnvironmentVariable($script:SiteCodeEnvVarName, $null, 'Process')
 
-        Mock Get-PackageModelGlobalConfigPath { $documents.GlobalConfigPath }
-        Mock Get-PackageModelDefinitionPath { param($DefinitionId) $documents.DefinitionPath }
+        Mock Get-PackageGlobalConfigPath { $documents.GlobalConfigPath }
+        Mock Get-PackageDefinitionPath { param($DefinitionId) $documents.DefinitionPath }
 
-        $config = Get-PackageModelConfig -DefinitionId 'VSCodeRuntime'
+        $config = Get-PackageConfig -DefinitionId 'VSCodeRuntime'
 
         $config.EnvironmentSources.PSObject.Properties.Name | Should -Contain 'remotePackageDepot'
         $config.EnvironmentSources.remotePackageDepot.basePath | Should -Be (Join-Path $TestDrive 'global-remote')
@@ -1314,8 +1373,8 @@ Describe 'Eigenverft.Manifested.Sandbox PackageModel' {
 
     It 'applies the site overlay on top of the inventory global overlay when site code is present' {
         $rootPath = Join-Path $TestDrive 'inventory-site'
-        $documents = Write-TestPackageModelDocuments -RootPath $rootPath -GlobalDocument (New-TestPackageModelGlobalDocument) -DefinitionDocument (New-TestVSCodeDefinitionDocument -Releases @(
-                New-TestPackageModelRelease -Id 'vsCode-win-x64-stable' -Version '2.0.0' -Architecture 'x64' -Flavor 'win32-x64' -FileName 'VSCode-win32-x64-2.0.0.zip' -AcquisitionCandidates @(
+        $documents = Write-TestPackageDocuments -RootPath $rootPath -GlobalDocument (New-TestPackageGlobalDocument) -DefinitionDocument (New-TestVSCodeDefinitionDocument -Releases @(
+                New-TestPackageRelease -Id 'vsCode-win-x64-stable' -Version '2.0.0' -Architecture 'x64' -Flavor 'win32-x64' -FileName 'VSCode-win32-x64-2.0.0.zip' -AcquisitionCandidates @(
                     @{
                         kind        = 'packageDepot'
                         priority    = 100
@@ -1337,17 +1396,76 @@ Describe 'Eigenverft.Manifested.Sandbox PackageModel' {
         [Environment]::SetEnvironmentVariable($script:SourceInventoryEnvVarName, $documents.SourceInventoryPath, 'Process')
         [Environment]::SetEnvironmentVariable($script:SiteCodeEnvVarName, 'BER', 'Process')
 
-        Mock Get-PackageModelGlobalConfigPath { $documents.GlobalConfigPath }
-        Mock Get-PackageModelDefinitionPath { param($DefinitionId) $documents.DefinitionPath }
+        Mock Get-PackageGlobalConfigPath { $documents.GlobalConfigPath }
+        Mock Get-PackageDefinitionPath { param($DefinitionId) $documents.DefinitionPath }
 
-        $config = Get-PackageModelConfig -DefinitionId 'VSCodeRuntime'
+        $config = Get-PackageConfig -DefinitionId 'VSCodeRuntime'
 
         $config.EnvironmentSources.remotePackageDepot.basePath | Should -Be (Join-Path $TestDrive 'site-remote')
     }
 
+    It 'filters depot inventory sources by enabled flag and semicolon site-code list' {
+        $rootPath = Join-Path $TestDrive 'depot-inventory-sites'
+        $depotInventory = New-TestDepotInventoryDocument -DefaultPackageDepotDirectory (Join-Path $rootPath 'default-depot') -EnvironmentSources @{
+            disabledDepot = @{
+                kind     = 'filesystem'
+                enabled  = $false
+                priority = 50
+                basePath = (Join-Path $rootPath 'disabled')
+            }
+            departmentDepot = @{
+                kind      = 'filesystem'
+                enabled   = $true
+                priority  = 150
+                siteCodes = @('BER-ENG')
+                basePath  = (Join-Path $rootPath 'department')
+            }
+            otherSiteDepot = @{
+                kind      = 'filesystem'
+                enabled   = $true
+                priority  = 100
+                siteCodes = @('PD')
+                basePath  = (Join-Path $rootPath 'other-site')
+            }
+            globalDepot = @{
+                kind     = 'filesystem'
+                enabled  = $true
+                priority = 400
+                basePath = (Join-Path $rootPath 'global')
+            }
+        }
+        $documents = Write-TestPackageDocuments -RootPath $rootPath -GlobalDocument (New-TestPackageGlobalDocument) -DepotInventoryDocument $depotInventory -DefinitionDocument (New-TestVSCodeDefinitionDocument -Releases @(
+                New-TestPackageRelease -Id 'vsCode-win-x64-stable' -Version '2.0.0' -Architecture 'x64' -Flavor 'win32-x64' -FileName 'VSCode-win32-x64-2.0.0.zip' -AcquisitionCandidates @(
+                    @{
+                        kind        = 'packageDepot'
+                        priority    = 100
+                        verification = @{ mode = 'none' }
+                    }
+                )
+            ))
+
+        [Environment]::SetEnvironmentVariable($script:SourceInventoryEnvVarName, (Join-Path $TestDrive 'missing-inventory.json'), 'Process')
+        [Environment]::SetEnvironmentVariable($script:SiteCodeEnvVarName, 'BER;BER-ENG', 'Process')
+
+        Mock Get-PackageGlobalConfigPath { $documents.GlobalConfigPath }
+        Mock Get-PackageDepotInventoryPath { $documents.DepotInventoryPath }
+        Mock Get-PackageDefinitionPath { param($DefinitionId) $documents.DefinitionPath }
+
+        $config = Get-PackageConfig -DefinitionId 'VSCodeRuntime'
+        $sourceNames = @($config.EnvironmentSources.PSObject.Properties.Name)
+        $depotSources = @(Get-PackagePackageDepotSources -PackageConfig $config)
+
+        $sourceNames | Should -Contain 'defaultPackageDepot'
+        $sourceNames | Should -Contain 'departmentDepot'
+        $sourceNames | Should -Contain 'globalDepot'
+        $sourceNames | Should -Not -Contain 'disabledDepot'
+        $sourceNames | Should -Not -Contain 'otherSiteDepot'
+        @($depotSources.id) | Should -Be @('departmentDepot', 'defaultPackageDepot', 'globalDepot')
+    }
+
     It 'rejects a selected release when compatibility.checks are not satisfied with onFail fail' {
         $rootPath = Join-Path $TestDrive 'requirements-checks-fail'
-        $release = New-TestPackageModelRelease -Id 'vsCode-win-x64-stable' -Version '2.0.0' -Architecture 'x64' -Flavor 'win32-x64' -Install @{ kind = 'reuseExisting' } -Compatibility @{
+        $release = New-TestPackageRelease -Id 'vsCode-win-x64-stable' -Version '2.0.0' -Architecture 'x64' -Flavor 'win32-x64' -Install @{ kind = 'reuseExisting' } -Compatibility @{
             checks = @(
                 @{
                     kind    = 'osFamily'
@@ -1355,22 +1473,22 @@ Describe 'Eigenverft.Manifested.Sandbox PackageModel' {
                 }
             )
         } -Validation (New-TestValidation -Version '2.0.0')
-        $documents = Write-TestPackageModelDocuments -RootPath $rootPath -GlobalDocument (New-TestPackageModelGlobalDocument) -DefinitionDocument (New-TestVSCodeDefinitionDocument -Releases @($release))
+        $documents = Write-TestPackageDocuments -RootPath $rootPath -GlobalDocument (New-TestPackageGlobalDocument) -DefinitionDocument (New-TestVSCodeDefinitionDocument -Releases @($release))
 
         [Environment]::SetEnvironmentVariable($script:SourceInventoryEnvVarName, (Join-Path $TestDrive 'missing-inventory.json'), 'Process')
-        Mock Get-PackageModelGlobalConfigPath { $documents.GlobalConfigPath }
-        Mock Get-PackageModelDefinitionPath { param($DefinitionId) $documents.DefinitionPath }
+        Mock Get-PackageGlobalConfigPath { $documents.GlobalConfigPath }
+        Mock Get-PackageDefinitionPath { param($DefinitionId) $documents.DefinitionPath }
 
-        $config = Get-PackageModelConfig -DefinitionId 'VSCodeRuntime'
-        $result = New-PackageModelResult -CommandName 'test' -PackageModelConfig $config
+        $config = Get-PackageConfig -DefinitionId 'VSCodeRuntime'
+        $result = New-PackageResult -CommandName 'test' -PackageConfig $config
 
-        { Resolve-PackageModelPackage -PackageModelResult $result } | Should -Throw '*compatibility.checks*'
+        { Resolve-PackagePackage -PackageResult $result } | Should -Throw '*compatibility.checks*'
     }
 
     It 'resolves environment and definition source refs from the effective acquisition environment and upstream sources' {
         $rootPath = Join-Path $TestDrive 'source-resolution'
-        $documents = Write-TestPackageModelDocuments -RootPath $rootPath -GlobalDocument (New-TestPackageModelGlobalDocument) -DefinitionDocument (New-TestVSCodeDefinitionDocument -Releases @(
-                New-TestPackageModelRelease -Id 'vsCode-win-x64-stable' -Version '2.0.0' -Architecture 'x64' -Flavor 'win32-x64' -Install @{ kind = 'reuseExisting' } -Validation (New-TestValidation -Version '2.0.0')
+        $documents = Write-TestPackageDocuments -RootPath $rootPath -GlobalDocument (New-TestPackageGlobalDocument) -DefinitionDocument (New-TestVSCodeDefinitionDocument -Releases @(
+                New-TestPackageRelease -Id 'vsCode-win-x64-stable' -Version '2.0.0' -Architecture 'x64' -Flavor 'win32-x64' -Install @{ kind = 'reuseExisting' } -Validation (New-TestValidation -Version '2.0.0')
             ) -UpstreamBaseUri 'https://example.invalid/vscode/') -SourceInventoryDocument (New-TestSourceInventoryDocument -GlobalEnvironmentSources @{
                 remotePackageDepot = @{
                     kind     = 'filesystem'
@@ -1379,12 +1497,12 @@ Describe 'Eigenverft.Manifested.Sandbox PackageModel' {
             })
 
         [Environment]::SetEnvironmentVariable($script:SourceInventoryEnvVarName, $documents.SourceInventoryPath, 'Process')
-        Mock Get-PackageModelGlobalConfigPath { $documents.GlobalConfigPath }
-        Mock Get-PackageModelDefinitionPath { param($DefinitionId) $documents.DefinitionPath }
+        Mock Get-PackageGlobalConfigPath { $documents.GlobalConfigPath }
+        Mock Get-PackageDefinitionPath { param($DefinitionId) $documents.DefinitionPath }
 
-        $config = Get-PackageModelConfig -DefinitionId 'VSCodeRuntime'
-        $environmentSource = Get-PackageModelSourceDefinition -PackageModelConfig $config -SourceRef ([pscustomobject]@{ scope = 'environment'; id = 'remotePackageDepot' })
-        $definitionSource = Get-PackageModelSourceDefinition -PackageModelConfig $config -SourceRef ([pscustomobject]@{ scope = 'definition'; id = 'vsCodeUpdateService' })
+        $config = Get-PackageConfig -DefinitionId 'VSCodeRuntime'
+        $environmentSource = Get-PackageSourceDefinition -PackageConfig $config -SourceRef ([pscustomobject]@{ scope = 'environment'; id = 'remotePackageDepot' })
+        $definitionSource = Get-PackageSourceDefinition -PackageConfig $config -SourceRef ([pscustomobject]@{ scope = 'definition'; id = 'vsCodeUpdateService' })
 
         $environmentSource.Kind | Should -Be 'filesystem'
         $environmentSource.BasePath | Should -Be (Join-Path $TestDrive 'remote-depot')
@@ -1394,7 +1512,7 @@ Describe 'Eigenverft.Manifested.Sandbox PackageModel' {
 
     It 'loads GitHub release upstream sources and keeps releaseTag separate from version' {
         $rootPath = Join-Path $TestDrive 'github-release-source'
-        $release = New-TestPackageModelRelease -Id 'llama-cpu-x64-stable' -Version '0.0.1' -ReleaseTag 'b8863' -Architecture 'x64' -Flavor 'win-cpu-x64' -FileName 'llama-b8863-bin-win-cpu-x64.zip' -AcquisitionCandidates @(
+        $release = New-TestPackageRelease -Id 'llama-cpu-x64-stable' -Version '0.0.1' -ReleaseTag 'b8863' -Architecture 'x64' -Flavor 'win-cpu-x64' -FileName 'llama-b8863-bin-win-cpu-x64.zip' -AcquisitionCandidates @(
             @{
                 kind         = 'download'
                 sourceId     = 'llamaCppGitHub'
@@ -1402,7 +1520,7 @@ Describe 'Eigenverft.Manifested.Sandbox PackageModel' {
                 verification = @{ mode = 'required' }
             }
         )
-        $documents = Write-TestPackageModelDocuments -RootPath $rootPath -GlobalDocument (New-TestPackageModelGlobalDocument) -DefinitionDocument (New-TestVSCodeDefinitionDocument -Releases @($release) -ReleaseDefaultsValidation (New-TestValidation -Version '0.0.1') -UpstreamSources @{
+        $documents = Write-TestPackageDocuments -RootPath $rootPath -GlobalDocument (New-TestPackageGlobalDocument) -DefinitionDocument (New-TestVSCodeDefinitionDocument -Releases @($release) -ReleaseDefaultsValidation (New-TestValidation -Version '0.0.1') -UpstreamSources @{
             llamaCppGitHub = @{
                 kind            = 'githubRelease'
                 repositoryOwner = 'ggml-org'
@@ -1411,13 +1529,13 @@ Describe 'Eigenverft.Manifested.Sandbox PackageModel' {
         })
 
         [Environment]::SetEnvironmentVariable($script:SourceInventoryEnvVarName, (Join-Path $TestDrive 'missing-inventory.json'), 'Process')
-        Mock Get-PackageModelGlobalConfigPath { $documents.GlobalConfigPath }
-        Mock Get-PackageModelDefinitionPath { param($DefinitionId) $documents.DefinitionPath }
+        Mock Get-PackageGlobalConfigPath { $documents.GlobalConfigPath }
+        Mock Get-PackageDefinitionPath { param($DefinitionId) $documents.DefinitionPath }
 
-        $config = Get-PackageModelConfig -DefinitionId 'VSCodeRuntime'
-        $result = New-PackageModelResult -CommandName 'test' -PackageModelConfig $config
-        $result = Resolve-PackageModelPackage -PackageModelResult $result
-        $definitionSource = Get-PackageModelSourceDefinition -PackageModelConfig $config -SourceRef ([pscustomobject]@{ scope = 'definition'; id = 'llamaCppGitHub' })
+        $config = Get-PackageConfig -DefinitionId 'VSCodeRuntime'
+        $result = New-PackageResult -CommandName 'test' -PackageConfig $config
+        $result = Resolve-PackagePackage -PackageResult $result
+        $definitionSource = Get-PackageSourceDefinition -PackageConfig $config -SourceRef ([pscustomobject]@{ scope = 'definition'; id = 'llamaCppGitHub' })
 
         $definitionSource.Kind | Should -Be 'githubRelease'
         $definitionSource.RepositoryOwner | Should -Be 'ggml-org'
@@ -1428,7 +1546,7 @@ Describe 'Eigenverft.Manifested.Sandbox PackageModel' {
 
     It 'requires releaseTag for GitHub-backed releases' {
         $rootPath = Join-Path $TestDrive 'github-release-tag-required'
-        $release = New-TestPackageModelRelease -Id 'llama-cpu-x64-stable' -Version '0.0.1' -Architecture 'x64' -Flavor 'win-cpu-x64' -FileName 'llama-b8863-bin-win-cpu-x64.zip' -AcquisitionCandidates @(
+        $release = New-TestPackageRelease -Id 'llama-cpu-x64-stable' -Version '0.0.1' -Architecture 'x64' -Flavor 'win-cpu-x64' -FileName 'llama-b8863-bin-win-cpu-x64.zip' -AcquisitionCandidates @(
             @{
                 kind         = 'download'
                 sourceId     = 'llamaCppGitHub'
@@ -1436,7 +1554,7 @@ Describe 'Eigenverft.Manifested.Sandbox PackageModel' {
                 verification = @{ mode = 'required' }
             }
         )
-        $documents = Write-TestPackageModelDocuments -RootPath $rootPath -GlobalDocument (New-TestPackageModelGlobalDocument) -DefinitionDocument (New-TestVSCodeDefinitionDocument -Releases @($release) -ReleaseDefaultsValidation (New-TestValidation -Version '0.0.1') -UpstreamSources @{
+        $documents = Write-TestPackageDocuments -RootPath $rootPath -GlobalDocument (New-TestPackageGlobalDocument) -DefinitionDocument (New-TestVSCodeDefinitionDocument -Releases @($release) -ReleaseDefaultsValidation (New-TestValidation -Version '0.0.1') -UpstreamSources @{
             llamaCppGitHub = @{
                 kind            = 'githubRelease'
                 repositoryOwner = 'ggml-org'
@@ -1445,15 +1563,15 @@ Describe 'Eigenverft.Manifested.Sandbox PackageModel' {
         })
 
         [Environment]::SetEnvironmentVariable($script:SourceInventoryEnvVarName, (Join-Path $TestDrive 'missing-inventory.json'), 'Process')
-        Mock Get-PackageModelGlobalConfigPath { $documents.GlobalConfigPath }
-        Mock Get-PackageModelDefinitionPath { param($DefinitionId) $documents.DefinitionPath }
+        Mock Get-PackageGlobalConfigPath { $documents.GlobalConfigPath }
+        Mock Get-PackageDefinitionPath { param($DefinitionId) $documents.DefinitionPath }
 
-        { Get-PackageModelConfig -DefinitionId 'VSCodeRuntime' } | Should -Throw '*requires releaseTag*'
+        { Get-PackageConfig -DefinitionId 'VSCodeRuntime' } | Should -Throw '*requires releaseTag*'
     }
 
     It 'resolves a GitHub release asset URL from releaseTag and packageFile.fileName' {
         $rootPath = Join-Path $TestDrive 'github-release-resolve'
-        $release = New-TestPackageModelRelease -Id 'llama-cpu-x64-stable' -Version '0.0.1' -ReleaseTag 'b8863' -Architecture 'x64' -Flavor 'win-cpu-x64' -FileName 'llama-b8863-bin-win-cpu-x64.zip' -AcquisitionCandidates @(
+        $release = New-TestPackageRelease -Id 'llama-cpu-x64-stable' -Version '0.0.1' -ReleaseTag 'b8863' -Architecture 'x64' -Flavor 'win-cpu-x64' -FileName 'llama-b8863-bin-win-cpu-x64.zip' -AcquisitionCandidates @(
             @{
                 kind         = 'download'
                 sourceId     = 'llamaCppGitHub'
@@ -1461,7 +1579,7 @@ Describe 'Eigenverft.Manifested.Sandbox PackageModel' {
                 verification = @{ mode = 'required' }
             }
         )
-        $documents = Write-TestPackageModelDocuments -RootPath $rootPath -GlobalDocument (New-TestPackageModelGlobalDocument) -DefinitionDocument (New-TestVSCodeDefinitionDocument -Releases @($release) -ReleaseDefaultsValidation (New-TestValidation -Version '0.0.1') -UpstreamSources @{
+        $documents = Write-TestPackageDocuments -RootPath $rootPath -GlobalDocument (New-TestPackageGlobalDocument) -DefinitionDocument (New-TestVSCodeDefinitionDocument -Releases @($release) -ReleaseDefaultsValidation (New-TestValidation -Version '0.0.1') -UpstreamSources @{
             llamaCppGitHub = @{
                 kind            = 'githubRelease'
                 repositoryOwner = 'ggml-org'
@@ -1470,8 +1588,8 @@ Describe 'Eigenverft.Manifested.Sandbox PackageModel' {
         })
 
         [Environment]::SetEnvironmentVariable($script:SourceInventoryEnvVarName, (Join-Path $TestDrive 'missing-inventory.json'), 'Process')
-        Mock Get-PackageModelGlobalConfigPath { $documents.GlobalConfigPath }
-        Mock Get-PackageModelDefinitionPath { param($DefinitionId) $documents.DefinitionPath }
+        Mock Get-PackageGlobalConfigPath { $documents.GlobalConfigPath }
+        Mock Get-PackageDefinitionPath { param($DefinitionId) $documents.DefinitionPath }
         Mock Get-GitHubRelease {
             [pscustomobject]@{
                 RepositoryOwner = 'ggml-org'
@@ -1486,11 +1604,11 @@ Describe 'Eigenverft.Manifested.Sandbox PackageModel' {
             }
         }
 
-        $config = Get-PackageModelConfig -DefinitionId 'VSCodeRuntime'
-        $result = New-PackageModelResult -CommandName 'test' -PackageModelConfig $config
-        $result = Resolve-PackageModelPackage -PackageModelResult $result
-        $sourceDefinition = Get-PackageModelSourceDefinition -PackageModelConfig $config -SourceRef ([pscustomobject]@{ scope = 'definition'; id = 'llamaCppGitHub' })
-        $resolvedSource = Resolve-PackageModelSource -SourceDefinition $sourceDefinition -AcquisitionCandidate $result.Package.acquisitionCandidates[0] -Package $result.Package
+        $config = Get-PackageConfig -DefinitionId 'VSCodeRuntime'
+        $result = New-PackageResult -CommandName 'test' -PackageConfig $config
+        $result = Resolve-PackagePackage -PackageResult $result
+        $sourceDefinition = Get-PackageSourceDefinition -PackageConfig $config -SourceRef ([pscustomobject]@{ scope = 'definition'; id = 'llamaCppGitHub' })
+        $resolvedSource = Resolve-PackageSource -SourceDefinition $sourceDefinition -AcquisitionCandidate $result.Package.acquisitionCandidates[0] -Package $result.Package
 
         $resolvedSource.Kind | Should -Be 'download'
         $resolvedSource.ResolvedSource | Should -Be 'https://example.invalid/ggml-org/llama.cpp/releases/download/b8863/llama-b8863-bin-win-cpu-x64.zip'
@@ -1579,29 +1697,29 @@ Describe 'Eigenverft.Manifested.Sandbox PackageModel' {
             }
         }
 
-        { Resolve-PackageModelSource -SourceDefinition $sourceDefinition -AcquisitionCandidate $candidate -Package $package } | Should -Throw '*does not contain asset*llama-b8863-bin-win-cpu-x64.zip*'
+        { Resolve-PackageSource -SourceDefinition $sourceDefinition -AcquisitionCandidate $candidate -Package $package } | Should -Throw '*does not contain asset*llama-b8863-bin-win-cpu-x64.zip*'
     }
 
     It 'builds an effective release from releaseDefaults and uses ReleaseTrack in path resolution' {
         $rootPath = Join-Path $TestDrive 'effective-release'
         $packageArchive = New-TestPackageArchiveInfo -RootPath (Join-Path $rootPath 'archive') -Version '2.0.0'
-        $release = New-TestPackageModelRelease -Id 'vsCode-win-x64-stable' -Version '2.0.0' -Architecture 'x64' -Flavor 'win32-x64' -FileName 'VSCode-win32-x64-2.0.0.zip' -AcquisitionCandidates @(
+        $release = New-TestPackageRelease -Id 'vsCode-win-x64-stable' -Version '2.0.0' -Architecture 'x64' -Flavor 'win32-x64' -FileName 'VSCode-win32-x64-2.0.0.zip' -AcquisitionCandidates @(
             @{
                 kind        = 'packageDepot'
                 priority    = 10
                 verification = @{ mode = 'optional'; algorithm = 'sha256'; sha256 = $packageArchive.Sha256 }
             }
         )
-        $documents = Write-TestPackageModelDocuments -RootPath $rootPath -GlobalDocument (New-TestPackageModelGlobalDocument -ReleaseTrack 'stable') -DefinitionDocument (New-TestVSCodeDefinitionDocument -Releases @($release) -ReleaseDefaultsValidation (New-TestValidation -Version '2.0.0'))
+        $documents = Write-TestPackageDocuments -RootPath $rootPath -GlobalDocument (New-TestPackageGlobalDocument -ReleaseTrack 'stable') -DefinitionDocument (New-TestVSCodeDefinitionDocument -Releases @($release) -ReleaseDefaultsValidation (New-TestValidation -Version '2.0.0'))
 
         [Environment]::SetEnvironmentVariable($script:SourceInventoryEnvVarName, (Join-Path $TestDrive 'missing-inventory.json'), 'Process')
-        Mock Get-PackageModelGlobalConfigPath { $documents.GlobalConfigPath }
-        Mock Get-PackageModelDefinitionPath { param($DefinitionId) $documents.DefinitionPath }
+        Mock Get-PackageGlobalConfigPath { $documents.GlobalConfigPath }
+        Mock Get-PackageDefinitionPath { param($DefinitionId) $documents.DefinitionPath }
 
-        $config = Get-PackageModelConfig -DefinitionId 'VSCodeRuntime'
-        $result = New-PackageModelResult -CommandName 'test' -PackageModelConfig $config
-        $result = Resolve-PackageModelPackage -PackageModelResult $result
-        $result = Resolve-PackageModelPaths -PackageModelResult $result
+        $config = Get-PackageConfig -DefinitionId 'VSCodeRuntime'
+        $result = New-PackageResult -CommandName 'test' -PackageConfig $config
+        $result = Resolve-PackagePackage -PackageResult $result
+        $result = Resolve-PackagePaths -PackageResult $result
 
         $result.EffectiveRelease | Should -Not -BeNullOrEmpty
         $result.Package.install.kind | Should -Be 'expandArchive'
@@ -1612,18 +1730,18 @@ Describe 'Eigenverft.Manifested.Sandbox PackageModel' {
 
     It 'writes resolved paths as separate console lines' {
         $rootPath = Join-Path $TestDrive 'resolved-path-lines'
-        $release = New-TestPackageModelRelease -Id 'vsCode-win-x64-stable' -Version '2.0.0' -Architecture 'x64' -Flavor 'win32-x64' -FileName 'VSCode-win32-x64-2.0.0.zip' -AcquisitionCandidates @(
+        $release = New-TestPackageRelease -Id 'vsCode-win-x64-stable' -Version '2.0.0' -Architecture 'x64' -Flavor 'win32-x64' -FileName 'VSCode-win32-x64-2.0.0.zip' -AcquisitionCandidates @(
             @{
                 kind         = 'packageDepot'
                 priority     = 10
                 verification = @{ mode = 'none' }
             }
         )
-        $documents = Write-TestPackageModelDocuments -RootPath $rootPath -GlobalDocument (New-TestPackageModelGlobalDocument) -DefinitionDocument (New-TestVSCodeDefinitionDocument -Releases @($release) -ReleaseDefaultsValidation (New-TestValidation -Version '2.0.0'))
+        $documents = Write-TestPackageDocuments -RootPath $rootPath -GlobalDocument (New-TestPackageGlobalDocument) -DefinitionDocument (New-TestVSCodeDefinitionDocument -Releases @($release) -ReleaseDefaultsValidation (New-TestValidation -Version '2.0.0'))
 
         [Environment]::SetEnvironmentVariable($script:SourceInventoryEnvVarName, (Join-Path $TestDrive 'missing-inventory.json'), 'Process')
-        Mock Get-PackageModelGlobalConfigPath { $documents.GlobalConfigPath }
-        Mock Get-PackageModelDefinitionPath { param($DefinitionId) $documents.DefinitionPath }
+        Mock Get-PackageGlobalConfigPath { $documents.GlobalConfigPath }
+        Mock Get-PackageDefinitionPath { param($DefinitionId) $documents.DefinitionPath }
 
         $messages = New-Object System.Collections.Generic.List[string]
         Mock Write-StandardMessage {
@@ -1631,10 +1749,10 @@ Describe 'Eigenverft.Manifested.Sandbox PackageModel' {
             $messages.Add($Message) | Out-Null
         }
 
-        $config = Get-PackageModelConfig -DefinitionId 'VSCodeRuntime'
-        $result = New-PackageModelResult -CommandName 'test' -PackageModelConfig $config
-        $result = Resolve-PackageModelPackage -PackageModelResult $result
-        $null = Resolve-PackageModelPaths -PackageModelResult $result
+        $config = Get-PackageConfig -DefinitionId 'VSCodeRuntime'
+        $result = New-PackageResult -CommandName 'test' -PackageConfig $config
+        $result = Resolve-PackagePackage -PackageResult $result
+        $null = Resolve-PackagePaths -PackageResult $result
 
         @($messages) | Should -Contain '[STATE] Resolved paths:'
         @($messages | Where-Object { $_.StartsWith('[PATH] Install workspace:') }).Count | Should -Be 1
@@ -1646,8 +1764,8 @@ Describe 'Eigenverft.Manifested.Sandbox PackageModel' {
     It 'skips PATH registration when mode is none' {
         $installRoot = Join-Path $TestDrive 'path-registration-none'
         $null = New-Item -ItemType Directory -Path $installRoot -Force
-        $packageModelResult = [pscustomobject]@{
-            PackageModelConfig = ConvertTo-TestPsObject @{
+        $packageResult = [pscustomobject]@{
+            PackageConfig = ConvertTo-TestPsObject @{
                 Definition = @{
                     providedTools = @{
                         commands = @()
@@ -1663,15 +1781,15 @@ Describe 'Eigenverft.Manifested.Sandbox PackageModel' {
                 }
             }
             InstallDirectory = $installRoot
-            InstallOrigin    = 'PackageModelInstalled'
+            InstallOrigin    = 'PackageInstalled'
         }
 
         Mock Get-EnvironmentVariableValue {}
         Mock Set-EnvironmentVariableValue {}
 
-        $packageModelResult = Register-PackageModelPath -PackageModelResult $packageModelResult
+        $packageResult = Register-PackagePath -PackageResult $packageResult
 
-        $packageModelResult.PathRegistration.Status | Should -Be 'Skipped'
+        $packageResult.PathRegistration.Status | Should -Be 'Skipped'
         Assert-MockCalled Set-EnvironmentVariableValue -Times 0
     }
 
@@ -1681,8 +1799,8 @@ Describe 'Eigenverft.Manifested.Sandbox PackageModel' {
         $null = New-Item -ItemType Directory -Path $binDirectory -Force
         Write-TestTextFile -Path (Join-Path $binDirectory 'code.cmd') -Content '@echo off'
 
-        $packageModelResult = [pscustomobject]@{
-            PackageModelConfig = ConvertTo-TestPsObject @{
+        $packageResult = [pscustomobject]@{
+            PackageConfig = ConvertTo-TestPsObject @{
                 Definition = @{
                     providedTools = @{
                         commands = @(
@@ -1707,7 +1825,7 @@ Describe 'Eigenverft.Manifested.Sandbox PackageModel' {
                 }
             }
             InstallDirectory = $installRoot
-            InstallOrigin    = 'PackageModelInstalled'
+            InstallOrigin    = 'PackageInstalled'
         }
 
         $writes = New-Object System.Collections.Generic.List[object]
@@ -1728,11 +1846,11 @@ Describe 'Eigenverft.Manifested.Sandbox PackageModel' {
             }) | Out-Null
         }
 
-        $packageModelResult = Register-PackageModelPath -PackageModelResult $packageModelResult
+        $packageResult = Register-PackagePath -PackageResult $packageResult
 
-        $packageModelResult.PathRegistration.Status | Should -Be 'Registered'
-        @($packageModelResult.PathRegistration.UpdatedTargets) | Should -Be @('Process', 'User')
-        $packageModelResult.PathRegistration.RegisteredPath | Should -Be $binDirectory
+        $packageResult.PathRegistration.Status | Should -Be 'Registered'
+        @($packageResult.PathRegistration.UpdatedTargets) | Should -Be @('Process', 'User')
+        $packageResult.PathRegistration.RegisteredPath | Should -Be $binDirectory
         @($writes | ForEach-Object { $_.Target }) | Should -Be @('Process', 'User')
         $expectedBinPattern = [regex]::Escape($binDirectory)
         @($writes | Where-Object { $_.Target -eq 'Process' })[0].Value | Should -Match $expectedBinPattern
@@ -1747,19 +1865,19 @@ Describe 'Eigenverft.Manifested.Sandbox PackageModel' {
         $null = New-Item -ItemType Directory -Path $cmdDirectory -Force
         Write-TestTextFile -Path (Join-Path $cmdDirectory 'git.exe') -Content 'fake git'
 
-        $config = Get-PackageModelConfig -DefinitionId 'GitRuntime'
-        $packageModelResult = New-PackageModelResult -CommandName 'test' -PackageModelConfig $config
-        $packageModelResult = Resolve-PackageModelPackage -PackageModelResult $packageModelResult
-        $packageModelResult.InstallDirectory = $installRoot
-        $packageModelResult.InstallOrigin = 'PackageModelInstalled'
+        $config = Get-PackageConfig -DefinitionId 'GitRuntime'
+        $packageResult = New-PackageResult -CommandName 'test' -PackageConfig $config
+        $packageResult = Resolve-PackagePackage -PackageResult $packageResult
+        $packageResult.InstallDirectory = $installRoot
+        $packageResult.InstallOrigin = 'PackageInstalled'
 
         Mock Get-EnvironmentVariableValue {}
         Mock Set-EnvironmentVariableValue {}
 
-        $packageModelResult = Register-PackageModelPath -PackageModelResult $packageModelResult
+        $packageResult = Register-PackagePath -PackageResult $packageResult
 
-        $packageModelResult.PathRegistration.Status | Should -Be 'Registered'
-        $packageModelResult.PathRegistration.RegisteredPath | Should -Be $cmdDirectory
+        $packageResult.PathRegistration.Status | Should -Be 'Registered'
+        $packageResult.PathRegistration.RegisteredPath | Should -Be $cmdDirectory
     }
 
     It 'resolves shipped GitHubCli PATH registration to the bin directory' {
@@ -1770,19 +1888,19 @@ Describe 'Eigenverft.Manifested.Sandbox PackageModel' {
         $null = New-Item -ItemType Directory -Path $binDirectory -Force
         Write-TestTextFile -Path (Join-Path $binDirectory 'gh.exe') -Content 'fake gh'
 
-        $config = Get-PackageModelConfig -DefinitionId 'GitHubCli'
-        $packageModelResult = New-PackageModelResult -CommandName 'test' -PackageModelConfig $config
-        $packageModelResult = Resolve-PackageModelPackage -PackageModelResult $packageModelResult
-        $packageModelResult.InstallDirectory = $installRoot
-        $packageModelResult.InstallOrigin = 'PackageModelInstalled'
+        $config = Get-PackageConfig -DefinitionId 'GitHubCli'
+        $packageResult = New-PackageResult -CommandName 'test' -PackageConfig $config
+        $packageResult = Resolve-PackagePackage -PackageResult $packageResult
+        $packageResult.InstallDirectory = $installRoot
+        $packageResult.InstallOrigin = 'PackageInstalled'
 
         Mock Get-EnvironmentVariableValue {}
         Mock Set-EnvironmentVariableValue {}
 
-        $packageModelResult = Register-PackageModelPath -PackageModelResult $packageModelResult
+        $packageResult = Register-PackagePath -PackageResult $packageResult
 
-        $packageModelResult.PathRegistration.Status | Should -Be 'Registered'
-        $packageModelResult.PathRegistration.RegisteredPath | Should -Be $binDirectory
+        $packageResult.PathRegistration.Status | Should -Be 'Registered'
+        $packageResult.PathRegistration.RegisteredPath | Should -Be $binDirectory
     }
 
     It 'resolves shipped NodeRuntime PATH registration to the install directory' {
@@ -1792,19 +1910,19 @@ Describe 'Eigenverft.Manifested.Sandbox PackageModel' {
         $null = New-Item -ItemType Directory -Path $installRoot -Force
         Write-TestTextFile -Path (Join-Path $installRoot 'node.exe') -Content 'fake node'
 
-        $config = Get-PackageModelConfig -DefinitionId 'NodeRuntime'
-        $packageModelResult = New-PackageModelResult -CommandName 'test' -PackageModelConfig $config
-        $packageModelResult = Resolve-PackageModelPackage -PackageModelResult $packageModelResult
-        $packageModelResult.InstallDirectory = $installRoot
-        $packageModelResult.InstallOrigin = 'PackageModelInstalled'
+        $config = Get-PackageConfig -DefinitionId 'NodeRuntime'
+        $packageResult = New-PackageResult -CommandName 'test' -PackageConfig $config
+        $packageResult = Resolve-PackagePackage -PackageResult $packageResult
+        $packageResult.InstallDirectory = $installRoot
+        $packageResult.InstallOrigin = 'PackageInstalled'
 
         Mock Get-EnvironmentVariableValue {}
         Mock Set-EnvironmentVariableValue {}
 
-        $packageModelResult = Register-PackageModelPath -PackageModelResult $packageModelResult
+        $packageResult = Register-PackagePath -PackageResult $packageResult
 
-        $packageModelResult.PathRegistration.Status | Should -Be 'Registered'
-        $packageModelResult.PathRegistration.RegisteredPath | Should -Be $installRoot
+        $packageResult.PathRegistration.Status | Should -Be 'Registered'
+        $packageResult.PathRegistration.RegisteredPath | Should -Be $installRoot
     }
 
     It 'resolves shipped npm-backed CLI PATH registrations to the install directory' {
@@ -1822,19 +1940,19 @@ Describe 'Eigenverft.Manifested.Sandbox PackageModel' {
             $null = New-Item -ItemType Directory -Path $installRoot -Force
             Write-TestTextFile -Path (Join-Path $installRoot $case.CommandFile) -Content '@echo off'
 
-            $config = Get-PackageModelConfig -DefinitionId $case.DefinitionId
-            $packageModelResult = New-PackageModelResult -CommandName 'test' -PackageModelConfig $config
-            $packageModelResult = Resolve-PackageModelPackage -PackageModelResult $packageModelResult
-            $packageModelResult.InstallDirectory = $installRoot
-            $packageModelResult.InstallOrigin = 'PackageModelInstalled'
+            $config = Get-PackageConfig -DefinitionId $case.DefinitionId
+            $packageResult = New-PackageResult -CommandName 'test' -PackageConfig $config
+            $packageResult = Resolve-PackagePackage -PackageResult $packageResult
+            $packageResult.InstallDirectory = $installRoot
+            $packageResult.InstallOrigin = 'PackageInstalled'
 
             Mock Get-EnvironmentVariableValue {}
             Mock Set-EnvironmentVariableValue {}
 
-            $packageModelResult = Register-PackageModelPath -PackageModelResult $packageModelResult
+            $packageResult = Register-PackagePath -PackageResult $packageResult
 
-            $packageModelResult.PathRegistration.Status | Should -Be 'Registered'
-            $packageModelResult.PathRegistration.RegisteredPath | Should -Be $installRoot
+            $packageResult.PathRegistration.Status | Should -Be 'Registered'
+            $packageResult.PathRegistration.RegisteredPath | Should -Be $installRoot
         }
     }
 
@@ -1845,19 +1963,19 @@ Describe 'Eigenverft.Manifested.Sandbox PackageModel' {
         $null = New-Item -ItemType Directory -Path $installRoot -Force
         Write-TestTextFile -Path (Join-Path $installRoot 'python.exe') -Content 'fake python'
 
-        $config = Get-PackageModelConfig -DefinitionId 'PythonRuntime'
-        $packageModelResult = New-PackageModelResult -CommandName 'test' -PackageModelConfig $config
-        $packageModelResult = Resolve-PackageModelPackage -PackageModelResult $packageModelResult
-        $packageModelResult.InstallDirectory = $installRoot
-        $packageModelResult.InstallOrigin = 'PackageModelInstalled'
+        $config = Get-PackageConfig -DefinitionId 'PythonRuntime'
+        $packageResult = New-PackageResult -CommandName 'test' -PackageConfig $config
+        $packageResult = Resolve-PackagePackage -PackageResult $packageResult
+        $packageResult.InstallDirectory = $installRoot
+        $packageResult.InstallOrigin = 'PackageInstalled'
 
         Mock Get-EnvironmentVariableValue {}
         Mock Set-EnvironmentVariableValue {}
 
-        $packageModelResult = Register-PackageModelPath -PackageModelResult $packageModelResult
+        $packageResult = Register-PackagePath -PackageResult $packageResult
 
-        $packageModelResult.PathRegistration.Status | Should -Be 'Registered'
-        $packageModelResult.PathRegistration.RegisteredPath | Should -Be $installRoot
+        $packageResult.PathRegistration.Status | Should -Be 'Registered'
+        $packageResult.PathRegistration.RegisteredPath | Should -Be $installRoot
     }
 
     It 'resolves shipped PowerShell7 PATH registration to the install directory' {
@@ -1867,19 +1985,19 @@ Describe 'Eigenverft.Manifested.Sandbox PackageModel' {
         $null = New-Item -ItemType Directory -Path $installRoot -Force
         Write-TestTextFile -Path (Join-Path $installRoot 'pwsh.exe') -Content 'fake pwsh'
 
-        $config = Get-PackageModelConfig -DefinitionId 'PowerShell7'
-        $packageModelResult = New-PackageModelResult -CommandName 'test' -PackageModelConfig $config
-        $packageModelResult = Resolve-PackageModelPackage -PackageModelResult $packageModelResult
-        $packageModelResult.InstallDirectory = $installRoot
-        $packageModelResult.InstallOrigin = 'PackageModelInstalled'
+        $config = Get-PackageConfig -DefinitionId 'PowerShell7'
+        $packageResult = New-PackageResult -CommandName 'test' -PackageConfig $config
+        $packageResult = Resolve-PackagePackage -PackageResult $packageResult
+        $packageResult.InstallDirectory = $installRoot
+        $packageResult.InstallOrigin = 'PackageInstalled'
 
         Mock Get-EnvironmentVariableValue {}
         Mock Set-EnvironmentVariableValue {}
 
-        $packageModelResult = Register-PackageModelPath -PackageModelResult $packageModelResult
+        $packageResult = Register-PackagePath -PackageResult $packageResult
 
-        $packageModelResult.PathRegistration.Status | Should -Be 'Registered'
-        $packageModelResult.PathRegistration.RegisteredPath | Should -Be $installRoot
+        $packageResult.PathRegistration.Status | Should -Be 'Registered'
+        $packageResult.PathRegistration.RegisteredPath | Should -Be $installRoot
     }
 
     It 'skips PATH registration for adopted external installs' {
@@ -1888,8 +2006,8 @@ Describe 'Eigenverft.Manifested.Sandbox PackageModel' {
         $null = New-Item -ItemType Directory -Path $binDirectory -Force
         Write-TestTextFile -Path (Join-Path $binDirectory 'code.cmd') -Content '@echo off'
 
-        $packageModelResult = [pscustomobject]@{
-            PackageModelConfig = ConvertTo-TestPsObject @{
+        $packageResult = [pscustomobject]@{
+            PackageConfig = ConvertTo-TestPsObject @{
                 Definition = @{
                     providedTools = @{
                         commands = @(
@@ -1920,13 +2038,13 @@ Describe 'Eigenverft.Manifested.Sandbox PackageModel' {
         Mock Get-EnvironmentVariableValue {}
         Mock Set-EnvironmentVariableValue {}
 
-        $packageModelResult = Register-PackageModelPath -PackageModelResult $packageModelResult
+        $packageResult = Register-PackagePath -PackageResult $packageResult
 
-        $packageModelResult.PathRegistration.Status | Should -Be 'SkippedNotPackageModelOwned'
+        $packageResult.PathRegistration.Status | Should -Be 'SkippedNotPackageOwned'
         Assert-MockCalled Set-EnvironmentVariableValue -Times 0
     }
 
-    It 'removes stale PackageModel-owned paths for the same install slot before registering the active path' {
+    It 'removes stale Package-owned paths for the same install slot before registering the active path' {
         $oldInstallRoot = Join-Path $TestDrive 'path-registration-stale-owned\old'
         $newInstallRoot = Join-Path $TestDrive 'path-registration-stale-owned\new'
         $oldBinDirectory = Join-Path $oldInstallRoot 'bin'
@@ -1935,8 +2053,8 @@ Describe 'Eigenverft.Manifested.Sandbox PackageModel' {
         $null = New-Item -ItemType Directory -Path $newBinDirectory -Force
         Write-TestTextFile -Path (Join-Path $newBinDirectory 'code.cmd') -Content '@echo off'
 
-        $packageModelResult = [pscustomobject]@{
-            PackageModelConfig = ConvertTo-TestPsObject @{
+        $packageResult = [pscustomobject]@{
+            PackageConfig = ConvertTo-TestPsObject @{
                 Definition = @{
                     providedTools = @{
                         commands = @(
@@ -1962,19 +2080,19 @@ Describe 'Eigenverft.Manifested.Sandbox PackageModel' {
             }
             ExistingPackage = [pscustomobject]@{
                 InstallDirectory = $oldInstallRoot
-                Classification   = 'PackageModelOwned'
-                Decision         = 'ReplacePackageModelOwnedInstall'
+                Classification   = 'PackageOwned'
+                Decision         = 'ReplacePackageOwnedInstall'
             }
             Ownership = [pscustomobject]@{
                 InstallSlotId   = 'VSCodeRuntime:stable:win32-x64'
-                Classification  = 'PackageModelOwned'
+                Classification  = 'PackageOwned'
                 OwnershipRecord = [pscustomobject]@{
                     installDirectory = $oldInstallRoot
-                    ownershipKind    = 'PackageModelInstalled'
+                    ownershipKind    = 'PackageInstalled'
                 }
             }
             InstallDirectory = $newInstallRoot
-            InstallOrigin    = 'PackageModelInstalled'
+            InstallOrigin    = 'PackageInstalled'
         }
 
         $writes = New-Object System.Collections.Generic.List[object]
@@ -1995,11 +2113,11 @@ Describe 'Eigenverft.Manifested.Sandbox PackageModel' {
             }) | Out-Null
         }
 
-        $packageModelResult = Register-PackageModelPath -PackageModelResult $packageModelResult
+        $packageResult = Register-PackagePath -PackageResult $packageResult
 
-        $packageModelResult.PathRegistration.Status | Should -Be 'Registered'
-        @($packageModelResult.PathRegistration.CleanedTargets) | Should -Be @('Process', 'User')
-        $packageModelResult.PathRegistration.CleanupDirectories | Should -Contain $oldBinDirectory
+        $packageResult.PathRegistration.Status | Should -Be 'Registered'
+        @($packageResult.PathRegistration.CleanedTargets) | Should -Be @('Process', 'User')
+        $packageResult.PathRegistration.CleanupDirectories | Should -Contain $oldBinDirectory
         @($writes | ForEach-Object { $_.Target }) | Should -Be @('Process', 'User')
         @($writes | Where-Object { $_.Target -eq 'Process' })[0].Value | Should -Not -Match ([regex]::Escape($oldBinDirectory))
         @($writes | Where-Object { $_.Target -eq 'Process' })[0].Value | Should -Match ([regex]::Escape($newBinDirectory))
@@ -2011,8 +2129,8 @@ Describe 'Eigenverft.Manifested.Sandbox PackageModel' {
         $installRoot = Join-Path $TestDrive 'path-registration-machine'
         $null = New-Item -ItemType Directory -Path $installRoot -Force
 
-        $packageModelResult = [pscustomobject]@{
-            PackageModelConfig = ConvertTo-TestPsObject @{
+        $packageResult = [pscustomobject]@{
+            PackageConfig = ConvertTo-TestPsObject @{
                 Definition = @{
                     providedTools = @{
                         commands = @()
@@ -2032,7 +2150,7 @@ Describe 'Eigenverft.Manifested.Sandbox PackageModel' {
                 }
             }
             InstallDirectory = $installRoot
-            InstallOrigin    = 'PackageModelInstalled'
+            InstallOrigin    = 'PackageInstalled'
         }
 
         $writes = New-Object System.Collections.Generic.List[object]
@@ -2053,11 +2171,11 @@ Describe 'Eigenverft.Manifested.Sandbox PackageModel' {
             }) | Out-Null
         }
 
-        $packageModelResult = Register-PackageModelPath -PackageModelResult $packageModelResult
+        $packageResult = Register-PackagePath -PackageResult $packageResult
 
-        $packageModelResult.PathRegistration.Status | Should -Be 'Registered'
-        @($packageModelResult.PathRegistration.UpdatedTargets) | Should -Be @('Process', 'Machine')
-        $packageModelResult.PathRegistration.RegisteredPath | Should -Be $installRoot
+        $packageResult.PathRegistration.Status | Should -Be 'Registered'
+        @($packageResult.PathRegistration.UpdatedTargets) | Should -Be @('Process', 'Machine')
+        $packageResult.PathRegistration.RegisteredPath | Should -Be $installRoot
         @($writes | ForEach-Object { $_.Target }) | Should -Be @('Process', 'Machine')
     }
 
@@ -2065,8 +2183,8 @@ Describe 'Eigenverft.Manifested.Sandbox PackageModel' {
         $installRoot = Join-Path $TestDrive 'path-registration-shim'
         $null = New-Item -ItemType Directory -Path $installRoot -Force
 
-        $packageModelResult = [pscustomobject]@{
-            PackageModelConfig = ConvertTo-TestPsObject @{
+        $packageResult = [pscustomobject]@{
+            PackageConfig = ConvertTo-TestPsObject @{
                 Definition = @{
                     providedTools = @{
                         commands = @()
@@ -2086,10 +2204,10 @@ Describe 'Eigenverft.Manifested.Sandbox PackageModel' {
                 }
             }
             InstallDirectory = $installRoot
-            InstallOrigin    = 'PackageModelInstalled'
+            InstallOrigin    = 'PackageInstalled'
         }
 
-        { Register-PackageModelPath -PackageModelResult $packageModelResult } | Should -Throw '*shim*not implemented*'
+        { Register-PackagePath -PackageResult $packageResult } | Should -Throw '*shim*not implemented*'
     }
 
     It 'resolves installRootRules for code.cmd and Code.exe' {
@@ -2122,31 +2240,33 @@ Describe 'Eigenverft.Manifested.Sandbox PackageModel' {
             )
         }
 
-        (Resolve-PackageModelExistingInstallRoot -ExistingInstallDiscovery $discovery -CandidatePath $codeCmdPath) | Should -Be $installRoot
-        (Resolve-PackageModelExistingInstallRoot -ExistingInstallDiscovery $discovery -CandidatePath $codeExePath) | Should -Be $installRoot
+        (Resolve-PackageExistingInstallRoot -ExistingInstallDiscovery $discovery -CandidatePath $codeCmdPath) | Should -Be $installRoot
+        (Resolve-PackageExistingInstallRoot -ExistingInstallDiscovery $discovery -CandidatePath $codeExePath) | Should -Be $installRoot
     }
 
     It 'keeps installWorkspace and defaultPackageDepot distinct in the resolved paths' {
         $rootPath = Join-Path $TestDrive 'distinct-roots'
         $packageArchive = New-TestPackageArchiveInfo -RootPath (Join-Path $rootPath 'archive') -Version '2.0.0'
-        $release = New-TestPackageModelRelease -Id 'vsCode-win-x64-stable' -Version '2.0.0' -Architecture 'x64' -Flavor 'win32-x64' -FileName 'VSCode-win32-x64-2.0.0.zip' -AcquisitionCandidates @(
+        $release = New-TestPackageRelease -Id 'vsCode-win-x64-stable' -Version '2.0.0' -Architecture 'x64' -Flavor 'win32-x64' -FileName 'VSCode-win32-x64-2.0.0.zip' -AcquisitionCandidates @(
             @{
                 kind        = 'packageDepot'
                 priority    = 10
                 verification = @{ mode = 'optional'; algorithm = 'sha256'; sha256 = $packageArchive.Sha256 }
             }
         )
-        $globalDocument = New-TestPackageModelGlobalDocument -InstallWorkspaceDirectory (Join-Path $rootPath 'workspace') -DefaultPackageDepotDirectory (Join-Path $rootPath 'default-depot')
-        $documents = Write-TestPackageModelDocuments -RootPath $rootPath -GlobalDocument $globalDocument -DefinitionDocument (New-TestVSCodeDefinitionDocument -Releases @($release) -ReleaseDefaultsValidation (New-TestValidation -Version '2.0.0'))
+        $globalDocument = New-TestPackageGlobalDocument -InstallWorkspaceDirectory (Join-Path $rootPath 'workspace')
+        $depotInventoryDocument = New-TestDepotInventoryDocument -DefaultPackageDepotDirectory (Join-Path $rootPath 'default-depot')
+        $documents = Write-TestPackageDocuments -RootPath $rootPath -GlobalDocument $globalDocument -DepotInventoryDocument $depotInventoryDocument -DefinitionDocument (New-TestVSCodeDefinitionDocument -Releases @($release) -ReleaseDefaultsValidation (New-TestValidation -Version '2.0.0'))
 
         [Environment]::SetEnvironmentVariable($script:SourceInventoryEnvVarName, (Join-Path $TestDrive 'missing-inventory.json'), 'Process')
-        Mock Get-PackageModelGlobalConfigPath { $documents.GlobalConfigPath }
-        Mock Get-PackageModelDefinitionPath { param($DefinitionId) $documents.DefinitionPath }
+        Mock Get-PackageGlobalConfigPath { $documents.GlobalConfigPath }
+        Mock Get-PackageDepotInventoryPath { $documents.DepotInventoryPath }
+        Mock Get-PackageDefinitionPath { param($DefinitionId) $documents.DefinitionPath }
 
-        $config = Get-PackageModelConfig -DefinitionId 'VSCodeRuntime'
-        $result = New-PackageModelResult -CommandName 'test' -PackageModelConfig $config
-        $result = Resolve-PackageModelPackage -PackageModelResult $result
-        $result = Resolve-PackageModelPaths -PackageModelResult $result
+        $config = Get-PackageConfig -DefinitionId 'VSCodeRuntime'
+        $result = New-PackageResult -CommandName 'test' -PackageConfig $config
+        $result = Resolve-PackagePackage -PackageResult $result
+        $result = Resolve-PackagePaths -PackageResult $result
 
         $result.InstallWorkspaceDirectory | Should -Not -Be $config.DefaultPackageDepotDirectory
         $result.PackageFilePath | Should -Not -Be $result.DefaultPackageDepotFilePath
@@ -2156,8 +2276,8 @@ Describe 'Eigenverft.Manifested.Sandbox PackageModel' {
     It 'hydrates the install workspace from the default package depot before upstream download' {
         $rootPath = Join-Path $TestDrive 'default-depot-hydration'
         $packageArchive = New-TestPackageArchiveInfo -RootPath (Join-Path $rootPath 'archive') -Version '2.0.0' -ArchiveFileName 'VSCode-win32-x64-2.0.0.zip'
-        $globalDocument = New-TestPackageModelGlobalDocument -InstallWorkspaceDirectory (Join-Path $rootPath 'workspace') -DefaultPackageDepotDirectory (Join-Path $rootPath 'default-depot')
-        $release = New-TestPackageModelRelease -Id 'vsCode-win-x64-stable' -Version '2.0.0' -Architecture 'x64' -Flavor 'win32-x64' -FileName 'VSCode-win32-x64-2.0.0.zip' -AcquisitionCandidates @(
+        $globalDocument = New-TestPackageGlobalDocument -InstallWorkspaceDirectory (Join-Path $rootPath 'workspace') -DefaultPackageDepotDirectory (Join-Path $rootPath 'default-depot')
+        $release = New-TestPackageRelease -Id 'vsCode-win-x64-stable' -Version '2.0.0' -Architecture 'x64' -Flavor 'win32-x64' -FileName 'VSCode-win32-x64-2.0.0.zip' -AcquisitionCandidates @(
             @{
                 kind        = 'packageDepot'
                 priority    = 10
@@ -2171,58 +2291,58 @@ Describe 'Eigenverft.Manifested.Sandbox PackageModel' {
                 verification = @{ mode = 'required'; algorithm = 'sha256'; sha256 = $packageArchive.Sha256 }
             }
         )
-        $documents = Write-TestPackageModelDocuments -RootPath $rootPath -GlobalDocument $globalDocument -DefinitionDocument (New-TestVSCodeDefinitionDocument -Releases @($release) -ReleaseDefaultsValidation (New-TestValidation -Version '2.0.0'))
+        $documents = Write-TestPackageDocuments -RootPath $rootPath -GlobalDocument $globalDocument -DefinitionDocument (New-TestVSCodeDefinitionDocument -Releases @($release) -ReleaseDefaultsValidation (New-TestValidation -Version '2.0.0'))
 
         [Environment]::SetEnvironmentVariable($script:SourceInventoryEnvVarName, (Join-Path $TestDrive 'missing-inventory.json'), 'Process')
-        Mock Get-PackageModelGlobalConfigPath { $documents.GlobalConfigPath }
-        Mock Get-PackageModelDefinitionPath { param($DefinitionId) $documents.DefinitionPath }
-        Mock Save-PackageModelDownloadFile { throw 'download should not run when the default package depot already has a verified artifact' }
+        Mock Get-PackageGlobalConfigPath { $documents.GlobalConfigPath }
+        Mock Get-PackageDefinitionPath { param($DefinitionId) $documents.DefinitionPath }
+        Mock Save-PackageDownloadFile { throw 'download should not run when the default package depot already has a verified artifact' }
 
-        $config = Get-PackageModelConfig -DefinitionId 'VSCodeRuntime'
-        $result = New-PackageModelResult -CommandName 'test' -PackageModelConfig $config
-        $result = Resolve-PackageModelPackage -PackageModelResult $result
-        $result = Resolve-PackageModelPaths -PackageModelResult $result
-        $result = Build-PackageModelAcquisitionPlan -PackageModelResult $result
+        $config = Get-PackageConfig -DefinitionId 'VSCodeRuntime'
+        $result = New-PackageResult -CommandName 'test' -PackageConfig $config
+        $result = Resolve-PackagePackage -PackageResult $result
+        $result = Resolve-PackagePaths -PackageResult $result
+        $result = Build-PackageAcquisitionPlan -PackageResult $result
 
         $null = New-Item -ItemType Directory -Path (Split-Path -Parent $result.DefaultPackageDepotFilePath) -Force
         Copy-Item -LiteralPath $packageArchive.ZipPath -Destination $result.DefaultPackageDepotFilePath -Force
 
-        $result = Save-PackageModelPackageFile -PackageModelResult $result
+        $result = Save-PackagePackageFile -PackageResult $result
 
         $result.PackageFileSave.Success | Should -BeTrue
         $result.PackageFileSave.Status | Should -Be 'HydratedFromDefaultPackageDepot'
         Test-Path -LiteralPath $result.PackageFilePath | Should -BeTrue
         (Get-FileHash -LiteralPath $result.PackageFilePath -Algorithm SHA256).Hash.ToLowerInvariant() | Should -Be $packageArchive.Sha256
-        Assert-MockCalled Save-PackageModelDownloadFile -Times 0
+        Assert-MockCalled Save-PackageDownloadFile -Times 0
     }
 
     It 'uses packageFile.integrity when acquisition candidates only declare verification mode' {
         $rootPath = Join-Path $TestDrive 'packagefile-integrity'
         $packageArchive = New-TestPackageArchiveInfo -RootPath (Join-Path $rootPath 'archive') -Version '2.0.0' -ArchiveFileName 'VSCode-win32-x64-2.0.0.zip'
-        $globalDocument = New-TestPackageModelGlobalDocument -InstallWorkspaceDirectory (Join-Path $rootPath 'workspace') -DefaultPackageDepotDirectory (Join-Path $rootPath 'default-depot')
-        $release = New-TestPackageModelRelease -Id 'vsCode-win-x64-stable' -Version '2.0.0' -Architecture 'x64' -Flavor 'win32-x64' -FileName 'VSCode-win32-x64-2.0.0.zip' -PackageFileSha256 $packageArchive.Sha256 -AcquisitionCandidates @(
+        $globalDocument = New-TestPackageGlobalDocument -InstallWorkspaceDirectory (Join-Path $rootPath 'workspace') -DefaultPackageDepotDirectory (Join-Path $rootPath 'default-depot')
+        $release = New-TestPackageRelease -Id 'vsCode-win-x64-stable' -Version '2.0.0' -Architecture 'x64' -Flavor 'win32-x64' -FileName 'VSCode-win32-x64-2.0.0.zip' -PackageFileSha256 $packageArchive.Sha256 -AcquisitionCandidates @(
             @{
                 kind         = 'packageDepot'
                 priority     = 10
                 verification = @{ mode = 'required' }
             }
         )
-        $documents = Write-TestPackageModelDocuments -RootPath $rootPath -GlobalDocument $globalDocument -DefinitionDocument (New-TestVSCodeDefinitionDocument -Releases @($release) -ReleaseDefaultsValidation (New-TestValidation -Version '2.0.0'))
+        $documents = Write-TestPackageDocuments -RootPath $rootPath -GlobalDocument $globalDocument -DefinitionDocument (New-TestVSCodeDefinitionDocument -Releases @($release) -ReleaseDefaultsValidation (New-TestValidation -Version '2.0.0'))
 
         [Environment]::SetEnvironmentVariable($script:SourceInventoryEnvVarName, (Join-Path $TestDrive 'missing-inventory.json'), 'Process')
-        Mock Get-PackageModelGlobalConfigPath { $documents.GlobalConfigPath }
-        Mock Get-PackageModelDefinitionPath { param($DefinitionId) $documents.DefinitionPath }
+        Mock Get-PackageGlobalConfigPath { $documents.GlobalConfigPath }
+        Mock Get-PackageDefinitionPath { param($DefinitionId) $documents.DefinitionPath }
 
-        $config = Get-PackageModelConfig -DefinitionId 'VSCodeRuntime'
-        $result = New-PackageModelResult -CommandName 'test' -PackageModelConfig $config
-        $result = Resolve-PackageModelPackage -PackageModelResult $result
-        $result = Resolve-PackageModelPaths -PackageModelResult $result
-        $result = Build-PackageModelAcquisitionPlan -PackageModelResult $result
+        $config = Get-PackageConfig -DefinitionId 'VSCodeRuntime'
+        $result = New-PackageResult -CommandName 'test' -PackageConfig $config
+        $result = Resolve-PackagePackage -PackageResult $result
+        $result = Resolve-PackagePaths -PackageResult $result
+        $result = Build-PackageAcquisitionPlan -PackageResult $result
 
         $null = New-Item -ItemType Directory -Path (Split-Path -Parent $result.DefaultPackageDepotFilePath) -Force
         Copy-Item -LiteralPath $packageArchive.ZipPath -Destination $result.DefaultPackageDepotFilePath -Force
 
-        $result = Save-PackageModelPackageFile -PackageModelResult $result
+        $result = Save-PackagePackageFile -PackageResult $result
 
         $result.PackageFileSave.Success | Should -BeTrue
         $result.PackageFileSave.Verification.Status | Should -Be 'VerificationPassed'
@@ -2242,20 +2362,20 @@ Describe 'Eigenverft.Manifested.Sandbox PackageModel' {
         ) -InstallRootRules @()
         $policy = New-TestExistingInstallPolicy -AllowAdoptExternal $true
         $validation = New-TestValidation -Version '2.0.0' -Directories @()
-        $release = New-TestPackageModelRelease -Id 'vsCode-win-x64-stable' -Version '2.0.0' -Architecture 'x64' -Flavor 'win32-x64' -Install @{ kind = 'reuseExisting' } -ExistingInstallDiscovery $discovery -ExistingInstallPolicy $policy -Validation $validation
-        $documents = Write-TestPackageModelDocuments -RootPath $rootPath -GlobalDocument (New-TestPackageModelGlobalDocument -PackageStateIndexFilePath (Join-Path $rootPath 'package-state.json')) -DefinitionDocument (New-TestVSCodeDefinitionDocument -Releases @($release) -ReleaseDefaultsValidation $validation)
+        $release = New-TestPackageRelease -Id 'vsCode-win-x64-stable' -Version '2.0.0' -Architecture 'x64' -Flavor 'win32-x64' -Install @{ kind = 'reuseExisting' } -ExistingInstallDiscovery $discovery -ExistingInstallPolicy $policy -Validation $validation
+        $documents = Write-TestPackageDocuments -RootPath $rootPath -GlobalDocument (New-TestPackageGlobalDocument -PackageStateIndexFilePath (Join-Path $rootPath 'package-state.json')) -DefinitionDocument (New-TestVSCodeDefinitionDocument -Releases @($release) -ReleaseDefaultsValidation $validation)
 
         [Environment]::SetEnvironmentVariable($script:SourceInventoryEnvVarName, (Join-Path $TestDrive 'missing-inventory.json'), 'Process')
-        Mock Get-PackageModelGlobalConfigPath { $documents.GlobalConfigPath }
-        Mock Get-PackageModelDefinitionPath { param($DefinitionId) $documents.DefinitionPath }
+        Mock Get-PackageGlobalConfigPath { $documents.GlobalConfigPath }
+        Mock Get-PackageDefinitionPath { param($DefinitionId) $documents.DefinitionPath }
 
-        $config = Get-PackageModelConfig -DefinitionId 'VSCodeRuntime'
-        $result = New-PackageModelResult -CommandName 'test' -PackageModelConfig $config
-        $result = Resolve-PackageModelPackage -PackageModelResult $result
-        $result = Resolve-PackageModelPaths -PackageModelResult $result
-        $result = Find-PackageModelExistingPackage -PackageModelResult $result
-        $result = Classify-PackageModelExistingPackage -PackageModelResult $result
-        $result = Resolve-PackageModelExistingPackageDecision -PackageModelResult $result
+        $config = Get-PackageConfig -DefinitionId 'VSCodeRuntime'
+        $result = New-PackageResult -CommandName 'test' -PackageConfig $config
+        $result = Resolve-PackagePackage -PackageResult $result
+        $result = Resolve-PackagePaths -PackageResult $result
+        $result = Find-PackageExistingPackage -PackageResult $result
+        $result = Classify-PackageExistingPackage -PackageResult $result
+        $result = Resolve-PackageExistingPackageDecision -PackageResult $result
 
         $result.ExistingPackage.Decision | Should -Be 'AdoptExternal'
         $result.InstallOrigin | Should -Be 'AdoptedExternal'
@@ -2272,22 +2392,22 @@ Describe 'Eigenverft.Manifested.Sandbox PackageModel' {
         $discovery = New-TestExistingInstallDiscovery -EnableDetection $true -SearchLocations @(
             @{ kind = 'directory'; path = $installRoot }
         ) -InstallRootRules @()
-        $policy = New-TestExistingInstallPolicy -AllowAdoptExternal $true -RequirePackageModelOwnership $true
+        $policy = New-TestExistingInstallPolicy -AllowAdoptExternal $true -RequirePackageOwnership $true
         $validation = New-TestValidation -Version '2.0.0' -Directories @()
-        $release = New-TestPackageModelRelease -Id 'vsCode-win-x64-stable' -Version '2.0.0' -Architecture 'x64' -Flavor 'win32-x64' -Install @{ kind = 'reuseExisting' } -ExistingInstallDiscovery $discovery -ExistingInstallPolicy $policy -Validation $validation
-        $documents = Write-TestPackageModelDocuments -RootPath $rootPath -GlobalDocument (New-TestPackageModelGlobalDocument -PackageStateIndexFilePath (Join-Path $rootPath 'package-state.json')) -DefinitionDocument (New-TestVSCodeDefinitionDocument -Releases @($release) -ReleaseDefaultsValidation $validation)
+        $release = New-TestPackageRelease -Id 'vsCode-win-x64-stable' -Version '2.0.0' -Architecture 'x64' -Flavor 'win32-x64' -Install @{ kind = 'reuseExisting' } -ExistingInstallDiscovery $discovery -ExistingInstallPolicy $policy -Validation $validation
+        $documents = Write-TestPackageDocuments -RootPath $rootPath -GlobalDocument (New-TestPackageGlobalDocument -PackageStateIndexFilePath (Join-Path $rootPath 'package-state.json')) -DefinitionDocument (New-TestVSCodeDefinitionDocument -Releases @($release) -ReleaseDefaultsValidation $validation)
 
         [Environment]::SetEnvironmentVariable($script:SourceInventoryEnvVarName, (Join-Path $TestDrive 'missing-inventory.json'), 'Process')
-        Mock Get-PackageModelGlobalConfigPath { $documents.GlobalConfigPath }
-        Mock Get-PackageModelDefinitionPath { param($DefinitionId) $documents.DefinitionPath }
+        Mock Get-PackageGlobalConfigPath { $documents.GlobalConfigPath }
+        Mock Get-PackageDefinitionPath { param($DefinitionId) $documents.DefinitionPath }
 
-        $config = Get-PackageModelConfig -DefinitionId 'VSCodeRuntime'
-        $result = New-PackageModelResult -CommandName 'test' -PackageModelConfig $config
-        $result = Resolve-PackageModelPackage -PackageModelResult $result
-        $result = Resolve-PackageModelPaths -PackageModelResult $result
-        $result = Find-PackageModelExistingPackage -PackageModelResult $result
-        $result = Classify-PackageModelExistingPackage -PackageModelResult $result
-        $result = Resolve-PackageModelExistingPackageDecision -PackageModelResult $result
+        $config = Get-PackageConfig -DefinitionId 'VSCodeRuntime'
+        $result = New-PackageResult -CommandName 'test' -PackageConfig $config
+        $result = Resolve-PackagePackage -PackageResult $result
+        $result = Resolve-PackagePaths -PackageResult $result
+        $result = Find-PackageExistingPackage -PackageResult $result
+        $result = Classify-PackageExistingPackage -PackageResult $result
+        $result = Resolve-PackageExistingPackageDecision -PackageResult $result
 
         $result.ExistingPackage.Decision | Should -Be 'ExternalIgnored'
         $result.Validation | Should -BeNullOrEmpty
@@ -2311,7 +2431,7 @@ Describe 'Eigenverft.Manifested.Sandbox PackageModel' {
                     currentReleaseId = 'vsCode-win-x64-stable'
                     currentVersion   = '2.0.0'
                     installDirectory = $installRoot
-                    ownershipKind    = 'PackageModelInstalled'
+                    ownershipKind    = 'PackageInstalled'
                     updatedAtUtc     = [DateTime]::UtcNow.ToString('o')
                 }
             )
@@ -2322,23 +2442,23 @@ Describe 'Eigenverft.Manifested.Sandbox PackageModel' {
         ) -InstallRootRules @()
         $policy = New-TestExistingInstallPolicy -AllowAdoptExternal $true
         $validation = New-TestValidation -Version '2.0.0' -Directories @()
-        $release = New-TestPackageModelRelease -Id 'vsCode-win-x64-stable' -Version '2.0.0' -Architecture 'x64' -Flavor 'win32-x64' -Install @{ kind = 'reuseExisting' } -ExistingInstallDiscovery $discovery -ExistingInstallPolicy $policy -Validation $validation
-        $documents = Write-TestPackageModelDocuments -RootPath $rootPath -GlobalDocument (New-TestPackageModelGlobalDocument -PackageStateIndexFilePath $packageStateIndexPath) -DefinitionDocument (New-TestVSCodeDefinitionDocument -Releases @($release) -ReleaseDefaultsValidation $validation)
+        $release = New-TestPackageRelease -Id 'vsCode-win-x64-stable' -Version '2.0.0' -Architecture 'x64' -Flavor 'win32-x64' -Install @{ kind = 'reuseExisting' } -ExistingInstallDiscovery $discovery -ExistingInstallPolicy $policy -Validation $validation
+        $documents = Write-TestPackageDocuments -RootPath $rootPath -GlobalDocument (New-TestPackageGlobalDocument -PackageStateIndexFilePath $packageStateIndexPath) -DefinitionDocument (New-TestVSCodeDefinitionDocument -Releases @($release) -ReleaseDefaultsValidation $validation)
 
         [Environment]::SetEnvironmentVariable($script:SourceInventoryEnvVarName, (Join-Path $TestDrive 'missing-inventory.json'), 'Process')
-        Mock Get-PackageModelGlobalConfigPath { $documents.GlobalConfigPath }
-        Mock Get-PackageModelDefinitionPath { param($DefinitionId) $documents.DefinitionPath }
+        Mock Get-PackageGlobalConfigPath { $documents.GlobalConfigPath }
+        Mock Get-PackageDefinitionPath { param($DefinitionId) $documents.DefinitionPath }
 
-        $config = Get-PackageModelConfig -DefinitionId 'VSCodeRuntime'
-        $result = New-PackageModelResult -CommandName 'test' -PackageModelConfig $config
-        $result = Resolve-PackageModelPackage -PackageModelResult $result
-        $result = Resolve-PackageModelPaths -PackageModelResult $result
-        $result = Find-PackageModelExistingPackage -PackageModelResult $result
-        $result = Classify-PackageModelExistingPackage -PackageModelResult $result
-        $result = Resolve-PackageModelExistingPackageDecision -PackageModelResult $result
+        $config = Get-PackageConfig -DefinitionId 'VSCodeRuntime'
+        $result = New-PackageResult -CommandName 'test' -PackageConfig $config
+        $result = Resolve-PackagePackage -PackageResult $result
+        $result = Resolve-PackagePaths -PackageResult $result
+        $result = Find-PackageExistingPackage -PackageResult $result
+        $result = Classify-PackageExistingPackage -PackageResult $result
+        $result = Resolve-PackageExistingPackageDecision -PackageResult $result
 
-        $result.ExistingPackage.Decision | Should -Be 'ReusePackageModelOwned'
-        $result.InstallOrigin | Should -Be 'PackageModelReused'
+        $result.ExistingPackage.Decision | Should -Be 'ReusePackageOwned'
+        $result.InstallOrigin | Should -Be 'PackageReused'
     }
 
     It 'discovers and reuses the current managed install path even when ownership tracking is missing' {
@@ -2350,36 +2470,36 @@ Describe 'Eigenverft.Manifested.Sandbox PackageModel' {
         Write-TestTextFile -Path (Join-Path $binDirectory 'code.cmd') -Content "@echo off`r`necho 2.0.0`r`n"
 
         $validation = New-TestValidation -Version '2.0.0' -Directories @()
-        $release = New-TestPackageModelRelease -Id 'vsCode-win-x64-stable' -Version '2.0.0' -Architecture 'x64' -Flavor 'win32-x64' -Install @{
+        $release = New-TestPackageRelease -Id 'vsCode-win-x64-stable' -Version '2.0.0' -Architecture 'x64' -Flavor 'win32-x64' -Install @{
             kind             = 'reuseExisting'
             installDirectory = $installRoot
         } -ExistingInstallDiscovery (New-TestExistingInstallDiscovery -EnableDetection $true -SearchLocations @()) -ExistingInstallPolicy (New-TestExistingInstallPolicy -AllowAdoptExternal $true) -Validation $validation
-        $documents = Write-TestPackageModelDocuments -RootPath $rootPath -GlobalDocument (New-TestPackageModelGlobalDocument -PreferredTargetInstallDirectory (Join-Path $rootPath 'managed-root') -PackageStateIndexFilePath (Join-Path $rootPath 'package-state.json')) -DefinitionDocument (New-TestVSCodeDefinitionDocument -Releases @($release) -ReleaseDefaultsValidation $validation)
+        $documents = Write-TestPackageDocuments -RootPath $rootPath -GlobalDocument (New-TestPackageGlobalDocument -PreferredTargetInstallDirectory (Join-Path $rootPath 'managed-root') -PackageStateIndexFilePath (Join-Path $rootPath 'package-state.json')) -DefinitionDocument (New-TestVSCodeDefinitionDocument -Releases @($release) -ReleaseDefaultsValidation $validation)
 
         [Environment]::SetEnvironmentVariable($script:SourceInventoryEnvVarName, (Join-Path $TestDrive 'missing-inventory.json'), 'Process')
-        Mock Get-PackageModelGlobalConfigPath { $documents.GlobalConfigPath }
-        Mock Get-PackageModelDefinitionPath { param($DefinitionId) $documents.DefinitionPath }
+        Mock Get-PackageGlobalConfigPath { $documents.GlobalConfigPath }
+        Mock Get-PackageDefinitionPath { param($DefinitionId) $documents.DefinitionPath }
 
-        $config = Get-PackageModelConfig -DefinitionId 'VSCodeRuntime'
-        $result = New-PackageModelResult -CommandName 'test' -PackageModelConfig $config
-        $result = Resolve-PackageModelPackage -PackageModelResult $result
-        $result = Resolve-PackageModelPaths -PackageModelResult $result
-        $result = Find-PackageModelExistingPackage -PackageModelResult $result
-        $result = Classify-PackageModelExistingPackage -PackageModelResult $result
-        $result = Resolve-PackageModelExistingPackageDecision -PackageModelResult $result
-        $result = Install-PackageModelPackage -PackageModelResult $result
+        $config = Get-PackageConfig -DefinitionId 'VSCodeRuntime'
+        $result = New-PackageResult -CommandName 'test' -PackageConfig $config
+        $result = Resolve-PackagePackage -PackageResult $result
+        $result = Resolve-PackagePaths -PackageResult $result
+        $result = Find-PackageExistingPackage -PackageResult $result
+        $result = Classify-PackageExistingPackage -PackageResult $result
+        $result = Resolve-PackageExistingPackageDecision -PackageResult $result
+        $result = Install-PackagePackage -PackageResult $result
 
-        $result.ExistingPackage.SearchKind | Should -Be 'packageModelTargetInstallPath'
-        $result.ExistingPackage.Decision | Should -Be 'ReusePackageModelOwned'
-        $result.InstallOrigin | Should -Be 'PackageModelReused'
-        $result.Install.Status | Should -Be 'ReusedPackageModelOwned'
+        $result.ExistingPackage.SearchKind | Should -Be 'packageTargetInstallPath'
+        $result.ExistingPackage.Decision | Should -Be 'ReusePackageOwned'
+        $result.InstallOrigin | Should -Be 'PackageReused'
+        $result.Install.Status | Should -Be 'ReusedPackageOwned'
     }
 
     It 'marks a failed validation on the managed install path as a repaired managed install after reinstall' {
         $rootPath = Join-Path $TestDrive 'repair-managed'
         $packageArchive = New-TestPackageArchiveInfo -RootPath (Join-Path $rootPath 'archive') -Version '2.0.0' -ArchiveFileName 'VSCode-win32-x64-2.0.0.zip'
-        $globalDocument = New-TestPackageModelGlobalDocument -InstallWorkspaceDirectory (Join-Path $rootPath 'workspace') -DefaultPackageDepotDirectory (Join-Path $rootPath 'default-depot') -PreferredTargetInstallDirectory (Join-Path $rootPath 'installs')
-        $release = New-TestPackageModelRelease -Id 'vsCode-win-x64-stable' -Version '2.0.0' -Architecture 'x64' -Flavor 'win32-x64' -FileName 'VSCode-win32-x64-2.0.0.zip' -Install @{
+        $globalDocument = New-TestPackageGlobalDocument -InstallWorkspaceDirectory (Join-Path $rootPath 'workspace') -DefaultPackageDepotDirectory (Join-Path $rootPath 'default-depot') -PreferredTargetInstallDirectory (Join-Path $rootPath 'installs')
+        $release = New-TestPackageRelease -Id 'vsCode-win-x64-stable' -Version '2.0.0' -Architecture 'x64' -Flavor 'win32-x64' -FileName 'VSCode-win32-x64-2.0.0.zip' -Install @{
             kind             = 'expandArchive'
             installDirectory = 'vscode-runtime/stable/2.0.0/win32-x64'
             expandedRoot     = 'auto'
@@ -2391,45 +2511,45 @@ Describe 'Eigenverft.Manifested.Sandbox PackageModel' {
                 verification = @{ mode = 'required'; algorithm = 'sha256'; sha256 = $packageArchive.Sha256 }
             }
         ) -Validation (New-TestValidation -Version '2.0.0')
-        $documents = Write-TestPackageModelDocuments -RootPath $rootPath -GlobalDocument $globalDocument -DefinitionDocument (New-TestVSCodeDefinitionDocument -Releases @($release) -ReleaseDefaultsValidation (New-TestValidation -Version '2.0.0'))
+        $documents = Write-TestPackageDocuments -RootPath $rootPath -GlobalDocument $globalDocument -DefinitionDocument (New-TestVSCodeDefinitionDocument -Releases @($release) -ReleaseDefaultsValidation (New-TestValidation -Version '2.0.0'))
 
         [Environment]::SetEnvironmentVariable($script:SourceInventoryEnvVarName, (Join-Path $TestDrive 'missing-inventory.json'), 'Process')
-        Mock Get-PackageModelGlobalConfigPath { $documents.GlobalConfigPath }
-        Mock Get-PackageModelDefinitionPath { param($DefinitionId) $documents.DefinitionPath }
+        Mock Get-PackageGlobalConfigPath { $documents.GlobalConfigPath }
+        Mock Get-PackageDefinitionPath { param($DefinitionId) $documents.DefinitionPath }
 
-        $config = Get-PackageModelConfig -DefinitionId 'VSCodeRuntime'
-        $result = New-PackageModelResult -CommandName 'test' -PackageModelConfig $config
-        $result = Resolve-PackageModelPackage -PackageModelResult $result
-        $result = Resolve-PackageModelPaths -PackageModelResult $result
-        $result = Build-PackageModelAcquisitionPlan -PackageModelResult $result
+        $config = Get-PackageConfig -DefinitionId 'VSCodeRuntime'
+        $result = New-PackageResult -CommandName 'test' -PackageConfig $config
+        $result = Resolve-PackagePackage -PackageResult $result
+        $result = Resolve-PackagePaths -PackageResult $result
+        $result = Build-PackageAcquisitionPlan -PackageResult $result
 
         $null = New-Item -ItemType Directory -Path (Split-Path -Parent $result.DefaultPackageDepotFilePath) -Force
         Copy-Item -LiteralPath $packageArchive.ZipPath -Destination $result.DefaultPackageDepotFilePath -Force
-        $result = Save-PackageModelPackageFile -PackageModelResult $result
-        $result = Install-PackageModelPackage -PackageModelResult $result
+        $result = Save-PackagePackageFile -PackageResult $result
+        $result = Install-PackagePackage -PackageResult $result
 
         Remove-Item -LiteralPath (Join-Path $result.InstallDirectory 'data') -Recurse -Force
 
-        $rerun = New-PackageModelResult -CommandName 'test' -PackageModelConfig $config
-        $rerun = Resolve-PackageModelPackage -PackageModelResult $rerun
-        $rerun = Resolve-PackageModelPaths -PackageModelResult $rerun
-        $rerun = Build-PackageModelAcquisitionPlan -PackageModelResult $rerun
-        $rerun = Find-PackageModelExistingPackage -PackageModelResult $rerun
-        $rerun = Classify-PackageModelExistingPackage -PackageModelResult $rerun
-        $rerun = Resolve-PackageModelExistingPackageDecision -PackageModelResult $rerun
-        $rerun = Save-PackageModelPackageFile -PackageModelResult $rerun
-        $rerun = Install-PackageModelPackage -PackageModelResult $rerun
+        $rerun = New-PackageResult -CommandName 'test' -PackageConfig $config
+        $rerun = Resolve-PackagePackage -PackageResult $rerun
+        $rerun = Resolve-PackagePaths -PackageResult $rerun
+        $rerun = Build-PackageAcquisitionPlan -PackageResult $rerun
+        $rerun = Find-PackageExistingPackage -PackageResult $rerun
+        $rerun = Classify-PackageExistingPackage -PackageResult $rerun
+        $rerun = Resolve-PackageExistingPackageDecision -PackageResult $rerun
+        $rerun = Save-PackagePackageFile -PackageResult $rerun
+        $rerun = Install-PackagePackage -PackageResult $rerun
 
-        $rerun.ExistingPackage.SearchKind | Should -Be 'packageModelTargetInstallPath'
+        $rerun.ExistingPackage.SearchKind | Should -Be 'packageTargetInstallPath'
         $rerun.ExistingPackage.Decision | Should -Be 'ExistingInstallValidationFailed'
-        $rerun.Install.Status | Should -Be 'RepairedPackageModelOwnedInstall'
+        $rerun.Install.Status | Should -Be 'RepairedPackageOwnedInstall'
     }
 
     It 'prefers Write-StandardMessage when it is available' {
         Mock Write-StandardMessage {}
         Mock Write-Host {}
 
-        { Write-PackageModelExecutionMessage -Message '[STEP] Example step' } | Should -Not -Throw
+        { Write-PackageExecutionMessage -Message '[STEP] Example step' } | Should -Not -Throw
 
         Assert-MockCalled Write-StandardMessage -Times 1
         Assert-MockCalled Write-Host -Times 0
@@ -2439,18 +2559,18 @@ Describe 'Eigenverft.Manifested.Sandbox PackageModel' {
         Mock Write-StandardMessage { throw 'logger unavailable' }
         Mock Write-Host {}
 
-        { Write-PackageModelExecutionMessage -Message '[STEP] Example step' } | Should -Not -Throw
+        { Write-PackageExecutionMessage -Message '[STEP] Example step' } | Should -Not -Throw
 
         Assert-MockCalled Write-StandardMessage -Times 1
         Assert-MockCalled Write-Host -Times 1
     }
 
-    It 'loads Write-StandardMessage from ExecutionEngine and the PackageModel logger adapter from Support Package' {
+    It 'loads Write-StandardMessage from ExecutionEngine and the Package logger adapter from Support Package' {
         $writeStandardMessage = Get-Command Write-StandardMessage -CommandType Function
-        $packageModelExecutionMessage = Get-Command Write-PackageModelExecutionMessage -CommandType Function
+        $packageExecutionMessage = Get-Command Write-PackageExecutionMessage -CommandType Function
 
         $writeStandardMessage.ScriptBlock.File | Should -Match 'Support\\ExecutionEngine\\.*StandardMessage\.ps1$'
-        $packageModelExecutionMessage.ScriptBlock.File | Should -Match 'Support\\Package\\.*ExecutionMessage\.ps1$'
+        $packageExecutionMessage.ScriptBlock.File | Should -Match 'Support\\Package\\.*ExecutionMessage\.ps1$'
     }
 
     It 'loads archive helpers from ExecutionEngine' {
@@ -2469,14 +2589,14 @@ Describe 'Eigenverft.Manifested.Sandbox PackageModel' {
         $copyFileToPath.ScriptBlock.File | Should -Match 'Support\\ExecutionEngine\\.*FileSystem\.ps1$'
     }
 
-    It 'loads generic npm helpers from ExecutionEngine and the PackageModel npm adapter from Support Package' {
+    It 'loads generic npm helpers from ExecutionEngine and the Package npm adapter from Support Package' {
         $getNpmRegistryUri = Get-Command Get-NpmRegistryUri -CommandType Function
         $getNpmGlobalConfigArguments = Get-Command Get-NpmGlobalConfigArguments -CommandType Function
-        $installPackageModelNpmPackage = Get-Command Install-PackageModelNpmPackage -CommandType Function
+        $installPackageNpmPackage = Get-Command Install-PackageNpmPackage -CommandType Function
 
         $getNpmRegistryUri.ScriptBlock.File | Should -Match 'Support\\ExecutionEngine\\.*Npm\.ps1$'
         $getNpmGlobalConfigArguments.ScriptBlock.File | Should -Match 'Support\\ExecutionEngine\\.*Npm\.ps1$'
-        $installPackageModelNpmPackage.ScriptBlock.File | Should -Match 'Support\\Package\\.*Npm\.ps1$'
+        $installPackageNpmPackage.ScriptBlock.File | Should -Match 'Support\\Package\\.*Npm\.ps1$'
     }
 
     It 'returns null when Get-ResolvedApplicationPath cannot resolve a command' {
@@ -2631,7 +2751,7 @@ Describe 'Eigenverft.Manifested.Sandbox PackageModel' {
         }
     }
 
-    It 'routes PackageModel archive installs through Expand-ArchiveToStage' {
+    It 'routes Package archive installs through Expand-ArchiveToStage' {
         $rootPath = Join-Path $TestDrive 'package-install-archive-route'
         $packageFilePath = Join-Path $rootPath 'package.zip'
         $stagePath = Join-Path $rootPath 'stage'
@@ -2649,7 +2769,7 @@ Describe 'Eigenverft.Manifested.Sandbox PackageModel' {
         }
         Mock Remove-PathIfExists { return $true }
 
-        $packageModelResult = [pscustomobject]@{
+        $packageResult = [pscustomobject]@{
             PackageId        = 'VSCodeRuntime'
             PackageFilePath  = $packageFilePath
             InstallDirectory = $installDirectory
@@ -2663,7 +2783,7 @@ Describe 'Eigenverft.Manifested.Sandbox PackageModel' {
             ExistingPackage = $null
         }
 
-        $installResult = Install-PackageModelArchive -PackageModelResult $packageModelResult
+        $installResult = Install-PackageArchive -PackageResult $packageResult
 
         Assert-MockCalled Expand-ArchiveToStage -Times 1
         Assert-MockCalled Remove-PathIfExists -Times 1 -ParameterFilter { $Path -eq $stagePath }
@@ -2677,7 +2797,7 @@ Describe 'Eigenverft.Manifested.Sandbox PackageModel' {
         $fakeNpmPath = Join-Path $rootPath 'node\npm.cmd'
         $installDirectory = Join-Path $rootPath 'install'
         $workspaceDirectory = Join-Path $rootPath 'workspace'
-        $packageStateIndexPath = Join-Path $rootPath 'package-state-index.json'
+        $packageStateIndexPath = Join-Path (Join-Path $rootPath 'State') 'package-state-index.json'
         Write-TestTextFile -Path $fakeNpmPath -Content @"
 @echo off
 set PREFIX=
@@ -2696,12 +2816,12 @@ echo @echo off>"%PREFIX%\codex.cmd"
 echo {"name":"@openai/codex"}>"%PREFIX%\node_modules\@openai\codex\package.json"
 exit /b 0
 "@
-        $packageModelResult = [pscustomobject]@{
+        $packageResult = [pscustomobject]@{
             PackageId              = 'codex-runtime-win32-x64-stable'
             DefinitionId           = 'CodexCli'
             InstallDirectory       = $installDirectory
             ExistingPackage        = $null
-            PackageModelConfig     = [pscustomobject]@{
+            PackageConfig     = [pscustomobject]@{
                 DefinitionId                  = 'CodexCli'
                 InstallWorkspaceRootDirectory = $workspaceDirectory
                 PackageStateIndexFilePath     = $packageStateIndexPath
@@ -2738,14 +2858,14 @@ exit /b 0
             }
         }
 
-        $installResult = Install-PackageModelNpmPackage -PackageModelResult $packageModelResult
+        $installResult = Install-PackageNpmPackage -PackageResult $packageResult
 
         $installResult.InstallKind | Should -Be 'npmGlobalPackage'
         $installResult.InstallerCommand | Should -Be 'npm'
         $installResult.InstallerCommandPath | Should -Be ([System.IO.Path]::GetFullPath($fakeNpmPath))
         $installResult.PackageSpec | Should -Be '@openai/codex@0.125.0'
         $installResult.CacheDirectory | Should -Match 'npm-cache'
-        $installResult.GlobalConfigPath | Should -Match 'External\\npm\\npmrc$'
+        $installResult.GlobalConfigPath | Should -Match 'Configuration\\External\\npm\\npmrc$'
         Test-Path -LiteralPath (Join-Path $installDirectory 'codex.cmd') -PathType Leaf | Should -BeTrue
         Test-Path -LiteralPath (Join-Path $installDirectory 'node_modules\@openai\codex\package.json') -PathType Leaf | Should -BeTrue
         Test-Path -LiteralPath $installResult.StagePath | Should -BeFalse
@@ -2756,16 +2876,16 @@ exit /b 0
         $fakeNpmPath = Join-Path $rootPath 'node\npm.cmd'
         $installDirectory = Join-Path $rootPath 'install'
         $workspaceDirectory = Join-Path $rootPath 'workspace'
-        $packageStateIndexPath = Join-Path $rootPath 'package-state-index.json'
+        $packageStateIndexPath = Join-Path (Join-Path $rootPath 'State') 'package-state-index.json'
         Write-TestTextFile -Path $fakeNpmPath -Content "@echo off`r`nexit /b 7`r`n"
         Write-TestTextFile -Path (Join-Path $installDirectory 'sentinel.txt') -Content 'keep-me'
 
-        $packageModelResult = [pscustomobject]@{
+        $packageResult = [pscustomobject]@{
             PackageId              = 'codex-runtime-win32-x64-stable'
             DefinitionId           = 'CodexCli'
             InstallDirectory       = $installDirectory
             ExistingPackage        = $null
-            PackageModelConfig     = [pscustomobject]@{
+            PackageConfig     = [pscustomobject]@{
                 DefinitionId                  = 'CodexCli'
                 InstallWorkspaceRootDirectory = $workspaceDirectory
                 PackageStateIndexFilePath     = $packageStateIndexPath
@@ -2794,21 +2914,21 @@ exit /b 0
             }
         }
 
-        { Install-PackageModelNpmPackage -PackageModelResult $packageModelResult } | Should -Throw '*exit code 7*'
+        { Install-PackageNpmPackage -PackageResult $packageResult } | Should -Throw '*exit code 7*'
         Test-Path -LiteralPath (Join-Path $installDirectory 'sentinel.txt') -PathType Leaf | Should -BeTrue
     }
 
     It 'fails npmGlobalPackage clearly when no ready dependency exposes the installer command' {
         $rootPath = Join-Path $TestDrive 'npm-missing-installer-command'
-        $packageModelResult = [pscustomobject]@{
+        $packageResult = [pscustomobject]@{
             PackageId              = 'codex-runtime-win32-x64-stable'
             DefinitionId           = 'CodexCli'
             InstallDirectory       = Join-Path $rootPath 'install'
             ExistingPackage        = $null
-            PackageModelConfig     = [pscustomobject]@{
+            PackageConfig     = [pscustomobject]@{
                 DefinitionId                  = 'CodexCli'
                 InstallWorkspaceRootDirectory = Join-Path $rootPath 'workspace'
-                PackageStateIndexFilePath     = Join-Path $rootPath 'package-state-index.json'
+                PackageStateIndexFilePath     = Join-Path (Join-Path $rootPath 'State') 'package-state-index.json'
             }
             Dependencies           = @(
                 [pscustomobject]@{
@@ -2829,7 +2949,7 @@ exit /b 0
             }
         }
 
-        { Install-PackageModelNpmPackage -PackageModelResult $packageModelResult } | Should -Throw '*no ready dependency exposes that command*'
+        { Install-PackageNpmPackage -PackageResult $packageResult } | Should -Throw '*no ready dependency exposes that command*'
     }
 
     It 'accepts package-file Authenticode verification without a SHA256 hash' {
@@ -2853,7 +2973,7 @@ exit /b 0
             }
         }
 
-        $result = Test-PackageModelSavedFile -Path $packageFilePath -Verification $verification
+        $result = Test-PackageSavedFile -Path $packageFilePath -Verification $verification
 
         $result.Accepted | Should -BeTrue
         $result.Status | Should -Be 'AuthenticodePassed'
@@ -2862,10 +2982,10 @@ exit /b 0
 
     It 'validates registry-only machine prerequisites without an install directory' {
         $registryPath = 'HKLM:\SOFTWARE\Microsoft\VisualStudio\14.0\VC\Runtimes\x64'
-        $packageModelResult = [pscustomobject]@{
+        $packageResult = [pscustomobject]@{
             InstallDirectory = $null
             Validation = $null
-            PackageModelConfig = [pscustomobject]@{}
+            PackageConfig = [pscustomobject]@{}
             Package = [pscustomobject]@{
                 validation = [pscustomobject]@{
                     files = @()
@@ -2899,10 +3019,10 @@ exit /b 0
             }
         } -ParameterFilter { $LiteralPath -eq $registryPath }
 
-        $packageModelResult = Test-PackageModelInstalledPackage -PackageModelResult $packageModelResult
+        $packageResult = Test-PackageInstalledPackage -PackageResult $packageResult
 
-        $packageModelResult.Validation.Accepted | Should -BeTrue
-        @($packageModelResult.Validation.Registry | ForEach-Object { $_.Status }) | Should -Be @('Ready', 'Ready')
+        $packageResult.Validation.Accepted | Should -BeTrue
+        @($packageResult.Validation.Registry | ForEach-Object { $_.Status }) | Should -Be @('Ready', 'Ready')
     }
 
     It 'resolves registry values through the generic execution-engine helper' {
@@ -2939,7 +3059,7 @@ exit /b 0
     }
 
     It 'marks a satisfied machine prerequisite so acquisition and installer execution can be skipped' {
-        $packageModelResult = [pscustomobject]@{
+        $packageResult = [pscustomobject]@{
             InstallOrigin = $null
             Install       = $null
             Validation    = $null
@@ -2951,9 +3071,9 @@ exit /b 0
             }
         }
 
-        Mock Test-PackageModelInstalledPackage {
-            param([psobject]$PackageModelResult)
-            $PackageModelResult.Validation = [pscustomobject]@{
+        Mock Test-PackageInstalledPackage {
+            param([psobject]$PackageResult)
+            $PackageResult.Validation = [pscustomobject]@{
                 Accepted      = $true
                 Files         = @()
                 Directories   = @()
@@ -2963,14 +3083,14 @@ exit /b 0
                 FileDetails   = @()
                 Registry      = @([pscustomobject]@{ Status = 'Ready' })
             }
-            $PackageModelResult
+            $PackageResult
         }
 
-        $packageModelResult = Resolve-PackageModelPreInstallSatisfaction -PackageModelResult $packageModelResult
+        $packageResult = Resolve-PackagePreInstallSatisfaction -PackageResult $packageResult
 
-        $packageModelResult.InstallOrigin | Should -Be 'AlreadySatisfied'
-        $packageModelResult.Install.Status | Should -Be 'AlreadySatisfied'
-        $packageModelResult.Install.TargetKind | Should -Be 'machinePrerequisite'
+        $packageResult.InstallOrigin | Should -Be 'AlreadySatisfied'
+        $packageResult.Install.Status | Should -Be 'AlreadySatisfied'
+        $packageResult.Install.TargetKind | Should -Be 'machinePrerequisite'
     }
 
     It 'runs required-elevation installers with RunAs and quoted log-path arguments' {
@@ -3005,12 +3125,13 @@ exit /b 0
             $process
         }
 
-        $packageModelResult = [pscustomobject]@{
+        $packageResult = [pscustomobject]@{
             PackageFilePath           = $installerPath
             InstallWorkspaceDirectory = $workspacePath
             InstallDirectory          = $null
-            PackageModelConfig        = [pscustomobject]@{
+            PackageConfig        = [pscustomobject]@{
                 PreferredTargetInstallRootDirectory = $rootPath
+                PackageStateIndexFilePath           = Join-Path (Join-Path $rootPath 'State') 'package-state-index.json'
             }
             Package = [pscustomobject]@{
                 install = [pscustomobject]@{
@@ -3019,7 +3140,7 @@ exit /b 0
                     installerKind  = 'burn'
                     uiMode         = 'quiet'
                     elevation      = 'required'
-                    logRelativePath = 'logs/vc-runtime/{timestamp}.log'
+                    logRelativePath = 'visual-cpp-redist/{timestamp}.log'
                     commandArguments = @('/install', '/quiet', '/norestart', '/log', '{logPath}')
                     successExitCodes = @(0)
                     restartExitCodes = @(3010)
@@ -3027,7 +3148,7 @@ exit /b 0
             }
         }
 
-        $result = Invoke-PackageModelInstallerProcess -PackageModelResult $packageModelResult
+        $result = Invoke-PackageInstallerProcess -PackageResult $packageResult
 
         $startProcessCalls.Count | Should -Be 1
         $startProcessCalls[0].Verb | Should -Be 'RunAs'
@@ -3036,6 +3157,7 @@ exit /b 0
         $startProcessCalls[0].ArgumentList[-1].EndsWith('"') | Should -BeTrue
         $result.TargetKind | Should -Be 'machinePrerequisite'
         $result.Elevation.ShouldElevate | Should -BeTrue
+        $result.LogPath | Should -Match '\\Logs\\visual-cpp-redist\\[0-9]{8}-[0-9]{6}\.log$'
     }
 
     It 'installs a single package file into the configured target-relative path' {
@@ -3044,7 +3166,7 @@ exit /b 0
         $installDirectory = Join-Path $rootPath 'install'
         Write-TestTextFile -Path $packageFilePath -Content 'gguf-binary'
 
-        $packageModelResult = [pscustomobject]@{
+        $packageResult = [pscustomobject]@{
             PackageId        = 'Qwen35_2B_Q6K_Model'
             PackageFilePath  = $packageFilePath
             InstallDirectory = $installDirectory
@@ -3060,7 +3182,7 @@ exit /b 0
             ExistingPackage = $null
         }
 
-        $installResult = Install-PackageModelPackageFile -PackageModelResult $packageModelResult
+        $installResult = Install-PackagePackageFile -PackageResult $packageResult
 
         $installResult.InstallKind | Should -Be 'placePackageFile'
         $installResult.InstalledFilePath | Should -Be (Join-Path $installDirectory 'models\Qwen3.5-2B-Q6_K.gguf')
@@ -3132,7 +3254,7 @@ exit /b 0
                 existingInstallPolicy = @{
                     allowAdoptExternal = $false
                     upgradeAdoptedInstall = $false
-                    requirePackageModelOwnership = $false
+                    requirePackageOwnership = $false
                 }
             }
             releases = @(
@@ -3163,24 +3285,24 @@ exit /b 0
                 }
             )
         }
-        $documents = Write-TestPackageModelDocuments -RootPath $rootPath -GlobalDocument (New-TestPackageModelGlobalDocument -InstallWorkspaceDirectory $installWorkspaceDirectory -DefaultPackageDepotDirectory $defaultPackageDepotDirectory -PreferredTargetInstallDirectory $preferredTargetInstallDirectory -PackageStateIndexFilePath $packageStateIndexFilePath) -DefinitionDocument $definitionDocument
+        $documents = Write-TestPackageDocuments -RootPath $rootPath -GlobalDocument (New-TestPackageGlobalDocument -InstallWorkspaceDirectory $installWorkspaceDirectory -DefaultPackageDepotDirectory $defaultPackageDepotDirectory -PreferredTargetInstallDirectory $preferredTargetInstallDirectory -PackageStateIndexFilePath $packageStateIndexFilePath) -DefinitionDocument $definitionDocument
 
         [Environment]::SetEnvironmentVariable($script:SourceInventoryEnvVarName, (Join-Path $TestDrive 'missing-inventory.json'), 'Process')
-        Mock Get-PackageModelGlobalConfigPath { $documents.GlobalConfigPath }
-        Mock Get-PackageModelDefinitionPath { param($DefinitionId) $documents.DefinitionPath }
+        Mock Get-PackageGlobalConfigPath { $documents.GlobalConfigPath }
+        Mock Get-PackageDefinitionPath { param($DefinitionId) $documents.DefinitionPath }
 
-        $config = Get-PackageModelConfig -DefinitionId 'Qwen35_2B_Q6K_Model'
-        $result = New-PackageModelResult -CommandName 'test' -PackageModelConfig $config
-        $result = Resolve-PackageModelPackage -PackageModelResult $result
-        $result = Resolve-PackageModelPaths -PackageModelResult $result
-        $result = Build-PackageModelAcquisitionPlan -PackageModelResult $result
+        $config = Get-PackageConfig -DefinitionId 'Qwen35_2B_Q6K_Model'
+        $result = New-PackageResult -CommandName 'test' -PackageConfig $config
+        $result = Resolve-PackagePackage -PackageResult $result
+        $result = Resolve-PackagePaths -PackageResult $result
+        $result = Build-PackageAcquisitionPlan -PackageResult $result
 
         $null = New-Item -ItemType Directory -Path (Split-Path -Parent $result.DefaultPackageDepotFilePath) -Force
         Write-TestTextFile -Path $result.DefaultPackageDepotFilePath -Content 'gguf-binary'
 
-        $result = Save-PackageModelPackageFile -PackageModelResult $result
-        $result = Install-PackageModelPackage -PackageModelResult $result
-        $result = Test-PackageModelInstalledPackage -PackageModelResult $result
+        $result = Save-PackagePackageFile -PackageResult $result
+        $result = Install-PackagePackage -PackageResult $result
+        $result = Test-PackageInstalledPackage -PackageResult $result
 
         $result.PackageFileSave.Status | Should -Be 'HydratedFromDefaultPackageDepot'
         $result.Install.InstallKind | Should -Be 'placePackageFile'
@@ -3197,7 +3319,7 @@ exit /b 0
         Write-TestTextFile -Path (Join-Path $installRoot 'Code.exe') -Content 'fake'
         Write-TestTextFile -Path $commandPath -Content '@echo off'
 
-        $packageModelResult = [pscustomobject]@{
+        $packageResult = [pscustomobject]@{
             InstallDirectory = $null
             ExistingPackage  = $null
             Package          = [pscustomobject]@{
@@ -3225,12 +3347,12 @@ exit /b 0
 
         Mock Get-ResolvedApplicationPath { $commandPath } -ParameterFilter { $CommandName -eq 'code' }
 
-        $packageModelResult = Find-PackageModelExistingPackage -PackageModelResult $packageModelResult
+        $packageResult = Find-PackageExistingPackage -PackageResult $packageResult
 
         Assert-MockCalled Get-ResolvedApplicationPath -Times 1 -ParameterFilter { $CommandName -eq 'code' }
-        $packageModelResult.ExistingPackage.SearchKind | Should -Be 'command'
-        $packageModelResult.ExistingPackage.CandidatePath | Should -Be $commandPath
-        $packageModelResult.ExistingPackage.InstallDirectory | Should -Be ([System.IO.Path]::GetFullPath($installRoot))
+        $packageResult.ExistingPackage.SearchKind | Should -Be 'command'
+        $packageResult.ExistingPackage.CandidatePath | Should -Be $commandPath
+        $packageResult.ExistingPackage.InstallDirectory | Should -Be ([System.IO.Path]::GetFullPath($installRoot))
     }
 
     It 'routes filesystem package saves through Copy-FileToPath' {
@@ -3240,7 +3362,7 @@ exit /b 0
 
         Mock Copy-FileToPath { $TargetPath } -ParameterFilter { $SourcePath -eq $sourcePath -and $TargetPath -eq $targetPath -and $Overwrite }
 
-        $resolvedPath = Save-PackageModelFilesystemFile -SourcePath $sourcePath -TargetPath $targetPath
+        $resolvedPath = Save-PackageFilesystemFile -SourcePath $sourcePath -TargetPath $targetPath
 
         Assert-MockCalled Copy-FileToPath -Times 1 -ParameterFilter { $SourcePath -eq $sourcePath -and $TargetPath -eq $targetPath -and $Overwrite }
         $resolvedPath | Should -Be $targetPath
@@ -3269,7 +3391,7 @@ exit /b 0
     }
 
     It 'evaluates physicalMemoryGiB and videoMemoryGiB compatibility checks with mocked helper outputs' {
-        $packageModelConfig = [pscustomobject]@{
+        $packageConfig = [pscustomobject]@{
             Platform     = 'windows'
             Architecture = 'x64'
             OSVersion    = '10.0'
@@ -3291,7 +3413,7 @@ exit /b 0
         Mock Get-PhysicalMemoryGiB { 16.0 }
         Mock Get-VideoMemoryGiB { 8.0 }
 
-        $evaluation = Test-PackageModelCompatibilityChecks -PackageModelConfig $packageModelConfig -Compatibility $compatibility
+        $evaluation = Test-PackageCompatibilityChecks -PackageConfig $packageConfig -Compatibility $compatibility
 
         $evaluation.Accepted | Should -BeTrue
         $evaluation.BlockingAccepted | Should -BeTrue
@@ -3319,7 +3441,7 @@ exit /b 0
         $evaluation.Accepted | Should -BeFalse
     }
 
-    It 'registers PATH from generic inputs without a PackageModel result object' {
+    It 'registers PATH from generic inputs without a Package result object' {
         $registeredDirectory = Join-Path $TestDrive 'generic-path-registration\bin'
         $null = New-Item -ItemType Directory -Path $registeredDirectory -Force
 
@@ -3355,25 +3477,25 @@ exit /b 0
         $packageStateIndexPath = Join-Path $rootPath 'package-state.json'
         $null = New-Item -ItemType Directory -Path $installRoot -Force
 
-        $globalDocument = New-TestPackageModelGlobalDocument -PackageStateIndexFilePath $packageStateIndexPath
-        $release = New-TestPackageModelRelease -Id 'vsCode-win-x64-stable' -Version '3.0.0' -Architecture 'x64' -Flavor 'win32-x64' -Install @{ kind = 'reuseExisting' } -Validation (New-TestValidation -Version '3.0.0')
-        $documents = Write-TestPackageModelDocuments -RootPath $rootPath -GlobalDocument $globalDocument -DefinitionDocument (New-TestVSCodeDefinitionDocument -Releases @($release) -ReleaseDefaultsValidation (New-TestValidation -Version '3.0.0'))
+        $globalDocument = New-TestPackageGlobalDocument -PackageStateIndexFilePath $packageStateIndexPath
+        $release = New-TestPackageRelease -Id 'vsCode-win-x64-stable' -Version '3.0.0' -Architecture 'x64' -Flavor 'win32-x64' -Install @{ kind = 'reuseExisting' } -Validation (New-TestValidation -Version '3.0.0')
+        $documents = Write-TestPackageDocuments -RootPath $rootPath -GlobalDocument $globalDocument -DefinitionDocument (New-TestVSCodeDefinitionDocument -Releases @($release) -ReleaseDefaultsValidation (New-TestValidation -Version '3.0.0'))
 
         [Environment]::SetEnvironmentVariable($script:SourceInventoryEnvVarName, (Join-Path $TestDrive 'missing-inventory.json'), 'Process')
-        Mock Get-PackageModelGlobalConfigPath { $documents.GlobalConfigPath }
-        Mock Get-PackageModelDefinitionPath { param($DefinitionId) $documents.DefinitionPath }
+        Mock Get-PackageGlobalConfigPath { $documents.GlobalConfigPath }
+        Mock Get-PackageDefinitionPath { param($DefinitionId) $documents.DefinitionPath }
 
-        $config = Get-PackageModelConfig -DefinitionId 'VSCodeRuntime'
-        $result = New-PackageModelResult -CommandName 'test' -PackageModelConfig $config
-        $result = Resolve-PackageModelPackage -PackageModelResult $result
+        $config = Get-PackageConfig -DefinitionId 'VSCodeRuntime'
+        $result = New-PackageResult -CommandName 'test' -PackageConfig $config
+        $result = Resolve-PackagePackage -PackageResult $result
         $result.InstallDirectory = $installRoot
         $result.Validation = [pscustomobject]@{
             Accepted = $true
         }
-        $result.InstallOrigin = 'PackageModelInstalled'
+        $result.InstallOrigin = 'PackageInstalled'
 
-        $result = Update-PackageModelOwnershipRecord -PackageModelResult $result
-        $savedDocument = Read-PackageModelJsonDocument -Path $packageStateIndexPath
+        $result = Update-PackageOwnershipRecord -PackageResult $result
+        $savedDocument = Read-PackageJsonDocument -Path $packageStateIndexPath
         $record = $savedDocument.Document.records[0]
 
         $record.installSlotId | Should -Be 'VSCodeRuntime:stable:win32-x64'
@@ -3382,7 +3504,7 @@ exit /b 0
         $record.definitionSourcePath | Should -Be ([System.IO.Path]::GetFullPath($documents.DefinitionPath))
         $record.definitionLocalPath | Should -Not -BeNullOrEmpty
         Test-Path -LiteralPath $record.definitionLocalPath -PathType Leaf | Should -BeTrue
-        (Read-PackageModelJsonDocument -Path $record.definitionLocalPath).Document.id | Should -Be 'VSCodeRuntime'
+        (Read-PackageJsonDocument -Path $record.definitionLocalPath).Document.id | Should -Be 'VSCodeRuntime'
         $record.currentReleaseId | Should -Be 'vsCode-win-x64-stable'
         $record.currentVersion | Should -Be '3.0.0'
         $record.installDirectory | Should -Be $installRoot
@@ -3390,22 +3512,18 @@ exit /b 0
 
     It 'resolves source inventory absence as no additional environment sources' {
         $rootPath = Join-Path $TestDrive 'no-inventory'
-        $documents = Write-TestPackageModelDocuments -RootPath $rootPath -GlobalDocument (New-TestPackageModelGlobalDocument) -DefinitionDocument (New-TestVSCodeDefinitionDocument -Releases @(
-                New-TestPackageModelRelease -Id 'vsCode-win-x64-stable' -Version '2.0.0' -Architecture 'x64' -Flavor 'win32-x64' -Install @{ kind = 'reuseExisting' } -Validation (New-TestValidation -Version '2.0.0')
+        $documents = Write-TestPackageDocuments -RootPath $rootPath -GlobalDocument (New-TestPackageGlobalDocument) -DefinitionDocument (New-TestVSCodeDefinitionDocument -Releases @(
+                New-TestPackageRelease -Id 'vsCode-win-x64-stable' -Version '2.0.0' -Architecture 'x64' -Flavor 'win32-x64' -Install @{ kind = 'reuseExisting' } -Validation (New-TestValidation -Version '2.0.0')
             ))
 
         [Environment]::SetEnvironmentVariable($script:SourceInventoryEnvVarName, (Join-Path $rootPath 'missing-source-inventory.json'), 'Process')
         [Environment]::SetEnvironmentVariable($script:SiteCodeEnvVarName, 'BER', 'Process')
 
-        Mock Get-PackageModelGlobalConfigPath { $documents.GlobalConfigPath }
-        Mock Get-PackageModelDefinitionPath { param($DefinitionId) $documents.DefinitionPath }
+        Mock Get-PackageGlobalConfigPath { $documents.GlobalConfigPath }
+        Mock Get-PackageDefinitionPath { param($DefinitionId) $documents.DefinitionPath }
 
-        $config = Get-PackageModelConfig -DefinitionId 'VSCodeRuntime'
+        $config = Get-PackageConfig -DefinitionId 'VSCodeRuntime'
 
         @($config.EnvironmentSources.PSObject.Properties.Name) | Should -Be @('defaultPackageDepot')
     }
 }
-
-
-
-

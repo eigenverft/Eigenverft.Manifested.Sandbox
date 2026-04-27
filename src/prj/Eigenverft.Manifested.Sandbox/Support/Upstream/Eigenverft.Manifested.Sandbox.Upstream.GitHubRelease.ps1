@@ -11,7 +11,7 @@ Gets one fixed GitHub release by tag through the GitHub Releases API.
 Calls the GitHub REST API through Invoke-WebRequestEx, parses the release
 metadata JSON, and returns a normalized release object with normalized asset
 metadata. This helper is intentionally focused on fixed release lookup by tag
-for PackageModel upstream resolution and does not implement "latest" behavior.
+for Package upstream resolution and does not implement "latest" behavior.
 
 .PARAMETER RepositoryOwner
 The GitHub repository owner or organization name.

@@ -2,54 +2,54 @@
     Eigenverft.Manifested.Sandbox.Package.CommandFlow
 #>
 
-function Get-PackageModelOutcomeSummary {
+function Get-PackageOutcomeSummary {
     param(
         [Parameter(Mandatory = $true)]
-        [psobject]$PackageModelResult
+        [psobject]$PackageResult
     )
 
-    $installDirectoryText = if ([string]::IsNullOrWhiteSpace([string]$PackageModelResult.InstallDirectory)) {
+    $installDirectoryText = if ([string]::IsNullOrWhiteSpace([string]$PackageResult.InstallDirectory)) {
         '<none>'
     }
     else {
-        [string]$PackageModelResult.InstallDirectory
+        [string]$PackageResult.InstallDirectory
     }
-    $packageFileStatusText = if ($PackageModelResult.PackageFileSave -and $PackageModelResult.PackageFileSave.PSObject.Properties['Status']) {
-        [string]$PackageModelResult.PackageFileSave.Status
+    $packageFileStatusText = if ($PackageResult.PackageFileSave -and $PackageResult.PackageFileSave.PSObject.Properties['Status']) {
+        [string]$PackageResult.PackageFileSave.Status
     }
     else {
         '<none>'
     }
-    $existingDecisionText = if ($PackageModelResult.ExistingPackage -and $PackageModelResult.ExistingPackage.PSObject.Properties['Decision']) {
-        [string]$PackageModelResult.ExistingPackage.Decision
+    $existingDecisionText = if ($PackageResult.ExistingPackage -and $PackageResult.ExistingPackage.PSObject.Properties['Decision']) {
+        [string]$PackageResult.ExistingPackage.Decision
     }
     else {
         '<none>'
     }
 
-    switch -Exact ([string]$PackageModelResult.InstallOrigin) {
-        'PackageModelReused' {
-            return ("[OUTCOME] Reused PackageModel-owned install '{0}' (existingDecision='{1}', packageFileStep='{2}')." -f $installDirectoryText, $existingDecisionText, $packageFileStatusText)
+    switch -Exact ([string]$PackageResult.InstallOrigin) {
+        'PackageReused' {
+            return ("[OUTCOME] Reused Package-owned install '{0}' (existingDecision='{1}', packageFileStep='{2}')." -f $installDirectoryText, $existingDecisionText, $packageFileStatusText)
         }
         'AdoptedExternal' {
             return ("[OUTCOME] Adopted external install '{0}' (existingDecision='{1}', packageFileStep='{2}')." -f $installDirectoryText, $existingDecisionText, $packageFileStatusText)
         }
-        'PackageModelInstalled' {
-            return ("[OUTCOME] Completed PackageModel-owned install into '{0}' with installStatus='{1}' and packageFileStep='{2}'." -f $installDirectoryText, [string]$PackageModelResult.Install.Status, $packageFileStatusText)
+        'PackageInstalled' {
+            return ("[OUTCOME] Completed Package-owned install into '{0}' with installStatus='{1}' and packageFileStep='{2}'." -f $installDirectoryText, [string]$PackageResult.Install.Status, $packageFileStatusText)
         }
-        'PackageModelApplied' {
-            return ("[OUTCOME] Applied PackageModel prerequisite with installStatus='{0}', packageFileStep='{1}', restartRequired='{2}'." -f [string]$PackageModelResult.Install.Status, $packageFileStatusText, [string]$PackageModelResult.Install.Installer.RestartRequired)
+        'PackageApplied' {
+            return ("[OUTCOME] Applied Package prerequisite with installStatus='{0}', packageFileStep='{1}', restartRequired='{2}'." -f [string]$PackageResult.Install.Status, $packageFileStatusText, [string]$PackageResult.Install.Installer.RestartRequired)
         }
         'AlreadySatisfied' {
             return ("[OUTCOME] Package prerequisite already satisfied; installer and package-file acquisition were skipped.")
         }
         default {
-            return ("[OUTCOME] Completed PackageModel run with installOrigin='{0}', installStatus='{1}', packageFileStep='{2}', installDirectory='{3}'." -f [string]$PackageModelResult.InstallOrigin, [string]$PackageModelResult.Install.Status, $packageFileStatusText, $installDirectoryText)
+            return ("[OUTCOME] Completed Package run with installOrigin='{0}', installStatus='{1}', packageFileStep='{2}', installDirectory='{3}'." -f [string]$PackageResult.InstallOrigin, [string]$PackageResult.Install.Status, $packageFileStatusText, $installDirectoryText)
         }
     }
 }
 
-function Get-PackageModelCommandFailureReason {
+function Get-PackageCommandFailureReason {
     param(
         [Parameter(Mandatory = $true)]
         [string]$CurrentStep
@@ -70,11 +70,11 @@ function Get-PackageModelCommandFailureReason {
         'RegisterPath' { return 'PathRegistrationFailed' }
         'ResolveEntryPoints' { return 'EntryPointResolutionFailed' }
         'UpdateOwnership' { return 'OwnershipUpdateFailed' }
-        default { return 'PackageModelCommandFailed' }
+        default { return 'PackageCommandFailed' }
     }
 }
 
-function Invoke-PackageModelDefinitionCommand {
+function Invoke-PackageDefinitionCommand {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true)]
@@ -88,42 +88,42 @@ function Invoke-PackageModelDefinitionCommand {
         [object[]]$DependencyStack = @()
     )
 
-    $packageModelConfig = Get-PackageModelConfig -DefinitionId $DefinitionId
-    $result = New-PackageModelResult -CommandName $CommandName -PackageModelConfig $packageModelConfig
+    $packageConfig = Get-PackageConfig -DefinitionId $DefinitionId
+    $result = New-PackageResult -CommandName $CommandName -PackageConfig $packageConfig
     $steps = @(
-        [pscustomobject]@{ Name = 'ResolvePackage'; Message = '[STEP] Resolving package selection.'; Action = { param($r) Resolve-PackageModelPackage -PackageModelResult $r } },
-        [pscustomobject]@{ Name = 'ResolveDependencies'; Message = '[STEP] Ensuring package dependencies.'; Action = { param($r) Resolve-PackageModelDependencies -PackageModelResult $r -DependencyStack $DependencyStack } },
-        [pscustomobject]@{ Name = 'ResolvePaths'; Message = '[STEP] Resolving package paths.'; Action = { param($r) Resolve-PackageModelPaths -PackageModelResult $r } },
-        [pscustomobject]@{ Name = 'ResolvePreInstallSatisfaction'; Message = '[STEP] Checking pre-install satisfaction.'; Action = { param($r) Resolve-PackageModelPreInstallSatisfaction -PackageModelResult $r } },
-        [pscustomobject]@{ Name = 'BuildAcquisitionPlan'; Message = '[STEP] Building acquisition plan.'; Action = { param($r) Build-PackageModelAcquisitionPlan -PackageModelResult $r } },
-        [pscustomobject]@{ Name = 'FindExistingPackage'; Message = '[STEP] Discovering existing installs.'; Action = { param($r) Find-PackageModelExistingPackage -PackageModelResult $r } },
-        [pscustomobject]@{ Name = 'ClassifyExistingPackage'; Message = '[STEP] Classifying install ownership.'; Action = { param($r) Classify-PackageModelExistingPackage -PackageModelResult $r } },
-        [pscustomobject]@{ Name = 'ResolveExistingPackageDecision'; Message = '[STEP] Deciding reuse, adoption, or replacement.'; Action = { param($r) Resolve-PackageModelExistingPackageDecision -PackageModelResult $r } },
-        [pscustomobject]@{ Name = 'SavePackageFile'; Message = '[STEP] Ensuring package file is available.'; Action = { param($r) Save-PackageModelPackageFile -PackageModelResult $r } },
-        [pscustomobject]@{ Name = 'InstallPackage'; Message = '[STEP] Installing or reusing the package.'; Action = { param($r) Install-PackageModelPackage -PackageModelResult $r } },
-        [pscustomobject]@{ Name = 'ValidateInstalledPackage'; Message = '[STEP] Validating the installed package.'; Action = { param($r) Test-PackageModelInstalledPackage -PackageModelResult $r } },
-        [pscustomobject]@{ Name = 'RegisterPath'; Message = '[STEP] Applying PATH registration.'; Action = { param($r) Register-PackageModelPath -PackageModelResult $r } },
-        [pscustomobject]@{ Name = 'ResolveEntryPoints'; Message = '[STEP] Resolving entry points.'; Action = { param($r) Resolve-PackageModelEntryPoints -PackageModelResult $r } },
-        [pscustomobject]@{ Name = 'UpdateOwnership'; Message = '[STEP] Updating ownership tracking.'; Action = { param($r) Update-PackageModelOwnershipRecord -PackageModelResult $r } }
+        [pscustomobject]@{ Name = 'ResolvePackage'; Message = '[STEP] Resolving package selection.'; Action = { param($r) Resolve-PackagePackage -PackageResult $r } },
+        [pscustomobject]@{ Name = 'ResolveDependencies'; Message = '[STEP] Ensuring package dependencies.'; Action = { param($r) Resolve-PackageDependencies -PackageResult $r -DependencyStack $DependencyStack } },
+        [pscustomobject]@{ Name = 'ResolvePaths'; Message = '[STEP] Resolving package paths.'; Action = { param($r) Resolve-PackagePaths -PackageResult $r } },
+        [pscustomobject]@{ Name = 'ResolvePreInstallSatisfaction'; Message = '[STEP] Checking pre-install satisfaction.'; Action = { param($r) Resolve-PackagePreInstallSatisfaction -PackageResult $r } },
+        [pscustomobject]@{ Name = 'BuildAcquisitionPlan'; Message = '[STEP] Building acquisition plan.'; Action = { param($r) Build-PackageAcquisitionPlan -PackageResult $r } },
+        [pscustomobject]@{ Name = 'FindExistingPackage'; Message = '[STEP] Discovering existing installs.'; Action = { param($r) Find-PackageExistingPackage -PackageResult $r } },
+        [pscustomobject]@{ Name = 'ClassifyExistingPackage'; Message = '[STEP] Classifying install ownership.'; Action = { param($r) Classify-PackageExistingPackage -PackageResult $r } },
+        [pscustomobject]@{ Name = 'ResolveExistingPackageDecision'; Message = '[STEP] Deciding reuse, adoption, or replacement.'; Action = { param($r) Resolve-PackageExistingPackageDecision -PackageResult $r } },
+        [pscustomobject]@{ Name = 'SavePackageFile'; Message = '[STEP] Ensuring package file is available.'; Action = { param($r) Save-PackagePackageFile -PackageResult $r } },
+        [pscustomobject]@{ Name = 'InstallPackage'; Message = '[STEP] Installing or reusing the package.'; Action = { param($r) Install-PackagePackage -PackageResult $r } },
+        [pscustomobject]@{ Name = 'ValidateInstalledPackage'; Message = '[STEP] Validating the installed package.'; Action = { param($r) Test-PackageInstalledPackage -PackageResult $r } },
+        [pscustomobject]@{ Name = 'RegisterPath'; Message = '[STEP] Applying PATH registration.'; Action = { param($r) Register-PackagePath -PackageResult $r } },
+        [pscustomobject]@{ Name = 'ResolveEntryPoints'; Message = '[STEP] Resolving entry points.'; Action = { param($r) Resolve-PackageEntryPoints -PackageResult $r } },
+        [pscustomobject]@{ Name = 'UpdateOwnership'; Message = '[STEP] Updating ownership tracking.'; Action = { param($r) Update-PackageOwnershipRecord -PackageResult $r } }
     )
 
     try {
-        Write-PackageModelExecutionMessage -Message ("[START] {0}" -f $CommandName)
+        Write-PackageExecutionMessage -Message ("[START] {0}" -f $CommandName)
         foreach ($step in $steps) {
             $result.CurrentStep = $step.Name
-            Write-PackageModelExecutionMessage -Message $step.Message
+            Write-PackageExecutionMessage -Message $step.Message
             $result = & $step.Action $result
         }
-        Write-PackageModelExecutionMessage -Message (Get-PackageModelOutcomeSummary -PackageModelResult $result)
-        Write-PackageModelExecutionMessage -Message ("[OK] PackageModel completed with InstallOrigin='{0}' and InstallStatus='{1}'." -f $result.InstallOrigin, $result.Install.Status)
+        Write-PackageExecutionMessage -Message (Get-PackageOutcomeSummary -PackageResult $result)
+        Write-PackageExecutionMessage -Message ("[OK] Package completed with InstallOrigin='{0}' and InstallStatus='{1}'." -f $result.InstallOrigin, $result.Install.Status)
     }
     catch {
         $result.Status = 'Failed'
         $result.ErrorMessage = $_.Exception.Message
-        Write-PackageModelExecutionMessage -Level 'ERR' -Message ("[FAIL] Step '{0}' failed: {1}" -f $result.CurrentStep, $_.Exception.Message)
-        $result.FailureReason = Get-PackageModelCommandFailureReason -CurrentStep ([string]$result.CurrentStep)
+        Write-PackageExecutionMessage -Level 'ERR' -Message ("[FAIL] Step '{0}' failed: {1}" -f $result.CurrentStep, $_.Exception.Message)
+        $result.FailureReason = Get-PackageCommandFailureReason -CurrentStep ([string]$result.CurrentStep)
     }
 
-    return (Complete-PackageModelResult -PackageModelResult $result)
+    return (Complete-PackageResult -PackageResult $result)
 }
 

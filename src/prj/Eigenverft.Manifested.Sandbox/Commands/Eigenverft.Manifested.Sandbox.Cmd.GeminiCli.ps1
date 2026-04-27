@@ -5,11 +5,11 @@
 function Invoke-GeminiCli {
 <#
 .SYNOPSIS
-Ensures the configured Gemini CLI package is available through PackageModel.
+Ensures the configured Gemini CLI package is available through Package.
 
 .DESCRIPTION
-Installs or reuses the pinned Gemini CLI npm package through the PackageModel
-npm backend, using PackageModel-owned Node.js as the package-manager dependency.
+Installs or reuses the pinned Gemini CLI npm package through the Package
+npm backend, using Package-owned Node.js as the package-manager dependency.
 
 .EXAMPLE
 Invoke-GeminiCli
@@ -17,6 +17,6 @@ Invoke-GeminiCli
     [CmdletBinding()]
     param()
 
-    return (Invoke-PackageModelDefinitionCommand -DefinitionId 'GeminiCli' -CommandName 'Invoke-GeminiCli')
+    return (Invoke-PackageDefinitionCommand -DefinitionId 'GeminiCli' -CommandName 'Invoke-GeminiCli')
 }
 

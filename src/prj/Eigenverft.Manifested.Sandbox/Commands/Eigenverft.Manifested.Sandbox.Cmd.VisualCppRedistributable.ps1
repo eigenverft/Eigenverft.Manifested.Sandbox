@@ -8,7 +8,7 @@ function Invoke-VisualCppRedistributable {
 Ensures the configured Microsoft Visual C++ Redistributable prerequisite is present.
 
 .DESCRIPTION
-Loads the shipped PackageModel JSON documents, validates whether the machine
+Loads the shipped Package JSON documents, validates whether the machine
 prerequisite is already satisfied, and only acquires and runs the signed
 installer when the registry checks show the runtime is missing.
 
@@ -18,6 +18,6 @@ Invoke-VisualCppRedistributable
     [CmdletBinding()]
     param()
 
-    return (Invoke-PackageModelDefinitionCommand -DefinitionId 'VisualCppRedistributable' -CommandName 'Invoke-VisualCppRedistributable')
+    return (Invoke-PackageDefinitionCommand -DefinitionId 'VisualCppRedistributable' -CommandName 'Invoke-VisualCppRedistributable')
 }
 

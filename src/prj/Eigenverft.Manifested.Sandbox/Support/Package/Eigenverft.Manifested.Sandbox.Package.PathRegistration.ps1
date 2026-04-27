@@ -2,7 +2,7 @@
     Eigenverft.Manifested.Sandbox.Package.PathRegistration
 #>
 
-function Get-PackageModelPathRegistrationSourcePath {
+function Get-PackagePathRegistrationSourcePath {
 <#
 .SYNOPSIS
 Resolves the raw source path for PATH registration.
@@ -14,12 +14,12 @@ or directory path for the requested install directory.
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true)]
-        [psobject]$PackageModelResult,
+        [psobject]$PackageResult,
 
         [string]$InstallDirectoryOverride
     )
 
-    $install = $PackageModelResult.Package.install
+    $install = $PackageResult.Package.install
     if (-not $install -or -not $install.PSObject.Properties['pathRegistration'] -or $null -eq $install.pathRegistration) {
         return $null
     }
@@ -33,77 +33,77 @@ or directory path for the requested install directory.
     $sourceKind = if ($source.PSObject.Properties['kind']) { [string]$source.kind } else { $null }
     $sourceValue = if ($source.PSObject.Properties['value']) { [string]$source.value } else { $null }
     if ([string]::IsNullOrWhiteSpace($sourceKind) -or [string]::IsNullOrWhiteSpace($sourceValue)) {
-        throw "PackageModel pathRegistration requires source.kind and source.value when pathRegistration.mode is not 'none'."
+        throw "Package pathRegistration requires source.kind and source.value when pathRegistration.mode is not 'none'."
     }
 
     $baseInstallDirectory = if (-not [string]::IsNullOrWhiteSpace($InstallDirectoryOverride)) {
         $InstallDirectoryOverride
     }
     else {
-        $PackageModelResult.InstallDirectory
+        $PackageResult.InstallDirectory
     }
 
     switch -Exact ($sourceKind) {
         'commandEntryPoint' {
-            foreach ($entryPoint in @($PackageModelResult.PackageModelConfig.Definition.providedTools.commands)) {
+            foreach ($entryPoint in @($PackageResult.PackageConfig.Definition.providedTools.commands)) {
                 if ([string]::Equals([string]$entryPoint.name, $sourceValue, [System.StringComparison]::OrdinalIgnoreCase)) {
                     return (Join-Path $baseInstallDirectory (([string]$entryPoint.relativePath) -replace '/', '\'))
                 }
             }
-            throw "PackageModel pathRegistration source commandEntryPoint '$sourceValue' was not found in providedTools.commands."
+            throw "Package pathRegistration source commandEntryPoint '$sourceValue' was not found in providedTools.commands."
         }
         'appEntryPoint' {
-            foreach ($entryPoint in @($PackageModelResult.PackageModelConfig.Definition.providedTools.apps)) {
+            foreach ($entryPoint in @($PackageResult.PackageConfig.Definition.providedTools.apps)) {
                 if ([string]::Equals([string]$entryPoint.name, $sourceValue, [System.StringComparison]::OrdinalIgnoreCase)) {
                     return (Join-Path $baseInstallDirectory (([string]$entryPoint.relativePath) -replace '/', '\'))
                 }
             }
-            throw "PackageModel pathRegistration source appEntryPoint '$sourceValue' was not found in providedTools.apps."
+            throw "Package pathRegistration source appEntryPoint '$sourceValue' was not found in providedTools.apps."
         }
         'installRelativeDirectory' {
             return (Join-Path $baseInstallDirectory (($sourceValue) -replace '/', '\'))
         }
         'shim' {
-            throw "PackageModel pathRegistration source kind 'shim' is reserved but not implemented yet."
+            throw "Package pathRegistration source kind 'shim' is reserved but not implemented yet."
         }
         default {
-            throw "Unsupported PackageModel pathRegistration source kind '$sourceKind'."
+            throw "Unsupported Package pathRegistration source kind '$sourceKind'."
         }
     }
 }
 
-function Test-PackageModelShouldApplyPathRegistration {
+function Test-PackageShouldApplyPathRegistration {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true)]
-        [psobject]$PackageModelResult
+        [psobject]$PackageResult
     )
 
-    return ([string]$PackageModelResult.InstallOrigin) -in @('PackageModelInstalled', 'PackageModelReused')
+    return ([string]$PackageResult.InstallOrigin) -in @('PackageInstalled', 'PackageReused')
 }
 
-function Get-PackageModelPathRegistrationCleanupDirectories {
+function Get-PackagePathRegistrationCleanupDirectories {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true)]
-        [psobject]$PackageModelResult
+        [psobject]$PackageResult
     )
 
-    $currentInstallDirectory = Get-NormalizedPathEntry -PathEntry ([string]$PackageModelResult.InstallDirectory)
+    $currentInstallDirectory = Get-NormalizedPathEntry -PathEntry ([string]$PackageResult.InstallDirectory)
     $cleanupDirectories = New-Object System.Collections.Generic.List[string]
     $candidateInstallDirectories = New-Object System.Collections.Generic.List[string]
 
-    if ($PackageModelResult.ExistingPackage -and
-        [string]::Equals([string]$PackageModelResult.ExistingPackage.Classification, 'PackageModelOwned', [System.StringComparison]::OrdinalIgnoreCase) -and
-        -not [string]::IsNullOrWhiteSpace([string]$PackageModelResult.ExistingPackage.InstallDirectory)) {
-        $candidateInstallDirectories.Add([string]$PackageModelResult.ExistingPackage.InstallDirectory) | Out-Null
+    if ($PackageResult.ExistingPackage -and
+        [string]::Equals([string]$PackageResult.ExistingPackage.Classification, 'PackageOwned', [System.StringComparison]::OrdinalIgnoreCase) -and
+        -not [string]::IsNullOrWhiteSpace([string]$PackageResult.ExistingPackage.InstallDirectory)) {
+        $candidateInstallDirectories.Add([string]$PackageResult.ExistingPackage.InstallDirectory) | Out-Null
     }
 
-    if ($PackageModelResult.Ownership -and
-        $PackageModelResult.Ownership.OwnershipRecord -and
-        $PackageModelResult.Ownership.OwnershipRecord.PSObject.Properties['installDirectory'] -and
-        -not [string]::IsNullOrWhiteSpace([string]$PackageModelResult.Ownership.OwnershipRecord.installDirectory)) {
-        $candidateInstallDirectories.Add([string]$PackageModelResult.Ownership.OwnershipRecord.installDirectory) | Out-Null
+    if ($PackageResult.Ownership -and
+        $PackageResult.Ownership.OwnershipRecord -and
+        $PackageResult.Ownership.OwnershipRecord.PSObject.Properties['installDirectory'] -and
+        -not [string]::IsNullOrWhiteSpace([string]$PackageResult.Ownership.OwnershipRecord.installDirectory)) {
+        $candidateInstallDirectories.Add([string]$PackageResult.Ownership.OwnershipRecord.installDirectory) | Out-Null
     }
 
     foreach ($candidateInstallDirectory in @($candidateInstallDirectories.ToArray())) {
@@ -113,9 +113,9 @@ function Get-PackageModelPathRegistrationCleanupDirectories {
             continue
         }
 
-        $candidateSourcePath = Get-PackageModelPathRegistrationSourcePath -PackageModelResult $PackageModelResult -InstallDirectoryOverride $candidateInstallDirectory
-        $candidateSourceKind = if ($PackageModelResult.Package.install.pathRegistration.source.PSObject.Properties['kind']) {
-            [string]$PackageModelResult.Package.install.pathRegistration.source.kind
+        $candidateSourcePath = Get-PackagePathRegistrationSourcePath -PackageResult $PackageResult -InstallDirectoryOverride $candidateInstallDirectory
+        $candidateSourceKind = if ($PackageResult.Package.install.pathRegistration.source.PSObject.Properties['kind']) {
+            [string]$PackageResult.Package.install.pathRegistration.source.kind
         }
         else {
             $null
@@ -134,25 +134,25 @@ function Get-PackageModelPathRegistrationCleanupDirectories {
     return @($cleanupDirectories.ToArray())
 }
 
-function Register-PackageModelPath {
+function Register-PackagePath {
 <#
 .SYNOPSIS
-Applies PackageModel PATH registration for a validated install.
+Applies Package PATH registration for a validated install.
 
 .DESCRIPTION
 Updates process and persisted PATH scopes according to install.pathRegistration.
 User mode updates Process and User PATH. Machine mode updates Process and
-Machine PATH. None skips registration. PackageModel only writes PATH entries
-for PackageModel-owned outcomes and only cleans stale PackageModel-owned paths
+Machine PATH. None skips registration. Package only writes PATH entries
+for Package-owned outcomes and only cleans stale Package-owned paths
 for the same install slot.
 #>
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true)]
-        [psobject]$PackageModelResult
+        [psobject]$PackageResult
     )
 
-    $install = $PackageModelResult.Package.install
+    $install = $PackageResult.Package.install
     $pathRegistration = if ($install -and $install.PSObject.Properties['pathRegistration']) { $install.pathRegistration } else { $null }
     $mode = if ($pathRegistration -and $pathRegistration.PSObject.Properties['mode'] -and -not [string]::IsNullOrWhiteSpace([string]$pathRegistration.mode)) {
         ([string]$pathRegistration.mode).ToLowerInvariant()
@@ -177,23 +177,23 @@ for the same install slot.
             CleanedTargets     = @()
             UpdatedTargets     = @()
         }
-        if ($PackageModelResult.PSObject.Properties['PathRegistration']) {
-            $PackageModelResult.PathRegistration = $pathRegistrationResult
+        if ($PackageResult.PSObject.Properties['PathRegistration']) {
+            $PackageResult.PathRegistration = $pathRegistrationResult
         }
         else {
-            $PackageModelResult | Add-Member -MemberType NoteProperty -Name PathRegistration -Value $pathRegistrationResult
+            $PackageResult | Add-Member -MemberType NoteProperty -Name PathRegistration -Value $pathRegistrationResult
         }
-        Write-PackageModelExecutionMessage -Message '[STATE] PATH registration skipped because mode is none.'
-        return $PackageModelResult
+        Write-PackageExecutionMessage -Message '[STATE] PATH registration skipped because mode is none.'
+        return $PackageResult
     }
 
     if ($mode -notin @('user', 'machine')) {
-        throw "Unsupported PackageModel pathRegistration.mode '$mode'."
+        throw "Unsupported Package pathRegistration.mode '$mode'."
     }
 
-    if (-not (Test-PackageModelShouldApplyPathRegistration -PackageModelResult $PackageModelResult)) {
+    if (-not (Test-PackageShouldApplyPathRegistration -PackageResult $PackageResult)) {
         $pathRegistrationResult = [pscustomobject]@{
-            Status             = 'SkippedNotPackageModelOwned'
+            Status             = 'SkippedNotPackageOwned'
             Mode               = $mode
             SourceKind         = $sourceKind
             SourceValue        = $sourceValue
@@ -203,24 +203,24 @@ for the same install slot.
             CleanedTargets     = @()
             UpdatedTargets     = @()
         }
-        if ($PackageModelResult.PSObject.Properties['PathRegistration']) {
-            $PackageModelResult.PathRegistration = $pathRegistrationResult
+        if ($PackageResult.PSObject.Properties['PathRegistration']) {
+            $PackageResult.PathRegistration = $pathRegistrationResult
         }
         else {
-            $PackageModelResult | Add-Member -MemberType NoteProperty -Name PathRegistration -Value $pathRegistrationResult
+            $PackageResult | Add-Member -MemberType NoteProperty -Name PathRegistration -Value $pathRegistrationResult
         }
 
-        Write-PackageModelExecutionMessage -Message ("[STATE] PATH registration skipped because installOrigin '{0}' is not PackageModel-owned." -f [string]$PackageModelResult.InstallOrigin)
-        return $PackageModelResult
+        Write-PackageExecutionMessage -Message ("[STATE] PATH registration skipped because installOrigin '{0}' is not Package-owned." -f [string]$PackageResult.InstallOrigin)
+        return $PackageResult
     }
 
-    $sourcePath = Get-PackageModelPathRegistrationSourcePath -PackageModelResult $PackageModelResult
+    $sourcePath = Get-PackagePathRegistrationSourcePath -PackageResult $PackageResult
     if ([string]::IsNullOrWhiteSpace($sourcePath) -or -not (Test-Path -LiteralPath $sourcePath)) {
-        throw "PackageModel PATH registration source path '$sourcePath' was not found."
+        throw "Package PATH registration source path '$sourcePath' was not found."
     }
 
     $registeredPath = Resolve-PathRegistrationDirectory -SourcePath $sourcePath -SourceKind $sourceKind
-    $cleanupDirectories = @(Get-PackageModelPathRegistrationCleanupDirectories -PackageModelResult $PackageModelResult)
+    $cleanupDirectories = @(Get-PackagePathRegistrationCleanupDirectories -PackageResult $PackageResult)
     $registrationResult = Register-PathEnvironment -Mode $mode -RegisteredPath $registeredPath -CleanupDirectories $cleanupDirectories
 
     $pathRegistrationResult = [pscustomobject]@{
@@ -234,19 +234,19 @@ for the same install slot.
         CleanedTargets     = @($registrationResult.CleanedTargets)
         UpdatedTargets     = @($registrationResult.UpdatedTargets)
     }
-    if ($PackageModelResult.PSObject.Properties['PathRegistration']) {
-        $PackageModelResult.PathRegistration = $pathRegistrationResult
+    if ($PackageResult.PSObject.Properties['PathRegistration']) {
+        $PackageResult.PathRegistration = $pathRegistrationResult
     }
     else {
-        $PackageModelResult | Add-Member -MemberType NoteProperty -Name PathRegistration -Value $pathRegistrationResult
+        $PackageResult | Add-Member -MemberType NoteProperty -Name PathRegistration -Value $pathRegistrationResult
     }
 
-    Write-PackageModelExecutionMessage -Message ("[STATE] PATH registration resolved source kind='{0}' value='{1}' to '{2}'." -f $sourceKind, $sourceValue, $registeredPath)
+    Write-PackageExecutionMessage -Message ("[STATE] PATH registration resolved source kind='{0}' value='{1}' to '{2}'." -f $sourceKind, $sourceValue, $registeredPath)
     if ($cleanupDirectories.Count -gt 0) {
-        Write-PackageModelExecutionMessage -Message ("[STATE] PATH cleanup directories for this PackageModel install slot: {0}" -f ($cleanupDirectories -join ', '))
+        Write-PackageExecutionMessage -Message ("[STATE] PATH cleanup directories for this Package install slot: {0}" -f ($cleanupDirectories -join ', '))
     }
-    Write-PackageModelExecutionMessage -Message ("[ACTION] PATH registration status='{0}' mode='{1}' updatedTargets='{2}' cleanedTargets='{3}'." -f $PackageModelResult.PathRegistration.Status, $mode, $(if ($registrationResult.UpdatedTargets.Count -gt 0) { @($registrationResult.UpdatedTargets) -join ',' } else { '<none>' }), $(if ($registrationResult.CleanedTargets.Count -gt 0) { @($registrationResult.CleanedTargets) -join ',' } else { '<none>' }))
+    Write-PackageExecutionMessage -Message ("[ACTION] PATH registration status='{0}' mode='{1}' updatedTargets='{2}' cleanedTargets='{3}'." -f $PackageResult.PathRegistration.Status, $mode, $(if ($registrationResult.UpdatedTargets.Count -gt 0) { @($registrationResult.UpdatedTargets) -join ',' } else { '<none>' }), $(if ($registrationResult.CleanedTargets.Count -gt 0) { @($registrationResult.CleanedTargets) -join ',' } else { '<none>' }))
 
-    return $PackageModelResult
+    return $PackageResult
 }
 

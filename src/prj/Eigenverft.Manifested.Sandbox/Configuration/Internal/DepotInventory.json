@@ -1,0 +1,29 @@
+{
+  "inventoryVersion": 1,
+  "acquisitionEnvironment": {
+    "environmentSources": {
+      "defaultPackageDepot": {
+        "kind": "filesystem",
+        "enabled": true,
+        "priority": 300,
+        "basePath": "%LOCALAPPDATA%/Eigenverft.Manifested.Sandbox/DefaultPackageDepot"
+      },
+      "sitePackageDepot": {
+        "kind": "filesystem",
+        "enabled": false,
+        "priority": 200,
+        "siteCodes": [
+          "BER",
+          "PD"
+        ],
+        "basePath": "\\\\site-server\\share\\PackageDepot"
+      },
+      "corpPackageDepot": {
+        "kind": "filesystem",
+        "enabled": false,
+        "priority": 100,
+        "basePath": "\\\\corp-server\\share\\PackageDepot"
+      }
+    }
+  }
+}

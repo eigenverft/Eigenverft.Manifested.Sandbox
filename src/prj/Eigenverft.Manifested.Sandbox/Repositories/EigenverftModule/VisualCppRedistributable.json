@@ -37,7 +37,7 @@
       "uiMode": "quiet",
       "elevation": "required",
       "timeoutSec": 300,
-      "logRelativePath": "logs/vc-runtime/{timestamp}.log",
+      "logRelativePath": "visual-cpp-redist/{timestamp}.log",
       "commandArguments": [
         "/install",
         "/quiet",
@@ -91,7 +91,7 @@
     "existingInstallPolicy": {
       "allowAdoptExternal": false,
       "upgradeAdoptedInstall": false,
-      "requirePackageModelOwnership": false
+      "requirePackageOwnership": false
     }
   },
   "releases": [

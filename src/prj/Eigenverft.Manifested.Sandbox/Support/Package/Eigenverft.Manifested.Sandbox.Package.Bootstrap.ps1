@@ -2,95 +2,113 @@
     Eigenverft.Manifested.Sandbox.Package.Bootstrap
 #>
 
-$script:ManifestedPackageModelRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
-$script:ManifestedPackageModelConfigurationRoot = Join-Path $script:ManifestedPackageModelRoot 'Configuration'
-$script:ManifestedPackageModelRepositoriesRoot = Join-Path $script:ManifestedPackageModelRoot 'Repositories'
-$script:ManifestedPackageModelDefaultRepositoryId = 'EigenverftModule'
-$script:ManifestedPackageModelSourceInventoryPathEnvironmentVariableName = 'EIGENVERFT_MANIFESTED_PACKAGE_MODEL_SOURCE_INVENTORY_PATH'
-$script:ManifestedPackageModelSiteCodeEnvironmentVariableName = 'EIGENVERFT_MANIFESTED_PACKAGE_MODEL_SITE_CODE'
+$script:ManifestedPackageRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
+$script:ManifestedPackageConfigurationRoot = Join-Path $script:ManifestedPackageRoot 'Configuration'
+$script:ManifestedPackageRepositoriesRoot = Join-Path $script:ManifestedPackageRoot 'Repositories'
+$script:ManifestedPackageDefaultRepositoryId = 'EigenverftModule'
+$script:ManifestedPackageSourceInventoryPathEnvironmentVariableName = 'EIGENVERFT_MANIFESTED_PACKAGE_SOURCE_INVENTORY_PATH'
+$script:ManifestedPackageSiteCodeEnvironmentVariableName = 'EIGENVERFT_MANIFESTED_PACKAGE_SITE_CODE'
 
-function Get-PackageModelConfigurationRoot {
+function Get-PackageConfigurationRoot {
 <#
 .SYNOPSIS
-Returns the shipped PackageModel configuration directory.
+Returns the shipped Package configuration directory.
 
 .DESCRIPTION
-Resolves the module-relative directory that contains shipped PackageModel
+Resolves the module-relative directory that contains shipped Package
 configuration JSON documents.
 
 .EXAMPLE
-Get-PackageModelConfigurationRoot
+Get-PackageConfigurationRoot
 #>
     [CmdletBinding()]
     param()
 
-    return $script:ManifestedPackageModelConfigurationRoot
+    return $script:ManifestedPackageConfigurationRoot
 }
 
-function Get-PackageModelRepositoriesRoot {
+function Get-PackageRepositoriesRoot {
 <#
 .SYNOPSIS
-Returns the shipped PackageModel repositories directory.
+Returns the shipped Package repositories directory.
 
 .DESCRIPTION
-Resolves the module-relative directory that contains shipped PackageModel
+Resolves the module-relative directory that contains shipped Package
 definition repositories.
 
 .EXAMPLE
-Get-PackageModelRepositoriesRoot
+Get-PackageRepositoriesRoot
 #>
     [CmdletBinding()]
     param()
 
-    return $script:ManifestedPackageModelRepositoriesRoot
+    return $script:ManifestedPackageRepositoriesRoot
 }
 
-function Get-PackageModelDefaultRepositoryId {
+function Get-PackageDefaultRepositoryId {
 <#
 .SYNOPSIS
-Returns the shipped PackageModel base repository id.
+Returns the shipped Package base repository id.
 
 .DESCRIPTION
 Returns the repository id used for the definitions shipped with this module.
 
 .EXAMPLE
-Get-PackageModelDefaultRepositoryId
+Get-PackageDefaultRepositoryId
 #>
     [CmdletBinding()]
     param()
 
-    return $script:ManifestedPackageModelDefaultRepositoryId
+    return $script:ManifestedPackageDefaultRepositoryId
 }
 
-function Get-PackageModelShippedGlobalConfigPath {
+function Get-PackageShippedGlobalConfigPath {
 <#
 .SYNOPSIS
-Returns the shipped PackageModel config path.
+Returns the shipped Package config path.
 
 .DESCRIPTION
-Builds the module-relative path to the JSON document that defines PackageModel
+Builds the module-relative path to the JSON document that defines Package
 defaults.
 
 .EXAMPLE
-Get-PackageModelShippedGlobalConfigPath
+Get-PackageShippedGlobalConfigPath
 #>
     [CmdletBinding()]
     param()
 
-    return (Join-Path (Join-Path (Get-PackageModelConfigurationRoot) 'Internal') 'Config.json')
+    return (Join-Path (Join-Path (Get-PackageConfigurationRoot) 'Internal') 'Config.json')
 }
 
-function Get-PackageModelLocalRoot {
+function Get-PackageShippedDepotInventoryPath {
 <#
 .SYNOPSIS
-Returns the PackageModel local application-data root.
+Returns the shipped Package depot-inventory path.
 
 .DESCRIPTION
-Builds the local application-data directory used for PackageModel state,
+Builds the module-relative path to the JSON document that defines Package
+depot/source defaults.
+
+.EXAMPLE
+Get-PackageShippedDepotInventoryPath
+#>
+    [CmdletBinding()]
+    param()
+
+    return (Join-Path (Join-Path (Get-PackageConfigurationRoot) 'Internal') 'DepotInventory.json')
+}
+
+function Get-PackageLocalRoot {
+<#
+.SYNOPSIS
+Returns the Package local application-data root.
+
+.DESCRIPTION
+Builds the local application-data directory used for Package state,
 configuration, repositories, workspaces, depots, and installs.
 
 .EXAMPLE
-Get-PackageModelLocalRoot
+Get-PackageLocalRoot
 #>
     [CmdletBinding()]
     param()
@@ -100,109 +118,155 @@ Get-PackageModelLocalRoot
         $localApplicationData = [Environment]::GetFolderPath('LocalApplicationData')
     }
     if ([string]::IsNullOrWhiteSpace($localApplicationData)) {
-        throw 'Could not resolve the LocalApplicationData directory for PackageModel.'
+        throw 'Could not resolve the LocalApplicationData directory for Package.'
     }
 
     return [System.IO.Path]::GetFullPath((Join-Path $localApplicationData 'Eigenverft.Manifested.Sandbox'))
 }
 
-function Get-PackageModelLocalGlobalConfigPath {
+function Get-PackageLocalGlobalConfigPath {
 <#
 .SYNOPSIS
-Returns the local PackageModel config path.
+Returns the local Package config path.
 
 .DESCRIPTION
 Builds the local copy path for Config.json. The local file can later be edited
 or refreshed independently of the module installation.
 
 .EXAMPLE
-Get-PackageModelLocalGlobalConfigPath
+Get-PackageLocalGlobalConfigPath
 #>
     [CmdletBinding()]
     param()
 
-    return [System.IO.Path]::GetFullPath((Join-Path (Join-Path (Get-PackageModelLocalRoot) 'Configuration\Internal') 'Config.json'))
+    return [System.IO.Path]::GetFullPath((Join-Path (Join-Path (Get-PackageLocalRoot) 'Configuration\Internal') 'Config.json'))
 }
 
-function Get-PackageModelGlobalConfigPath {
+function Get-PackageLocalDepotInventoryPath {
 <#
 .SYNOPSIS
-Returns the active PackageModel config path.
+Returns the local Package depot-inventory path.
+
+.DESCRIPTION
+Builds the local copy path for DepotInventory.json. The local file can later
+be edited or refreshed independently of the module installation.
+
+.EXAMPLE
+Get-PackageLocalDepotInventoryPath
+#>
+    [CmdletBinding()]
+    param()
+
+    return [System.IO.Path]::GetFullPath((Join-Path (Join-Path (Get-PackageLocalRoot) 'Configuration\Internal') 'DepotInventory.json'))
+}
+
+function Get-PackageGlobalConfigPath {
+<#
+.SYNOPSIS
+Returns the active Package config path.
 
 .DESCRIPTION
 Returns the local Config.json path, creating it from the shipped module
 configuration when the local copy does not exist yet.
 
 .EXAMPLE
-Get-PackageModelGlobalConfigPath
+Get-PackageGlobalConfigPath
 #>
     [CmdletBinding()]
     param()
 
-    $localConfigPath = Get-PackageModelLocalGlobalConfigPath
+    $localConfigPath = Get-PackageLocalGlobalConfigPath
     if (-not (Test-Path -LiteralPath $localConfigPath -PathType Leaf)) {
         $localConfigDirectory = Split-Path -Parent $localConfigPath
         if (-not [string]::IsNullOrWhiteSpace($localConfigDirectory)) {
             $null = New-Item -ItemType Directory -Path $localConfigDirectory -Force
         }
 
-        Copy-FileToPath -SourcePath (Get-PackageModelShippedGlobalConfigPath) -TargetPath $localConfigPath -Overwrite | Out-Null
+        Copy-FileToPath -SourcePath (Get-PackageShippedGlobalConfigPath) -TargetPath $localConfigPath -Overwrite | Out-Null
     }
 
     return $localConfigPath
 }
 
-function Get-PackageModelSourceInventoryPathEnvironmentVariableName {
+function Get-PackageDepotInventoryPath {
 <#
 .SYNOPSIS
-Returns the PackageModel source-inventory path environment-variable name.
+Returns the active Package depot-inventory path.
 
 .DESCRIPTION
-Provides the environment-variable name that can point PackageModel to an
+Returns the local DepotInventory.json path, creating it from the shipped
+module configuration when the local copy does not exist yet.
+
+.EXAMPLE
+Get-PackageDepotInventoryPath
+#>
+    [CmdletBinding()]
+    param()
+
+    $localInventoryPath = Get-PackageLocalDepotInventoryPath
+    if (-not (Test-Path -LiteralPath $localInventoryPath -PathType Leaf)) {
+        $localInventoryDirectory = Split-Path -Parent $localInventoryPath
+        if (-not [string]::IsNullOrWhiteSpace($localInventoryDirectory)) {
+            $null = New-Item -ItemType Directory -Path $localInventoryDirectory -Force
+        }
+
+        Copy-FileToPath -SourcePath (Get-PackageShippedDepotInventoryPath) -TargetPath $localInventoryPath -Overwrite | Out-Null
+    }
+
+    return $localInventoryPath
+}
+
+function Get-PackageSourceInventoryPathEnvironmentVariableName {
+<#
+.SYNOPSIS
+Returns the Package source-inventory path environment-variable name.
+
+.DESCRIPTION
+Provides the environment-variable name that can point Package to an
 external source-inventory document.
 
 .EXAMPLE
-Get-PackageModelSourceInventoryPathEnvironmentVariableName
+Get-PackageSourceInventoryPathEnvironmentVariableName
 #>
     [CmdletBinding()]
     param()
 
-    return $script:ManifestedPackageModelSourceInventoryPathEnvironmentVariableName
+    return $script:ManifestedPackageSourceInventoryPathEnvironmentVariableName
 }
 
-function Get-PackageModelSiteCodeEnvironmentVariableName {
+function Get-PackageSiteCodeEnvironmentVariableName {
 <#
 .SYNOPSIS
-Returns the PackageModel site-code environment-variable name.
+Returns the Package site-code environment-variable name.
 
 .DESCRIPTION
 Provides the environment-variable name used to select a site-specific overlay
-from the external PackageModel source inventory.
+from the external Package source inventory.
 
 .EXAMPLE
-Get-PackageModelSiteCodeEnvironmentVariableName
+Get-PackageSiteCodeEnvironmentVariableName
 #>
     [CmdletBinding()]
     param()
 
-    return $script:ManifestedPackageModelSiteCodeEnvironmentVariableName
+    return $script:ManifestedPackageSiteCodeEnvironmentVariableName
 }
 
-function Get-PackageModelDefinitionPath {
+function Get-PackageDefinitionPath {
 <#
 .SYNOPSIS
-Returns the shipped PackageModel definition path for an id.
+Returns the shipped Package definition path for an id.
 
 .DESCRIPTION
-Builds the module-relative path to a PackageModel definition JSON file in the
+Builds the module-relative path to a Package definition JSON file in the
 shipped EigenverftModule repository by using the definition id as the filename
 stem.
 
 .PARAMETER DefinitionId
-The PackageModel definition id.
+The Package definition id.
 
 .EXAMPLE
-Get-PackageModelDefinitionPath -DefinitionId VSCodeRuntime
+Get-PackageDefinitionPath -DefinitionId VSCodeRuntime
 #>
     [CmdletBinding()]
     param(
@@ -210,6 +274,6 @@ Get-PackageModelDefinitionPath -DefinitionId VSCodeRuntime
         [string]$DefinitionId
     )
 
-    return (Join-Path (Join-Path (Get-PackageModelRepositoriesRoot) (Get-PackageModelDefaultRepositoryId)) ($DefinitionId + '.json'))
+    return (Join-Path (Join-Path (Get-PackageRepositoriesRoot) (Get-PackageDefaultRepositoryId)) ($DefinitionId + '.json'))
 }
 

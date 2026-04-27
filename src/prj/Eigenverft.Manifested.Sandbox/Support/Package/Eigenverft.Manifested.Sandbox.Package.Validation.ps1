@@ -2,7 +2,7 @@
     Eigenverft.Manifested.Sandbox.Package.Validation
 #>
 
-function Get-PackageModelEntryPointDefinition {
+function Get-PackageEntryPointDefinition {
 <#
 .SYNOPSIS
 Returns an entry-point definition by name.
@@ -12,13 +12,13 @@ Searches the definition provided-tool collections and returns the first matching
 command or app entry by name.
 
 .PARAMETER Definition
-The PackageModel definition object.
+The Package definition object.
 
 .PARAMETER EntryPointName
 The entry-point name to resolve.
 
 .EXAMPLE
-Get-PackageModelEntryPointDefinition -Definition $definition -EntryPointName code
+Get-PackageEntryPointDefinition -Definition $definition -EntryPointName code
 #>
     [CmdletBinding()]
     param(
@@ -43,50 +43,50 @@ Get-PackageModelEntryPointDefinition -Definition $definition -EntryPointName cod
     return $null
 }
 
-function Get-PackageModelCommandCheckPath {
+function Get-PackageCommandCheckPath {
 <#
 .SYNOPSIS
 Resolves the command path used for a validation command check.
 
 .DESCRIPTION
 Uses an explicit relative path when provided, otherwise resolves the path from
-the named PackageModel entry point.
+the named Package entry point.
 
-.PARAMETER PackageModelResult
-The current PackageModel result object.
+.PARAMETER PackageResult
+The current Package result object.
 
 .PARAMETER CommandCheck
 The validation command-check definition.
 
 .EXAMPLE
-Get-PackageModelCommandCheckPath -PackageModelResult $result -CommandCheck $check
+Get-PackageCommandCheckPath -PackageResult $result -CommandCheck $check
 #>
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true)]
-        [psobject]$PackageModelResult,
+        [psobject]$PackageResult,
 
         [Parameter(Mandatory = $true)]
         [psobject]$CommandCheck
     )
 
     if ($CommandCheck.PSObject.Properties['relativePath'] -and -not [string]::IsNullOrWhiteSpace([string]$CommandCheck.relativePath)) {
-        return (Join-Path $PackageModelResult.InstallDirectory (([string]$CommandCheck.relativePath) -replace '/', '\'))
+        return (Join-Path $PackageResult.InstallDirectory (([string]$CommandCheck.relativePath) -replace '/', '\'))
     }
 
     if ($CommandCheck.PSObject.Properties['entryPoint'] -and -not [string]::IsNullOrWhiteSpace([string]$CommandCheck.entryPoint)) {
-        $entryPoint = Get-PackageModelEntryPointDefinition -Definition $PackageModelResult.PackageModelConfig.Definition -EntryPointName ([string]$CommandCheck.entryPoint)
+        $entryPoint = Get-PackageEntryPointDefinition -Definition $PackageResult.PackageConfig.Definition -EntryPointName ([string]$CommandCheck.entryPoint)
         if (-not $entryPoint -or -not $entryPoint.PSObject.Properties['relativePath']) {
-            throw "PackageModel validation entry point '$($CommandCheck.entryPoint)' was not found."
+            throw "Package validation entry point '$($CommandCheck.entryPoint)' was not found."
         }
 
-        return (Join-Path $PackageModelResult.InstallDirectory (([string]$entryPoint.relativePath) -replace '/', '\'))
+        return (Join-Path $PackageResult.InstallDirectory (([string]$entryPoint.relativePath) -replace '/', '\'))
     }
 
-    throw 'PackageModel command checks require either relativePath or entryPoint.'
+    throw 'Package command checks require either relativePath or entryPoint.'
 }
 
-function Get-PackageModelJsonValue {
+function Get-PackageJsonValue {
 <#
 .SYNOPSIS
 Reads a dotted property path from an object.
@@ -102,7 +102,7 @@ The object to read from.
 The dotted property path.
 
 .EXAMPLE
-Get-PackageModelJsonValue -InputObject $document -PropertyPath version
+Get-PackageJsonValue -InputObject $document -PropertyPath version
 #>
     [CmdletBinding()]
     param(
@@ -125,7 +125,7 @@ Get-PackageModelJsonValue -InputObject $document -PropertyPath version
     return $current
 }
 
-function Test-PackageModelValidationValueComparison {
+function Test-PackageValidationValueComparison {
     [CmdletBinding()]
     [OutputType([bool])]
     param(
@@ -149,45 +149,45 @@ function Test-PackageModelValidationValueComparison {
         return (-not [string]::Equals($actualText, $expectedText, [System.StringComparison]::OrdinalIgnoreCase))
     }
 
-    $actualVersion = ConvertTo-PackageModelVersion -VersionText $actualText
-    $expectedVersion = ConvertTo-PackageModelVersion -VersionText $expectedText
+    $actualVersion = ConvertTo-PackageVersion -VersionText $actualText
+    $expectedVersion = ConvertTo-PackageVersion -VersionText $expectedText
     switch -Exact ($operatorText) {
         '>' { return $actualVersion -gt $expectedVersion }
         '>=' { return $actualVersion -ge $expectedVersion }
         '<' { return $actualVersion -lt $expectedVersion }
         '<=' { return $actualVersion -le $expectedVersion }
-        default { throw "Unsupported PackageModel validation comparison operator '$operatorText'." }
+        default { throw "Unsupported Package validation comparison operator '$operatorText'." }
     }
 }
 
-function Test-PackageModelInstalledPackage {
+function Test-PackageInstalledPackage {
 <#
 .SYNOPSIS
-Validates an installed package against its PackageModel rules.
+Validates an installed package against its Package rules.
 
 .DESCRIPTION
 Runs file, directory, command, metadata, signature, file-details, and registry
 checks for the current install directory and attaches the validation result to
-the PackageModel result object.
+the Package result object.
 
-.PARAMETER PackageModelResult
-The PackageModel result object to validate.
+.PARAMETER PackageResult
+The Package result object to validate.
 
 .EXAMPLE
-Test-PackageModelInstalledPackage -PackageModelResult $result
+Test-PackageInstalledPackage -PackageResult $result
 #>
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true)]
-        [psobject]$PackageModelResult
+        [psobject]$PackageResult
     )
 
-    $package = $PackageModelResult.Package
+    $package = $PackageResult.Package
     if (-not $package -or -not $package.PSObject.Properties['validation'] -or $null -eq $package.validation) {
-        $PackageModelResult.Validation = [pscustomobject]@{
+        $PackageResult.Validation = [pscustomobject]@{
             Status       = 'Ready'
             Accepted     = $true
-            InstallDirectory = $PackageModelResult.InstallDirectory
+            InstallDirectory = $PackageResult.InstallDirectory
             Files        = @()
             Directories  = @()
             Commands     = @()
@@ -196,10 +196,10 @@ Test-PackageModelInstalledPackage -PackageModelResult $result
             FileDetails  = @()
             Registry     = @()
         }
-        return $PackageModelResult
+        return $PackageResult
     }
 
-    $installDirectory = $PackageModelResult.InstallDirectory
+    $installDirectory = $PackageResult.InstallDirectory
     $validation = $package.validation
     $requiresInstallDirectory = (@($validation.files).Count -gt 0) -or
         (@($validation.directories).Count -gt 0) -or
@@ -208,7 +208,7 @@ Test-PackageModelInstalledPackage -PackageModelResult $result
         (@($validation.signatures).Count -gt 0) -or
         (@($validation.fileDetails).Count -gt 0)
     if ($requiresInstallDirectory -and ([string]::IsNullOrWhiteSpace($installDirectory) -or -not (Test-Path -LiteralPath $installDirectory))) {
-        $PackageModelResult.Validation = [pscustomobject]@{
+        $PackageResult.Validation = [pscustomobject]@{
             Status           = 'Failed'
             Accepted         = $false
             FailureReason    = 'InstallDirectoryMissing'
@@ -221,7 +221,7 @@ Test-PackageModelInstalledPackage -PackageModelResult $result
             FileDetails      = @()
             Registry         = @()
         }
-        return $PackageModelResult
+        return $PackageResult
     }
 
     $fileResults = New-Object System.Collections.Generic.List[object]
@@ -257,10 +257,10 @@ Test-PackageModelInstalledPackage -PackageModelResult $result
         if ($null -eq $commandCheck) {
             continue
         }
-        $commandPath = Get-PackageModelCommandCheckPath -PackageModelResult $PackageModelResult -CommandCheck $commandCheck
+        $commandPath = Get-PackageCommandCheckPath -PackageResult $PackageResult -CommandCheck $commandCheck
         $arguments = @()
         foreach ($argument in @($commandCheck.arguments)) {
-            $arguments += (Resolve-PackageModelTemplateText -Text ([string]$argument) -PackageModelConfig $PackageModelResult.PackageModelConfig -Package $package)
+            $arguments += (Resolve-PackageTemplateText -Text ([string]$argument) -PackageConfig $PackageResult.PackageConfig -Package $package)
         }
 
         $outputLines = @()
@@ -293,7 +293,7 @@ Test-PackageModelInstalledPackage -PackageModelResult $result
         }
 
         $expectedValue = if ($commandCheck.PSObject.Properties['expectedValue'] -and -not [string]::IsNullOrWhiteSpace([string]$commandCheck.expectedValue)) {
-            Resolve-PackageModelTemplateText -Text ([string]$commandCheck.expectedValue) -PackageModelConfig $PackageModelResult.PackageModelConfig -Package $package
+            Resolve-PackageTemplateText -Text ([string]$commandCheck.expectedValue) -PackageConfig $PackageResult.PackageConfig -Package $package
         }
         else {
             $null
@@ -324,8 +324,8 @@ Test-PackageModelInstalledPackage -PackageModelResult $result
         if ($exists) {
             try {
                 $document = Get-Content -LiteralPath $path -Raw -ErrorAction Stop | ConvertFrom-Json -ErrorAction Stop
-                $value = Get-PackageModelJsonValue -InputObject $document -PropertyPath ([string]$metadataCheck.jsonPath)
-                $expectedValue = Resolve-PackageModelTemplateText -Text ([string]$metadataCheck.expectedValue) -PackageModelConfig $PackageModelResult.PackageModelConfig -Package $package
+                $value = Get-PackageJsonValue -InputObject $document -PropertyPath ([string]$metadataCheck.jsonPath)
+                $expectedValue = Resolve-PackageTemplateText -Text ([string]$metadataCheck.expectedValue) -PackageConfig $PackageResult.PackageConfig -Package $package
                 $status = if ([string]::Equals([string]$value, [string]$expectedValue, [System.StringComparison]::OrdinalIgnoreCase)) { 'Ready' } else { 'Failed' }
             }
             catch {
@@ -333,7 +333,7 @@ Test-PackageModelInstalledPackage -PackageModelResult $result
             }
         }
         else {
-            $expectedValue = Resolve-PackageModelTemplateText -Text ([string]$metadataCheck.expectedValue) -PackageModelConfig $PackageModelResult.PackageModelConfig -Package $package
+            $expectedValue = Resolve-PackageTemplateText -Text ([string]$metadataCheck.expectedValue) -PackageConfig $PackageResult.PackageConfig -Package $package
         }
 
         $metadataResults.Add([pscustomobject]@{
@@ -452,7 +452,7 @@ Test-PackageModelInstalledPackage -PackageModelResult $result
             $null
         }
         $expectedValue = if ($registryCheck.PSObject.Properties['expectedValue']) {
-            Resolve-PackageModelTemplateText -Text ([string]$registryCheck.expectedValue) -PackageModelConfig $PackageModelResult.PackageModelConfig -Package $package
+            Resolve-PackageTemplateText -Text ([string]$registryCheck.expectedValue) -PackageConfig $PackageResult.PackageConfig -Package $package
         }
         else {
             $null
@@ -466,7 +466,7 @@ Test-PackageModelInstalledPackage -PackageModelResult $result
         $registryResolution = Resolve-RegistryValueFromPaths -Paths $registryPaths -ValueName $valueName
         $status = [string]$registryResolution.Status
         if ($status -eq 'Ready' -and $registryCheck.PSObject.Properties['expectedValue']) {
-            $status = if (Test-PackageModelValidationValueComparison -ActualValue $registryResolution.ActualValue -ExpectedValue $expectedValue -Operator $operator) { 'Ready' } else { 'Failed' }
+            $status = if (Test-PackageValidationValueComparison -ActualValue $registryResolution.ActualValue -ExpectedValue $expectedValue -Operator $operator) { 'Ready' } else { 'Failed' }
         }
 
         $registryResults.Add([pscustomobject]@{
@@ -483,7 +483,7 @@ Test-PackageModelInstalledPackage -PackageModelResult $result
     $allResults = @($fileResults.ToArray()) + @($directoryResults.ToArray()) + @($commandResults.ToArray()) + @($metadataResults.ToArray()) + @($signatureResults.ToArray()) + @($fileDetailResults.ToArray()) + @($registryResults.ToArray())
     $accepted = (@($allResults | Where-Object { $_.Status -ne 'Ready' }).Count -eq 0)
 
-    $PackageModelResult.Validation = [pscustomobject]@{
+    $PackageResult.Validation = [pscustomobject]@{
         Status           = if ($accepted) { 'Ready' } else { 'Failed' }
         Accepted         = $accepted
         FailureReason    = if ($accepted) { $null } else { 'InstalledPackageValidationFailed' }
@@ -498,8 +498,8 @@ Test-PackageModelInstalledPackage -PackageModelResult $result
     }
 
     $failedCount = @($allResults | Where-Object { $_.Status -ne 'Ready' }).Count
-    Write-PackageModelExecutionMessage -Message ("[STATE] Validation completed for '{0}' with accepted='{1}', failedChecks={2}." -f $installDirectory, $accepted, $failedCount)
+    Write-PackageExecutionMessage -Message ("[STATE] Validation completed for '{0}' with accepted='{1}', failedChecks={2}." -f $installDirectory, $accepted, $failedCount)
 
-    return $PackageModelResult
+    return $PackageResult
 }
 

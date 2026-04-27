@@ -1,6 +1,6 @@
 {
-  "packageModel": {
-    "preferredTargetInstallDirectory": "%LOCALAPPDATA%/Eigenverft.Manifested.Sandbox/Installs",
+  "package": {
+    "preferredTargetInstallDirectory": "%LOCALAPPDATA%/Eigenverft.Manifested.Sandbox/Installed",
     "repositorySources": {
       "EigenverftModule": {
         "kind": "moduleLocal",
@@ -10,19 +10,18 @@
     "localRepositoryRoot": "%LOCALAPPDATA%/Eigenverft.Manifested.Sandbox/PackageRepositories",
     "acquisitionEnvironment": {
       "stores": {
-        "installWorkspaceDirectory": "%LOCALAPPDATA%/Eigenverft.Manifested.Sandbox/InstallWorkspace",
-        "defaultPackageDepotDirectory": "%LOCALAPPDATA%/Eigenverft.Manifested.Sandbox/DefaultPackageDepot"
+        "installWorkspaceDirectory": "%LOCALAPPDATA%/Eigenverft.Manifested.Sandbox/InstallWorkspace"
       },
       "defaults": {
         "allowFallback": true,
         "mirrorDownloadedArtifactsToDefaultPackageDepot": true
       },
       "tracking": {
-        "packageFileIndexFilePath": "%LOCALAPPDATA%/Eigenverft.Manifested.Sandbox/package-file-index.json"
+        "packageFileIndexFilePath": "%LOCALAPPDATA%/Eigenverft.Manifested.Sandbox/State/package-file-index.json"
       }
     },
     "packageState": {
-      "indexFilePath": "%LOCALAPPDATA%/Eigenverft.Manifested.Sandbox/package-state-index.json"
+      "indexFilePath": "%LOCALAPPDATA%/Eigenverft.Manifested.Sandbox/State/package-state-index.json"
     },
     "selectionDefaults": {
       "releaseTrack": "stable",

@@ -2,31 +2,31 @@
     Eigenverft.Manifested.Sandbox.Package.EntryPoints
 #>
 
-function Resolve-PackageModelEntryPoints {
+function Resolve-PackageEntryPoints {
 <#
 .SYNOPSIS
-Resolves the install-relative provided tools for a PackageModel result.
+Resolves the install-relative provided tools for a Package result.
 
 .DESCRIPTION
 Maps the definition command and app tool entries into absolute paths beneath
-the final install directory and attaches them to the PackageModel result.
+the final install directory and attaches them to the Package result.
 
-.PARAMETER PackageModelResult
-The PackageModel result object to enrich.
+.PARAMETER PackageResult
+The Package result object to enrich.
 
 .EXAMPLE
-Resolve-PackageModelEntryPoints -PackageModelResult $result
+Resolve-PackageEntryPoints -PackageResult $result
 #>
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true)]
-        [psobject]$PackageModelResult
+        [psobject]$PackageResult
     )
 
-    $definition = $PackageModelResult.PackageModelConfig.Definition
+    $definition = $PackageResult.PackageConfig.Definition
     $commands = @(
         foreach ($entryPoint in @($definition.providedTools.commands)) {
-            $path = Join-Path $PackageModelResult.InstallDirectory (([string]$entryPoint.relativePath) -replace '/', '\')
+            $path = Join-Path $PackageResult.InstallDirectory (([string]$entryPoint.relativePath) -replace '/', '\')
             [pscustomobject]@{
                 Name   = $entryPoint.name
                 Path   = $path
@@ -37,7 +37,7 @@ Resolve-PackageModelEntryPoints -PackageModelResult $result
 
     $apps = @(
         foreach ($entryPoint in @($definition.providedTools.apps)) {
-            $path = Join-Path $PackageModelResult.InstallDirectory (([string]$entryPoint.relativePath) -replace '/', '\')
+            $path = Join-Path $PackageResult.InstallDirectory (([string]$entryPoint.relativePath) -replace '/', '\')
             [pscustomobject]@{
                 Name   = $entryPoint.name
                 Path   = $path
@@ -46,71 +46,71 @@ Resolve-PackageModelEntryPoints -PackageModelResult $result
         }
     )
 
-    $PackageModelResult.EntryPoints = [pscustomobject]@{
+    $PackageResult.EntryPoints = [pscustomobject]@{
         Commands = $commands
         Apps     = $apps
     }
 
-    Write-PackageModelExecutionMessage -Message '[STATE] Resolved entry points:'
+    Write-PackageExecutionMessage -Message '[STATE] Resolved entry points:'
     if (@($commands).Count -eq 0) {
-        Write-PackageModelExecutionMessage -Message '[PATH] Command entry points: <none>'
+        Write-PackageExecutionMessage -Message '[PATH] Command entry points: <none>'
     }
     else {
         foreach ($command in $commands) {
-            Write-PackageModelExecutionMessage -Message ("[PATH] Command {0}: {1} (exists={2})" -f [string]$command.Name, [string]$command.Path, [bool]$command.Exists)
+            Write-PackageExecutionMessage -Message ("[PATH] Command {0}: {1} (exists={2})" -f [string]$command.Name, [string]$command.Path, [bool]$command.Exists)
         }
     }
 
     if (@($apps).Count -eq 0) {
-        Write-PackageModelExecutionMessage -Message '[PATH] App entry points: <none>'
+        Write-PackageExecutionMessage -Message '[PATH] App entry points: <none>'
     }
     else {
         foreach ($app in $apps) {
-            Write-PackageModelExecutionMessage -Message ("[PATH] App {0}: {1} (exists={2})" -f [string]$app.Name, [string]$app.Path, [bool]$app.Exists)
+            Write-PackageExecutionMessage -Message ("[PATH] App {0}: {1} (exists={2})" -f [string]$app.Name, [string]$app.Path, [bool]$app.Exists)
         }
     }
 
-    return $PackageModelResult
+    return $PackageResult
 }
 
-function Complete-PackageModelResult {
+function Complete-PackageResult {
 <#
 .SYNOPSIS
-Finalizes a PackageModel result for output.
+Finalizes a Package result for output.
 
 .DESCRIPTION
 Applies final status and failure details, then removes the internal config
-state before returning the user-facing PackageModel result object.
+state before returning the user-facing Package result object.
 
-.PARAMETER PackageModelResult
-The PackageModel result object to finalize.
+.PARAMETER PackageResult
+The Package result object to finalize.
 
 .EXAMPLE
-Complete-PackageModelResult -PackageModelResult $result
+Complete-PackageResult -PackageResult $result
 #>
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true)]
-        [psobject]$PackageModelResult
+        [psobject]$PackageResult
     )
 
-    if (-not [string]::IsNullOrWhiteSpace($PackageModelResult.ErrorMessage)) {
-        $PackageModelResult.Status = 'Failed'
+    if (-not [string]::IsNullOrWhiteSpace($PackageResult.ErrorMessage)) {
+        $PackageResult.Status = 'Failed'
     }
-    elseif ($PackageModelResult.Validation -and $PackageModelResult.Validation.Accepted) {
-        $PackageModelResult.Status = 'Ready'
+    elseif ($PackageResult.Validation -and $PackageResult.Validation.Accepted) {
+        $PackageResult.Status = 'Ready'
     }
     else {
-        $PackageModelResult.Status = 'Failed'
-        if ([string]::IsNullOrWhiteSpace($PackageModelResult.FailureReason)) {
-            $PackageModelResult.FailureReason = 'InstalledPackageValidationFailed'
+        $PackageResult.Status = 'Failed'
+        if ([string]::IsNullOrWhiteSpace($PackageResult.FailureReason)) {
+            $PackageResult.FailureReason = 'InstalledPackageValidationFailed'
         }
     }
 
-    $null = $PackageModelResult.PSObject.Properties.Remove('PackageModelConfig')
-    $null = $PackageModelResult.PSObject.Properties.Remove('CurrentStep')
-    $null = $PackageModelResult.PSObject.Properties.Remove('EffectiveRelease')
-    $null = $PackageModelResult.PSObject.Properties.Remove('AcquisitionPlan')
-    return [pscustomobject]$PackageModelResult
+    $null = $PackageResult.PSObject.Properties.Remove('PackageConfig')
+    $null = $PackageResult.PSObject.Properties.Remove('CurrentStep')
+    $null = $PackageResult.PSObject.Properties.Remove('EffectiveRelease')
+    $null = $PackageResult.PSObject.Properties.Remove('AcquisitionPlan')
+    return [pscustomobject]$PackageResult
 }
 

@@ -2,10 +2,10 @@
     Eigenverft.Manifested.Sandbox.Package.Config
 #>
 
-function Read-PackageModelJsonDocument {
+function Read-PackageJsonDocument {
 <#
 .SYNOPSIS
-Reads a PackageModel JSON document from disk.
+Reads a Package JSON document from disk.
 
 .DESCRIPTION
 Resolves a JSON file path, validates that it contains content, parses it, and
@@ -15,7 +15,7 @@ returns the resolved path together with the parsed document object.
 Path to the JSON file that should be loaded.
 
 .EXAMPLE
-Read-PackageModelJsonDocument -Path .\Configuration\Internal\Config.json
+Read-PackageJsonDocument -Path .\Configuration\Internal\Config.json
 #>
     [CmdletBinding()]
     param(
@@ -26,14 +26,14 @@ Read-PackageModelJsonDocument -Path .\Configuration\Internal\Config.json
     $resolvedPath = (Resolve-Path -LiteralPath $Path -ErrorAction Stop).Path
     $rawContent = Get-Content -LiteralPath $resolvedPath -Raw -ErrorAction Stop
     if ([string]::IsNullOrWhiteSpace($rawContent)) {
-        throw "PackageModel JSON file '$resolvedPath' is empty."
+        throw "Package JSON file '$resolvedPath' is empty."
     }
 
     try {
         $document = $rawContent | ConvertFrom-Json -ErrorAction Stop
     }
     catch {
-        throw "PackageModel JSON file '$resolvedPath' could not be parsed. $($_.Exception.Message)"
+        throw "Package JSON file '$resolvedPath' could not be parsed. $($_.Exception.Message)"
     }
 
     return [pscustomobject]@{
@@ -42,7 +42,7 @@ Read-PackageModelJsonDocument -Path .\Configuration\Internal\Config.json
     }
 }
 
-function Resolve-PackageModelPathValue {
+function Resolve-PackagePathValue {
 <#
 .SYNOPSIS
 Expands and normalizes a filesystem path value.
@@ -55,7 +55,7 @@ filesystem path for relative, local, or UNC paths.
 The raw path value that should be normalized.
 
 .EXAMPLE
-Resolve-PackageModelPathValue -PathValue '%USERPROFILE%/Downloads/Test'
+Resolve-PackagePathValue -PathValue '%USERPROFILE%/Downloads/Test'
 #>
     [CmdletBinding()]
     param(
@@ -65,7 +65,7 @@ Resolve-PackageModelPathValue -PathValue '%USERPROFILE%/Downloads/Test'
 
     $expandedPath = [Environment]::ExpandEnvironmentVariables($PathValue).Trim()
     if ([string]::IsNullOrWhiteSpace($expandedPath)) {
-        throw 'PackageModel path values must not be empty.'
+        throw 'Package path values must not be empty.'
     }
 
     $normalizedPath = $expandedPath -replace '/', '\'
@@ -76,16 +76,16 @@ Resolve-PackageModelPathValue -PathValue '%USERPROFILE%/Downloads/Test'
     return [System.IO.Path]::GetFullPath((Join-Path (Get-Location) $normalizedPath))
 }
 
-function Get-PackageModelRuntimeContext {
+function Get-PackageRuntimeContext {
 <#
 .SYNOPSIS
-Resolves the current PackageModel runtime context.
+Resolves the current Package runtime context.
 
 .DESCRIPTION
 Detects the effective platform and architecture used for package matching.
 
 .EXAMPLE
-Get-PackageModelRuntimeContext
+Get-PackageRuntimeContext
 #>
     [CmdletBinding()]
     param()
@@ -121,147 +121,174 @@ Get-PackageModelRuntimeContext
     }
 }
 
-function Get-PackageModelDefaultInstallWorkspaceDirectory {
+function Get-PackageDefaultInstallWorkspaceDirectory {
 <#
 .SYNOPSIS
-Returns the default PackageModel install-workspace root.
+Returns the default Package install-workspace root.
 
 .DESCRIPTION
-Builds the fallback local workspace root for PackageModel working artifacts
+Builds the fallback local workspace root for Package working artifacts
 when the shipped or external config does not define one explicitly.
 
 .EXAMPLE
-Get-PackageModelDefaultInstallWorkspaceDirectory
+Get-PackageDefaultInstallWorkspaceDirectory
 #>
     [CmdletBinding()]
     param()
 
-    return [System.IO.Path]::GetFullPath((Join-Path (Get-PackageModelLocalRoot) 'InstallWorkspace'))
+    return [System.IO.Path]::GetFullPath((Join-Path (Get-PackageLocalRoot) 'InstallWorkspace'))
 }
 
-function Get-PackageModelDefaultPreferredTargetInstallDirectory {
+function Get-PackageDefaultPreferredTargetInstallDirectory {
 <#
 .SYNOPSIS
-Returns the default PackageModel preferred target-install root.
+Returns the default Package preferred target-install root.
 
 .DESCRIPTION
-Builds the fallback local application-data root for PackageModel preferred
+Builds the fallback local application-data root for Package preferred
 target installs when the global document does not define one explicitly.
 
 .EXAMPLE
-Get-PackageModelDefaultPreferredTargetInstallDirectory
+Get-PackageDefaultPreferredTargetInstallDirectory
 #>
     [CmdletBinding()]
     param()
 
-    return [System.IO.Path]::GetFullPath((Join-Path (Get-PackageModelLocalRoot) 'Installs'))
+    return [System.IO.Path]::GetFullPath((Join-Path (Get-PackageLocalRoot) 'Installed'))
 }
 
-function Get-PackageModelDefaultPackageDepotDirectory {
+function Get-PackageDefaultPackageFileIndexFilePath {
 <#
 .SYNOPSIS
-Returns the default PackageModel default package-depot root.
+Returns the default Package package-file index path.
 
 .DESCRIPTION
-Builds the fallback persistent default depot directory that can mirror
-verified downloaded artifacts for later reuse.
-
-.EXAMPLE
-Get-PackageModelDefaultPackageDepotDirectory
-#>
-    [CmdletBinding()]
-    param()
-
-    return [System.IO.Path]::GetFullPath((Join-Path (Get-PackageModelLocalRoot) 'DefaultPackageDepot'))
-}
-
-function Get-PackageModelDefaultPackageFileIndexFilePath {
-<#
-.SYNOPSIS
-Returns the default PackageModel package-file index path.
-
-.DESCRIPTION
-Builds the fallback local package-file index file path when the PackageModel
+Builds the fallback local package-file index file path when the Package
 acquisition environment does not define one explicitly.
 
 .EXAMPLE
-Get-PackageModelDefaultPackageFileIndexFilePath
+Get-PackageDefaultPackageFileIndexFilePath
 #>
     [CmdletBinding()]
     param()
 
-    return [System.IO.Path]::GetFullPath((Join-Path (Get-PackageModelLocalRoot) 'package-file-index.json'))
+    return [System.IO.Path]::GetFullPath((Join-Path (Join-Path (Get-PackageLocalRoot) 'State') 'package-file-index.json'))
 }
 
-function Get-PackageModelDefaultPackageStateIndexFilePath {
+function Get-PackageDefaultPackageStateIndexFilePath {
 <#
 .SYNOPSIS
-Returns the default PackageModel package-state index path.
+Returns the default Package package-state index path.
 
 .DESCRIPTION
-Builds the fallback local package-state index file path when the PackageModel
+Builds the fallback local package-state index file path when the Package
 global document does not define one explicitly.
 
 .EXAMPLE
-Get-PackageModelDefaultPackageStateIndexFilePath
+Get-PackageDefaultPackageStateIndexFilePath
 #>
     [CmdletBinding()]
     param()
 
-    return [System.IO.Path]::GetFullPath((Join-Path (Get-PackageModelLocalRoot) 'package-state-index.json'))
+    return [System.IO.Path]::GetFullPath((Join-Path (Join-Path (Get-PackageLocalRoot) 'State') 'package-state-index.json'))
 }
 
-function Get-PackageModelDefaultLocalRepositoryRoot {
+function Get-PackageDefaultLocalRepositoryRoot {
 <#
 .SYNOPSIS
-Returns the default PackageModel local repository root.
+Returns the default Package local repository root.
 
 .DESCRIPTION
 Builds the fallback local repository-copy root for package definitions that
 have been used successfully.
 
 .EXAMPLE
-Get-PackageModelDefaultLocalRepositoryRoot
+Get-PackageDefaultLocalRepositoryRoot
 #>
     [CmdletBinding()]
     param()
 
-    return [System.IO.Path]::GetFullPath((Join-Path (Get-PackageModelLocalRoot) 'PackageRepositories'))
+    return [System.IO.Path]::GetFullPath((Join-Path (Get-PackageLocalRoot) 'PackageRepositories'))
 }
 
-function Get-PackageModelDefaultSourceInventoryPath {
+function Get-PackageDefaultSourceInventoryPath {
 <#
 .SYNOPSIS
-Returns the default external PackageModel source-inventory path.
+Returns the default external Package source-inventory path.
 
 .DESCRIPTION
 Builds the fallback local source-inventory path that can hold environment and
 site acquisition sources outside the shipped module JSON.
 
 .EXAMPLE
-Get-PackageModelDefaultSourceInventoryPath
+Get-PackageDefaultSourceInventoryPath
 #>
     [CmdletBinding()]
     param()
 
-    return [System.IO.Path]::GetFullPath((Join-Path (Get-PackageModelLocalRoot) 'SourceInventory.json'))
+    return [System.IO.Path]::GetFullPath((Join-Path (Join-Path (Get-PackageLocalRoot) 'Configuration\External') 'SourceInventory.json'))
 }
 
-function Resolve-PackageModelTemplateText {
+function Get-PackageDefaultLogRootDirectory {
 <#
 .SYNOPSIS
-Resolves simple PackageModel template tokens in text.
+Returns the default Package log root.
+
+.DESCRIPTION
+Builds the fallback local application-data root for package installer logs.
+
+.EXAMPLE
+Get-PackageDefaultLogRootDirectory
+#>
+    [CmdletBinding()]
+    param()
+
+    return [System.IO.Path]::GetFullPath((Join-Path (Get-PackageLocalRoot) 'Logs'))
+}
+
+function Get-PackageRootFromStateIndexPath {
+<#
+.SYNOPSIS
+Returns the Package local root from a package-state index path.
+
+.DESCRIPTION
+The current layout stores indexes under State. Older or custom test layouts may
+place the state index directly under the package root, so this helper accepts
+both shapes.
+
+.EXAMPLE
+Get-PackageRootFromStateIndexPath -PackageStateIndexFilePath $path
+#>
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [ValidateNotNullOrEmpty()]
+        [string]$PackageStateIndexFilePath
+    )
+
+    $indexDirectory = Split-Path -Parent ([System.IO.Path]::GetFullPath($PackageStateIndexFilePath))
+    if ([string]::Equals((Split-Path -Leaf $indexDirectory), 'State', [System.StringComparison]::OrdinalIgnoreCase)) {
+        return [System.IO.Path]::GetFullPath((Split-Path -Parent $indexDirectory))
+    }
+
+    return [System.IO.Path]::GetFullPath($indexDirectory)
+}
+
+function Resolve-PackageTemplateText {
+<#
+.SYNOPSIS
+Resolves simple Package template tokens in text.
 
 .DESCRIPTION
 Replaces package-aware tokens such as `{releaseTrack}`, `{version}`, and
-`{flavor}` with the current values from the resolved PackageModel config and
+`{flavor}` with the current values from the resolved Package config and
 selected release.
 
 .PARAMETER Text
-The text that contains optional PackageModel tokens.
+The text that contains optional Package tokens.
 
-.PARAMETER PackageModelConfig
-The resolved PackageModel config object.
+.PARAMETER PackageConfig
+The resolved Package config object.
 
 .PARAMETER Package
 The selected release object.
@@ -270,7 +297,7 @@ The selected release object.
 Optional extra tokens to merge into the standard replacement map.
 
 .EXAMPLE
-Resolve-PackageModelTemplateText -Text '{releaseTrack}\{version}\{flavor}' -PackageModelConfig $config -Package $package
+Resolve-PackageTemplateText -Text '{releaseTrack}\{version}\{flavor}' -PackageConfig $config -Package $package
 #>
     [CmdletBinding()]
     param(
@@ -278,7 +305,7 @@ Resolve-PackageModelTemplateText -Text '{releaseTrack}\{version}\{flavor}' -Pack
         [string]$Text,
 
         [AllowNull()]
-        [psobject]$PackageModelConfig,
+        [psobject]$PackageConfig,
 
         [AllowNull()]
         [psobject]$Package,
@@ -291,19 +318,19 @@ Resolve-PackageModelTemplateText -Text '{releaseTrack}\{version}\{flavor}' -Pack
     }
 
     $tokens = [ordered]@{}
-    if ($PackageModelConfig) {
-        $tokens['definitionId'] = $PackageModelConfig.DefinitionId
-        $tokens['platform'] = $PackageModelConfig.Platform
-        $tokens['architecture'] = $PackageModelConfig.Architecture
-        $tokens['releaseTrack'] = $PackageModelConfig.ReleaseTrack
-        if ($PackageModelConfig.PSObject.Properties['PreferredTargetInstallRootDirectory']) {
-            $tokens['preferredTargetInstallDirectory'] = $PackageModelConfig.PreferredTargetInstallRootDirectory
+    if ($PackageConfig) {
+        $tokens['definitionId'] = $PackageConfig.DefinitionId
+        $tokens['platform'] = $PackageConfig.Platform
+        $tokens['architecture'] = $PackageConfig.Architecture
+        $tokens['releaseTrack'] = $PackageConfig.ReleaseTrack
+        if ($PackageConfig.PSObject.Properties['PreferredTargetInstallRootDirectory']) {
+            $tokens['preferredTargetInstallDirectory'] = $PackageConfig.PreferredTargetInstallRootDirectory
         }
-        if ($PackageModelConfig.PSObject.Properties['InstallWorkspaceRootDirectory']) {
-            $tokens['installWorkspaceDirectory'] = $PackageModelConfig.InstallWorkspaceRootDirectory
+        if ($PackageConfig.PSObject.Properties['InstallWorkspaceRootDirectory']) {
+            $tokens['installWorkspaceDirectory'] = $PackageConfig.InstallWorkspaceRootDirectory
         }
-        if ($PackageModelConfig.PSObject.Properties['DefaultPackageDepotDirectory']) {
-            $tokens['defaultPackageDepotDirectory'] = $PackageModelConfig.DefaultPackageDepotDirectory
+        if ($PackageConfig.PSObject.Properties['DefaultPackageDepotDirectory']) {
+            $tokens['defaultPackageDepotDirectory'] = $PackageConfig.DefaultPackageDepotDirectory
         }
     }
     if ($Package) {
@@ -329,7 +356,7 @@ Resolve-PackageModelTemplateText -Text '{releaseTrack}\{version}\{flavor}' -Pack
     return $resolvedText
 }
 
-function Get-PackageModelPackageFileRelativeDirectory {
+function Get-PackagePackageFileRelativeDirectory {
 <#
 .SYNOPSIS
 Builds the relative package-file directory for depot and workspace storage.
@@ -338,39 +365,39 @@ Builds the relative package-file directory for depot and workspace storage.
 Derives the shared relative directory used below package depots and the
 install workspace from the definition id and selected release identity.
 
-.PARAMETER PackageModelConfig
-The resolved PackageModel config object.
+.PARAMETER PackageConfig
+The resolved Package config object.
 
 .PARAMETER Package
 The selected release object.
 
 .EXAMPLE
-Get-PackageModelPackageFileRelativeDirectory -PackageModelConfig $config -Package $package
+Get-PackagePackageFileRelativeDirectory -PackageConfig $config -Package $package
 #>
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true)]
-        [psobject]$PackageModelConfig,
+        [psobject]$PackageConfig,
 
         [Parameter(Mandatory = $true)]
         [psobject]$Package
     )
 
-    $definitionId = [string]$PackageModelConfig.DefinitionId
-    $releaseTrack = if ($Package.PSObject.Properties['releaseTrack']) { [string]$Package.releaseTrack } else { [string]$PackageModelConfig.ReleaseTrack }
+    $definitionId = [string]$PackageConfig.DefinitionId
+    $releaseTrack = if ($Package.PSObject.Properties['releaseTrack']) { [string]$Package.releaseTrack } else { [string]$PackageConfig.ReleaseTrack }
     $version = if ($Package.PSObject.Properties['version']) { [string]$Package.version } else { $null }
     $flavor = if ($Package.PSObject.Properties['flavor']) { [string]$Package.flavor } else { $null }
 
     foreach ($requiredValue in @($definitionId, $releaseTrack, $version, $flavor)) {
         if ([string]::IsNullOrWhiteSpace($requiredValue)) {
-            throw 'PackageModel package-file directory derivation requires definition id, releaseTrack, version, and flavor.'
+            throw 'Package package-file directory derivation requires definition id, releaseTrack, version, and flavor.'
         }
     }
 
     $pathSegments = @('packages', $definitionId, $releaseTrack, $version, $flavor) | ForEach-Object {
         $segmentText = ([string]$_).Trim() -replace '[\\/:\*\?"<>\|]', '-'
         if ([string]::IsNullOrWhiteSpace($segmentText)) {
-            throw 'PackageModel package-file directory derivation produced an empty path segment.'
+            throw 'Package package-file directory derivation produced an empty path segment.'
         }
         $segmentText
     }
@@ -378,7 +405,7 @@ Get-PackageModelPackageFileRelativeDirectory -PackageModelConfig $config -Packag
     return (($pathSegments -join '\') -replace '/', '\')
 }
 
-function ConvertTo-PackageModelMergeValue {
+function ConvertTo-PackageMergeValue {
     [CmdletBinding()]
     param(
         [AllowNull()]
@@ -399,23 +426,23 @@ function ConvertTo-PackageModelMergeValue {
     if ($InputObject -is [System.Collections.IDictionary]) {
         $result = [ordered]@{}
         foreach ($key in @($InputObject.Keys)) {
-            $result[[string]$key] = ConvertTo-PackageModelMergeValue -InputObject $InputObject[$key]
+            $result[[string]$key] = ConvertTo-PackageMergeValue -InputObject $InputObject[$key]
         }
         return $result
     }
 
     if ($InputObject -is [System.Collections.IEnumerable] -and -not ($InputObject -is [psobject] -and $InputObject.PSObject.Properties.Count -gt 0)) {
-        return @($InputObject | ForEach-Object { ConvertTo-PackageModelMergeValue -InputObject $_ })
+        return @($InputObject | ForEach-Object { ConvertTo-PackageMergeValue -InputObject $_ })
     }
 
     if ($InputObject -is [System.Collections.IEnumerable] -and -not ($InputObject -is [string])) {
-        return @($InputObject | ForEach-Object { ConvertTo-PackageModelMergeValue -InputObject $_ })
+        return @($InputObject | ForEach-Object { ConvertTo-PackageMergeValue -InputObject $_ })
     }
 
     if ($InputObject.PSObject.Properties.Count -gt 0) {
         $result = [ordered]@{}
         foreach ($property in @($InputObject.PSObject.Properties)) {
-            $result[$property.Name] = ConvertTo-PackageModelMergeValue -InputObject $property.Value
+            $result[$property.Name] = ConvertTo-PackageMergeValue -InputObject $property.Value
         }
         return $result
     }
@@ -423,7 +450,7 @@ function ConvertTo-PackageModelMergeValue {
     return $InputObject
 }
 
-function Merge-PackageModelValues {
+function Merge-PackageValues {
     [CmdletBinding()]
     param(
         [AllowNull()]
@@ -434,10 +461,10 @@ function Merge-PackageModelValues {
     )
 
     if ($null -eq $BaseValue) {
-        return (ConvertTo-PackageModelMergeValue -InputObject $OverlayValue)
+        return (ConvertTo-PackageMergeValue -InputObject $OverlayValue)
     }
     if ($null -eq $OverlayValue) {
-        return (ConvertTo-PackageModelMergeValue -InputObject $BaseValue)
+        return (ConvertTo-PackageMergeValue -InputObject $BaseValue)
     }
 
     $baseIsObject = ($BaseValue -is [System.Collections.IDictionary])
@@ -445,15 +472,15 @@ function Merge-PackageModelValues {
     if ($baseIsObject -and $overlayIsObject) {
         $merged = [ordered]@{}
         foreach ($key in @($BaseValue.Keys)) {
-            $merged[[string]$key] = ConvertTo-PackageModelMergeValue -InputObject $BaseValue[$key]
+            $merged[[string]$key] = ConvertTo-PackageMergeValue -InputObject $BaseValue[$key]
         }
         foreach ($key in @($OverlayValue.Keys)) {
             $keyText = [string]$key
             if ($merged.Contains($keyText)) {
-                $merged[$keyText] = Merge-PackageModelValues -BaseValue $merged[$keyText] -OverlayValue $OverlayValue[$key]
+                $merged[$keyText] = Merge-PackageValues -BaseValue $merged[$keyText] -OverlayValue $OverlayValue[$key]
             }
             else {
-                $merged[$keyText] = ConvertTo-PackageModelMergeValue -InputObject $OverlayValue[$key]
+                $merged[$keyText] = ConvertTo-PackageMergeValue -InputObject $OverlayValue[$key]
             }
         }
         return $merged
@@ -461,13 +488,13 @@ function Merge-PackageModelValues {
 
     if (($BaseValue -is [System.Collections.IEnumerable] -and -not ($BaseValue -is [string])) -and
         ($OverlayValue -is [System.Collections.IEnumerable] -and -not ($OverlayValue -is [string]))) {
-        return @(ConvertTo-PackageModelMergeValue -InputObject $OverlayValue)
+        return @(ConvertTo-PackageMergeValue -InputObject $OverlayValue)
     }
 
-    return (ConvertTo-PackageModelMergeValue -InputObject $OverlayValue)
+    return (ConvertTo-PackageMergeValue -InputObject $OverlayValue)
 }
 
-function ConvertTo-PackageModelObject {
+function ConvertTo-PackageObject {
     [CmdletBinding()]
     param(
         [AllowNull()]
@@ -488,7 +515,7 @@ function ConvertTo-PackageModelObject {
     if ($InputObject -is [System.Collections.IDictionary]) {
         $result = [ordered]@{}
         foreach ($key in @($InputObject.Keys)) {
-            $result[[string]$key] = ConvertTo-PackageModelObject -InputObject $InputObject[$key]
+            $result[[string]$key] = ConvertTo-PackageObject -InputObject $InputObject[$key]
         }
         return [pscustomobject]$result
     }
@@ -496,13 +523,13 @@ function ConvertTo-PackageModelObject {
     if ($InputObject -is [System.Collections.IEnumerable] -and
         -not ($InputObject -is [string]) -and
         -not ($InputObject -is [psobject] -and $InputObject.PSObject.Properties.Count -gt 0)) {
-        return @($InputObject | ForEach-Object { ConvertTo-PackageModelObject -InputObject $_ })
+        return @($InputObject | ForEach-Object { ConvertTo-PackageObject -InputObject $_ })
     }
 
     if ($InputObject.PSObject.Properties.Count -gt 0) {
         $result = [ordered]@{}
         foreach ($property in @($InputObject.PSObject.Properties)) {
-            $result[$property.Name] = ConvertTo-PackageModelObject -InputObject $property.Value
+            $result[$property.Name] = ConvertTo-PackageObject -InputObject $property.Value
         }
         return [pscustomobject]$result
     }
@@ -510,45 +537,45 @@ function ConvertTo-PackageModelObject {
     return $InputObject
 }
 
-function Get-PackageModelSourceInventoryPath {
+function Get-PackageSourceInventoryPath {
 <#
 .SYNOPSIS
-Returns the effective external PackageModel source-inventory path.
+Returns the effective external Package source-inventory path.
 
 .DESCRIPTION
 Resolves the environment-variable override first, then falls back to the
 well-known local inventory path.
 
 .EXAMPLE
-Get-PackageModelSourceInventoryPath
+Get-PackageSourceInventoryPath
 #>
     [CmdletBinding()]
     param()
 
-    $environmentVariableName = Get-PackageModelSourceInventoryPathEnvironmentVariableName
+    $environmentVariableName = Get-PackageSourceInventoryPathEnvironmentVariableName
     $configuredPath = [Environment]::GetEnvironmentVariable($environmentVariableName)
     if (-not [string]::IsNullOrWhiteSpace($configuredPath)) {
-        return (Resolve-PackageModelPathValue -PathValue $configuredPath)
+        return (Resolve-PackagePathValue -PathValue $configuredPath)
     }
 
-    return (Get-PackageModelDefaultSourceInventoryPath)
+    return (Get-PackageDefaultSourceInventoryPath)
 }
 
-function Get-PackageModelSiteCode {
+function Get-PackageSiteCode {
 <#
 .SYNOPSIS
-Returns the effective PackageModel site code.
+Returns the effective Package site code.
 
 .DESCRIPTION
 Reads the optional site-code environment variable and normalizes its value.
 
 .EXAMPLE
-Get-PackageModelSiteCode
+Get-PackageSiteCode
 #>
     [CmdletBinding()]
     param()
 
-    $environmentVariableName = Get-PackageModelSiteCodeEnvironmentVariableName
+    $environmentVariableName = Get-PackageSiteCodeEnvironmentVariableName
     $siteCode = [Environment]::GetEnvironmentVariable($environmentVariableName)
     if ([string]::IsNullOrWhiteSpace($siteCode)) {
         return $null
@@ -557,10 +584,101 @@ Get-PackageModelSiteCode
     return $siteCode.Trim()
 }
 
-function Assert-PackageModelSourceInventorySchema {
+function Get-PackageActiveSiteCodes {
 <#
 .SYNOPSIS
-Validates the PackageModel source-inventory schema.
+Returns the effective Package site-code list.
+
+.DESCRIPTION
+Reads the optional site-code environment variable as a semicolon-separated
+list, trims empty entries, and de-duplicates while preserving order.
+
+.EXAMPLE
+Get-PackageActiveSiteCodes
+#>
+    [CmdletBinding()]
+    param()
+
+    $environmentVariableName = Get-PackageSiteCodeEnvironmentVariableName
+    $siteCodeText = [Environment]::GetEnvironmentVariable($environmentVariableName)
+    if ([string]::IsNullOrWhiteSpace($siteCodeText)) {
+        return @()
+    }
+
+    $seen = New-Object 'System.Collections.Generic.HashSet[string]' ([System.StringComparer]::OrdinalIgnoreCase)
+    $siteCodes = New-Object System.Collections.Generic.List[string]
+    foreach ($siteCode in @($siteCodeText -split ';')) {
+        $normalizedSiteCode = ([string]$siteCode).Trim()
+        if ([string]::IsNullOrWhiteSpace($normalizedSiteCode)) {
+            continue
+        }
+        if ($seen.Add($normalizedSiteCode)) {
+            $siteCodes.Add($normalizedSiteCode) | Out-Null
+        }
+    }
+
+    return @($siteCodes.ToArray())
+}
+
+function Assert-PackageDepotInventorySchema {
+<#
+.SYNOPSIS
+Validates the Package depot-inventory schema.
+
+.DESCRIPTION
+Checks that the internal depot inventory document uses the current shape with
+inventoryVersion and acquisitionEnvironment.
+
+.PARAMETER DepotInventoryDocumentInfo
+The loaded depot-inventory document info.
+
+.EXAMPLE
+Assert-PackageDepotInventorySchema -DepotInventoryDocumentInfo $inventoryInfo
+#>
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [psobject]$DepotInventoryDocumentInfo
+    )
+
+    $document = $DepotInventoryDocumentInfo.Document
+    if (-not $document.PSObject.Properties['inventoryVersion']) {
+        throw "Package depot inventory '$($DepotInventoryDocumentInfo.Path)' is missing inventoryVersion."
+    }
+    if (-not $document.PSObject.Properties['acquisitionEnvironment'] -or $null -eq $document.acquisitionEnvironment) {
+        throw "Package depot inventory '$($DepotInventoryDocumentInfo.Path)' is missing acquisitionEnvironment."
+    }
+}
+
+function Get-PackageDepotInventoryInfo {
+<#
+.SYNOPSIS
+Loads the internal Package depot inventory.
+
+.DESCRIPTION
+Loads the effective local depot-inventory document, creating it from the
+shipped module defaults when missing.
+
+.EXAMPLE
+Get-PackageDepotInventoryInfo
+#>
+    [CmdletBinding()]
+    param()
+
+    $inventoryPath = Get-PackageDepotInventoryPath
+    $documentInfo = Read-PackageJsonDocument -Path $inventoryPath
+    Assert-PackageDepotInventorySchema -DepotInventoryDocumentInfo $documentInfo
+    return [pscustomobject]@{
+        Path     = $documentInfo.Path
+        Document = $documentInfo.Document
+        Exists   = $true
+    }
+}
+
+function Assert-PackageSourceInventorySchema {
+<#
+.SYNOPSIS
+Validates the Package source-inventory schema.
 
 .DESCRIPTION
 Checks that the external inventory document uses the current shape with
@@ -570,7 +688,7 @@ inventoryVersion, global, and optional site overlays.
 The loaded source-inventory document info.
 
 .EXAMPLE
-Assert-PackageModelSourceInventorySchema -SourceInventoryDocumentInfo $inventoryInfo
+Assert-PackageSourceInventorySchema -SourceInventoryDocumentInfo $inventoryInfo
 #>
     [CmdletBinding()]
     param(
@@ -580,7 +698,7 @@ Assert-PackageModelSourceInventorySchema -SourceInventoryDocumentInfo $inventory
 
     $document = $SourceInventoryDocumentInfo.Document
     if (-not $document.PSObject.Properties['inventoryVersion']) {
-        throw "PackageModel source inventory '$($SourceInventoryDocumentInfo.Path)' is missing inventoryVersion."
+        throw "Package source inventory '$($SourceInventoryDocumentInfo.Path)' is missing inventoryVersion."
     }
     if (-not $document.PSObject.Properties['global']) {
         $document | Add-Member -MemberType NoteProperty -Name global -Value ([pscustomobject]@{})
@@ -590,22 +708,22 @@ Assert-PackageModelSourceInventorySchema -SourceInventoryDocumentInfo $inventory
     }
 }
 
-function Get-PackageModelSourceInventoryInfo {
+function Get-PackageSourceInventoryInfo {
 <#
 .SYNOPSIS
-Loads the optional external PackageModel source inventory.
+Loads the optional external Package source inventory.
 
 .DESCRIPTION
 Resolves the effective inventory path, loads it when present, validates the
 schema, and otherwise returns a null document marker.
 
 .EXAMPLE
-Get-PackageModelSourceInventoryInfo
+Get-PackageSourceInventoryInfo
 #>
     [CmdletBinding()]
     param()
 
-    $inventoryPath = Get-PackageModelSourceInventoryPath
+    $inventoryPath = Get-PackageSourceInventoryPath
     if (-not (Test-Path -LiteralPath $inventoryPath -PathType Leaf)) {
         return [pscustomobject]@{
             Path     = $inventoryPath
@@ -614,8 +732,8 @@ Get-PackageModelSourceInventoryInfo
         }
     }
 
-    $documentInfo = Read-PackageModelJsonDocument -Path $inventoryPath
-    Assert-PackageModelSourceInventorySchema -SourceInventoryDocumentInfo $documentInfo
+    $documentInfo = Read-PackageJsonDocument -Path $inventoryPath
+    Assert-PackageSourceInventorySchema -SourceInventoryDocumentInfo $documentInfo
     return [pscustomobject]@{
         Path     = $documentInfo.Path
         Document = $documentInfo.Document
@@ -623,20 +741,20 @@ Get-PackageModelSourceInventoryInfo
     }
 }
 
-function Assert-PackageModelGlobalConfigSchema {
+function Assert-PackageGlobalConfigSchema {
 <#
 .SYNOPSIS
-Validates the PackageModel global config schema.
+Validates the Package global config schema.
 
 .DESCRIPTION
-Rejects retired global field names and requires the current PackageModel
+Rejects retired global field names and requires the current Package
 preferred-install and acquisition-environment fields.
 
 .PARAMETER GlobalDocumentInfo
-The loaded PackageModel global config document info.
+The loaded Package global config document info.
 
 .EXAMPLE
-Assert-PackageModelGlobalConfigSchema -GlobalDocumentInfo $globalInfo
+Assert-PackageGlobalConfigSchema -GlobalDocumentInfo $globalInfo
 #>
     [CmdletBinding()]
     param(
@@ -644,127 +762,158 @@ Assert-PackageModelGlobalConfigSchema -GlobalDocumentInfo $globalInfo
         [psobject]$GlobalDocumentInfo
     )
 
-    if (-not $GlobalDocumentInfo.Document.PSObject.Properties['packageModel'] -or $null -eq $GlobalDocumentInfo.Document.packageModel) {
-        throw "PackageModel global config '$($GlobalDocumentInfo.Path)' does not contain a 'packageModel' object."
+    if (-not $GlobalDocumentInfo.Document.PSObject.Properties['package'] -or $null -eq $GlobalDocumentInfo.Document.package) {
+        throw "Package global config '$($GlobalDocumentInfo.Path)' does not contain a 'package' object."
     }
 
-    $packageModel = $GlobalDocumentInfo.Document.packageModel
+    $package = $GlobalDocumentInfo.Document.package
     foreach ($retiredProperty in @('managedStorageRoots', 'acquisitionDefaults', 'sourceBindings', 'downloadRootDirectory', 'installRootDirectory', 'allowSourceFallback', 'packageSelection', 'ownershipTracking')) {
-        if ($packageModel.PSObject.Properties[$retiredProperty]) {
-            throw "PackageModel global config '$($GlobalDocumentInfo.Path)' still uses retired property '$retiredProperty'."
+        if ($package.PSObject.Properties[$retiredProperty]) {
+            throw "Package global config '$($GlobalDocumentInfo.Path)' still uses retired property '$retiredProperty'."
         }
     }
 
     foreach ($requiredProperty in @('preferredTargetInstallDirectory', 'repositorySources', 'localRepositoryRoot', 'acquisitionEnvironment', 'packageState', 'selectionDefaults')) {
-        if (-not $packageModel.PSObject.Properties[$requiredProperty]) {
-            throw "PackageModel global config '$($GlobalDocumentInfo.Path)' is missing required property '$requiredProperty'."
+        if (-not $package.PSObject.Properties[$requiredProperty]) {
+            throw "Package global config '$($GlobalDocumentInfo.Path)' is missing required property '$requiredProperty'."
         }
     }
 
-    if ($packageModel.selectionDefaults.PSObject.Properties['channel']) {
-        throw "PackageModel global config '$($GlobalDocumentInfo.Path)' still uses retired property 'selectionDefaults.channel'."
+    if ($package.selectionDefaults.PSObject.Properties['channel']) {
+        throw "Package global config '$($GlobalDocumentInfo.Path)' still uses retired property 'selectionDefaults.channel'."
     }
 
-    if ([string]::IsNullOrWhiteSpace([string]$packageModel.preferredTargetInstallDirectory)) {
-        throw "PackageModel global config '$($GlobalDocumentInfo.Path)' is missing preferredTargetInstallDirectory."
+    if ([string]::IsNullOrWhiteSpace([string]$package.preferredTargetInstallDirectory)) {
+        throw "Package global config '$($GlobalDocumentInfo.Path)' is missing preferredTargetInstallDirectory."
     }
 
     foreach ($requiredAcquisitionProperty in @('stores', 'defaults', 'tracking')) {
-        if (-not $packageModel.acquisitionEnvironment.PSObject.Properties[$requiredAcquisitionProperty]) {
-            throw "PackageModel global config '$($GlobalDocumentInfo.Path)' is missing acquisitionEnvironment.$requiredAcquisitionProperty."
+        if (-not $package.acquisitionEnvironment.PSObject.Properties[$requiredAcquisitionProperty]) {
+            throw "Package global config '$($GlobalDocumentInfo.Path)' is missing acquisitionEnvironment.$requiredAcquisitionProperty."
         }
     }
 
-    foreach ($requiredStoreProperty in @('installWorkspaceDirectory', 'defaultPackageDepotDirectory')) {
-        if (-not $packageModel.acquisitionEnvironment.stores.PSObject.Properties[$requiredStoreProperty]) {
-            throw "PackageModel global config '$($GlobalDocumentInfo.Path)' is missing acquisitionEnvironment.stores.$requiredStoreProperty."
+    if ($package.acquisitionEnvironment.stores.PSObject.Properties['defaultPackageDepotDirectory']) {
+        throw "Package global config '$($GlobalDocumentInfo.Path)' still uses retired property 'acquisitionEnvironment.stores.defaultPackageDepotDirectory'. Use Configuration/Internal/DepotInventory.json environmentSources.defaultPackageDepot.basePath."
+    }
+
+    foreach ($requiredStoreProperty in @('installWorkspaceDirectory')) {
+        if (-not $package.acquisitionEnvironment.stores.PSObject.Properties[$requiredStoreProperty]) {
+            throw "Package global config '$($GlobalDocumentInfo.Path)' is missing acquisitionEnvironment.stores.$requiredStoreProperty."
         }
     }
 
     foreach ($requiredDefaultProperty in @('allowFallback', 'mirrorDownloadedArtifactsToDefaultPackageDepot')) {
-        if (-not $packageModel.acquisitionEnvironment.defaults.PSObject.Properties[$requiredDefaultProperty]) {
-            throw "PackageModel global config '$($GlobalDocumentInfo.Path)' is missing acquisitionEnvironment.defaults.$requiredDefaultProperty."
+        if (-not $package.acquisitionEnvironment.defaults.PSObject.Properties[$requiredDefaultProperty]) {
+            throw "Package global config '$($GlobalDocumentInfo.Path)' is missing acquisitionEnvironment.defaults.$requiredDefaultProperty."
         }
     }
 
-    if ($packageModel.acquisitionEnvironment.tracking.PSObject.Properties['artifactIndexFilePath']) {
-        throw "PackageModel global config '$($GlobalDocumentInfo.Path)' still uses retired property 'acquisitionEnvironment.tracking.artifactIndexFilePath'. Use 'acquisitionEnvironment.tracking.packageFileIndexFilePath'."
+    if ($package.acquisitionEnvironment.tracking.PSObject.Properties['artifactIndexFilePath']) {
+        throw "Package global config '$($GlobalDocumentInfo.Path)' still uses retired property 'acquisitionEnvironment.tracking.artifactIndexFilePath'. Use 'acquisitionEnvironment.tracking.packageFileIndexFilePath'."
     }
-    if (-not $packageModel.acquisitionEnvironment.tracking.PSObject.Properties['packageFileIndexFilePath']) {
-        throw "PackageModel global config '$($GlobalDocumentInfo.Path)' is missing acquisitionEnvironment.tracking.packageFileIndexFilePath."
+    if (-not $package.acquisitionEnvironment.tracking.PSObject.Properties['packageFileIndexFilePath']) {
+        throw "Package global config '$($GlobalDocumentInfo.Path)' is missing acquisitionEnvironment.tracking.packageFileIndexFilePath."
     }
-    if (-not $packageModel.packageState.PSObject.Properties['indexFilePath']) {
-        throw "PackageModel global config '$($GlobalDocumentInfo.Path)' is missing packageState.indexFilePath."
+    if (-not $package.packageState.PSObject.Properties['indexFilePath']) {
+        throw "Package global config '$($GlobalDocumentInfo.Path)' is missing packageState.indexFilePath."
     }
-    if (-not $packageModel.selectionDefaults.PSObject.Properties['releaseTrack']) {
-        throw "PackageModel global config '$($GlobalDocumentInfo.Path)' is missing selectionDefaults.releaseTrack."
+    if (-not $package.selectionDefaults.PSObject.Properties['releaseTrack']) {
+        throw "Package global config '$($GlobalDocumentInfo.Path)' is missing selectionDefaults.releaseTrack."
     }
 
-    foreach ($repositoryProperty in @($packageModel.repositorySources.PSObject.Properties)) {
+    foreach ($repositoryProperty in @($package.repositorySources.PSObject.Properties)) {
         $repositorySource = $repositoryProperty.Value
         if (-not $repositorySource.PSObject.Properties['kind'] -or [string]::IsNullOrWhiteSpace([string]$repositorySource.kind)) {
-            throw "PackageModel global config '$($GlobalDocumentInfo.Path)' repositorySources.$($repositoryProperty.Name) is missing kind."
+            throw "Package global config '$($GlobalDocumentInfo.Path)' repositorySources.$($repositoryProperty.Name) is missing kind."
         }
         if (-not $repositorySource.PSObject.Properties['definitionRoot'] -or [string]::IsNullOrWhiteSpace([string]$repositorySource.definitionRoot)) {
-            throw "PackageModel global config '$($GlobalDocumentInfo.Path)' repositorySources.$($repositoryProperty.Name) is missing definitionRoot."
+            throw "Package global config '$($GlobalDocumentInfo.Path)' repositorySources.$($repositoryProperty.Name) is missing definitionRoot."
         }
     }
 
-    if ($packageModel.acquisitionEnvironment.PSObject.Properties['environmentSources'] -and $null -ne $packageModel.acquisitionEnvironment.environmentSources) {
+    if ($package.acquisitionEnvironment.PSObject.Properties['environmentSources'] -and $null -ne $package.acquisitionEnvironment.environmentSources) {
         foreach ($retiredEnvironmentSourceId in @('localPackageDepot', 'remotePackageDepot', 'corpPackageDepot', 'sitePackageDepot', 'vsCodeUpdateService')) {
-            if ($packageModel.acquisitionEnvironment.environmentSources.PSObject.Properties[$retiredEnvironmentSourceId]) {
-                throw "PackageModel global config '$($GlobalDocumentInfo.Path)' must not define acquisitionEnvironment.environmentSources.$retiredEnvironmentSourceId in the shipped global config."
+            if ($package.acquisitionEnvironment.environmentSources.PSObject.Properties[$retiredEnvironmentSourceId]) {
+                throw "Package global config '$($GlobalDocumentInfo.Path)' must not define acquisitionEnvironment.environmentSources.$retiredEnvironmentSourceId in the shipped global config."
             }
         }
     }
 }
 
-function Resolve-PackageModelEnvironmentSources {
+function Resolve-PackageEnvironmentSources {
     [CmdletBinding()]
     param(
         [AllowNull()]
         [psobject]$EnvironmentSources,
 
         [AllowNull()]
-        [string]$DefaultPackageDepotDirectory
+        [string[]]$ActiveSiteCodes = @()
     )
 
     $resolvedSources = [ordered]@{}
 
-    if (-not [string]::IsNullOrWhiteSpace($DefaultPackageDepotDirectory)) {
-        $resolvedSources['defaultPackageDepot'] = [ordered]@{
-            id       = 'defaultPackageDepot'
-            kind     = 'filesystem'
-            basePath = $DefaultPackageDepotDirectory
-        }
-    }
-
     if ($EnvironmentSources) {
         foreach ($property in @($EnvironmentSources.PSObject.Properties)) {
             $sourceValue = $property.Value
+            $enabled = $true
+            if ($sourceValue.PSObject.Properties['enabled']) {
+                $enabled = [bool]$sourceValue.enabled
+            }
+            if (-not $enabled) {
+                continue
+            }
+
+            $sourceSiteCodes = @()
+            if ($sourceValue.PSObject.Properties['siteCodes'] -and $null -ne $sourceValue.siteCodes) {
+                $sourceSiteCodes = @($sourceValue.siteCodes | ForEach-Object { ([string]$_).Trim() } | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
+            }
+            if ($sourceSiteCodes.Count -gt 0) {
+                $matchesActiveSiteCode = $false
+                foreach ($sourceSiteCode in $sourceSiteCodes) {
+                    foreach ($activeSiteCode in @($ActiveSiteCodes)) {
+                        if ([string]::Equals([string]$sourceSiteCode, [string]$activeSiteCode, [System.StringComparison]::OrdinalIgnoreCase)) {
+                            $matchesActiveSiteCode = $true
+                            break
+                        }
+                    }
+                    if ($matchesActiveSiteCode) {
+                        break
+                    }
+                }
+                if (-not $matchesActiveSiteCode) {
+                    continue
+                }
+            }
+
             $resolvedSource = [ordered]@{
-                id   = $property.Name
-                kind = if ($sourceValue.PSObject.Properties['kind']) { [string]$sourceValue.kind } else { $null }
+                id       = $property.Name
+                kind     = if ($sourceValue.PSObject.Properties['kind']) { [string]$sourceValue.kind } else { $null }
+                enabled  = $true
+                priority = if ($sourceValue.PSObject.Properties['priority']) { [int]$sourceValue.priority } else { 1000 }
             }
 
             if ($sourceValue.PSObject.Properties['baseUri'] -and -not [string]::IsNullOrWhiteSpace([string]$sourceValue.baseUri)) {
                 $resolvedSource.baseUri = [string]$sourceValue.baseUri
             }
             if ($sourceValue.PSObject.Properties['basePath'] -and -not [string]::IsNullOrWhiteSpace([string]$sourceValue.basePath)) {
-                $resolvedSource.basePath = Resolve-PackageModelPathValue -PathValue ([string]$sourceValue.basePath)
+                $resolvedSource.basePath = Resolve-PackagePathValue -PathValue ([string]$sourceValue.basePath)
+            }
+            if ($sourceSiteCodes.Count -gt 0) {
+                $resolvedSource.siteCodes = @($sourceSiteCodes)
             }
 
             $resolvedSources[$property.Name] = $resolvedSource
         }
     }
 
-    return (ConvertTo-PackageModelObject -InputObject $resolvedSources)
+    return (ConvertTo-PackageObject -InputObject $resolvedSources)
 }
 
-function Resolve-PackageModelEffectiveAcquisitionEnvironment {
+function Resolve-PackageEffectiveAcquisitionEnvironment {
 <#
 .SYNOPSIS
-Materializes the effective PackageModel acquisition environment.
+Materializes the effective Package acquisition environment.
 
 .DESCRIPTION
 Starts from the shipped acquisition-environment config, applies optional
@@ -772,13 +921,16 @@ inventory global and site overlays, resolves concrete store paths, and returns
 the internal effective environment model used by later source planning.
 
 .PARAMETER GlobalConfiguration
-The shipped PackageModel global config object.
+The shipped Package global config object.
 
 .PARAMETER SourceInventoryInfo
 The optional external source-inventory document info.
 
+.PARAMETER DepotInventoryInfo
+The internal depot-inventory document info.
+
 .EXAMPLE
-Resolve-PackageModelEffectiveAcquisitionEnvironment -GlobalConfiguration $global -SourceInventoryInfo $inventory
+Resolve-PackageEffectiveAcquisitionEnvironment -GlobalConfiguration $global -SourceInventoryInfo $inventory -DepotInventoryInfo $depotInventory
 #>
     [CmdletBinding()]
     param(
@@ -786,52 +938,62 @@ Resolve-PackageModelEffectiveAcquisitionEnvironment -GlobalConfiguration $global
         [psobject]$GlobalConfiguration,
 
         [Parameter(Mandatory = $true)]
-        [psobject]$SourceInventoryInfo
+        [psobject]$SourceInventoryInfo,
+
+        [Parameter(Mandatory = $true)]
+        [psobject]$DepotInventoryInfo
     )
 
-    $mergedAcquisitionEnvironment = ConvertTo-PackageModelMergeValue -InputObject $GlobalConfiguration.acquisitionEnvironment
-    $siteCode = Get-PackageModelSiteCode
+    $mergedAcquisitionEnvironment = ConvertTo-PackageMergeValue -InputObject $GlobalConfiguration.acquisitionEnvironment
+    $activeSiteCodes = @(Get-PackageActiveSiteCodes)
+
+    if ($DepotInventoryInfo -and $DepotInventoryInfo.Document) {
+        $depotOverlay = Get-PackageInventoryAcquisitionOverlay -InventoryNode $DepotInventoryInfo.Document
+        if ($depotOverlay) {
+            $mergedAcquisitionEnvironment = Merge-PackageValues -BaseValue $mergedAcquisitionEnvironment -OverlayValue (ConvertTo-PackageMergeValue -InputObject $depotOverlay)
+        }
+    }
 
     if ($SourceInventoryInfo -and $SourceInventoryInfo.Exists -and $SourceInventoryInfo.Document) {
         $inventoryGlobal = if ($SourceInventoryInfo.Document.PSObject.Properties['global']) { $SourceInventoryInfo.Document.global } else { $null }
         if ($inventoryGlobal) {
-            $mergedAcquisitionEnvironment = Merge-PackageModelValues -BaseValue $mergedAcquisitionEnvironment -OverlayValue (ConvertTo-PackageModelMergeValue -InputObject $inventoryGlobal)
+            $inventoryGlobalOverlay = Get-PackageInventoryAcquisitionOverlay -InventoryNode $inventoryGlobal
+            if ($inventoryGlobalOverlay) {
+                $mergedAcquisitionEnvironment = Merge-PackageValues -BaseValue $mergedAcquisitionEnvironment -OverlayValue (ConvertTo-PackageMergeValue -InputObject $inventoryGlobalOverlay)
+            }
         }
 
-        if (-not [string]::IsNullOrWhiteSpace($siteCode) -and $SourceInventoryInfo.Document.PSObject.Properties['sites']) {
-            foreach ($siteProperty in @($SourceInventoryInfo.Document.sites.PSObject.Properties)) {
-                if ([string]::Equals([string]$siteProperty.Name, [string]$siteCode, [System.StringComparison]::OrdinalIgnoreCase)) {
-                    $mergedAcquisitionEnvironment = Merge-PackageModelValues -BaseValue $mergedAcquisitionEnvironment -OverlayValue (ConvertTo-PackageModelMergeValue -InputObject $siteProperty.Value)
-                    break
+        if ($activeSiteCodes.Count -gt 0 -and $SourceInventoryInfo.Document.PSObject.Properties['sites']) {
+            foreach ($activeSiteCode in @($activeSiteCodes)) {
+                foreach ($siteProperty in @($SourceInventoryInfo.Document.sites.PSObject.Properties)) {
+                    if ([string]::Equals([string]$siteProperty.Name, [string]$activeSiteCode, [System.StringComparison]::OrdinalIgnoreCase)) {
+                        $siteOverlay = Get-PackageInventoryAcquisitionOverlay -InventoryNode $siteProperty.Value
+                        if ($siteOverlay) {
+                            $mergedAcquisitionEnvironment = Merge-PackageValues -BaseValue $mergedAcquisitionEnvironment -OverlayValue (ConvertTo-PackageMergeValue -InputObject $siteOverlay)
+                        }
+                        break
+                    }
                 }
             }
         }
     }
 
-    $acquisitionEnvironment = ConvertTo-PackageModelObject -InputObject $mergedAcquisitionEnvironment
+    $acquisitionEnvironment = ConvertTo-PackageObject -InputObject $mergedAcquisitionEnvironment
 
     $installWorkspaceDirectory = if ($acquisitionEnvironment.stores.PSObject.Properties['installWorkspaceDirectory'] -and
         -not [string]::IsNullOrWhiteSpace([string]$acquisitionEnvironment.stores.installWorkspaceDirectory)) {
-        Resolve-PackageModelPathValue -PathValue ([string]$acquisitionEnvironment.stores.installWorkspaceDirectory)
+        Resolve-PackagePathValue -PathValue ([string]$acquisitionEnvironment.stores.installWorkspaceDirectory)
     }
     else {
-        Get-PackageModelDefaultInstallWorkspaceDirectory
-    }
-
-    $defaultPackageDepotDirectory = if ($acquisitionEnvironment.stores.PSObject.Properties['defaultPackageDepotDirectory'] -and
-        -not [string]::IsNullOrWhiteSpace([string]$acquisitionEnvironment.stores.defaultPackageDepotDirectory)) {
-        Resolve-PackageModelPathValue -PathValue ([string]$acquisitionEnvironment.stores.defaultPackageDepotDirectory)
-    }
-    else {
-        Get-PackageModelDefaultPackageDepotDirectory
+        Get-PackageDefaultInstallWorkspaceDirectory
     }
 
     $packageFileIndexFilePath = if ($acquisitionEnvironment.tracking.PSObject.Properties['packageFileIndexFilePath'] -and
         -not [string]::IsNullOrWhiteSpace([string]$acquisitionEnvironment.tracking.packageFileIndexFilePath)) {
-        Resolve-PackageModelPathValue -PathValue ([string]$acquisitionEnvironment.tracking.packageFileIndexFilePath)
+        Resolve-PackagePathValue -PathValue ([string]$acquisitionEnvironment.tracking.packageFileIndexFilePath)
     }
     else {
-        Get-PackageModelDefaultPackageFileIndexFilePath
+        Get-PackageDefaultPackageFileIndexFilePath
     }
 
     $allowFallback = $true
@@ -849,11 +1011,22 @@ Resolve-PackageModelEffectiveAcquisitionEnvironment -GlobalConfiguration $global
         $configuredEnvironmentSources = $acquisitionEnvironment.environmentSources
     }
 
-    $environmentSources = Resolve-PackageModelEnvironmentSources -EnvironmentSources $configuredEnvironmentSources -DefaultPackageDepotDirectory $defaultPackageDepotDirectory
+    $environmentSources = Resolve-PackageEnvironmentSources -EnvironmentSources $configuredEnvironmentSources -ActiveSiteCodes $activeSiteCodes
+    $defaultPackageDepotDirectory = $null
+    if ($environmentSources -and $environmentSources.PSObject.Properties['defaultPackageDepot']) {
+        $defaultPackageDepot = $environmentSources.defaultPackageDepot
+        if ([string]::Equals([string]$defaultPackageDepot.kind, 'filesystem', [System.StringComparison]::OrdinalIgnoreCase) -and
+            $defaultPackageDepot.PSObject.Properties['basePath'] -and
+            -not [string]::IsNullOrWhiteSpace([string]$defaultPackageDepot.basePath)) {
+            $defaultPackageDepotDirectory = [string]$defaultPackageDepot.basePath
+        }
+    }
 
     return [pscustomobject]@{
         SourceInventoryPath = $SourceInventoryInfo.Path
-        SiteCode            = $siteCode
+        DepotInventoryPath  = $DepotInventoryInfo.Path
+        SiteCode            = (@($activeSiteCodes) -join ';')
+        SiteCodes           = @($activeSiteCodes)
         Stores              = [pscustomobject]@{
             InstallWorkspaceDirectory = $installWorkspaceDirectory
             DefaultPackageDepotDirectory = $defaultPackageDepotDirectory
@@ -869,23 +1042,41 @@ Resolve-PackageModelEffectiveAcquisitionEnvironment -GlobalConfiguration $global
     }
 }
 
-function Assert-PackageModelDefinitionSchema {
+function Get-PackageInventoryAcquisitionOverlay {
+    [CmdletBinding()]
+    param(
+        [AllowNull()]
+        [psobject]$InventoryNode
+    )
+
+    if (-not $InventoryNode) {
+        return $null
+    }
+
+    if ($InventoryNode.PSObject.Properties['acquisitionEnvironment'] -and $null -ne $InventoryNode.acquisitionEnvironment) {
+        return $InventoryNode.acquisitionEnvironment
+    }
+
+    return $InventoryNode
+}
+
+function Assert-PackageDefinitionSchema {
 <#
 .SYNOPSIS
-Validates the PackageModel definition schema for this package pass.
+Validates the Package definition schema for this package pass.
 
 .DESCRIPTION
 Checks that the definition uses the current package-definition and
 acquisition-source model and rejects the earlier experimental schema names.
 
 .PARAMETER DefinitionDocumentInfo
-The loaded PackageModel definition document info.
+The loaded Package definition document info.
 
 .PARAMETER DefinitionId
 The expected definition id.
 
 .EXAMPLE
-Assert-PackageModelDefinitionSchema -DefinitionDocumentInfo $definitionInfo -DefinitionId VSCodeRuntime
+Assert-PackageDefinitionSchema -DefinitionDocumentInfo $definitionInfo -DefinitionId VSCodeRuntime
 #>
     [CmdletBinding()]
     param(
@@ -899,33 +1090,33 @@ Assert-PackageModelDefinitionSchema -DefinitionDocumentInfo $definitionInfo -Def
     $definition = $DefinitionDocumentInfo.Document
     foreach ($retiredProperty in @('classification', 'target', 'origins', 'interfaces', 'packageType', 'paths', 'sources', 'packages', 'entryPoints', 'packageFamily', 'managedPaths')) {
         if ($definition.PSObject.Properties[$retiredProperty]) {
-            throw "PackageModel definition '$($DefinitionDocumentInfo.Path)' still uses retired property '$retiredProperty'."
+            throw "Package definition '$($DefinitionDocumentInfo.Path)' still uses retired property '$retiredProperty'."
         }
     }
 
     foreach ($requiredProperty in @('schemaVersion', 'id', 'display', 'upstreamSources', 'providedTools', 'releaseDefaults', 'releases')) {
         if (-not $definition.PSObject.Properties[$requiredProperty]) {
-            throw "PackageModel definition '$($DefinitionDocumentInfo.Path)' is missing required property '$requiredProperty'."
+            throw "Package definition '$($DefinitionDocumentInfo.Path)' is missing required property '$requiredProperty'."
         }
     }
     if ([string]::IsNullOrWhiteSpace([string]$definition.schemaVersion)) {
-        throw "PackageModel definition '$($DefinitionDocumentInfo.Path)' defines schemaVersion, but it is empty."
+        throw "Package definition '$($DefinitionDocumentInfo.Path)' defines schemaVersion, but it is empty."
     }
     if (-not [string]::Equals([string]$definition.schemaVersion, '1.0', [System.StringComparison]::Ordinal)) {
-        throw "PackageModel definition '$($DefinitionDocumentInfo.Path)' uses unsupported schemaVersion '$($definition.schemaVersion)'. Supported schemaVersion is '1.0'."
+        throw "Package definition '$($DefinitionDocumentInfo.Path)' uses unsupported schemaVersion '$($definition.schemaVersion)'. Supported schemaVersion is '1.0'."
     }
 
     if (-not [string]::Equals([string]$definition.id, [string]$DefinitionId, [System.StringComparison]::Ordinal)) {
-        throw "PackageModel definition id '$($definition.id)' does not match requested definition id '$DefinitionId'."
+        throw "Package definition id '$($definition.id)' does not match requested definition id '$DefinitionId'."
     }
 
     if ($definition.PSObject.Properties['dependencies']) {
         foreach ($dependency in @($definition.dependencies)) {
             if (-not $dependency.PSObject.Properties['definitionId'] -or [string]::IsNullOrWhiteSpace([string]$dependency.definitionId)) {
-                throw "PackageModel definition '$($definition.id)' has dependency without definitionId."
+                throw "Package definition '$($definition.id)' has dependency without definitionId."
             }
             if ([string]::Equals([string]$dependency.definitionId, [string]$definition.id, [System.StringComparison]::OrdinalIgnoreCase)) {
-                throw "PackageModel definition '$($definition.id)' cannot depend on itself."
+                throw "Package definition '$($definition.id)' cannot depend on itself."
             }
         }
     }
@@ -933,90 +1124,90 @@ Assert-PackageModelDefinitionSchema -DefinitionDocumentInfo $definitionInfo -Def
     foreach ($upstreamSourceProperty in @($definition.upstreamSources.PSObject.Properties)) {
         $upstreamSource = $upstreamSourceProperty.Value
         if (-not $upstreamSource.PSObject.Properties['kind'] -or [string]::IsNullOrWhiteSpace([string]$upstreamSource.kind)) {
-            throw "PackageModel definition '$($definition.id)' has upstream source '$($upstreamSourceProperty.Name)' without kind."
+            throw "Package definition '$($definition.id)' has upstream source '$($upstreamSourceProperty.Name)' without kind."
         }
 
         switch -Exact ([string]$upstreamSource.kind) {
             'download' {
                 if (-not $upstreamSource.PSObject.Properties['baseUri'] -or [string]::IsNullOrWhiteSpace([string]$upstreamSource.baseUri)) {
-                    throw "PackageModel definition '$($definition.id)' has download upstream source '$($upstreamSourceProperty.Name)' without baseUri."
+                    throw "Package definition '$($definition.id)' has download upstream source '$($upstreamSourceProperty.Name)' without baseUri."
                 }
             }
             'githubRelease' {
                 if (-not $upstreamSource.PSObject.Properties['repositoryOwner'] -or [string]::IsNullOrWhiteSpace([string]$upstreamSource.repositoryOwner)) {
-                    throw "PackageModel definition '$($definition.id)' has GitHub release upstream source '$($upstreamSourceProperty.Name)' without repositoryOwner."
+                    throw "Package definition '$($definition.id)' has GitHub release upstream source '$($upstreamSourceProperty.Name)' without repositoryOwner."
                 }
                 if (-not $upstreamSource.PSObject.Properties['repositoryName'] -or [string]::IsNullOrWhiteSpace([string]$upstreamSource.repositoryName)) {
-                    throw "PackageModel definition '$($definition.id)' has GitHub release upstream source '$($upstreamSourceProperty.Name)' without repositoryName."
+                    throw "Package definition '$($definition.id)' has GitHub release upstream source '$($upstreamSourceProperty.Name)' without repositoryName."
                 }
             }
             default {
-                throw "PackageModel definition '$($definition.id)' uses unsupported upstream source kind '$($upstreamSource.kind)' for '$($upstreamSourceProperty.Name)'."
+                throw "Package definition '$($definition.id)' uses unsupported upstream source kind '$($upstreamSource.kind)' for '$($upstreamSourceProperty.Name)'."
             }
         }
     }
 
     if ($definition.releaseDefaults.PSObject.Properties['requirements']) {
-        throw "PackageModel definition '$($definition.id)' still uses retired property 'releaseDefaults.requirements'. Use 'releaseDefaults.compatibility.checks'."
+        throw "Package definition '$($definition.id)' still uses retired property 'releaseDefaults.requirements'. Use 'releaseDefaults.compatibility.checks'."
     }
 
     foreach ($requiredDefaultProperty in @('compatibility', 'install', 'validation', 'existingInstallDiscovery', 'existingInstallPolicy')) {
         if (-not $definition.releaseDefaults.PSObject.Properties[$requiredDefaultProperty]) {
-            throw "PackageModel definition '$($definition.id)' is missing releaseDefaults.$requiredDefaultProperty."
+            throw "Package definition '$($definition.id)' is missing releaseDefaults.$requiredDefaultProperty."
         }
     }
     foreach ($retiredDefaultProperty in @('existingInstall')) {
         if ($definition.releaseDefaults.PSObject.Properties[$retiredDefaultProperty]) {
-            throw "PackageModel definition '$($definition.id)' still uses retired property 'releaseDefaults.$retiredDefaultProperty'."
+            throw "Package definition '$($definition.id)' still uses retired property 'releaseDefaults.$retiredDefaultProperty'."
         }
     }
 
     foreach ($release in @($definition.releases)) {
         foreach ($retiredProperty in @('artifact', 'acquisitions', 'sourceOptions', 'reuse', 'channel')) {
             if ($release.PSObject.Properties[$retiredProperty]) {
-                throw "PackageModel release '$($release.id)' in '$($definition.id)' still uses retired property '$retiredProperty'."
+                throw "Package release '$($release.id)' in '$($definition.id)' still uses retired property '$retiredProperty'."
             }
         }
         if ($release.PSObject.Properties['requirements']) {
-            throw "PackageModel release '$($release.id)' in '$($definition.id)' still uses retired property 'requirements'. Use 'compatibility.checks'."
+            throw "Package release '$($release.id)' in '$($definition.id)' still uses retired property 'requirements'. Use 'compatibility.checks'."
         }
         foreach ($retiredReleaseProperty in @('existingInstall')) {
             if ($release.PSObject.Properties[$retiredReleaseProperty]) {
-                throw "PackageModel release '$($release.id)' in '$($definition.id)' still uses retired property '$retiredReleaseProperty'."
+                throw "Package release '$($release.id)' in '$($definition.id)' still uses retired property '$retiredReleaseProperty'."
             }
         }
 
         foreach ($requiredProperty in @('id', 'version', 'releaseTrack', 'flavor', 'constraints')) {
             if (-not $release.PSObject.Properties[$requiredProperty]) {
-                throw "PackageModel release '$($release.id)' in '$($definition.id)' is missing required property '$requiredProperty'."
+                throw "Package release '$($release.id)' in '$($definition.id)' is missing required property '$requiredProperty'."
             }
         }
 
-        $effectiveRelease = Resolve-PackageModelEffectiveRelease -Definition $definition -Release $release
+        $effectiveRelease = Resolve-PackageEffectiveRelease -Definition $definition -Release $release
         foreach ($requiredEffectiveProperty in @('install', 'validation', 'compatibility', 'existingInstallDiscovery', 'existingInstallPolicy')) {
             if (-not $effectiveRelease.PSObject.Properties[$requiredEffectiveProperty]) {
-                throw "PackageModel release '$($release.id)' in '$($definition.id)' is missing required effective property '$requiredEffectiveProperty'."
+                throw "Package release '$($release.id)' in '$($definition.id)' is missing required effective property '$requiredEffectiveProperty'."
             }
         }
         if ($effectiveRelease.compatibility.PSObject.Properties['packages']) {
-            throw "PackageModel release '$($release.id)' in '$($definition.id)' still uses retired property 'compatibility.packages'. Use 'compatibility.checks'."
+            throw "Package release '$($release.id)' in '$($definition.id)' still uses retired property 'compatibility.packages'. Use 'compatibility.checks'."
         }
         if (-not $effectiveRelease.compatibility.PSObject.Properties['checks']) {
-            throw "PackageModel release '$($release.id)' in '$($definition.id)' is missing compatibility.checks."
+            throw "Package release '$($release.id)' in '$($definition.id)' is missing compatibility.checks."
         }
         foreach ($compatibilityCheck in @($effectiveRelease.compatibility.checks)) {
             if ($null -eq $compatibilityCheck) {
                 continue
             }
             if (-not $compatibilityCheck.PSObject.Properties['kind'] -or [string]::IsNullOrWhiteSpace([string]$compatibilityCheck.kind)) {
-                throw "PackageModel release '$($release.id)' in '$($definition.id)' has a compatibility check without kind."
+                throw "Package release '$($release.id)' in '$($definition.id)' has a compatibility check without kind."
             }
             $onFail = 'fail'
             if ($compatibilityCheck.PSObject.Properties['onFail'] -and -not [string]::IsNullOrWhiteSpace([string]$compatibilityCheck.onFail)) {
                 $onFail = ([string]$compatibilityCheck.onFail).ToLowerInvariant()
             }
             if ($onFail -notin @('fail', 'warn')) {
-                throw "PackageModel release '$($release.id)' in '$($definition.id)' uses unsupported compatibility onFail '$($compatibilityCheck.onFail)'."
+                throw "Package release '$($release.id)' in '$($definition.id)' uses unsupported compatibility onFail '$($compatibilityCheck.onFail)'."
             }
 
             switch -Exact ([string]$compatibilityCheck.kind) {
@@ -1024,67 +1215,67 @@ Assert-PackageModelDefinitionSchema -DefinitionDocumentInfo $definitionInfo -Def
                     $hasAllowed = $compatibilityCheck.PSObject.Properties['allowed'] -and @($compatibilityCheck.allowed).Count -gt 0
                     $hasBlocked = $compatibilityCheck.PSObject.Properties['blocked'] -and @($compatibilityCheck.blocked).Count -gt 0
                     if (-not $hasAllowed -and -not $hasBlocked) {
-                        throw "PackageModel release '$($release.id)' in '$($definition.id)' has an osFamily compatibility check without allowed or blocked values."
+                        throw "Package release '$($release.id)' in '$($definition.id)' has an osFamily compatibility check without allowed or blocked values."
                     }
                 }
                 'cpuArchitecture' {
                     $hasAllowed = $compatibilityCheck.PSObject.Properties['allowed'] -and @($compatibilityCheck.allowed).Count -gt 0
                     $hasBlocked = $compatibilityCheck.PSObject.Properties['blocked'] -and @($compatibilityCheck.blocked).Count -gt 0
                     if (-not $hasAllowed -and -not $hasBlocked) {
-                        throw "PackageModel release '$($release.id)' in '$($definition.id)' has a cpuArchitecture compatibility check without allowed or blocked values."
+                        throw "Package release '$($release.id)' in '$($definition.id)' has a cpuArchitecture compatibility check without allowed or blocked values."
                     }
                 }
                 'osVersion' {
                     if (-not $compatibilityCheck.PSObject.Properties['operator'] -or [string]::IsNullOrWhiteSpace([string]$compatibilityCheck.operator)) {
-                        throw "PackageModel release '$($release.id)' in '$($definition.id)' has an osVersion compatibility check without operator."
+                        throw "Package release '$($release.id)' in '$($definition.id)' has an osVersion compatibility check without operator."
                     }
                     if (-not $compatibilityCheck.PSObject.Properties['value'] -or [string]::IsNullOrWhiteSpace([string]$compatibilityCheck.value)) {
-                        throw "PackageModel release '$($release.id)' in '$($definition.id)' has an osVersion compatibility check without value."
+                        throw "Package release '$($release.id)' in '$($definition.id)' has an osVersion compatibility check without value."
                     }
                 }
                 'physicalMemoryGiB' {
                     if (-not $compatibilityCheck.PSObject.Properties['operator'] -or [string]::IsNullOrWhiteSpace([string]$compatibilityCheck.operator)) {
-                        throw "PackageModel release '$($release.id)' in '$($definition.id)' has a physicalMemoryGiB compatibility check without operator."
+                        throw "Package release '$($release.id)' in '$($definition.id)' has a physicalMemoryGiB compatibility check without operator."
                     }
                     if (-not $compatibilityCheck.PSObject.Properties['value']) {
-                        throw "PackageModel release '$($release.id)' in '$($definition.id)' has a physicalMemoryGiB compatibility check without value."
+                        throw "Package release '$($release.id)' in '$($definition.id)' has a physicalMemoryGiB compatibility check without value."
                     }
                     $parsedValue = 0.0
                     if (-not [double]::TryParse(([string]$compatibilityCheck.value), [System.Globalization.NumberStyles]::Float, [System.Globalization.CultureInfo]::InvariantCulture, [ref]$parsedValue)) {
-                        throw "PackageModel release '$($release.id)' in '$($definition.id)' has a physicalMemoryGiB compatibility check with non-numeric value '$($compatibilityCheck.value)'."
+                        throw "Package release '$($release.id)' in '$($definition.id)' has a physicalMemoryGiB compatibility check with non-numeric value '$($compatibilityCheck.value)'."
                     }
                 }
                 'videoMemoryGiB' {
                     if (-not $compatibilityCheck.PSObject.Properties['operator'] -or [string]::IsNullOrWhiteSpace([string]$compatibilityCheck.operator)) {
-                        throw "PackageModel release '$($release.id)' in '$($definition.id)' has a videoMemoryGiB compatibility check without operator."
+                        throw "Package release '$($release.id)' in '$($definition.id)' has a videoMemoryGiB compatibility check without operator."
                     }
                     if (-not $compatibilityCheck.PSObject.Properties['value']) {
-                        throw "PackageModel release '$($release.id)' in '$($definition.id)' has a videoMemoryGiB compatibility check without value."
+                        throw "Package release '$($release.id)' in '$($definition.id)' has a videoMemoryGiB compatibility check without value."
                     }
                     $parsedValue = 0.0
                     if (-not [double]::TryParse(([string]$compatibilityCheck.value), [System.Globalization.NumberStyles]::Float, [System.Globalization.CultureInfo]::InvariantCulture, [ref]$parsedValue)) {
-                        throw "PackageModel release '$($release.id)' in '$($definition.id)' has a videoMemoryGiB compatibility check with non-numeric value '$($compatibilityCheck.value)'."
+                        throw "Package release '$($release.id)' in '$($definition.id)' has a videoMemoryGiB compatibility check with non-numeric value '$($compatibilityCheck.value)'."
                     }
                 }
                 'physicalOrVideoMemoryGiB' {
                     if (-not $compatibilityCheck.PSObject.Properties['operator'] -or [string]::IsNullOrWhiteSpace([string]$compatibilityCheck.operator)) {
-                        throw "PackageModel release '$($release.id)' in '$($definition.id)' has a physicalOrVideoMemoryGiB compatibility check without operator."
+                        throw "Package release '$($release.id)' in '$($definition.id)' has a physicalOrVideoMemoryGiB compatibility check without operator."
                     }
                     if (-not $compatibilityCheck.PSObject.Properties['value']) {
-                        throw "PackageModel release '$($release.id)' in '$($definition.id)' has a physicalOrVideoMemoryGiB compatibility check without value."
+                        throw "Package release '$($release.id)' in '$($definition.id)' has a physicalOrVideoMemoryGiB compatibility check without value."
                     }
                     $parsedValue = 0.0
                     if (-not [double]::TryParse(([string]$compatibilityCheck.value), [System.Globalization.NumberStyles]::Float, [System.Globalization.CultureInfo]::InvariantCulture, [ref]$parsedValue)) {
-                        throw "PackageModel release '$($release.id)' in '$($definition.id)' has a physicalOrVideoMemoryGiB compatibility check with non-numeric value '$($compatibilityCheck.value)'."
+                        throw "Package release '$($release.id)' in '$($definition.id)' has a physicalOrVideoMemoryGiB compatibility check with non-numeric value '$($compatibilityCheck.value)'."
                     }
                 }
                 default {
-                    throw "PackageModel release '$($release.id)' in '$($definition.id)' uses unsupported compatibility kind '$($compatibilityCheck.kind)'."
+                    throw "Package release '$($release.id)' in '$($definition.id)' uses unsupported compatibility kind '$($compatibilityCheck.kind)'."
                 }
             }
         }
         if ($effectiveRelease.existingInstallPolicy -and $effectiveRelease.existingInstallPolicy.PSObject.Properties['requireManagedOwnership']) {
-            throw "PackageModel release '$($release.id)' in '$($definition.id)' still uses retired property 'requireManagedOwnership'. Use 'requirePackageModelOwnership'."
+            throw "Package release '$($release.id)' in '$($definition.id)' still uses retired property 'requireManagedOwnership'. Use 'requirePackageOwnership'."
         }
 
         $installKind = if ($effectiveRelease.install -and $effectiveRelease.install.PSObject.Properties['kind']) {
@@ -1095,60 +1286,60 @@ Assert-PackageModelDefinitionSchema -DefinitionDocumentInfo $definitionInfo -Def
         }
 
         if ([string]::IsNullOrWhiteSpace($installKind)) {
-            throw "PackageModel release '$($release.id)' in '$($definition.id)' is missing install.kind."
+            throw "Package release '$($release.id)' in '$($definition.id)' is missing install.kind."
         }
 
         if ($installKind -notin @('expandArchive', 'placePackageFile', 'runInstaller', 'npmGlobalPackage', 'reuseExisting')) {
-            throw "PackageModel release '$($release.id)' in '$($definition.id)' uses unsupported install.kind '$installKind'."
+            throw "Package release '$($release.id)' in '$($definition.id)' uses unsupported install.kind '$installKind'."
         }
 
         foreach ($retiredInstallProperty in @('managerKind', 'managerDependency')) {
             if ($effectiveRelease.install.PSObject.Properties[$retiredInstallProperty]) {
-                throw "PackageModel release '$($release.id)' in '$($definition.id)' still uses retired property 'install.$retiredInstallProperty'. Use install.kind 'npmGlobalPackage' with install.installerCommand."
+                throw "Package release '$($release.id)' in '$($definition.id)' still uses retired property 'install.$retiredInstallProperty'. Use install.kind 'npmGlobalPackage' with install.installerCommand."
             }
         }
 
         if ($effectiveRelease.install.PSObject.Properties['targetKind'] -and
             -not [string]::IsNullOrWhiteSpace([string]$effectiveRelease.install.targetKind) -and
             ([string]$effectiveRelease.install.targetKind) -notin @('directory', 'machinePrerequisite')) {
-            throw "PackageModel release '$($release.id)' in '$($definition.id)' uses unsupported install.targetKind '$($effectiveRelease.install.targetKind)'."
+            throw "Package release '$($release.id)' in '$($definition.id)' uses unsupported install.targetKind '$($effectiveRelease.install.targetKind)'."
         }
 
         if ($effectiveRelease.install.PSObject.Properties['elevation'] -and
             -not [string]::IsNullOrWhiteSpace([string]$effectiveRelease.install.elevation) -and
             ([string]$effectiveRelease.install.elevation) -notin @('none', 'required', 'auto')) {
-            throw "PackageModel release '$($release.id)' in '$($definition.id)' uses unsupported install.elevation '$($effectiveRelease.install.elevation)'."
+            throw "Package release '$($release.id)' in '$($definition.id)' uses unsupported install.elevation '$($effectiveRelease.install.elevation)'."
         }
 
         if ([string]::Equals($installKind, 'npmGlobalPackage', [System.StringComparison]::OrdinalIgnoreCase)) {
             if (-not $effectiveRelease.install.PSObject.Properties['packageSpec'] -or [string]::IsNullOrWhiteSpace([string]$effectiveRelease.install.packageSpec)) {
-                throw "PackageModel release '$($release.id)' in '$($definition.id)' uses install.kind 'npmGlobalPackage' without install.packageSpec."
+                throw "Package release '$($release.id)' in '$($definition.id)' uses install.kind 'npmGlobalPackage' without install.packageSpec."
             }
             if (-not $effectiveRelease.install.PSObject.Properties['installerCommand'] -or [string]::IsNullOrWhiteSpace([string]$effectiveRelease.install.installerCommand)) {
-                throw "PackageModel release '$($release.id)' in '$($definition.id)' uses install.kind 'npmGlobalPackage' without install.installerCommand."
+                throw "Package release '$($release.id)' in '$($definition.id)' uses install.kind 'npmGlobalPackage' without install.installerCommand."
             }
         }
 
         if ($effectiveRelease.install -and $effectiveRelease.install.PSObject.Properties['pathRegistration'] -and $null -ne $effectiveRelease.install.pathRegistration) {
             $pathRegistration = $effectiveRelease.install.pathRegistration
             if (-not $pathRegistration.PSObject.Properties['mode'] -or [string]::IsNullOrWhiteSpace([string]$pathRegistration.mode)) {
-                throw "PackageModel release '$($release.id)' in '$($definition.id)' defines install.pathRegistration without mode."
+                throw "Package release '$($release.id)' in '$($definition.id)' defines install.pathRegistration without mode."
             }
 
             $pathRegistrationMode = ([string]$pathRegistration.mode).ToLowerInvariant()
             if ($pathRegistrationMode -notin @('none', 'user', 'machine')) {
-                throw "PackageModel release '$($release.id)' in '$($definition.id)' uses unsupported install.pathRegistration.mode '$($pathRegistration.mode)'."
+                throw "Package release '$($release.id)' in '$($definition.id)' uses unsupported install.pathRegistration.mode '$($pathRegistration.mode)'."
             }
 
             if ($pathRegistrationMode -ne 'none') {
                 if (-not $pathRegistration.PSObject.Properties['source'] -or $null -eq $pathRegistration.source) {
-                    throw "PackageModel release '$($release.id)' in '$($definition.id)' defines install.pathRegistration.mode '$($pathRegistration.mode)' without source."
+                    throw "Package release '$($release.id)' in '$($definition.id)' defines install.pathRegistration.mode '$($pathRegistration.mode)' without source."
                 }
                 if (-not $pathRegistration.source.PSObject.Properties['kind'] -or [string]::IsNullOrWhiteSpace([string]$pathRegistration.source.kind)) {
-                    throw "PackageModel release '$($release.id)' in '$($definition.id)' defines install.pathRegistration without source.kind."
+                    throw "Package release '$($release.id)' in '$($definition.id)' defines install.pathRegistration without source.kind."
                 }
                 if (-not $pathRegistration.source.PSObject.Properties['value'] -or [string]::IsNullOrWhiteSpace([string]$pathRegistration.source.value)) {
-                    throw "PackageModel release '$($release.id)' in '$($definition.id)' defines install.pathRegistration without source.value."
+                    throw "Package release '$($release.id)' in '$($definition.id)' defines install.pathRegistration without source.value."
                 }
 
                 switch -Exact ([string]$pathRegistration.source.kind) {
@@ -1157,7 +1348,7 @@ Assert-PackageModelDefinitionSchema -DefinitionDocumentInfo $definitionInfo -Def
                     'installRelativeDirectory' { }
                     'shim' { }
                     default {
-                        throw "PackageModel release '$($release.id)' in '$($definition.id)' uses unsupported install.pathRegistration.source.kind '$($pathRegistration.source.kind)'."
+                        throw "Package release '$($release.id)' in '$($definition.id)' uses unsupported install.pathRegistration.source.kind '$($pathRegistration.source.kind)'."
                     }
                 }
             }
@@ -1175,7 +1366,7 @@ Assert-PackageModelDefinitionSchema -DefinitionDocumentInfo $definitionInfo -Def
                 $requiresAcquisitionCandidates = $true
                 if ($effectiveRelease.install.PSObject.Properties['targetRelativePath'] -and
                     [string]::IsNullOrWhiteSpace([string]$effectiveRelease.install.targetRelativePath)) {
-                    throw "PackageModel release '$($release.id)' in '$($definition.id)' defines install.targetRelativePath without a value."
+                    throw "Package release '$($release.id)' in '$($definition.id)' defines install.targetRelativePath without a value."
                 }
             }
             'runInstaller' {
@@ -1188,16 +1379,16 @@ Assert-PackageModelDefinitionSchema -DefinitionDocumentInfo $definitionInfo -Def
 
         if ($requiresPackageFile) {
             if (-not $effectiveRelease.PSObject.Properties['packageFile'] -or $null -eq $effectiveRelease.packageFile) {
-                throw "PackageModel release '$($release.id)' in '$($definition.id)' is missing required property 'packageFile'."
+                throw "Package release '$($release.id)' in '$($definition.id)' is missing required property 'packageFile'."
             }
             if (-not $effectiveRelease.packageFile.PSObject.Properties['fileName'] -or [string]::IsNullOrWhiteSpace([string]$effectiveRelease.packageFile.fileName)) {
-                throw "PackageModel release '$($release.id)' in '$($definition.id)' is missing packageFile.fileName."
+                throw "Package release '$($release.id)' in '$($definition.id)' is missing packageFile.fileName."
             }
         }
 
         if ($effectiveRelease.PSObject.Properties['packageFile'] -and $effectiveRelease.packageFile -and
             (-not $effectiveRelease.packageFile.PSObject.Properties['fileName'] -or [string]::IsNullOrWhiteSpace([string]$effectiveRelease.packageFile.fileName))) {
-            throw "PackageModel release '$($release.id)' in '$($definition.id)' defines packageFile without packageFile.fileName."
+            throw "Package release '$($release.id)' in '$($definition.id)' defines packageFile without packageFile.fileName."
         }
         if ($effectiveRelease.PSObject.Properties['packageFile'] -and
             $effectiveRelease.packageFile -and
@@ -1205,13 +1396,13 @@ Assert-PackageModelDefinitionSchema -DefinitionDocumentInfo $definitionInfo -Def
             $null -ne $effectiveRelease.packageFile.integrity) {
             $integrity = $effectiveRelease.packageFile.integrity
             if (-not $integrity.PSObject.Properties['algorithm'] -or [string]::IsNullOrWhiteSpace([string]$integrity.algorithm)) {
-                throw "PackageModel release '$($release.id)' in '$($definition.id)' defines packageFile.integrity without algorithm."
+                throw "Package release '$($release.id)' in '$($definition.id)' defines packageFile.integrity without algorithm."
             }
             if (-not $integrity.PSObject.Properties['sha256'] -or [string]::IsNullOrWhiteSpace([string]$integrity.sha256)) {
-                throw "PackageModel release '$($release.id)' in '$($definition.id)' defines packageFile.integrity without sha256."
+                throw "Package release '$($release.id)' in '$($definition.id)' defines packageFile.integrity without sha256."
             }
             if (-not [string]::Equals([string]$integrity.algorithm, 'sha256', [System.StringComparison]::OrdinalIgnoreCase)) {
-                throw "PackageModel release '$($release.id)' in '$($definition.id)' uses unsupported packageFile.integrity.algorithm '$($integrity.algorithm)'."
+                throw "Package release '$($release.id)' in '$($definition.id)' uses unsupported packageFile.integrity.algorithm '$($integrity.algorithm)'."
             }
         }
 
@@ -1222,17 +1413,17 @@ Assert-PackageModelDefinitionSchema -DefinitionDocumentInfo $definitionInfo -Def
             $authenticode = $effectiveRelease.packageFile.authenticode
             if ($authenticode.PSObject.Properties['requireValid'] -and
                 $null -eq $authenticode.requireValid) {
-                throw "PackageModel release '$($release.id)' in '$($definition.id)' defines packageFile.authenticode.requireValid without a value."
+                throw "Package release '$($release.id)' in '$($definition.id)' defines packageFile.authenticode.requireValid without a value."
             }
             if ($authenticode.PSObject.Properties['subjectContains'] -and
                 [string]::IsNullOrWhiteSpace([string]$authenticode.subjectContains)) {
-                throw "PackageModel release '$($release.id)' in '$($definition.id)' defines packageFile.authenticode.subjectContains without a value."
+                throw "Package release '$($release.id)' in '$($definition.id)' defines packageFile.authenticode.subjectContains without a value."
             }
         }
 
         if ($requiresAcquisitionCandidates) {
             if (-not $effectiveRelease.PSObject.Properties['acquisitionCandidates'] -or @($effectiveRelease.acquisitionCandidates).Count -eq 0) {
-                throw "PackageModel release '$($release.id)' in '$($definition.id)' is missing required property 'acquisitionCandidates'."
+                throw "Package release '$($release.id)' in '$($definition.id)' is missing required property 'acquisitionCandidates'."
             }
         }
 
@@ -1242,19 +1433,19 @@ Assert-PackageModelDefinitionSchema -DefinitionDocumentInfo $definitionInfo -Def
                     continue
                 }
                 if ($candidate.PSObject.Properties['sourceBindingId']) {
-                    throw "PackageModel release '$($release.id)' in '$($definition.id)' still uses retired property 'sourceBindingId'."
+                    throw "Package release '$($release.id)' in '$($definition.id)' still uses retired property 'sourceBindingId'."
                 }
                 if ($candidate.PSObject.Properties['sourceRef']) {
-                    throw "PackageModel release '$($release.id)' in '$($definition.id)' still uses retired property 'sourceRef'."
+                    throw "Package release '$($release.id)' in '$($definition.id)' still uses retired property 'sourceRef'."
                 }
                 if (-not $candidate.PSObject.Properties['kind'] -or [string]::IsNullOrWhiteSpace([string]$candidate.kind)) {
-                    throw "PackageModel release '$($release.id)' in '$($definition.id)' has an acquisition candidate without kind."
+                    throw "Package release '$($release.id)' in '$($definition.id)' has an acquisition candidate without kind."
                 }
                 switch -Exact ([string]$candidate.kind) {
                     'packageDepot' { }
                     'download' {
                         if (-not $candidate.PSObject.Properties['sourceId'] -or [string]::IsNullOrWhiteSpace([string]$candidate.sourceId)) {
-                            throw "PackageModel release '$($release.id)' in '$($definition.id)' has a download acquisition candidate without sourceId."
+                            throw "Package release '$($release.id)' in '$($definition.id)' has a download acquisition candidate without sourceId."
                         }
 
                         $downloadSource = $null
@@ -1265,42 +1456,42 @@ Assert-PackageModelDefinitionSchema -DefinitionDocumentInfo $definitionInfo -Def
                             }
                         }
                         if (-not $downloadSource) {
-                            throw "PackageModel release '$($release.id)' in '$($definition.id)' references unknown download sourceId '$($candidate.sourceId)'."
+                            throw "Package release '$($release.id)' in '$($definition.id)' references unknown download sourceId '$($candidate.sourceId)'."
                         }
 
                         $downloadSourceKind = if ($downloadSource.PSObject.Properties['kind']) { [string]$downloadSource.kind } else { $null }
                         switch -Exact ($downloadSourceKind) {
                             'download' {
                                 if (-not $candidate.PSObject.Properties['sourcePath'] -or [string]::IsNullOrWhiteSpace([string]$candidate.sourcePath)) {
-                                    throw "PackageModel release '$($release.id)' in '$($definition.id)' has a download acquisition candidate without sourcePath."
+                                    throw "Package release '$($release.id)' in '$($definition.id)' has a download acquisition candidate without sourcePath."
                                 }
                             }
                             'githubRelease' {
                                 if ($candidate.PSObject.Properties['sourcePath'] -and -not [string]::IsNullOrWhiteSpace([string]$candidate.sourcePath)) {
-                                    throw "PackageModel release '$($release.id)' in '$($definition.id)' must not define sourcePath for GitHub release source '$($candidate.sourceId)'."
+                                    throw "Package release '$($release.id)' in '$($definition.id)' must not define sourcePath for GitHub release source '$($candidate.sourceId)'."
                                 }
                                 if (-not $effectiveRelease.PSObject.Properties['releaseTag'] -or [string]::IsNullOrWhiteSpace([string]$effectiveRelease.releaseTag)) {
-                                    throw "PackageModel release '$($release.id)' in '$($definition.id)' requires releaseTag when download source '$($candidate.sourceId)' is a GitHub release source."
+                                    throw "Package release '$($release.id)' in '$($definition.id)' requires releaseTag when download source '$($candidate.sourceId)' is a GitHub release source."
                                 }
                                 if (-not $effectiveRelease.PSObject.Properties['packageFile'] -or
                                     $null -eq $effectiveRelease.packageFile -or
                                     -not $effectiveRelease.packageFile.PSObject.Properties['fileName'] -or
                                     [string]::IsNullOrWhiteSpace([string]$effectiveRelease.packageFile.fileName)) {
-                                    throw "PackageModel release '$($release.id)' in '$($definition.id)' requires packageFile.fileName when download source '$($candidate.sourceId)' is a GitHub release source."
+                                    throw "Package release '$($release.id)' in '$($definition.id)' requires packageFile.fileName when download source '$($candidate.sourceId)' is a GitHub release source."
                                 }
                             }
                             default {
-                                throw "PackageModel release '$($release.id)' in '$($definition.id)' references unsupported download source kind '$downloadSourceKind' for sourceId '$($candidate.sourceId)'."
+                                throw "Package release '$($release.id)' in '$($definition.id)' references unsupported download source kind '$downloadSourceKind' for sourceId '$($candidate.sourceId)'."
                             }
                         }
                     }
                     'filesystem' {
                         if (-not $candidate.PSObject.Properties['sourcePath'] -or [string]::IsNullOrWhiteSpace([string]$candidate.sourcePath)) {
-                            throw "PackageModel release '$($release.id)' in '$($definition.id)' has a filesystem acquisition candidate without sourcePath."
+                            throw "Package release '$($release.id)' in '$($definition.id)' has a filesystem acquisition candidate without sourcePath."
                         }
                     }
                     default {
-                        throw "PackageModel release '$($release.id)' in '$($definition.id)' uses unsupported acquisition kind '$($candidate.kind)'."
+                        throw "Package release '$($release.id)' in '$($definition.id)' uses unsupported acquisition kind '$($candidate.kind)'."
                     }
                 }
             }
@@ -1309,39 +1500,39 @@ Assert-PackageModelDefinitionSchema -DefinitionDocumentInfo $definitionInfo -Def
         $existingInstallDiscovery = $effectiveRelease.existingInstallDiscovery
         if ($existingInstallDiscovery.PSObject.Properties['enableDetection'] -and [bool]$existingInstallDiscovery.enableDetection) {
             if (-not $existingInstallDiscovery.PSObject.Properties['searchLocations']) {
-                throw "PackageModel release '$($release.id)' in '$($definition.id)' is missing existingInstallDiscovery.searchLocations."
+                throw "Package release '$($release.id)' in '$($definition.id)' is missing existingInstallDiscovery.searchLocations."
             }
             if (-not $existingInstallDiscovery.PSObject.Properties['installRootRules']) {
-                throw "PackageModel release '$($release.id)' in '$($definition.id)' is missing existingInstallDiscovery.installRootRules."
+                throw "Package release '$($release.id)' in '$($definition.id)' is missing existingInstallDiscovery.installRootRules."
             }
             foreach ($rule in @($existingInstallDiscovery.installRootRules)) {
                 if ($null -eq $rule) {
                     continue
                 }
                 if ($rule.PSObject.Properties['fileName'] -or $rule.PSObject.Properties['homePath']) {
-                    throw "PackageModel release '$($release.id)' in '$($definition.id)' still uses retired installRootRules fields from installHomeRules."
+                    throw "Package release '$($release.id)' in '$($definition.id)' still uses retired installRootRules fields from installHomeRules."
                 }
                 if (-not $rule.PSObject.Properties['match'] -or $null -eq $rule.match) {
-                    throw "PackageModel release '$($release.id)' in '$($definition.id)' has an installRootRule without match."
+                    throw "Package release '$($release.id)' in '$($definition.id)' has an installRootRule without match."
                 }
                 if (-not $rule.match.PSObject.Properties['kind'] -or [string]::IsNullOrWhiteSpace([string]$rule.match.kind)) {
-                    throw "PackageModel release '$($release.id)' in '$($definition.id)' has an installRootRule without match.kind."
+                    throw "Package release '$($release.id)' in '$($definition.id)' has an installRootRule without match.kind."
                 }
                 if (-not $rule.match.PSObject.Properties['value'] -or [string]::IsNullOrWhiteSpace([string]$rule.match.value)) {
-                    throw "PackageModel release '$($release.id)' in '$($definition.id)' has an installRootRule without match.value."
+                    throw "Package release '$($release.id)' in '$($definition.id)' has an installRootRule without match.value."
                 }
                 if (-not $rule.PSObject.Properties['installRootRelativePath']) {
-                    throw "PackageModel release '$($release.id)' in '$($definition.id)' has an installRootRule without installRootRelativePath."
+                    throw "Package release '$($release.id)' in '$($definition.id)' has an installRootRule without installRootRelativePath."
                 }
             }
         }
     }
 }
 
-function Resolve-PackageModelEffectiveRelease {
+function Resolve-PackageEffectiveRelease {
 <#
 .SYNOPSIS
-Builds the effective PackageModel release by applying definition defaults.
+Builds the effective Package release by applying definition defaults.
 
 .DESCRIPTION
 Applies whole-block fallback from the definition releaseDefaults block to a
@@ -1349,13 +1540,13 @@ single release entry. When a release defines one of the known release blocks,
 that block fully replaces the default block.
 
 .PARAMETER Definition
-The PackageModel definition object.
+The Package definition object.
 
 .PARAMETER Release
 The raw release object from the definition.
 
 .EXAMPLE
-Resolve-PackageModelEffectiveRelease -Definition $definition -Release $release
+Resolve-PackageEffectiveRelease -Definition $definition -Release $release
 #>
     [CmdletBinding()]
     param(
@@ -1366,33 +1557,33 @@ Resolve-PackageModelEffectiveRelease -Definition $definition -Release $release
         [psobject]$Release
     )
 
-    $effectiveRelease = ConvertTo-PackageModelObject -InputObject $Release
+    $effectiveRelease = ConvertTo-PackageObject -InputObject $Release
     foreach ($propertyName in @('compatibility', 'install', 'validation', 'existingInstallDiscovery', 'existingInstallPolicy')) {
         if (-not $effectiveRelease.PSObject.Properties[$propertyName] -and $Definition.releaseDefaults.PSObject.Properties[$propertyName]) {
-            $effectiveRelease | Add-Member -MemberType NoteProperty -Name $propertyName -Value (ConvertTo-PackageModelObject -InputObject $Definition.releaseDefaults.$propertyName)
+            $effectiveRelease | Add-Member -MemberType NoteProperty -Name $propertyName -Value (ConvertTo-PackageObject -InputObject $Definition.releaseDefaults.$propertyName)
         }
     }
 
     return $effectiveRelease
 }
 
-function Get-PackageModelConfig {
+function Get-PackageConfig {
 <#
 .SYNOPSIS
-Loads the effective PackageModel config for a definition id.
+Loads the effective Package config for a definition id.
 
 .DESCRIPTION
-Loads the shipped PackageModel global document, applies the optional external
-source inventory, loads one shipped PackageModel definition, validates the
-current schema, resolves runtime context and PackageModel roots, and returns the
+Loads the shipped Package global document, applies the optional external
+source inventory, loads one shipped Package definition, validates the
+current schema, resolves runtime context and Package roots, and returns the
 combined config object for command orchestration.
 
 .PARAMETER DefinitionId
-The PackageModel definition id. The shipped JSON filename stem must match this
+The Package definition id. The shipped JSON filename stem must match this
 value.
 
 .EXAMPLE
-Get-PackageModelConfig -DefinitionId VSCodeRuntime
+Get-PackageConfig -DefinitionId VSCodeRuntime
 #>
     [CmdletBinding()]
     param(
@@ -1400,56 +1591,57 @@ Get-PackageModelConfig -DefinitionId VSCodeRuntime
         [string]$DefinitionId
     )
 
-    $globalDocumentInfo = Read-PackageModelJsonDocument -Path (Get-PackageModelGlobalConfigPath)
-    Assert-PackageModelGlobalConfigSchema -GlobalDocumentInfo $globalDocumentInfo
+    $globalDocumentInfo = Read-PackageJsonDocument -Path (Get-PackageGlobalConfigPath)
+    Assert-PackageGlobalConfigSchema -GlobalDocumentInfo $globalDocumentInfo
 
-    $sourceInventoryInfo = Get-PackageModelSourceInventoryInfo
+    $depotInventoryInfo = Get-PackageDepotInventoryInfo
+    $sourceInventoryInfo = Get-PackageSourceInventoryInfo
 
-    $definitionDocumentInfo = Read-PackageModelJsonDocument -Path (Get-PackageModelDefinitionPath -DefinitionId $DefinitionId)
-    Assert-PackageModelDefinitionSchema -DefinitionDocumentInfo $definitionDocumentInfo -DefinitionId $DefinitionId
+    $definitionDocumentInfo = Read-PackageJsonDocument -Path (Get-PackageDefinitionPath -DefinitionId $DefinitionId)
+    Assert-PackageDefinitionSchema -DefinitionDocumentInfo $definitionDocumentInfo -DefinitionId $DefinitionId
 
-    $packageModelGlobalConfig = $globalDocumentInfo.Document.packageModel
-    $runtimeContext = Get-PackageModelRuntimeContext
+    $packageGlobalConfig = $globalDocumentInfo.Document.package
+    $runtimeContext = Get-PackageRuntimeContext
     $definition = $definitionDocumentInfo.Document
-    $effectiveAcquisitionEnvironment = Resolve-PackageModelEffectiveAcquisitionEnvironment -GlobalConfiguration $packageModelGlobalConfig -SourceInventoryInfo $sourceInventoryInfo
+    $effectiveAcquisitionEnvironment = Resolve-PackageEffectiveAcquisitionEnvironment -GlobalConfiguration $packageGlobalConfig -SourceInventoryInfo $sourceInventoryInfo -DepotInventoryInfo $depotInventoryInfo
 
     $selectionReleaseTrack = 'none'
-    if ($packageModelGlobalConfig.selectionDefaults.PSObject.Properties['releaseTrack'] -and
-        -not [string]::IsNullOrWhiteSpace([string]$packageModelGlobalConfig.selectionDefaults.releaseTrack)) {
-        $selectionReleaseTrack = [string]$packageModelGlobalConfig.selectionDefaults.releaseTrack
+    if ($packageGlobalConfig.selectionDefaults.PSObject.Properties['releaseTrack'] -and
+        -not [string]::IsNullOrWhiteSpace([string]$packageGlobalConfig.selectionDefaults.releaseTrack)) {
+        $selectionReleaseTrack = [string]$packageGlobalConfig.selectionDefaults.releaseTrack
     }
 
     $selectionStrategy = 'latestByVersion'
-    if ($packageModelGlobalConfig.selectionDefaults.PSObject.Properties['strategy'] -and
-        -not [string]::IsNullOrWhiteSpace([string]$packageModelGlobalConfig.selectionDefaults.strategy)) {
-        $selectionStrategy = [string]$packageModelGlobalConfig.selectionDefaults.strategy
+    if ($packageGlobalConfig.selectionDefaults.PSObject.Properties['strategy'] -and
+        -not [string]::IsNullOrWhiteSpace([string]$packageGlobalConfig.selectionDefaults.strategy)) {
+        $selectionStrategy = [string]$packageGlobalConfig.selectionDefaults.strategy
     }
 
-    $preferredTargetInstallDirectory = if ($packageModelGlobalConfig.PSObject.Properties['preferredTargetInstallDirectory'] -and
-        -not [string]::IsNullOrWhiteSpace([string]$packageModelGlobalConfig.preferredTargetInstallDirectory)) {
-        Resolve-PackageModelPathValue -PathValue ([string]$packageModelGlobalConfig.preferredTargetInstallDirectory)
+    $preferredTargetInstallDirectory = if ($packageGlobalConfig.PSObject.Properties['preferredTargetInstallDirectory'] -and
+        -not [string]::IsNullOrWhiteSpace([string]$packageGlobalConfig.preferredTargetInstallDirectory)) {
+        Resolve-PackagePathValue -PathValue ([string]$packageGlobalConfig.preferredTargetInstallDirectory)
     }
     else {
-        Get-PackageModelDefaultPreferredTargetInstallDirectory
+        Get-PackageDefaultPreferredTargetInstallDirectory
     }
 
-    $packageStateIndexFilePath = if ($packageModelGlobalConfig.packageState.PSObject.Properties['indexFilePath'] -and
-        -not [string]::IsNullOrWhiteSpace([string]$packageModelGlobalConfig.packageState.indexFilePath)) {
-        Resolve-PackageModelPathValue -PathValue ([string]$packageModelGlobalConfig.packageState.indexFilePath)
+    $packageStateIndexFilePath = if ($packageGlobalConfig.packageState.PSObject.Properties['indexFilePath'] -and
+        -not [string]::IsNullOrWhiteSpace([string]$packageGlobalConfig.packageState.indexFilePath)) {
+        Resolve-PackagePathValue -PathValue ([string]$packageGlobalConfig.packageState.indexFilePath)
     }
     else {
-        Get-PackageModelDefaultPackageStateIndexFilePath
+        Get-PackageDefaultPackageStateIndexFilePath
     }
 
-    $localRepositoryRoot = if ($packageModelGlobalConfig.PSObject.Properties['localRepositoryRoot'] -and
-        -not [string]::IsNullOrWhiteSpace([string]$packageModelGlobalConfig.localRepositoryRoot)) {
-        Resolve-PackageModelPathValue -PathValue ([string]$packageModelGlobalConfig.localRepositoryRoot)
+    $localRepositoryRoot = if ($packageGlobalConfig.PSObject.Properties['localRepositoryRoot'] -and
+        -not [string]::IsNullOrWhiteSpace([string]$packageGlobalConfig.localRepositoryRoot)) {
+        Resolve-PackagePathValue -PathValue ([string]$packageGlobalConfig.localRepositoryRoot)
     }
     else {
-        Get-PackageModelDefaultLocalRepositoryRoot
+        Get-PackageDefaultLocalRepositoryRoot
     }
 
-    $definitionRepositoryId = Get-PackageModelDefaultRepositoryId
+    $definitionRepositoryId = Get-PackageDefaultRepositoryId
     $definitionFileName = Split-Path -Leaf $definitionDocumentInfo.Path
 
     $display = if ($definition.display -and $definition.display.PSObject.Properties['default'] -and $null -ne $definition.display.default) {
@@ -1461,9 +1653,11 @@ Get-PackageModelConfig -DefinitionId VSCodeRuntime
 
     return [pscustomobject]@{
         GlobalConfigurationPath            = $globalDocumentInfo.Path
-        GlobalConfiguration                = $packageModelGlobalConfig
+        GlobalConfiguration                = $packageGlobalConfig
         SourceInventoryPath                = $effectiveAcquisitionEnvironment.SourceInventoryPath
         SourceInventory                    = $sourceInventoryInfo.Document
+        DepotInventoryPath                 = $effectiveAcquisitionEnvironment.DepotInventoryPath
+        DepotInventory                     = $depotInventoryInfo.Document
         EffectiveAcquisitionEnvironment    = $effectiveAcquisitionEnvironment
         DefinitionPath                     = $definitionDocumentInfo.Path
         Definition                         = $definition
@@ -1490,7 +1684,7 @@ Get-PackageModelConfig -DefinitionId VSCodeRuntime
     }
 }
 
-function Resolve-PackageModelPaths {
+function Resolve-PackagePaths {
 <#
 .SYNOPSIS
 Resolves the concrete package-file workspace/depot and install paths for a selected release.
@@ -1498,26 +1692,26 @@ Resolves the concrete package-file workspace/depot and install paths for a selec
 .DESCRIPTION
 Builds the shared relative package-file directory for depot and workspace
 storage from the selected release identity, resolves the effective install
-directory template, and attaches the resolved directories to the PackageModel
+directory template, and attaches the resolved directories to the Package
 result object.
 
-.PARAMETER PackageModelResult
-The PackageModel result object to enrich.
+.PARAMETER PackageResult
+The Package result object to enrich.
 
 .EXAMPLE
-Resolve-PackageModelPaths -PackageModelResult $result
+Resolve-PackagePaths -PackageResult $result
 #>
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true)]
-        [psobject]$PackageModelResult
+        [psobject]$PackageResult
     )
 
-    $packageModelConfig = $PackageModelResult.PackageModelConfig
-    $definition = $packageModelConfig.Definition
-    $package = $PackageModelResult.Package
+    $packageConfig = $PackageResult.PackageConfig
+    $definition = $packageConfig.Definition
+    $package = $PackageResult.Package
     if (-not $package) {
-        throw 'Resolve-PackageModelPaths requires a selected release.'
+        throw 'Resolve-PackagePaths requires a selected release.'
     }
     $installKind = if ($package.PSObject.Properties['install'] -and $package.install -and $package.install.PSObject.Properties['kind']) {
         [string]$package.install.kind
@@ -1533,24 +1727,24 @@ Resolve-PackageModelPaths -PackageModelResult $result
         'directory'
     }
 
-    $packageFileRelativeDirectory = Get-PackageModelPackageFileRelativeDirectory -PackageModelConfig $packageModelConfig -Package $package
+    $packageFileRelativeDirectory = Get-PackagePackageFileRelativeDirectory -PackageConfig $packageConfig -Package $package
     $installDirectoryTemplate = $null
     if ($package.PSObject.Properties['install'] -and $package.install -and
         $package.install.PSObject.Properties['installDirectory'] -and
         -not [string]::IsNullOrWhiteSpace([string]$package.install.installDirectory)) {
-        $installDirectoryTemplate = Resolve-PackageModelTemplateText -Text ([string]$package.install.installDirectory) -PackageModelConfig $packageModelConfig -Package $package
+        $installDirectoryTemplate = Resolve-PackageTemplateText -Text ([string]$package.install.installDirectory) -PackageConfig $packageConfig -Package $package
     }
     elseif (-not [string]::Equals($installKind, 'reuseExisting', [System.StringComparison]::OrdinalIgnoreCase) -and
         -not [string]::Equals($installTargetKind, 'machinePrerequisite', [System.StringComparison]::OrdinalIgnoreCase)) {
-        throw "PackageModel definition '$($definition.id)' does not define an install target path. Use install.installDirectory."
+        throw "Package definition '$($definition.id)' does not define an install target path. Use install.installDirectory."
     }
 
     $normalizedPackageFileRelativeDirectory = $packageFileRelativeDirectory.Trim() -replace '/', '\'
     if ([System.IO.Path]::IsPathRooted($normalizedPackageFileRelativeDirectory)) {
-        throw "PackageModel definition '$($definition.id)' must use a relative package-file directory."
+        throw "Package definition '$($definition.id)' must use a relative package-file directory."
     }
 
-    $installWorkspaceDirectory = [System.IO.Path]::GetFullPath((Join-Path $packageModelConfig.InstallWorkspaceRootDirectory $normalizedPackageFileRelativeDirectory))
+    $installWorkspaceDirectory = [System.IO.Path]::GetFullPath((Join-Path $packageConfig.InstallWorkspaceRootDirectory $normalizedPackageFileRelativeDirectory))
 
     $installDirectory = $null
     if (-not [string]::IsNullOrWhiteSpace($installDirectoryTemplate)) {
@@ -1559,7 +1753,7 @@ Resolve-PackageModelPaths -PackageModelResult $result
             [System.IO.Path]::GetFullPath($expandedInstallDirectoryTemplate)
         }
         else {
-            [System.IO.Path]::GetFullPath((Join-Path $packageModelConfig.PreferredTargetInstallRootDirectory $expandedInstallDirectoryTemplate))
+            [System.IO.Path]::GetFullPath((Join-Path $packageConfig.PreferredTargetInstallRootDirectory $expandedInstallDirectoryTemplate))
         }
     }
 
@@ -1570,45 +1764,47 @@ Resolve-PackageModelPaths -PackageModelResult $result
         $package.packageFile.PSObject.Properties['fileName'] -and
         -not [string]::IsNullOrWhiteSpace([string]$package.packageFile.fileName)) {
         $packageFilePath = Join-Path $installWorkspaceDirectory ([string]$package.packageFile.fileName)
-        $defaultPackageDepotDirectory = [System.IO.Path]::GetFullPath((Join-Path $packageModelConfig.DefaultPackageDepotDirectory $normalizedPackageFileRelativeDirectory))
-        $defaultPackageDepotFilePath = Join-Path $defaultPackageDepotDirectory ([string]$package.packageFile.fileName)
+        if (-not [string]::IsNullOrWhiteSpace([string]$packageConfig.DefaultPackageDepotDirectory)) {
+            $defaultPackageDepotDirectory = [System.IO.Path]::GetFullPath((Join-Path $packageConfig.DefaultPackageDepotDirectory $normalizedPackageFileRelativeDirectory))
+            $defaultPackageDepotFilePath = Join-Path $defaultPackageDepotDirectory ([string]$package.packageFile.fileName)
+        }
     }
 
-    $PackageModelResult.InstallWorkspaceDirectory = $installWorkspaceDirectory
-    $PackageModelResult.InstallDirectory = $installDirectory
-    $PackageModelResult.PackageFileRelativeDirectory = $normalizedPackageFileRelativeDirectory
-    $PackageModelResult.PackageFilePath = $packageFilePath
-    $PackageModelResult.DefaultPackageDepotFilePath = $defaultPackageDepotFilePath
+    $PackageResult.InstallWorkspaceDirectory = $installWorkspaceDirectory
+    $PackageResult.InstallDirectory = $installDirectory
+    $PackageResult.PackageFileRelativeDirectory = $normalizedPackageFileRelativeDirectory
+    $PackageResult.PackageFilePath = $packageFilePath
+    $PackageResult.DefaultPackageDepotFilePath = $defaultPackageDepotFilePath
 
     $resolvedInstallDirectoryText = if ([string]::IsNullOrWhiteSpace([string]$installDirectory)) { '<none>' } else { $installDirectory }
     $resolvedPackageFilePathText = if ([string]::IsNullOrWhiteSpace([string]$packageFilePath)) { '<none>' } else { $packageFilePath }
     $resolvedDefaultDepotFilePathText = if ([string]::IsNullOrWhiteSpace([string]$defaultPackageDepotFilePath)) { '<none>' } else { $defaultPackageDepotFilePath }
-    Write-PackageModelExecutionMessage -Message '[STATE] Resolved paths:'
-    Write-PackageModelExecutionMessage -Message ("[PATH] Install workspace: {0}" -f $installWorkspaceDirectory)
-    Write-PackageModelExecutionMessage -Message ("[PATH] Target install directory: {0}" -f $resolvedInstallDirectoryText)
-    Write-PackageModelExecutionMessage -Message ("[PATH] Package file: {0}" -f $resolvedPackageFilePathText)
-    Write-PackageModelExecutionMessage -Message ("[PATH] Default package depot file: {0}" -f $resolvedDefaultDepotFilePathText)
+    Write-PackageExecutionMessage -Message '[STATE] Resolved paths:'
+    Write-PackageExecutionMessage -Message ("[PATH] Install workspace: {0}" -f $installWorkspaceDirectory)
+    Write-PackageExecutionMessage -Message ("[PATH] Target install directory: {0}" -f $resolvedInstallDirectoryText)
+    Write-PackageExecutionMessage -Message ("[PATH] Package file: {0}" -f $resolvedPackageFilePathText)
+    Write-PackageExecutionMessage -Message ("[PATH] Default package depot file: {0}" -f $resolvedDefaultDepotFilePathText)
 
-    return $PackageModelResult
+    return $PackageResult
 }
 
-function New-PackageModelResult {
+function New-PackageResult {
 <#
 .SYNOPSIS
-Creates the initial PackageModel result object.
+Creates the initial Package result object.
 
 .DESCRIPTION
-Creates the result object that later PackageModel stage helpers enrich with
+Creates the result object that later Package stage helpers enrich with
 release selection, package file, install, ownership, validation, and entry-point data.
 
 .PARAMETER CommandName
 The command that owns the result.
 
-.PARAMETER PackageModelConfig
-The resolved PackageModel config object for the command.
+.PARAMETER PackageConfig
+The resolved Package config object for the command.
 
 .EXAMPLE
-New-PackageModelResult -CommandName Invoke-VSCodeRuntime -PackageModelConfig $config
+New-PackageResult -CommandName Invoke-VSCodeRuntime -PackageConfig $config
 #>
     [CmdletBinding()]
     param(
@@ -1616,7 +1812,7 @@ New-PackageModelResult -CommandName Invoke-VSCodeRuntime -PackageModelConfig $co
         [string]$CommandName,
 
         [Parameter(Mandatory = $true)]
-        [psobject]$PackageModelConfig
+        [psobject]$PackageConfig
     )
 
     return [pscustomobject]@{
@@ -1625,21 +1821,22 @@ New-PackageModelResult -CommandName Invoke-VSCodeRuntime -PackageModelConfig $co
         FailureReason                    = $null
         ErrorMessage                     = $null
         CurrentStep                      = 'Pending'
-        DefinitionId                     = $PackageModelConfig.DefinitionId
-        DefinitionRepositoryId           = $PackageModelConfig.DefinitionRepositoryId
-        DefinitionFileName               = $PackageModelConfig.DefinitionFileName
-        Display                          = $PackageModelConfig.Display
-        Platform                         = $PackageModelConfig.Platform
-        Architecture                     = $PackageModelConfig.Architecture
-        OSVersion                        = $PackageModelConfig.OSVersion
-        ReleaseTrack                     = $PackageModelConfig.ReleaseTrack
-        SourceInventoryPath              = $PackageModelConfig.SourceInventoryPath
-        InstallWorkspaceRootDirectory    = $PackageModelConfig.InstallWorkspaceRootDirectory
-        DefaultPackageDepotDirectory     = $PackageModelConfig.DefaultPackageDepotDirectory
-        PreferredTargetInstallRootDirectory = $PackageModelConfig.PreferredTargetInstallRootDirectory
-        LocalRepositoryRoot              = $PackageModelConfig.LocalRepositoryRoot
-        PackageFileIndexFilePath         = $PackageModelConfig.PackageFileIndexFilePath
-        PackageStateIndexFilePath        = $PackageModelConfig.PackageStateIndexFilePath
+        DefinitionId                     = $PackageConfig.DefinitionId
+        DefinitionRepositoryId           = $PackageConfig.DefinitionRepositoryId
+        DefinitionFileName               = $PackageConfig.DefinitionFileName
+        Display                          = $PackageConfig.Display
+        Platform                         = $PackageConfig.Platform
+        Architecture                     = $PackageConfig.Architecture
+        OSVersion                        = $PackageConfig.OSVersion
+        ReleaseTrack                     = $PackageConfig.ReleaseTrack
+        SourceInventoryPath              = $PackageConfig.SourceInventoryPath
+        DepotInventoryPath               = $PackageConfig.DepotInventoryPath
+        InstallWorkspaceRootDirectory    = $PackageConfig.InstallWorkspaceRootDirectory
+        DefaultPackageDepotDirectory     = $PackageConfig.DefaultPackageDepotDirectory
+        PreferredTargetInstallRootDirectory = $PackageConfig.PreferredTargetInstallRootDirectory
+        LocalRepositoryRoot              = $PackageConfig.LocalRepositoryRoot
+        PackageFileIndexFilePath         = $PackageConfig.PackageFileIndexFilePath
+        PackageStateIndexFilePath        = $PackageConfig.PackageStateIndexFilePath
         Package                          = $null
         EffectiveRelease                 = $null
         PackageId                        = $null
@@ -1660,7 +1857,7 @@ New-PackageModelResult -CommandName Invoke-VSCodeRuntime -PackageModelConfig $co
         Validation                       = $null
         EntryPoints                      = $null
         PathRegistration                 = $null
-        PackageModelConfig               = $PackageModelConfig
+        PackageConfig               = $PackageConfig
     }
 }
 

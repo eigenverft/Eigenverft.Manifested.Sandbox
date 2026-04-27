@@ -2,15 +2,15 @@
     Eigenverft.Manifested.Sandbox.Package.ExecutionMessage
 #>
 
-function Write-PackageModelExecutionMessage {
+function Write-PackageExecutionMessage {
 <#
 .SYNOPSIS
-Writes a PackageModel execution message with a safe console fallback.
+Writes a Package execution message with a safe console fallback.
 
 .DESCRIPTION
 Routes messages through the generic `Write-StandardMessage` helper when it is
 available in the current session. If that helper is missing or throws, this
-adapter falls back to plain `Write-Host` so PackageModel flow tracing stays
+adapter falls back to plain `Write-Host` so Package flow tracing stays
 visible even when the generic logger is unavailable.
 
 .PARAMETER Message
@@ -20,7 +20,7 @@ The message text to write.
 The message severity.
 
 .EXAMPLE
-Write-PackageModelExecutionMessage -Message '[STEP] ResolvePackage'
+Write-PackageExecutionMessage -Message '[STEP] ResolvePackage'
 #>
     [CmdletBinding()]
     param(
