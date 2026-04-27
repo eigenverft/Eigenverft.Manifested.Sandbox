@@ -110,7 +110,7 @@
       "acquisitionCandidates": [
         {
           "kind": "packageDepot",
-          "priority": 250,
+          "searchOrder": 100,
           "verification": {
             "mode": "optional"
           }
@@ -118,7 +118,7 @@
         {
           "kind": "download",
           "sourceId": "ghCliGitHub",
-          "priority": 200,
+          "searchOrder": 900,
           "verification": {
             "mode": "required"
           }
@@ -152,7 +152,7 @@
       "acquisitionCandidates": [
         {
           "kind": "packageDepot",
-          "priority": 250,
+          "searchOrder": 100,
           "verification": {
             "mode": "optional"
           }
@@ -160,7 +160,7 @@
         {
           "kind": "download",
           "sourceId": "ghCliGitHub",
-          "priority": 200,
+          "searchOrder": 900,
           "verification": {
             "mode": "required"
           }

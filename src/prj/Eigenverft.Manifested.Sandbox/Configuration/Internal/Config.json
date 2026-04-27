@@ -10,7 +10,8 @@
     "localRepositoryRoot": "%LOCALAPPDATA%/Eigenverft.Manifested.Sandbox/PackageRepositories",
     "acquisitionEnvironment": {
       "stores": {
-        "installWorkspaceDirectory": "%LOCALAPPDATA%/Eigenverft.Manifested.Sandbox/InstallWorkspace"
+        "packageFileStagingDirectory": "%LOCALAPPDATA%/Eigenverft.Manifested.Sandbox/PackageFileStaging",
+        "packageInstallStageDirectory": "%LOCALAPPDATA%/Eigenverft.Manifested.Sandbox/PackageInstallStage"
       },
       "defaults": {
         "allowFallback": true,

@@ -456,39 +456,37 @@ Install-PackageArchive -PackageResult $result
     }
 
     $install = $PackageResult.Package.install
-    $stageInfo = $null
-    try {
-        $stageInfo = Expand-ArchiveToStage -ArchivePath $PackageResult.PackageFilePath -Prefix 'package'
-        $expandedRoot = $stageInfo.ExpandedRoot
-        if ($install.PSObject.Properties['expandedRoot'] -and
-            -not [string]::IsNullOrWhiteSpace([string]$install.expandedRoot) -and
-            [string]$install.expandedRoot -ne 'auto') {
-            $expandedRoot = Join-Path $stageInfo.StagePath (([string]$install.expandedRoot) -replace '/', '\')
-        }
-
-        if (-not (Test-Path -LiteralPath $expandedRoot -PathType Container)) {
-            throw "Expanded package root '$expandedRoot' was not found for '$($PackageResult.PackageId)'."
-        }
-
-        $null = New-Item -ItemType Directory -Path (Split-Path -Parent $PackageResult.InstallDirectory) -Force
-        if (Test-Path -LiteralPath $PackageResult.InstallDirectory) {
-            Remove-Item -LiteralPath $PackageResult.InstallDirectory -Recurse -Force
-        }
-
-        New-Item -ItemType Directory -Path $PackageResult.InstallDirectory -Force | Out-Null
-        Get-ChildItem -LiteralPath $expandedRoot -Force | ForEach-Object {
-            Move-Item -LiteralPath $_.FullName -Destination $PackageResult.InstallDirectory -Force
-        }
-
-        foreach ($relativePath in @($install.createDirectories)) {
-            $targetDirectory = Join-Path $PackageResult.InstallDirectory (([string]$relativePath) -replace '/', '\')
-            New-Item -ItemType Directory -Path $targetDirectory -Force | Out-Null
-        }
+    if ([string]::IsNullOrWhiteSpace([string]$PackageResult.PackageInstallStageDirectory)) {
+        throw "Package archive install for '$($PackageResult.PackageId)' requires a package install stage directory."
     }
-    finally {
-        if ($stageInfo) {
-            Remove-PathIfExists -Path $stageInfo.StagePath | Out-Null
-        }
+
+    $stagePath = [System.IO.Path]::GetFullPath([string]$PackageResult.PackageInstallStageDirectory)
+    Remove-PathIfExists -Path $stagePath | Out-Null
+    Expand-ArchiveToDirectory -ArchivePath $PackageResult.PackageFilePath -DestinationDirectory $stagePath -Overwrite | Out-Null
+    $expandedRoot = Get-ExpandedArchiveRoot -StagePath $stagePath
+    if ($install.PSObject.Properties['expandedRoot'] -and
+        -not [string]::IsNullOrWhiteSpace([string]$install.expandedRoot) -and
+        [string]$install.expandedRoot -ne 'auto') {
+        $expandedRoot = Join-Path $stagePath (([string]$install.expandedRoot) -replace '/', '\')
+    }
+
+    if (-not (Test-Path -LiteralPath $expandedRoot -PathType Container)) {
+        throw "Expanded package root '$expandedRoot' was not found for '$($PackageResult.PackageId)'."
+    }
+
+    $null = New-Item -ItemType Directory -Path (Split-Path -Parent $PackageResult.InstallDirectory) -Force
+    if (Test-Path -LiteralPath $PackageResult.InstallDirectory) {
+        Remove-Item -LiteralPath $PackageResult.InstallDirectory -Recurse -Force
+    }
+
+    New-Item -ItemType Directory -Path $PackageResult.InstallDirectory -Force | Out-Null
+    Get-ChildItem -LiteralPath $expandedRoot -Force | ForEach-Object {
+        Move-Item -LiteralPath $_.FullName -Destination $PackageResult.InstallDirectory -Force
+    }
+
+    foreach ($relativePath in @($install.createDirectories)) {
+        $targetDirectory = Join-Path $PackageResult.InstallDirectory (([string]$relativePath) -replace '/', '\')
+        New-Item -ItemType Directory -Path $targetDirectory -Force | Out-Null
     }
 
     return [pscustomobject]@{
@@ -644,8 +642,9 @@ Invoke-PackageInstallerProcess -PackageResult $result
         $resolvedArgument = Resolve-PackageTemplateText -Text ([string]$argument) -PackageConfig $PackageResult.PackageConfig -Package $PackageResult.Package -ExtraTokens @{
                 packageFilePath   = $PackageResult.PackageFilePath
                 installDirectory  = $PackageResult.InstallDirectory
-                installWorkspaceDirectory = $PackageResult.InstallWorkspaceDirectory
-                downloadDirectory = $PackageResult.InstallWorkspaceDirectory
+                packageFileStagingDirectory = $PackageResult.PackageFileStagingDirectory
+                packageInstallStageDirectory = $PackageResult.PackageInstallStageDirectory
+                downloadDirectory = $PackageResult.PackageFileStagingDirectory
                 logPath           = $logPath
                 timestamp         = $timestamp
             }
@@ -661,7 +660,7 @@ Invoke-PackageInstallerProcess -PackageResult $result
         $PackageResult.InstallDirectory
     }
     else {
-        $PackageResult.InstallWorkspaceDirectory
+        $PackageResult.PackageInstallStageDirectory
     }
     if (-not [string]::IsNullOrWhiteSpace([string]$workingDirectory)) {
         $null = New-Item -ItemType Directory -Path $workingDirectory -Force
@@ -780,8 +779,8 @@ Install-PackagePackage -PackageResult $result
         throw "Package release '$($package.id)' requires an existing install, but no reusable install passed validation."
     }
 
-    if ($PackageResult.PackageFileSave -and -not $PackageResult.PackageFileSave.Success) {
-        throw $PackageResult.PackageFileSave.ErrorMessage
+    if ($PackageResult.PackageFilePreparation -and -not $PackageResult.PackageFilePreparation.Success) {
+        throw $PackageResult.PackageFilePreparation.ErrorMessage
     }
 
     switch -Exact ([string]$install.kind) {
@@ -825,4 +824,5 @@ Install-PackagePackage -PackageResult $result
     Write-PackageExecutionMessage -Message ("[ACTION] Completed Package-owned install with status '{0}'." -f $PackageResult.Install.Status)
     return $PackageResult
 }
+
 

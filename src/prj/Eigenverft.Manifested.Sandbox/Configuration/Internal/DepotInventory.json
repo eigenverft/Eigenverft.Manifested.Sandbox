@@ -5,24 +5,36 @@
       "defaultPackageDepot": {
         "kind": "filesystem",
         "enabled": true,
-        "priority": 300,
-        "basePath": "%LOCALAPPDATA%/Eigenverft.Manifested.Sandbox/DefaultPackageDepot"
+        "searchOrder": 100,
+        "basePath": "%LOCALAPPDATA%/Eigenverft.Manifested.Sandbox/DefaultPackageDepot",
+        "readable": true,
+        "writable": true,
+        "mirrorTarget": true,
+        "ensureExists": true
       },
       "sitePackageDepot": {
         "kind": "filesystem",
         "enabled": false,
-        "priority": 200,
+        "searchOrder": 200,
         "siteCodes": [
           "BER",
           "PD"
         ],
-        "basePath": "\\\\site-server\\share\\PackageDepot"
+        "basePath": "\\\\site-server\\share\\PackageDepot",
+        "readable": true,
+        "writable": false,
+        "mirrorTarget": false,
+        "ensureExists": false
       },
       "corpPackageDepot": {
         "kind": "filesystem",
         "enabled": false,
-        "priority": 100,
-        "basePath": "\\\\corp-server\\share\\PackageDepot"
+        "searchOrder": 300,
+        "basePath": "\\\\corp-server\\share\\PackageDepot",
+        "readable": true,
+        "writable": false,
+        "mirrorTarget": false,
+        "ensureExists": false
       }
     }
   }

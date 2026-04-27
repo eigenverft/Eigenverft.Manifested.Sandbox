@@ -118,7 +118,7 @@
       "acquisitionCandidates": [
         {
           "kind": "packageDepot",
-          "priority": 250,
+          "searchOrder": 100,
           "verification": {
             "mode": "optional"
           }
@@ -127,7 +127,7 @@
           "kind": "download",
           "sourceId": "pythonNuGetPackage",
           "sourcePath": "python/3.13.13/python.3.13.13.nupkg",
-          "priority": 200,
+          "searchOrder": 900,
           "verification": {
             "mode": "required"
           }
@@ -161,7 +161,7 @@
       "acquisitionCandidates": [
         {
           "kind": "packageDepot",
-          "priority": 250,
+          "searchOrder": 100,
           "verification": {
             "mode": "optional"
           }
@@ -170,7 +170,7 @@
           "kind": "download",
           "sourceId": "pythonNuGetPackage",
           "sourcePath": "pythonarm64/3.13.13/pythonarm64.3.13.13.nupkg",
-          "priority": 200,
+          "searchOrder": 900,
           "verification": {
             "mode": "required"
           }

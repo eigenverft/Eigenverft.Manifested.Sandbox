@@ -122,7 +122,7 @@
       "acquisitionCandidates": [
         {
           "kind": "packageDepot",
-          "priority": 250,
+          "searchOrder": 100,
           "verification": {
             "mode": "optional"
           }
@@ -131,7 +131,7 @@
           "kind": "download",
           "sourceId": "visualCppRedistributableDownload",
           "sourcePath": "vc14/vc_redist.x64.exe",
-          "priority": 200,
+          "searchOrder": 900,
           "verification": {
             "mode": "required"
           }

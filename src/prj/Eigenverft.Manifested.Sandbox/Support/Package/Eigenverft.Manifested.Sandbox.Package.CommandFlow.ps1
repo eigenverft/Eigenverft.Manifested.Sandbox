@@ -14,8 +14,8 @@ function Get-PackageOutcomeSummary {
     else {
         [string]$PackageResult.InstallDirectory
     }
-    $packageFileStatusText = if ($PackageResult.PackageFileSave -and $PackageResult.PackageFileSave.PSObject.Properties['Status']) {
-        [string]$PackageResult.PackageFileSave.Status
+    $packageFileStatusText = if ($PackageResult.PackageFilePreparation -and $PackageResult.PackageFilePreparation.PSObject.Properties['Status']) {
+        [string]$PackageResult.PackageFilePreparation.Status
     }
     else {
         '<none>'
@@ -64,14 +64,48 @@ function Get-PackageCommandFailureReason {
         'FindExistingPackage' { return 'ExistingPackageDiscoveryFailed' }
         'ClassifyExistingPackage' { return 'ExistingPackageOwnershipClassificationFailed' }
         'ResolveExistingPackageDecision' { return 'ExistingPackageDecisionFailed' }
-        'SavePackageFile' { return 'PackageFileSaveFailed' }
+        'PreparePackageInstallFile' { return 'PackageFilePreparationFailed' }
         'InstallPackage' { return 'PackageInstallFailed' }
         'ValidateInstalledPackage' { return 'InstalledPackageValidationFailed' }
         'RegisterPath' { return 'PathRegistrationFailed' }
         'ResolveEntryPoints' { return 'EntryPointResolutionFailed' }
         'UpdateOwnership' { return 'OwnershipUpdateFailed' }
+        'ClearPackageWorkDirectories' { return 'PackageWorkDirectoryCleanupFailed' }
         default { return 'PackageCommandFailed' }
     }
+}
+
+function Clear-PackageWorkDirectories {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [psobject]$PackageResult
+    )
+
+    foreach ($cleanupTarget in @(
+            [pscustomobject]@{ Label = 'package file staging'; Path = [string]$PackageResult.PackageFileStagingDirectory }
+            [pscustomobject]@{ Label = 'package install stage'; Path = [string]$PackageResult.PackageInstallStageDirectory }
+        )) {
+        if ([string]::IsNullOrWhiteSpace($cleanupTarget.Path)) {
+            Write-PackageExecutionMessage -Message ("[STATE] {0} cleanup skipped because no directory was resolved." -f $cleanupTarget.Label)
+            continue
+        }
+
+        try {
+            $removed = Remove-PathIfExists -Path $cleanupTarget.Path
+            if ($removed) {
+                Write-PackageExecutionMessage -Message ("[ACTION] Cleaned {0} directory '{1}'." -f $cleanupTarget.Label, $cleanupTarget.Path)
+            }
+            else {
+                Write-PackageExecutionMessage -Message ("[STATE] {0} cleanup skipped because '{1}' does not exist." -f $cleanupTarget.Label, $cleanupTarget.Path)
+            }
+        }
+        catch {
+            Write-PackageExecutionMessage -Level 'WRN' -Message ("[WARN] Failed to clean {0} directory '{1}': {2}" -f $cleanupTarget.Label, $cleanupTarget.Path, $_.Exception.Message)
+        }
+    }
+
+    return $PackageResult
 }
 
 function Invoke-PackageDefinitionCommand {
@@ -99,12 +133,13 @@ function Invoke-PackageDefinitionCommand {
         [pscustomobject]@{ Name = 'FindExistingPackage'; Message = '[STEP] Discovering existing installs.'; Action = { param($r) Find-PackageExistingPackage -PackageResult $r } },
         [pscustomobject]@{ Name = 'ClassifyExistingPackage'; Message = '[STEP] Classifying install ownership.'; Action = { param($r) Classify-PackageExistingPackage -PackageResult $r } },
         [pscustomobject]@{ Name = 'ResolveExistingPackageDecision'; Message = '[STEP] Deciding reuse, adoption, or replacement.'; Action = { param($r) Resolve-PackageExistingPackageDecision -PackageResult $r } },
-        [pscustomobject]@{ Name = 'SavePackageFile'; Message = '[STEP] Ensuring package file is available.'; Action = { param($r) Save-PackagePackageFile -PackageResult $r } },
+        [pscustomobject]@{ Name = 'PreparePackageInstallFile'; Message = '[STEP] Ensuring package file is available.'; Action = { param($r) Prepare-PackageInstallFile -PackageResult $r } },
         [pscustomobject]@{ Name = 'InstallPackage'; Message = '[STEP] Installing or reusing the package.'; Action = { param($r) Install-PackagePackage -PackageResult $r } },
         [pscustomobject]@{ Name = 'ValidateInstalledPackage'; Message = '[STEP] Validating the installed package.'; Action = { param($r) Test-PackageInstalledPackage -PackageResult $r } },
         [pscustomobject]@{ Name = 'RegisterPath'; Message = '[STEP] Applying PATH registration.'; Action = { param($r) Register-PackagePath -PackageResult $r } },
         [pscustomobject]@{ Name = 'ResolveEntryPoints'; Message = '[STEP] Resolving entry points.'; Action = { param($r) Resolve-PackageEntryPoints -PackageResult $r } },
-        [pscustomobject]@{ Name = 'UpdateOwnership'; Message = '[STEP] Updating ownership tracking.'; Action = { param($r) Update-PackageOwnershipRecord -PackageResult $r } }
+        [pscustomobject]@{ Name = 'UpdateOwnership'; Message = '[STEP] Updating ownership tracking.'; Action = { param($r) Update-PackageOwnershipRecord -PackageResult $r } },
+        [pscustomobject]@{ Name = 'ClearPackageWorkDirectories'; Message = '[STEP] Cleaning package staging directories.'; Action = { param($r) Clear-PackageWorkDirectories -PackageResult $r } }
     )
 
     try {
@@ -126,4 +161,5 @@ function Invoke-PackageDefinitionCommand {
 
     return (Complete-PackageResult -PackageResult $result)
 }
+
 

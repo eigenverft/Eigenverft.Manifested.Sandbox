@@ -43,7 +43,7 @@ Get-PackagePackageFileIndex -PackageConfig $config
     }
 }
 
-function Save-PackagePackageFileIndex {
+function Prepare-PackageInstallFileIndex {
 <#
 .SYNOPSIS
 Writes the Package package-file index to disk.
@@ -58,7 +58,7 @@ The target index file path.
 The package-file records to persist.
 
 .EXAMPLE
-Save-PackagePackageFileIndex -IndexPath $path -Records $records
+Prepare-PackageInstallFileIndex -IndexPath $path -Records $records
 #>
     [CmdletBinding()]
     param(
@@ -145,7 +145,7 @@ Update-PackagePackageFileIndexRecord -PackageResult $result -PackageFilePath $pa
         updatedAtUtc = [DateTime]::UtcNow.ToString('o')
     }
 
-    Save-PackagePackageFileIndex -IndexPath $index.Path -Records $records
+    Prepare-PackageInstallFileIndex -IndexPath $index.Path -Records $records
 }
 
 function Get-PackageSourceDefinition {
@@ -756,17 +756,100 @@ function Get-PackagePackageDepotSources {
         if (-not [string]::Equals([string]$source.kind, 'filesystem', [System.StringComparison]::OrdinalIgnoreCase)) {
             continue
         }
+        if ($source.PSObject.Properties['readable'] -and -not [bool]$source.readable) {
+            continue
+        }
 
         $orderedSources.Add([pscustomobject]@{
-            id       = $property.Name
-            priority = if ($source.PSObject.Properties['priority']) { [int]$source.priority } else { 1000 }
+            id           = $property.Name
+            searchOrder  = if ($source.PSObject.Properties['searchOrder']) { [int]$source.searchOrder } else { 1000 }
+            readable     = if ($source.PSObject.Properties['readable']) { [bool]$source.readable } else { $true }
+            writable     = if ($source.PSObject.Properties['writable']) { [bool]$source.writable } else { $false }
+            mirrorTarget = if ($source.PSObject.Properties['mirrorTarget']) { [bool]$source.mirrorTarget } else { $false }
+            ensureExists = if ($source.PSObject.Properties['ensureExists']) { [bool]$source.ensureExists } else { $false }
         }) | Out-Null
     }
 
     return @(
         $orderedSources.ToArray() |
-            Sort-Object -Property priority, id
+            Sort-Object -Property searchOrder, id
     )
+}
+
+function Get-PackageWritableMirrorDepotSources {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [psobject]$PackageConfig
+    )
+
+    $mirrorSources = New-Object System.Collections.Generic.List[object]
+    foreach ($property in @($PackageConfig.EnvironmentSources.PSObject.Properties)) {
+        $source = $property.Value
+        if (-not [string]::Equals([string]$source.kind, 'filesystem', [System.StringComparison]::OrdinalIgnoreCase)) {
+            continue
+        }
+        if (-not ($source.PSObject.Properties['writable'] -and [bool]$source.writable)) {
+            continue
+        }
+        if (-not ($source.PSObject.Properties['mirrorTarget'] -and [bool]$source.mirrorTarget)) {
+            continue
+        }
+        if (-not ($source.PSObject.Properties['basePath'] -and -not [string]::IsNullOrWhiteSpace([string]$source.basePath))) {
+            continue
+        }
+
+        $mirrorSources.Add([pscustomobject]@{
+            id           = $property.Name
+            basePath     = [string]$source.basePath
+            searchOrder  = if ($source.PSObject.Properties['searchOrder']) { [int]$source.searchOrder } else { 1000 }
+            ensureExists = if ($source.PSObject.Properties['ensureExists']) { [bool]$source.ensureExists } else { $false }
+        }) | Out-Null
+    }
+
+    return @(
+        $mirrorSources.ToArray() |
+            Sort-Object -Property searchOrder, id
+    )
+}
+
+function Copy-PackageFileToMirrorDepots {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [psobject]$PackageResult,
+
+        [Parameter(Mandatory = $true)]
+        [psobject]$SourceDefinition
+    )
+
+    if (-not $PackageResult.PackageConfig.MirrorDownloadedArtifactsToDefaultPackageDepot) {
+        return
+    }
+    if ([string]::IsNullOrWhiteSpace([string]$PackageResult.PackageFilePath) -or
+        -not (Test-Path -LiteralPath $PackageResult.PackageFilePath -PathType Leaf)) {
+        return
+    }
+    if (-not $PackageResult.Package -or -not $PackageResult.Package.PSObject.Properties['packageFile'] -or
+        -not $PackageResult.Package.packageFile.PSObject.Properties['fileName']) {
+        return
+    }
+
+    foreach ($mirrorSource in @(Get-PackageWritableMirrorDepotSources -PackageConfig $PackageResult.PackageConfig)) {
+        $targetDirectory = [System.IO.Path]::GetFullPath((Join-Path $mirrorSource.basePath $PackageResult.PackageFileRelativeDirectory))
+        $targetPath = Join-Path $targetDirectory ([string]$PackageResult.Package.packageFile.fileName)
+        try {
+            if ($mirrorSource.ensureExists) {
+                $null = New-Item -ItemType Directory -Path $targetDirectory -Force
+            }
+            $null = Copy-FileToPath -SourcePath $PackageResult.PackageFilePath -TargetPath $targetPath -Overwrite
+            Update-PackagePackageFileIndexRecord -PackageResult $PackageResult -PackageFilePath $targetPath -SourceScope 'environment' -SourceId $mirrorSource.id
+            Write-PackageExecutionMessage -Message ("[ACTION] Mirrored package file to depot '{0}' at '{1}'." -f $mirrorSource.id, $targetPath)
+        }
+        catch {
+            Write-PackageExecutionMessage -Level 'WRN' -Message ("[WARN] Failed to mirror package file to depot '{0}' at '{1}': {2}" -f $mirrorSource.id, $targetPath, $_.Exception.Message)
+        }
+    }
 }
 
 function Build-PackageAcquisitionPlan {
@@ -775,7 +858,7 @@ function Build-PackageAcquisitionPlan {
 Builds the internal Package acquisition plan for the selected release.
 
 .DESCRIPTION
-Normalizes the ordered acquisition candidates and captures the install-workspace
+    Normalizes the ordered acquisition candidates and captures the install-preparation
 and default-depot targets so later package-file save steps can execute linearly.
 
 .PARAMETER PackageResult
@@ -798,7 +881,7 @@ Build-PackageAcquisitionPlan -PackageResult $result
     if ([string]::Equals([string]$PackageResult.InstallOrigin, 'AlreadySatisfied', [System.StringComparison]::OrdinalIgnoreCase)) {
         $PackageResult.AcquisitionPlan = [pscustomobject]@{
             PackageFileRequired      = $false
-            InstallWorkspaceFilePath = $PackageResult.PackageFilePath
+            PackageFileStagingFilePath = $PackageResult.PackageFilePath
             Candidates               = @()
         }
         Write-PackageExecutionMessage -Message '[STATE] Acquisition skipped because package target is already satisfied.'
@@ -809,7 +892,7 @@ Build-PackageAcquisitionPlan -PackageResult $result
     $orderedCandidates = New-Object System.Collections.Generic.List[object]
     if ($requiresPackageFile -and $package.PSObject.Properties['acquisitionCandidates']) {
         foreach ($candidate in @($package.acquisitionCandidates | Sort-Object -Property @{
-                    Expression = { if ($_.PSObject.Properties['priority']) { [int]$_.priority } else { [int]::MaxValue } }
+                    Expression = { if ($_.PSObject.Properties['searchOrder']) { [int]$_.searchOrder } else { [int]::MaxValue } }
                 })) {
             $resolvedVerification = Resolve-PackageAcquisitionCandidateVerification -Package $package -AcquisitionCandidate $candidate
             switch -Exact ([string]$candidate.kind) {
@@ -818,8 +901,8 @@ Build-PackageAcquisitionPlan -PackageResult $result
                     foreach ($depotSource in @(Get-PackagePackageDepotSources -PackageConfig $PackageResult.PackageConfig)) {
                         $orderedCandidates.Add([pscustomobject]@{
                             kind         = 'packageDepot'
-                            priority     = if ($candidate.PSObject.Properties['priority']) { [int]$candidate.priority } else { [int]::MaxValue }
-                            sourcePriority = [int]$depotSource.priority
+                            searchOrder     = if ($candidate.PSObject.Properties['searchOrder']) { [int]$candidate.searchOrder } else { [int]::MaxValue }
+                            sourceSearchOrder = [int]$depotSource.searchOrder
                             sourceRef    = [pscustomobject]@{
                                 scope = 'environment'
                                 id    = $depotSource.id
@@ -832,8 +915,8 @@ Build-PackageAcquisitionPlan -PackageResult $result
                 'download' {
                     $orderedCandidates.Add([pscustomobject]@{
                         kind         = 'download'
-                        priority     = if ($candidate.PSObject.Properties['priority']) { [int]$candidate.priority } else { [int]::MaxValue }
-                        sourcePriority = 1000
+                        searchOrder     = if ($candidate.PSObject.Properties['searchOrder']) { [int]$candidate.searchOrder } else { [int]::MaxValue }
+                        sourceSearchOrder = 1000
                         sourceRef    = [pscustomobject]@{
                             scope = 'definition'
                             id    = [string]$candidate.sourceId
@@ -845,8 +928,8 @@ Build-PackageAcquisitionPlan -PackageResult $result
                 'filesystem' {
                     $orderedCandidates.Add([pscustomobject]@{
                         kind         = 'filesystem'
-                        priority     = if ($candidate.PSObject.Properties['priority']) { [int]$candidate.priority } else { [int]::MaxValue }
-                        sourcePriority = 1000
+                        searchOrder     = if ($candidate.PSObject.Properties['searchOrder']) { [int]$candidate.searchOrder } else { [int]::MaxValue }
+                        sourceSearchOrder = 1000
                         sourceRef    = if ($candidate.PSObject.Properties['sourceId'] -and -not [string]::IsNullOrWhiteSpace([string]$candidate.sourceId)) {
                             [pscustomobject]@{
                                 scope = 'environment'
@@ -866,11 +949,11 @@ Build-PackageAcquisitionPlan -PackageResult $result
 
     $PackageResult.AcquisitionPlan = [pscustomobject]@{
         PackageFileRequired    = $requiresPackageFile
-        InstallWorkspaceFilePath = $PackageResult.PackageFilePath
+        PackageFileStagingFilePath = $PackageResult.PackageFilePath
         DefaultPackageDepotFilePath = $PackageResult.DefaultPackageDepotFilePath
         Candidates             = @(
             $orderedCandidates.ToArray() |
-                Sort-Object -Property priority, sourcePriority, @{
+                Sort-Object -Property searchOrder, sourceSearchOrder, @{
                     Expression = {
                         if ($_.sourceRef) { [string]$_.sourceRef.id } else { [string]::Empty }
                     }
@@ -886,7 +969,7 @@ Build-PackageAcquisitionPlan -PackageResult $result
             else {
                 'direct'
             }
-            '{0}@{1}->{2}' -f [string]$candidate.kind, [string]$candidate.priority, $sourceSummary
+            '{0}@{1}->{2}' -f [string]$candidate.kind, [string]$candidate.searchOrder, $sourceSummary
         }
     ) -join ', '
     if ([string]::IsNullOrWhiteSpace($candidateSummary)) {
@@ -897,21 +980,21 @@ Build-PackageAcquisitionPlan -PackageResult $result
     return $PackageResult
 }
 
-function Save-PackagePackageFile {
+function Prepare-PackageInstallFile {
 <#
 .SYNOPSIS
-Ensures the selected package file is present in the install workspace.
+Ensures the selected package file is present in the package file staging.
 
 .DESCRIPTION
 Reuses an already-present verified package file when possible, then checks the
 default package depot, and otherwise attempts each configured acquisition
-candidate in priority order until one succeeds or all candidates fail.
+candidate in searchOrder order until one succeeds or all candidates fail.
 
 .PARAMETER PackageResult
 The Package result object to enrich.
 
 .EXAMPLE
-Save-PackagePackageFile -PackageResult $result
+Prepare-PackageInstallFile -PackageResult $result
 #>
     [CmdletBinding()]
     param(
@@ -923,13 +1006,13 @@ Save-PackagePackageFile -PackageResult $result
     $packageConfig = $PackageResult.PackageConfig
 
     if (-not $package -or -not $package.PSObject.Properties['install'] -or -not $package.install) {
-        throw 'Save-PackagePackageFile requires a selected release with install settings.'
+        throw 'Prepare-PackageInstallFile requires a selected release with install settings.'
     }
 
     if ($PackageResult.ExistingPackage -and
         $PackageResult.ExistingPackage.PSObject.Properties['Decision'] -and
         $PackageResult.ExistingPackage.Decision -in @('ReusePackageOwned', 'AdoptExternal')) {
-        $PackageResult.PackageFileSave = [pscustomobject]@{
+        $PackageResult.PackageFilePreparation = [pscustomobject]@{
             Success         = $true
             Status          = 'Skipped'
             PackageFilePath = $PackageResult.PackageFilePath
@@ -948,7 +1031,7 @@ Save-PackagePackageFile -PackageResult $result
     }
 
     if (-not $PackageResult.AcquisitionPlan.PackageFileRequired) {
-        $PackageResult.PackageFileSave = [pscustomobject]@{
+        $PackageResult.PackageFilePreparation = [pscustomobject]@{
             Success         = $true
             Status          = 'Skipped'
             PackageFilePath = $PackageResult.PackageFilePath
@@ -979,23 +1062,23 @@ Save-PackagePackageFile -PackageResult $result
         $attempts.Add([pscustomobject]@{
             AttemptType        = 'ReuseCheck'
             Status             = if ($verification.Accepted) { 'ReusedPackageFile' } else { 'ReuseRejected' }
-            SourceScope        = 'installWorkspace'
-            SourceId           = 'installWorkspace'
+            SourceScope        = 'packageFileStaging'
+            SourceId           = 'packageFileStaging'
             SourceKind         = 'filesystem'
             ResolvedSource     = $PackageResult.PackageFilePath
             VerificationStatus = $verification.Status
-            ErrorMessage       = if ($verification.Accepted) { $null } else { 'Existing install-workspace file did not satisfy verification.' }
+            ErrorMessage       = if ($verification.Accepted) { $null } else { 'Existing package-file staging file did not satisfy verification.' }
         }) | Out-Null
 
         if ($verification.Accepted) {
-            Update-PackagePackageFileIndexRecord -PackageResult $PackageResult -PackageFilePath $PackageResult.PackageFilePath -SourceScope 'installWorkspace' -SourceId 'installWorkspace'
-            $PackageResult.PackageFileSave = [pscustomobject]@{
+            Update-PackagePackageFileIndexRecord -PackageResult $PackageResult -PackageFilePath $PackageResult.PackageFilePath -SourceScope 'packageFileStaging' -SourceId 'packageFileStaging'
+            $PackageResult.PackageFilePreparation = [pscustomobject]@{
                 Success         = $true
                 Status          = 'ReusedPackageFile'
                 PackageFilePath = $PackageResult.PackageFilePath
                 SelectedSource  = [pscustomobject]@{
-                    SourceScope = 'installWorkspace'
-                    SourceId    = 'installWorkspace'
+                    SourceScope = 'packageFileStaging'
+                    SourceId    = 'packageFileStaging'
                     SourceKind  = 'filesystem'
                     ResolvedSource = $PackageResult.PackageFilePath
                 }
@@ -1004,12 +1087,12 @@ Save-PackagePackageFile -PackageResult $result
                 FailureReason   = $null
                 ErrorMessage    = $null
             }
-            Write-PackageExecutionMessage -Message ("[ACTION] Reused install workspace package file '{0}'." -f $PackageResult.PackageFilePath)
+            Write-PackageExecutionMessage -Message ("[ACTION] Reused package-file staging file '{0}'." -f $PackageResult.PackageFilePath)
             return $PackageResult
         }
     }
 
-    $null = New-Item -ItemType Directory -Path $PackageResult.InstallWorkspaceDirectory -Force
+    $null = New-Item -ItemType Directory -Path $PackageResult.PackageFileStagingDirectory -Force
 
     foreach ($candidate in $orderedCandidates) {
         $sourceDefinition = $null
@@ -1077,12 +1160,8 @@ Save-PackagePackageFile -PackageResult $result
             Move-Item -LiteralPath $stagingPath -Destination $PackageResult.PackageFilePath -Force
             Update-PackagePackageFileIndexRecord -PackageResult $PackageResult -PackageFilePath $PackageResult.PackageFilePath -SourceScope $sourceDefinition.Scope -SourceId $sourceDefinition.Id
 
-            if ([string]::Equals([string]$resolvedSource.Kind, 'download', [System.StringComparison]::OrdinalIgnoreCase) -and
-                $packageConfig.MirrorDownloadedArtifactsToDefaultPackageDepot -and
-                -not [string]::IsNullOrWhiteSpace($PackageResult.DefaultPackageDepotFilePath)) {
-                $null = New-Item -ItemType Directory -Path (Split-Path -Parent $PackageResult.DefaultPackageDepotFilePath) -Force
-                $null = Copy-FileToPath -SourcePath $PackageResult.PackageFilePath -TargetPath $PackageResult.DefaultPackageDepotFilePath -Overwrite
-                Update-PackagePackageFileIndexRecord -PackageResult $PackageResult -PackageFilePath $PackageResult.DefaultPackageDepotFilePath -SourceScope $sourceDefinition.Scope -SourceId $sourceDefinition.Id
+            if ([string]::Equals([string]$resolvedSource.Kind, 'download', [System.StringComparison]::OrdinalIgnoreCase)) {
+                Copy-PackageFileToMirrorDepots -PackageResult $PackageResult -SourceDefinition $sourceDefinition
             }
             elseif ([string]::Equals([string]$sourceDefinition.Scope, 'environment', [System.StringComparison]::OrdinalIgnoreCase) -and
                 [string]::Equals([string]$sourceDefinition.Id, 'defaultPackageDepot', [System.StringComparison]::OrdinalIgnoreCase) -and
@@ -1109,7 +1188,7 @@ Save-PackagePackageFile -PackageResult $result
                 ErrorMessage       = $null
             }) | Out-Null
 
-            $PackageResult.PackageFileSave = [pscustomobject]@{
+            $PackageResult.PackageFilePreparation = [pscustomobject]@{
                 Success         = $true
                 Status          = $saveStatus
                 PackageFilePath = $PackageResult.PackageFilePath
@@ -1149,7 +1228,7 @@ Save-PackagePackageFile -PackageResult $result
         }
     }
 
-    $PackageResult.PackageFileSave = [pscustomobject]@{
+    $PackageResult.PackageFilePreparation = [pscustomobject]@{
         Success         = $false
         Status          = 'Failed'
         PackageFilePath = $PackageResult.PackageFilePath
@@ -1164,4 +1243,5 @@ Save-PackagePackageFile -PackageResult $result
 
     return $PackageResult
 }
+
 

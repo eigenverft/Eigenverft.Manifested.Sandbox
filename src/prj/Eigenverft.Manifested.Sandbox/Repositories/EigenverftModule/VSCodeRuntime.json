@@ -158,7 +158,7 @@
       "acquisitionCandidates": [
         {
           "kind": "packageDepot",
-          "priority": 250,
+          "searchOrder": 100,
           "verification": {
             "mode": "optional"
           }
@@ -166,7 +166,7 @@
         {
           "kind": "download",
           "sourceId": "vsCodeUpdateService",
-          "priority": 200,
+          "searchOrder": 900,
           "sourcePath": "1.116.0/win32-x64-archive/stable",
           "verification": {
             "mode": "required"
@@ -200,7 +200,7 @@
       "acquisitionCandidates": [
         {
           "kind": "packageDepot",
-          "priority": 50,
+          "searchOrder": 100,
           "verification": {
             "mode": "optional"
           }
@@ -208,7 +208,7 @@
         {
           "kind": "download",
           "sourceId": "vsCodeUpdateService",
-          "priority": 200,
+          "searchOrder": 900,
           "sourcePath": "1.116.0/win32-arm64-archive/stable",
           "verification": {
             "mode": "required"

@@ -148,7 +148,8 @@ function Get-PackageStateConfig {
         SourceInventory                     = $sourceInventoryInfo.Document
         SourceInventoryInfo                 = $sourceInventoryInfo
         EffectiveAcquisitionEnvironment     = $effectiveAcquisitionEnvironment
-        InstallWorkspaceRootDirectory       = $effectiveAcquisitionEnvironment.Stores.InstallWorkspaceDirectory
+        PackageFileStagingRootDirectory       = $effectiveAcquisitionEnvironment.Stores.PackageFileStagingDirectory
+        PackageInstallStageRootDirectory      = $effectiveAcquisitionEnvironment.Stores.PackageInstallStageDirectory
         DefaultPackageDepotDirectory        = $effectiveAcquisitionEnvironment.Stores.DefaultPackageDepotDirectory
         PreferredTargetInstallRootDirectory = $preferredTargetInstallDirectory
         LocalRepositoryRoot                 = $localRepositoryRoot
@@ -172,7 +173,8 @@ function Get-PackageState {
 
     $directories = [pscustomobject]@{
         Installed           = Get-PackageStateDirectorySummary -Path $config.PreferredTargetInstallRootDirectory
-        InstallWorkspace    = Get-PackageStateDirectorySummary -Path $config.InstallWorkspaceRootDirectory
+        PackageFileStaging    = Get-PackageStateDirectorySummary -Path $config.PackageFileStagingRootDirectory
+        PackageInstallStage   = Get-PackageStateDirectorySummary -Path $config.PackageInstallStageRootDirectory
         DefaultPackageDepot = Get-PackageStateDirectorySummary -Path $config.DefaultPackageDepotDirectory
         LocalRepositoryRoot = Get-PackageStateDirectorySummary -Path $config.LocalRepositoryRoot
     }
@@ -218,3 +220,4 @@ function Get-PackageState {
         Directories               = $directories
     }
 }
+

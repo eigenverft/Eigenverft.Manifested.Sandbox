@@ -113,7 +113,8 @@ function global:New-TestPackageArchiveInfo {
 
 function global:New-TestPackageGlobalDocument {
     param(
-        [string]$InstallWorkspaceDirectory,
+        [string]$PackageFileStagingDirectory,
+        [string]$PackageInstallStageDirectory,
         [string]$DefaultPackageDepotDirectory,
         [string]$PreferredTargetInstallDirectory,
         [string]$LocalRepositoryRoot,
@@ -128,7 +129,8 @@ function global:New-TestPackageGlobalDocument {
 
     $acquisitionEnvironment = @{
         stores = @{
-            installWorkspaceDirectory = if ($PSBoundParameters.ContainsKey('InstallWorkspaceDirectory')) { $InstallWorkspaceDirectory } else { '%LOCALAPPDATA%/Eigenverft.Manifested.Sandbox/InstallWorkspace' }
+            packageFileStagingDirectory = if ($PSBoundParameters.ContainsKey('PackageFileStagingDirectory')) { $PackageFileStagingDirectory } else { '%LOCALAPPDATA%/Eigenverft.Manifested.Sandbox/PackageFileStaging' }
+            packageInstallStageDirectory = if ($PSBoundParameters.ContainsKey('PackageInstallStageDirectory')) { $PackageInstallStageDirectory } else { '%LOCALAPPDATA%/Eigenverft.Manifested.Sandbox/PackageInstallStage' }
         }
         defaults = @{
             allowFallback = $AllowFallback
@@ -164,6 +166,33 @@ function global:New-TestPackageGlobalDocument {
     }
 }
 
+function global:Add-TestFilesystemSourceCapabilities {
+    param(
+        [Parameter(Mandatory = $true)]
+        [hashtable]$Source,
+
+        [bool]$Readable = $true,
+        [bool]$Writable = $false,
+        [bool]$MirrorTarget = $false,
+        [bool]$EnsureExists = $false
+    )
+
+    if (-not $Source.ContainsKey('readable')) {
+        $Source.readable = $Readable
+    }
+    if (-not $Source.ContainsKey('writable')) {
+        $Source.writable = $Writable
+    }
+    if (-not $Source.ContainsKey('mirrorTarget')) {
+        $Source.mirrorTarget = $MirrorTarget
+    }
+    if (-not $Source.ContainsKey('ensureExists')) {
+        $Source.ensureExists = $EnsureExists
+    }
+
+    return $Source
+}
+
 function global:New-TestDepotInventoryDocument {
     param(
         [string]$DefaultPackageDepotDirectory,
@@ -171,14 +200,19 @@ function global:New-TestDepotInventoryDocument {
     )
 
     $sources = @{}
-    $sources.defaultPackageDepot = @{
-        kind     = 'filesystem'
-        enabled  = $true
-        priority = 300
-        basePath = if ($PSBoundParameters.ContainsKey('DefaultPackageDepotDirectory')) { $DefaultPackageDepotDirectory } else { '%LOCALAPPDATA%/Eigenverft.Manifested.Sandbox/DefaultPackageDepot' }
-    }
+    $sources.defaultPackageDepot = Add-TestFilesystemSourceCapabilities -Source @{
+        kind         = 'filesystem'
+        enabled      = $true
+        searchOrder  = 300
+        basePath     = if ($PSBoundParameters.ContainsKey('DefaultPackageDepotDirectory')) { $DefaultPackageDepotDirectory } else { '%LOCALAPPDATA%/Eigenverft.Manifested.Sandbox/DefaultPackageDepot' }
+    } -Writable $true -MirrorTarget $true -EnsureExists $true
     foreach ($key in @($EnvironmentSources.Keys)) {
-        $sources[$key] = $EnvironmentSources[$key]
+        $sources[$key] = if ([string]::Equals([string]$EnvironmentSources[$key].kind, 'filesystem', [System.StringComparison]::OrdinalIgnoreCase)) {
+            Add-TestFilesystemSourceCapabilities -Source $EnvironmentSources[$key]
+        }
+        else {
+            $EnvironmentSources[$key]
+        }
     }
 
     return @{
@@ -199,6 +233,16 @@ function global:New-TestSourceInventoryDocument {
     )
 
     $sites = @{}
+    foreach ($key in @($GlobalEnvironmentSources.Keys)) {
+        if ([string]::Equals([string]$GlobalEnvironmentSources[$key].kind, 'filesystem', [System.StringComparison]::OrdinalIgnoreCase)) {
+            $GlobalEnvironmentSources[$key] = Add-TestFilesystemSourceCapabilities -Source $GlobalEnvironmentSources[$key]
+        }
+    }
+    foreach ($key in @($SiteEnvironmentSources.Keys)) {
+        if ([string]::Equals([string]$SiteEnvironmentSources[$key].kind, 'filesystem', [System.StringComparison]::OrdinalIgnoreCase)) {
+            $SiteEnvironmentSources[$key] = Add-TestFilesystemSourceCapabilities -Source $SiteEnvironmentSources[$key]
+        }
+    }
     if ($SiteEnvironmentSources.Count -gt 0 -or $SiteDefaults.Count -gt 0) {
         $sites[$SiteCode] = @{}
         if ($SiteEnvironmentSources.Count -gt 0) {
@@ -679,7 +723,8 @@ Describe 'Eigenverft.Manifested.Sandbox Package' {
         $config = [pscustomobject]@{
             LocalConfigurationPath              = Join-Path $root 'Configuration\Internal\Config.json'
             PreferredTargetInstallRootDirectory = Join-Path $root 'Installed'
-            InstallWorkspaceRootDirectory       = Join-Path $root 'InstallWorkspace'
+            PackageFileStagingRootDirectory       = Join-Path $root 'PackageFileStaging'
+            PackageInstallStageRootDirectory    = Join-Path $root 'PackageInstallStage'
             DefaultPackageDepotDirectory        = Join-Path $root 'DefaultPackageDepot'
             LocalRepositoryRoot                 = Join-Path $root 'PackageRepositories'
             PackageStateIndexFilePath           = Join-Path (Join-Path $root 'State') 'package-state-index.json'
@@ -705,7 +750,8 @@ Describe 'Eigenverft.Manifested.Sandbox Package' {
         $state.PackageRecords.Count | Should -Be 0
         $state.PackageFiles.Count | Should -Be 0
         $state.Directories.Installed.Exists | Should -BeFalse
-        $state.Directories.InstallWorkspace.Exists | Should -BeFalse
+        $state.Directories.PackageFileStaging.Exists | Should -BeFalse
+        $state.Directories.PackageInstallStage.Exists | Should -BeFalse
         $state.Directories.DefaultPackageDepot.Exists | Should -BeFalse
         $state.Directories.LocalRepositoryRoot.Exists | Should -BeFalse
     }
@@ -715,7 +761,8 @@ Describe 'Eigenverft.Manifested.Sandbox Package' {
         $config = [pscustomobject]@{
             LocalConfigurationPath              = Join-Path $root 'Configuration\Internal\Config.json'
             PreferredTargetInstallRootDirectory = Join-Path $root 'Installed'
-            InstallWorkspaceRootDirectory       = Join-Path $root 'InstallWorkspace'
+            PackageFileStagingRootDirectory       = Join-Path $root 'PackageFileStaging'
+            PackageInstallStageRootDirectory    = Join-Path $root 'PackageInstallStage'
             DefaultPackageDepotDirectory        = Join-Path $root 'DefaultPackageDepot'
             LocalRepositoryRoot                 = Join-Path $root 'PackageRepositories'
             PackageStateIndexFilePath           = Join-Path (Join-Path $root 'State') 'package-state-index.json'
@@ -736,7 +783,8 @@ Describe 'Eigenverft.Manifested.Sandbox Package' {
     It 'summarizes package ownership records, artifact records, and local directory state' {
         $root = Join-Path $TestDrive 'populated-package-state'
         $installRoot = Join-Path $root 'Installed'
-        $workspaceRoot = Join-Path $root 'InstallWorkspace'
+        $workspaceRoot = Join-Path $root 'PackageFileStaging'
+        $installStageRoot = Join-Path $root 'PackageInstallStage'
         $depotRoot = Join-Path $root 'DefaultPackageDepot'
         $localRepositoryRoot = Join-Path $root 'PackageRepositories'
         $installDirectory = Join-Path $installRoot 'vscode-runtime\stable\1.0.0\win32-x64'
@@ -746,6 +794,7 @@ Describe 'Eigenverft.Manifested.Sandbox Package' {
 
         $null = New-Item -ItemType Directory -Path $installDirectory -Force
         $null = New-Item -ItemType Directory -Path $workspaceRoot -Force
+        $null = New-Item -ItemType Directory -Path $installStageRoot -Force
         Write-TestTextFile -Path $artifactPath -Content 'fake-zip'
         Write-TestJsonDocument -Path $definitionLocalPath -Document (New-TestVSCodeDefinitionDocument -Releases @(
                 New-TestPackageRelease -Id 'vsCode-win-x64-stable' -Version '1.0.0' -Architecture 'x64' -Flavor 'win32-x64'
@@ -755,7 +804,8 @@ Describe 'Eigenverft.Manifested.Sandbox Package' {
         $config = [pscustomobject]@{
             LocalConfigurationPath              = Join-Path $root 'Configuration\Internal\Config.json'
             PreferredTargetInstallRootDirectory = $installRoot
-            InstallWorkspaceRootDirectory       = $workspaceRoot
+            PackageFileStagingRootDirectory       = $workspaceRoot
+            PackageInstallStageRootDirectory    = $installStageRoot
             DefaultPackageDepotDirectory        = $depotRoot
             LocalRepositoryRoot                 = $localRepositoryRoot
             PackageStateIndexFilePath           = Join-Path (Join-Path $root 'State') 'package-state-index.json'
@@ -811,7 +861,8 @@ Describe 'Eigenverft.Manifested.Sandbox Package' {
         $state.PackageFiles[0].Path | Should -Be $artifactPath
         $state.PackageFiles[0].Exists | Should -BeTrue
         $state.Directories.Installed.Exists | Should -BeTrue
-        $state.Directories.InstallWorkspace.Exists | Should -BeTrue
+        $state.Directories.PackageFileStaging.Exists | Should -BeTrue
+        $state.Directories.PackageInstallStage.Exists | Should -BeTrue
         $state.Directories.DefaultPackageDepot.Exists | Should -BeTrue
         $state.Directories.LocalRepositoryRoot.Exists | Should -BeTrue
     }
@@ -821,7 +872,8 @@ Describe 'Eigenverft.Manifested.Sandbox Package' {
         $config = [pscustomobject]@{
             LocalConfigurationPath              = Join-Path $root 'Configuration\Internal\Config.json'
             PreferredTargetInstallRootDirectory = Join-Path $root 'Installed'
-            InstallWorkspaceRootDirectory       = Join-Path $root 'InstallWorkspace'
+            PackageFileStagingRootDirectory       = Join-Path $root 'PackageFileStaging'
+            PackageInstallStageRootDirectory    = Join-Path $root 'PackageInstallStage'
             DefaultPackageDepotDirectory        = Join-Path $root 'DefaultPackageDepot'
             LocalRepositoryRoot                 = Join-Path $root 'PackageRepositories'
             PackageStateIndexFilePath           = Join-Path (Join-Path $root 'State') 'package-state-index.json'
@@ -893,10 +945,15 @@ Describe 'Eigenverft.Manifested.Sandbox Package' {
         $globalInfo.Document.package.PSObject.Properties.Name | Should -Contain 'repositorySources'
         $globalInfo.Document.package.PSObject.Properties.Name | Should -Contain 'localRepositoryRoot'
         $globalInfo.Document.package.PSObject.Properties.Name | Should -Contain 'packageState'
-        $globalInfo.Document.package.acquisitionEnvironment.stores.PSObject.Properties.Name | Should -Contain 'installWorkspaceDirectory'
+        $globalInfo.Document.package.acquisitionEnvironment.stores.PSObject.Properties.Name | Should -Contain 'packageFileStagingDirectory'
+        $globalInfo.Document.package.acquisitionEnvironment.stores.PSObject.Properties.Name | Should -Contain 'packageInstallStageDirectory'
         $globalInfo.Document.package.acquisitionEnvironment.stores.PSObject.Properties.Name | Should -Not -Contain 'defaultPackageDepotDirectory'
         $depotInfo = Read-PackageJsonDocument -Path (Get-PackageShippedDepotInventoryPath)
         $depotInfo.Document.acquisitionEnvironment.environmentSources.PSObject.Properties.Name | Should -Contain 'defaultPackageDepot'
+        $depotInfo.Document.acquisitionEnvironment.environmentSources.defaultPackageDepot.readable | Should -BeTrue
+        $depotInfo.Document.acquisitionEnvironment.environmentSources.defaultPackageDepot.writable | Should -BeTrue
+        $depotInfo.Document.acquisitionEnvironment.environmentSources.defaultPackageDepot.mirrorTarget | Should -BeTrue
+        $depotInfo.Document.acquisitionEnvironment.environmentSources.defaultPackageDepot.ensureExists | Should -BeTrue
         $globalInfo.Document.package.acquisitionEnvironment.tracking.PSObject.Properties.Name | Should -Contain 'packageFileIndexFilePath'
         $globalInfo.Document.package.acquisitionEnvironment.PSObject.Properties['environmentSources'] | Should -BeNullOrEmpty
     }
@@ -950,6 +1007,56 @@ Describe 'Eigenverft.Manifested.Sandbox Package' {
 
         $globalInfo = Read-PackageJsonDocument -Path $globalConfigPath
         { Assert-PackageGlobalConfigSchema -GlobalDocumentInfo $globalInfo } | Should -Throw '*artifactIndexFilePath*'
+    }
+
+    It 'fails clearly when global config still uses retired installWorkspaceDirectory' {
+        $globalConfigPath = Join-Path $TestDrive 'Global-old-install-workspace.json'
+        $badGlobal = New-TestPackageGlobalDocument
+        $badGlobal.package.acquisitionEnvironment.stores.Remove('packageFileStagingDirectory')
+        $badGlobal.package.acquisitionEnvironment.stores.installWorkspaceDirectory = Join-Path $TestDrive 'InstallWorkspace'
+        Write-TestJsonDocument -Path $globalConfigPath -Document $badGlobal
+
+        $globalInfo = Read-PackageJsonDocument -Path $globalConfigPath
+        { Assert-PackageGlobalConfigSchema -GlobalDocumentInfo $globalInfo } | Should -Throw '*installWorkspaceDirectory*'
+    }
+
+    It 'fails clearly when global config still uses retired installPreparationDirectory' {
+        $globalConfigPath = Join-Path $TestDrive 'Global-old-install-preparation.json'
+        $badGlobal = New-TestPackageGlobalDocument
+        $badGlobal.package.acquisitionEnvironment.stores.Remove('packageFileStagingDirectory')
+        $badGlobal.package.acquisitionEnvironment.stores.Remove('packageInstallStageDirectory')
+        $badGlobal.package.acquisitionEnvironment.stores.installPreparationDirectory = Join-Path $TestDrive 'InstallPreparation'
+        Write-TestJsonDocument -Path $globalConfigPath -Document $badGlobal
+
+        $globalInfo = Read-PackageJsonDocument -Path $globalConfigPath
+        { Assert-PackageGlobalConfigSchema -GlobalDocumentInfo $globalInfo } | Should -Throw '*installPreparationDirectory*'
+    }
+
+    It 'rejects filesystem depot inventory entries without explicit capability fields' {
+        $depotInventoryPath = Join-Path $TestDrive 'DepotInventory-missing-capability.json'
+        $badDepotInventory = New-TestDepotInventoryDocument
+        $badDepotInventory.acquisitionEnvironment.environmentSources.defaultPackageDepot.Remove('readable')
+        Write-TestJsonDocument -Path $depotInventoryPath -Document $badDepotInventory
+
+        $depotInfo = Read-PackageJsonDocument -Path $depotInventoryPath
+        { Assert-PackageDepotInventorySchema -DepotInventoryDocumentInfo $depotInfo } | Should -Throw '*readable*'
+    }
+
+    It 'rejects depot inventory mirror and ensure flags when a filesystem depot is not writable' {
+        $depotInventoryPath = Join-Path $TestDrive 'DepotInventory-invalid-capabilities.json'
+        $badDepotInventory = New-TestDepotInventoryDocument
+        $badDepotInventory.acquisitionEnvironment.environmentSources.defaultPackageDepot.writable = $false
+        $badDepotInventory.acquisitionEnvironment.environmentSources.defaultPackageDepot.mirrorTarget = $true
+        $badDepotInventory.acquisitionEnvironment.environmentSources.defaultPackageDepot.ensureExists = $true
+        Write-TestJsonDocument -Path $depotInventoryPath -Document $badDepotInventory
+
+        $depotInfo = Read-PackageJsonDocument -Path $depotInventoryPath
+        { Assert-PackageDepotInventorySchema -DepotInventoryDocumentInfo $depotInfo } | Should -Throw '*mirrorTarget=true*'
+
+        $badDepotInventory.acquisitionEnvironment.environmentSources.defaultPackageDepot.mirrorTarget = $false
+        Write-TestJsonDocument -Path $depotInventoryPath -Document $badDepotInventory
+        $depotInfo = Read-PackageJsonDocument -Path $depotInventoryPath
+        { Assert-PackageDepotInventorySchema -DepotInventoryDocumentInfo $depotInfo } | Should -Throw '*ensureExists=true*'
     }
 
     It 'loads the shipped LlamaCppRuntime definition and selects the fixed GitHub-backed release' {
@@ -1338,6 +1445,23 @@ Describe 'Eigenverft.Manifested.Sandbox Package' {
         { Assert-PackageDefinitionSchema -DefinitionDocumentInfo $definitionInfo -DefinitionId 'VSCodeRuntime' } | Should -Throw '*releaseDefaults.requirements*'
     }
 
+    It 'fails clearly when an acquisition candidate still uses retired priority' {
+        $release = New-TestPackageRelease -Id 'vsCode-win-x64-stable' -Version '2.0.0' -Architecture 'x64' -Flavor 'win32-x64' -FileName 'VSCode-win32-x64-2.0.0.zip' -AcquisitionCandidates @(
+            @{
+                kind         = 'packageDepot'
+                priority     = 100
+                verification = @{ mode = 'none' }
+            }
+        )
+        $definitionDocument = New-TestVSCodeDefinitionDocument -Releases @($release)
+        $definitionInfo = [pscustomobject]@{
+            Path     = Join-Path $TestDrive 'VSCodeRuntime.json'
+            Document = ConvertTo-TestPsObject -InputObject $definitionDocument
+        }
+
+        { Assert-PackageDefinitionSchema -DefinitionDocumentInfo $definitionInfo -DefinitionId 'VSCodeRuntime' } | Should -Throw '*priority*'
+    }
+
     It 'uses the default source inventory path when the env var is unset' {
         [Environment]::SetEnvironmentVariable($script:SourceInventoryEnvVarName, $null, 'Process')
         (Get-PackageSourceInventoryPath) | Should -Be (Get-PackageDefaultSourceInventoryPath)
@@ -1349,14 +1473,15 @@ Describe 'Eigenverft.Manifested.Sandbox Package' {
                 New-TestPackageRelease -Id 'vsCode-win-x64-stable' -Version '2.0.0' -Architecture 'x64' -Flavor 'win32-x64' -FileName 'VSCode-win32-x64-2.0.0.zip' -AcquisitionCandidates @(
                     @{
                         kind        = 'packageDepot'
-                        priority    = 100
+                        searchOrder    = 100
                         verification = @{ mode = 'none' }
                     }
                 )
             )) -SourceInventoryDocument (New-TestSourceInventoryDocument -GlobalEnvironmentSources @{
                 remotePackageDepot = @{
-                    kind     = 'filesystem'
-                    basePath = (Join-Path $TestDrive 'global-remote')
+                    kind        = 'filesystem'
+                    searchOrder = 150
+                    basePath    = (Join-Path $TestDrive 'global-remote')
                 }
             })
 
@@ -1378,19 +1503,21 @@ Describe 'Eigenverft.Manifested.Sandbox Package' {
                 New-TestPackageRelease -Id 'vsCode-win-x64-stable' -Version '2.0.0' -Architecture 'x64' -Flavor 'win32-x64' -FileName 'VSCode-win32-x64-2.0.0.zip' -AcquisitionCandidates @(
                     @{
                         kind        = 'packageDepot'
-                        priority    = 100
+                        searchOrder    = 100
                         verification = @{ mode = 'none' }
                     }
                 )
             )) -SourceInventoryDocument (New-TestSourceInventoryDocument -GlobalEnvironmentSources @{
                 remotePackageDepot = @{
-                    kind     = 'filesystem'
-                    basePath = (Join-Path $TestDrive 'global-remote')
+                    kind        = 'filesystem'
+                    searchOrder = 150
+                    basePath    = (Join-Path $TestDrive 'global-remote')
                 }
             } -SiteEnvironmentSources @{
                 remotePackageDepot = @{
-                    kind     = 'filesystem'
-                    basePath = (Join-Path $TestDrive 'site-remote')
+                    kind        = 'filesystem'
+                    searchOrder = 150
+                    basePath    = (Join-Path $TestDrive 'site-remote')
                 }
             } -SiteCode 'BER')
 
@@ -1411,27 +1538,27 @@ Describe 'Eigenverft.Manifested.Sandbox Package' {
             disabledDepot = @{
                 kind     = 'filesystem'
                 enabled  = $false
-                priority = 50
+                searchOrder = 50
                 basePath = (Join-Path $rootPath 'disabled')
             }
             departmentDepot = @{
                 kind      = 'filesystem'
                 enabled   = $true
-                priority  = 150
+                searchOrder  = 150
                 siteCodes = @('BER-ENG')
                 basePath  = (Join-Path $rootPath 'department')
             }
             otherSiteDepot = @{
                 kind      = 'filesystem'
                 enabled   = $true
-                priority  = 100
+                searchOrder  = 100
                 siteCodes = @('PD')
                 basePath  = (Join-Path $rootPath 'other-site')
             }
             globalDepot = @{
                 kind     = 'filesystem'
                 enabled  = $true
-                priority = 400
+                searchOrder = 400
                 basePath = (Join-Path $rootPath 'global')
             }
         }
@@ -1439,7 +1566,7 @@ Describe 'Eigenverft.Manifested.Sandbox Package' {
                 New-TestPackageRelease -Id 'vsCode-win-x64-stable' -Version '2.0.0' -Architecture 'x64' -Flavor 'win32-x64' -FileName 'VSCode-win32-x64-2.0.0.zip' -AcquisitionCandidates @(
                     @{
                         kind        = 'packageDepot'
-                        priority    = 100
+                        searchOrder    = 100
                         verification = @{ mode = 'none' }
                     }
                 )
@@ -1492,8 +1619,9 @@ Describe 'Eigenverft.Manifested.Sandbox Package' {
                 New-TestPackageRelease -Id 'vsCode-win-x64-stable' -Version '2.0.0' -Architecture 'x64' -Flavor 'win32-x64' -Install @{ kind = 'reuseExisting' } -Validation (New-TestValidation -Version '2.0.0')
             ) -UpstreamBaseUri 'https://example.invalid/vscode/') -SourceInventoryDocument (New-TestSourceInventoryDocument -GlobalEnvironmentSources @{
                 remotePackageDepot = @{
-                    kind     = 'filesystem'
-                    basePath = (Join-Path $TestDrive 'remote-depot')
+                    kind        = 'filesystem'
+                    searchOrder = 150
+                    basePath    = (Join-Path $TestDrive 'remote-depot')
                 }
             })
 
@@ -1517,7 +1645,7 @@ Describe 'Eigenverft.Manifested.Sandbox Package' {
             @{
                 kind         = 'download'
                 sourceId     = 'llamaCppGitHub'
-                priority     = 100
+                searchOrder     = 100
                 verification = @{ mode = 'required' }
             }
         )
@@ -1551,7 +1679,7 @@ Describe 'Eigenverft.Manifested.Sandbox Package' {
             @{
                 kind         = 'download'
                 sourceId     = 'llamaCppGitHub'
-                priority     = 100
+                searchOrder     = 100
                 verification = @{ mode = 'required' }
             }
         )
@@ -1576,7 +1704,7 @@ Describe 'Eigenverft.Manifested.Sandbox Package' {
             @{
                 kind         = 'download'
                 sourceId     = 'llamaCppGitHub'
-                priority     = 100
+                searchOrder     = 100
                 verification = @{ mode = 'required' }
             }
         )
@@ -1707,7 +1835,7 @@ Describe 'Eigenverft.Manifested.Sandbox Package' {
         $release = New-TestPackageRelease -Id 'vsCode-win-x64-stable' -Version '2.0.0' -Architecture 'x64' -Flavor 'win32-x64' -FileName 'VSCode-win32-x64-2.0.0.zip' -AcquisitionCandidates @(
             @{
                 kind        = 'packageDepot'
-                priority    = 10
+                searchOrder    = 10
                 verification = @{ mode = 'optional'; algorithm = 'sha256'; sha256 = $packageArchive.Sha256 }
             }
         )
@@ -1734,7 +1862,7 @@ Describe 'Eigenverft.Manifested.Sandbox Package' {
         $release = New-TestPackageRelease -Id 'vsCode-win-x64-stable' -Version '2.0.0' -Architecture 'x64' -Flavor 'win32-x64' -FileName 'VSCode-win32-x64-2.0.0.zip' -AcquisitionCandidates @(
             @{
                 kind         = 'packageDepot'
-                priority     = 10
+                searchOrder     = 10
                 verification = @{ mode = 'none' }
             }
         )
@@ -1756,7 +1884,7 @@ Describe 'Eigenverft.Manifested.Sandbox Package' {
         $null = Resolve-PackagePaths -PackageResult $result
 
         @($messages) | Should -Contain '[STATE] Resolved paths:'
-        @($messages | Where-Object { $_.StartsWith('[PATH] Install workspace:') }).Count | Should -Be 1
+        @($messages | Where-Object { $_.StartsWith('[PATH] Package file staging:') }).Count | Should -Be 1
         @($messages | Where-Object { $_.StartsWith('[PATH] Target install directory:') }).Count | Should -Be 1
         @($messages | Where-Object { $_.StartsWith('[PATH] Package file:') }).Count | Should -Be 1
         @($messages | Where-Object { $_.StartsWith('[PATH] Default package depot file:') }).Count | Should -Be 1
@@ -2245,17 +2373,17 @@ Describe 'Eigenverft.Manifested.Sandbox Package' {
         (Resolve-PackageExistingInstallRoot -ExistingInstallDiscovery $discovery -CandidatePath $codeExePath) | Should -Be $installRoot
     }
 
-    It 'keeps installWorkspace and defaultPackageDepot distinct in the resolved paths' {
+    It 'keeps packageFileStaging and defaultPackageDepot distinct in the resolved paths' {
         $rootPath = Join-Path $TestDrive 'distinct-roots'
         $packageArchive = New-TestPackageArchiveInfo -RootPath (Join-Path $rootPath 'archive') -Version '2.0.0'
         $release = New-TestPackageRelease -Id 'vsCode-win-x64-stable' -Version '2.0.0' -Architecture 'x64' -Flavor 'win32-x64' -FileName 'VSCode-win32-x64-2.0.0.zip' -AcquisitionCandidates @(
             @{
                 kind        = 'packageDepot'
-                priority    = 10
+                searchOrder    = 10
                 verification = @{ mode = 'optional'; algorithm = 'sha256'; sha256 = $packageArchive.Sha256 }
             }
         )
-        $globalDocument = New-TestPackageGlobalDocument -InstallWorkspaceDirectory (Join-Path $rootPath 'workspace')
+        $globalDocument = New-TestPackageGlobalDocument -PackageFileStagingDirectory (Join-Path $rootPath 'workspace')
         $depotInventoryDocument = New-TestDepotInventoryDocument -DefaultPackageDepotDirectory (Join-Path $rootPath 'default-depot')
         $documents = Write-TestPackageDocuments -RootPath $rootPath -GlobalDocument $globalDocument -DepotInventoryDocument $depotInventoryDocument -DefinitionDocument (New-TestVSCodeDefinitionDocument -Releases @($release) -ReleaseDefaultsValidation (New-TestValidation -Version '2.0.0'))
 
@@ -2269,25 +2397,25 @@ Describe 'Eigenverft.Manifested.Sandbox Package' {
         $result = Resolve-PackagePackage -PackageResult $result
         $result = Resolve-PackagePaths -PackageResult $result
 
-        $result.InstallWorkspaceDirectory | Should -Not -Be $config.DefaultPackageDepotDirectory
+        $result.PackageFileStagingDirectory | Should -Not -Be $config.DefaultPackageDepotDirectory
         $result.PackageFilePath | Should -Not -Be $result.DefaultPackageDepotFilePath
         Split-Path -Parent $result.DefaultPackageDepotFilePath | Should -Match 'default-depot'
     }
 
-    It 'hydrates the install workspace from the default package depot before upstream download' {
+    It 'hydrates the package file staging from the default package depot before upstream download' {
         $rootPath = Join-Path $TestDrive 'default-depot-hydration'
         $packageArchive = New-TestPackageArchiveInfo -RootPath (Join-Path $rootPath 'archive') -Version '2.0.0' -ArchiveFileName 'VSCode-win32-x64-2.0.0.zip'
-        $globalDocument = New-TestPackageGlobalDocument -InstallWorkspaceDirectory (Join-Path $rootPath 'workspace') -DefaultPackageDepotDirectory (Join-Path $rootPath 'default-depot')
+        $globalDocument = New-TestPackageGlobalDocument -PackageFileStagingDirectory (Join-Path $rootPath 'workspace') -DefaultPackageDepotDirectory (Join-Path $rootPath 'default-depot')
         $release = New-TestPackageRelease -Id 'vsCode-win-x64-stable' -Version '2.0.0' -Architecture 'x64' -Flavor 'win32-x64' -FileName 'VSCode-win32-x64-2.0.0.zip' -AcquisitionCandidates @(
             @{
                 kind        = 'packageDepot'
-                priority    = 10
+                searchOrder    = 10
                 verification = @{ mode = 'required'; algorithm = 'sha256'; sha256 = $packageArchive.Sha256 }
             },
             @{
                 kind        = 'download'
                 sourceId    = 'vsCodeUpdateService'
-                priority    = 100
+                searchOrder    = 100
                 sourcePath  = '2.0.0/win32-x64-archive/stable'
                 verification = @{ mode = 'required'; algorithm = 'sha256'; sha256 = $packageArchive.Sha256 }
             }
@@ -2308,23 +2436,71 @@ Describe 'Eigenverft.Manifested.Sandbox Package' {
         $null = New-Item -ItemType Directory -Path (Split-Path -Parent $result.DefaultPackageDepotFilePath) -Force
         Copy-Item -LiteralPath $packageArchive.ZipPath -Destination $result.DefaultPackageDepotFilePath -Force
 
-        $result = Save-PackagePackageFile -PackageResult $result
+        $result = Prepare-PackageInstallFile -PackageResult $result
 
-        $result.PackageFileSave.Success | Should -BeTrue
-        $result.PackageFileSave.Status | Should -Be 'HydratedFromDefaultPackageDepot'
+        $result.PackageFilePreparation.Success | Should -BeTrue
+        $result.PackageFilePreparation.Status | Should -Be 'HydratedFromDefaultPackageDepot'
         Test-Path -LiteralPath $result.PackageFilePath | Should -BeTrue
         (Get-FileHash -LiteralPath $result.PackageFilePath -Algorithm SHA256).Hash.ToLowerInvariant() | Should -Be $packageArchive.Sha256
+        Assert-MockCalled Save-PackageDownloadFile -Times 0
+    }
+
+    It 'hydrates from a read-only default package depot without trying to create or mirror into it' {
+        $rootPath = Join-Path $TestDrive 'readonly-default-depot-hydration'
+        $packageArchive = New-TestPackageArchiveInfo -RootPath (Join-Path $rootPath 'archive') -Version '2.0.0' -ArchiveFileName 'VSCode-win32-x64-2.0.0.zip'
+        $defaultDepotPath = Join-Path $rootPath 'readonly-default-depot'
+        $globalDocument = New-TestPackageGlobalDocument -PackageFileStagingDirectory (Join-Path $rootPath 'workspace')
+        $depotInventoryDocument = New-TestDepotInventoryDocument -DefaultPackageDepotDirectory $defaultDepotPath
+        $depotInventoryDocument.acquisitionEnvironment.environmentSources.defaultPackageDepot.writable = $false
+        $depotInventoryDocument.acquisitionEnvironment.environmentSources.defaultPackageDepot.mirrorTarget = $false
+        $depotInventoryDocument.acquisitionEnvironment.environmentSources.defaultPackageDepot.ensureExists = $false
+        $release = New-TestPackageRelease -Id 'vsCode-win-x64-stable' -Version '2.0.0' -Architecture 'x64' -Flavor 'win32-x64' -FileName 'VSCode-win32-x64-2.0.0.zip' -AcquisitionCandidates @(
+            @{
+                kind         = 'packageDepot'
+                searchOrder  = 10
+                verification = @{ mode = 'required'; algorithm = 'sha256'; sha256 = $packageArchive.Sha256 }
+            },
+            @{
+                kind         = 'download'
+                sourceId     = 'vsCodeUpdateService'
+                searchOrder  = 100
+                sourcePath   = '2.0.0/win32-x64-archive/stable'
+                verification = @{ mode = 'required'; algorithm = 'sha256'; sha256 = $packageArchive.Sha256 }
+            }
+        )
+        $documents = Write-TestPackageDocuments -RootPath $rootPath -GlobalDocument $globalDocument -DepotInventoryDocument $depotInventoryDocument -DefinitionDocument (New-TestVSCodeDefinitionDocument -Releases @($release) -ReleaseDefaultsValidation (New-TestValidation -Version '2.0.0'))
+
+        [Environment]::SetEnvironmentVariable($script:SourceInventoryEnvVarName, (Join-Path $TestDrive 'missing-inventory.json'), 'Process')
+        Mock Get-PackageGlobalConfigPath { $documents.GlobalConfigPath }
+        Mock Get-PackageDepotInventoryPath { $documents.DepotInventoryPath }
+        Mock Get-PackageDefinitionPath { param($DefinitionId) $documents.DefinitionPath }
+        Mock Save-PackageDownloadFile { throw 'download should not run when a readable package depot already has a verified artifact' }
+
+        $config = Get-PackageConfig -DefinitionId 'VSCodeRuntime'
+        $result = New-PackageResult -CommandName 'test' -PackageConfig $config
+        $result = Resolve-PackagePackage -PackageResult $result
+        $result = Resolve-PackagePaths -PackageResult $result
+        $result = Build-PackageAcquisitionPlan -PackageResult $result
+
+        $null = New-Item -ItemType Directory -Path (Split-Path -Parent $result.DefaultPackageDepotFilePath) -Force
+        Copy-Item -LiteralPath $packageArchive.ZipPath -Destination $result.DefaultPackageDepotFilePath -Force
+
+        $result = Prepare-PackageInstallFile -PackageResult $result
+
+        $result.PackageFilePreparation.Success | Should -BeTrue
+        $result.PackageFilePreparation.Status | Should -Be 'HydratedFromDefaultPackageDepot'
+        Test-Path -LiteralPath $result.PackageFilePath | Should -BeTrue
         Assert-MockCalled Save-PackageDownloadFile -Times 0
     }
 
     It 'uses packageFile.integrity when acquisition candidates only declare verification mode' {
         $rootPath = Join-Path $TestDrive 'packagefile-integrity'
         $packageArchive = New-TestPackageArchiveInfo -RootPath (Join-Path $rootPath 'archive') -Version '2.0.0' -ArchiveFileName 'VSCode-win32-x64-2.0.0.zip'
-        $globalDocument = New-TestPackageGlobalDocument -InstallWorkspaceDirectory (Join-Path $rootPath 'workspace') -DefaultPackageDepotDirectory (Join-Path $rootPath 'default-depot')
+        $globalDocument = New-TestPackageGlobalDocument -PackageFileStagingDirectory (Join-Path $rootPath 'workspace') -DefaultPackageDepotDirectory (Join-Path $rootPath 'default-depot')
         $release = New-TestPackageRelease -Id 'vsCode-win-x64-stable' -Version '2.0.0' -Architecture 'x64' -Flavor 'win32-x64' -FileName 'VSCode-win32-x64-2.0.0.zip' -PackageFileSha256 $packageArchive.Sha256 -AcquisitionCandidates @(
             @{
                 kind         = 'packageDepot'
-                priority     = 10
+                searchOrder     = 10
                 verification = @{ mode = 'required' }
             }
         )
@@ -2343,11 +2519,11 @@ Describe 'Eigenverft.Manifested.Sandbox Package' {
         $null = New-Item -ItemType Directory -Path (Split-Path -Parent $result.DefaultPackageDepotFilePath) -Force
         Copy-Item -LiteralPath $packageArchive.ZipPath -Destination $result.DefaultPackageDepotFilePath -Force
 
-        $result = Save-PackagePackageFile -PackageResult $result
+        $result = Prepare-PackageInstallFile -PackageResult $result
 
-        $result.PackageFileSave.Success | Should -BeTrue
-        $result.PackageFileSave.Verification.Status | Should -Be 'VerificationPassed'
-        $result.PackageFileSave.Verification.ExpectedHash | Should -Be $packageArchive.Sha256
+        $result.PackageFilePreparation.Success | Should -BeTrue
+        $result.PackageFilePreparation.Verification.Status | Should -Be 'VerificationPassed'
+        $result.PackageFilePreparation.Verification.ExpectedHash | Should -Be $packageArchive.Sha256
     }
 
     It 'adopts a valid external install when policy allows it' {
@@ -2499,7 +2675,7 @@ Describe 'Eigenverft.Manifested.Sandbox Package' {
     It 'marks a failed validation on the managed install path as a repaired managed install after reinstall' {
         $rootPath = Join-Path $TestDrive 'repair-managed'
         $packageArchive = New-TestPackageArchiveInfo -RootPath (Join-Path $rootPath 'archive') -Version '2.0.0' -ArchiveFileName 'VSCode-win32-x64-2.0.0.zip'
-        $globalDocument = New-TestPackageGlobalDocument -InstallWorkspaceDirectory (Join-Path $rootPath 'workspace') -DefaultPackageDepotDirectory (Join-Path $rootPath 'default-depot') -PreferredTargetInstallDirectory (Join-Path $rootPath 'installs')
+        $globalDocument = New-TestPackageGlobalDocument -PackageFileStagingDirectory (Join-Path $rootPath 'workspace') -DefaultPackageDepotDirectory (Join-Path $rootPath 'default-depot') -PreferredTargetInstallDirectory (Join-Path $rootPath 'installs')
         $release = New-TestPackageRelease -Id 'vsCode-win-x64-stable' -Version '2.0.0' -Architecture 'x64' -Flavor 'win32-x64' -FileName 'VSCode-win32-x64-2.0.0.zip' -Install @{
             kind             = 'expandArchive'
             installDirectory = 'vscode-runtime/stable/2.0.0/win32-x64'
@@ -2508,7 +2684,7 @@ Describe 'Eigenverft.Manifested.Sandbox Package' {
         } -AcquisitionCandidates @(
             @{
                 kind         = 'packageDepot'
-                priority     = 10
+                searchOrder     = 10
                 verification = @{ mode = 'required'; algorithm = 'sha256'; sha256 = $packageArchive.Sha256 }
             }
         ) -Validation (New-TestValidation -Version '2.0.0')
@@ -2526,7 +2702,7 @@ Describe 'Eigenverft.Manifested.Sandbox Package' {
 
         $null = New-Item -ItemType Directory -Path (Split-Path -Parent $result.DefaultPackageDepotFilePath) -Force
         Copy-Item -LiteralPath $packageArchive.ZipPath -Destination $result.DefaultPackageDepotFilePath -Force
-        $result = Save-PackagePackageFile -PackageResult $result
+        $result = Prepare-PackageInstallFile -PackageResult $result
         $result = Install-PackagePackage -PackageResult $result
 
         Remove-Item -LiteralPath (Join-Path $result.InstallDirectory 'data') -Recurse -Force
@@ -2538,7 +2714,7 @@ Describe 'Eigenverft.Manifested.Sandbox Package' {
         $rerun = Find-PackageExistingPackage -PackageResult $rerun
         $rerun = Classify-PackageExistingPackage -PackageResult $rerun
         $rerun = Resolve-PackageExistingPackageDecision -PackageResult $rerun
-        $rerun = Save-PackagePackageFile -PackageResult $rerun
+        $rerun = Prepare-PackageInstallFile -PackageResult $rerun
         $rerun = Install-PackagePackage -PackageResult $rerun
 
         $rerun.ExistingPackage.SearchKind | Should -Be 'packageTargetInstallPath'
@@ -2752,29 +2928,22 @@ Describe 'Eigenverft.Manifested.Sandbox Package' {
         }
     }
 
-    It 'routes Package archive installs through Expand-ArchiveToStage' {
+    It 'routes Package archive installs through PackageInstallStage' {
         $rootPath = Join-Path $TestDrive 'package-install-archive-route'
         $packageFilePath = Join-Path $rootPath 'package.zip'
         $stagePath = Join-Path $rootPath 'stage'
-        $expandedRoot = Join-Path $stagePath 'payload'
+        $layoutRoot = Join-Path $rootPath 'layout\payload'
         $installDirectory = Join-Path $rootPath 'install'
-        $null = New-Item -ItemType Directory -Path $expandedRoot -Force
-        Write-TestTextFile -Path $packageFilePath -Content 'placeholder'
-        Write-TestTextFile -Path (Join-Path $expandedRoot 'Code.exe') -Content 'binary'
-
-        Mock Expand-ArchiveToStage {
-            [pscustomobject]@{
-                StagePath    = $stagePath
-                ExpandedRoot = $expandedRoot
-            }
-        }
-        Mock Remove-PathIfExists { return $true }
+        $null = New-Item -ItemType Directory -Path $layoutRoot -Force
+        Write-TestTextFile -Path (Join-Path $layoutRoot 'Code.exe') -Content 'binary'
+        Write-TestZipFromDirectory -SourceDirectory (Join-Path $rootPath 'layout') -ZipPath $packageFilePath
 
         $packageResult = [pscustomobject]@{
-            PackageId        = 'VSCodeRuntime'
-            PackageFilePath  = $packageFilePath
-            InstallDirectory = $installDirectory
-            Package          = [pscustomobject]@{
+            PackageId                    = 'VSCodeRuntime'
+            PackageFilePath              = $packageFilePath
+            PackageInstallStageDirectory = $stagePath
+            InstallDirectory             = $installDirectory
+            Package                      = [pscustomobject]@{
                 install = [pscustomobject]@{
                     kind              = 'expandArchive'
                     expandedRoot      = 'auto'
@@ -2786,9 +2955,8 @@ Describe 'Eigenverft.Manifested.Sandbox Package' {
 
         $installResult = Install-PackageArchive -PackageResult $packageResult
 
-        Assert-MockCalled Expand-ArchiveToStage -Times 1
-        Assert-MockCalled Remove-PathIfExists -Times 1 -ParameterFilter { $Path -eq $stagePath }
         $installResult.InstallKind | Should -Be 'expandArchive'
+        Test-Path -LiteralPath $stagePath -PathType Container | Should -BeTrue
         Test-Path -LiteralPath (Join-Path $installDirectory 'Code.exe') -PathType Leaf | Should -BeTrue
         Test-Path -LiteralPath (Join-Path $installDirectory 'data') -PathType Container | Should -BeTrue
     }
@@ -2798,6 +2966,7 @@ Describe 'Eigenverft.Manifested.Sandbox Package' {
         $fakeNpmPath = Join-Path $rootPath 'node\npm.cmd'
         $installDirectory = Join-Path $rootPath 'install'
         $workspaceDirectory = Join-Path $rootPath 'workspace'
+        $stageDirectory = Join-Path $rootPath 'PackageInstallStage\packages\CodexCli\stable\0.125.0\win32-x64'
         $packageStateIndexPath = Join-Path (Join-Path $rootPath 'State') 'package-state-index.json'
         Write-TestTextFile -Path $fakeNpmPath -Content @"
 @echo off
@@ -2821,10 +2990,11 @@ exit /b 0
             PackageId              = 'codex-runtime-win32-x64-stable'
             DefinitionId           = 'CodexCli'
             InstallDirectory       = $installDirectory
+            PackageInstallStageDirectory = $stageDirectory
             ExistingPackage        = $null
             PackageConfig     = [pscustomobject]@{
                 DefinitionId                  = 'CodexCli'
-                InstallWorkspaceRootDirectory = $workspaceDirectory
+                PackageFileStagingRootDirectory = $workspaceDirectory
                 PackageStateIndexFilePath     = $packageStateIndexPath
             }
             Dependencies           = @(
@@ -2865,7 +3035,7 @@ exit /b 0
         $installResult.InstallerCommand | Should -Be 'npm'
         $installResult.InstallerCommandPath | Should -Be ([System.IO.Path]::GetFullPath($fakeNpmPath))
         $installResult.PackageSpec | Should -Be '@openai/codex@0.125.0'
-        $installResult.CacheDirectory | Should -Match 'npm-cache'
+        $installResult.CacheDirectory | Should -Match '\\Caches\\npm\\'
         $installResult.GlobalConfigPath | Should -Match 'Configuration\\External\\npm\\npmrc$'
         Test-Path -LiteralPath (Join-Path $installDirectory 'codex.cmd') -PathType Leaf | Should -BeTrue
         Test-Path -LiteralPath (Join-Path $installDirectory 'node_modules\@openai\codex\package.json') -PathType Leaf | Should -BeTrue
@@ -2877,6 +3047,7 @@ exit /b 0
         $fakeNpmPath = Join-Path $rootPath 'node\npm.cmd'
         $installDirectory = Join-Path $rootPath 'install'
         $workspaceDirectory = Join-Path $rootPath 'workspace'
+        $stageDirectory = Join-Path $rootPath 'PackageInstallStage\packages\CodexCli\stable\0.125.0\win32-x64'
         $packageStateIndexPath = Join-Path (Join-Path $rootPath 'State') 'package-state-index.json'
         Write-TestTextFile -Path $fakeNpmPath -Content "@echo off`r`nexit /b 7`r`n"
         Write-TestTextFile -Path (Join-Path $installDirectory 'sentinel.txt') -Content 'keep-me'
@@ -2885,10 +3056,11 @@ exit /b 0
             PackageId              = 'codex-runtime-win32-x64-stable'
             DefinitionId           = 'CodexCli'
             InstallDirectory       = $installDirectory
+            PackageInstallStageDirectory = $stageDirectory
             ExistingPackage        = $null
             PackageConfig     = [pscustomobject]@{
                 DefinitionId                  = 'CodexCli'
-                InstallWorkspaceRootDirectory = $workspaceDirectory
+                PackageFileStagingRootDirectory = $workspaceDirectory
                 PackageStateIndexFilePath     = $packageStateIndexPath
             }
             Dependencies           = @(
@@ -2917,6 +3089,7 @@ exit /b 0
 
         { Install-PackageNpmPackage -PackageResult $packageResult } | Should -Throw '*exit code 7*'
         Test-Path -LiteralPath (Join-Path $installDirectory 'sentinel.txt') -PathType Leaf | Should -BeTrue
+        Test-Path -LiteralPath $stageDirectory -PathType Container | Should -BeTrue
     }
 
     It 'fails npmGlobalPackage clearly when no ready dependency exposes the installer command' {
@@ -2928,7 +3101,7 @@ exit /b 0
             ExistingPackage        = $null
             PackageConfig     = [pscustomobject]@{
                 DefinitionId                  = 'CodexCli'
-                InstallWorkspaceRootDirectory = Join-Path $rootPath 'workspace'
+                PackageFileStagingRootDirectory = Join-Path $rootPath 'workspace'
                 PackageStateIndexFilePath     = Join-Path (Join-Path $rootPath 'State') 'package-state-index.json'
             }
             Dependencies           = @(
@@ -3128,7 +3301,8 @@ exit /b 0
 
         $packageResult = [pscustomobject]@{
             PackageFilePath           = $installerPath
-            InstallWorkspaceDirectory = $workspacePath
+            PackageFileStagingDirectory = $workspacePath
+            PackageInstallStageDirectory = $workspacePath
             InstallDirectory          = $null
             PackageConfig        = [pscustomobject]@{
                 PreferredTargetInstallRootDirectory = $rootPath
@@ -3193,7 +3367,7 @@ exit /b 0
 
     It 'installs a shipped single-file resource from the default package depot and validates it' {
         $rootPath = Join-Path $TestDrive 'resource-package-flow'
-        $installWorkspaceDirectory = Join-Path $rootPath 'workspace'
+        $packageFileStagingDirectory = Join-Path $rootPath 'workspace'
         $defaultPackageDepotDirectory = Join-Path $rootPath 'default-depot'
         $preferredTargetInstallDirectory = Join-Path $rootPath 'installs'
         $packageStateIndexFilePath = Join-Path $rootPath 'package-state.json'
@@ -3277,7 +3451,7 @@ exit /b 0
                     acquisitionCandidates = @(
                         @{
                             kind = 'packageDepot'
-                            priority = 250
+                            searchOrder = 250
                             verification = @{
                                 mode = 'none'
                             }
@@ -3286,7 +3460,7 @@ exit /b 0
                 }
             )
         }
-        $documents = Write-TestPackageDocuments -RootPath $rootPath -GlobalDocument (New-TestPackageGlobalDocument -InstallWorkspaceDirectory $installWorkspaceDirectory -DefaultPackageDepotDirectory $defaultPackageDepotDirectory -PreferredTargetInstallDirectory $preferredTargetInstallDirectory -PackageStateIndexFilePath $packageStateIndexFilePath) -DefinitionDocument $definitionDocument
+        $documents = Write-TestPackageDocuments -RootPath $rootPath -GlobalDocument (New-TestPackageGlobalDocument -PackageFileStagingDirectory $packageFileStagingDirectory -DefaultPackageDepotDirectory $defaultPackageDepotDirectory -PreferredTargetInstallDirectory $preferredTargetInstallDirectory -PackageStateIndexFilePath $packageStateIndexFilePath) -DefinitionDocument $definitionDocument
 
         [Environment]::SetEnvironmentVariable($script:SourceInventoryEnvVarName, (Join-Path $TestDrive 'missing-inventory.json'), 'Process')
         Mock Get-PackageGlobalConfigPath { $documents.GlobalConfigPath }
@@ -3301,15 +3475,35 @@ exit /b 0
         $null = New-Item -ItemType Directory -Path (Split-Path -Parent $result.DefaultPackageDepotFilePath) -Force
         Write-TestTextFile -Path $result.DefaultPackageDepotFilePath -Content 'gguf-binary'
 
-        $result = Save-PackagePackageFile -PackageResult $result
+        $result = Prepare-PackageInstallFile -PackageResult $result
         $result = Install-PackagePackage -PackageResult $result
         $result = Test-PackageInstalledPackage -PackageResult $result
 
-        $result.PackageFileSave.Status | Should -Be 'HydratedFromDefaultPackageDepot'
+        $result.PackageFilePreparation.Status | Should -Be 'HydratedFromDefaultPackageDepot'
         $result.Install.InstallKind | Should -Be 'placePackageFile'
         $result.Install.InstalledFilePath | Should -Be (Join-Path $result.InstallDirectory 'Qwen3.5-2B-Q8_0.gguf')
         Test-Path -LiteralPath $result.Install.InstalledFilePath -PathType Leaf | Should -BeTrue
         $result.Validation.Accepted | Should -BeTrue
+    }
+
+    It 'cleans package-specific staging directories after a successful run' {
+        $rootPath = Join-Path $TestDrive 'install-preparation-cleanup'
+        $preparationDirectory = Join-Path $rootPath 'PackageFileStaging\packages\VSCodeRuntime\stable\2.0.0\win32-x64'
+        $installStageDirectory = Join-Path $rootPath 'PackageInstallStage\packages\VSCodeRuntime\stable\2.0.0\win32-x64'
+        $npmCacheDirectory = Join-Path $rootPath 'Caches\npm\CodexCli\stable\0.125.0\win32-x64'
+        Write-TestTextFile -Path (Join-Path $preparationDirectory 'package.zip') -Content 'package'
+        Write-TestTextFile -Path (Join-Path $installStageDirectory 'expanded\Code.exe') -Content 'binary'
+        Write-TestTextFile -Path (Join-Path $npmCacheDirectory 'cache-entry') -Content 'cache'
+
+        $result = Clear-PackageWorkDirectories -PackageResult ([pscustomobject]@{
+                PackageFileStagingDirectory = $preparationDirectory
+                PackageInstallStageDirectory = $installStageDirectory
+            })
+
+        $result.PackageFileStagingDirectory | Should -Be $preparationDirectory
+        Test-Path -LiteralPath $preparationDirectory | Should -BeFalse
+        Test-Path -LiteralPath $installStageDirectory | Should -BeFalse
+        Test-Path -LiteralPath $npmCacheDirectory -PathType Container | Should -BeTrue
     }
 
     It 'discovers command-based existing installs through Get-ResolvedApplicationPath' {
@@ -3528,3 +3722,4 @@ exit /b 0
         @($config.EnvironmentSources.PSObject.Properties.Name) | Should -Be @('defaultPackageDepot')
     }
 }
+

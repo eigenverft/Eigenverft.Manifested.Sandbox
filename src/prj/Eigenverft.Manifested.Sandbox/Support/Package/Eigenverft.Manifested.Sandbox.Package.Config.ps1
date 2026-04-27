@@ -121,22 +121,40 @@ Get-PackageRuntimeContext
     }
 }
 
-function Get-PackageDefaultInstallWorkspaceDirectory {
+function Get-PackageDefaultPackageFileStagingDirectory {
 <#
 .SYNOPSIS
-Returns the default Package install-workspace root.
+Returns the default Package package-file staging root.
 
 .DESCRIPTION
-Builds the fallback local workspace root for Package working artifacts
+Builds the fallback local staging root for raw package files
 when the shipped or external config does not define one explicitly.
 
 .EXAMPLE
-Get-PackageDefaultInstallWorkspaceDirectory
+Get-PackageDefaultPackageFileStagingDirectory
 #>
     [CmdletBinding()]
     param()
 
-    return [System.IO.Path]::GetFullPath((Join-Path (Get-PackageLocalRoot) 'InstallWorkspace'))
+    return [System.IO.Path]::GetFullPath((Join-Path (Get-PackageLocalRoot) 'PackageFileStaging'))
+}
+
+function Get-PackageDefaultPackageInstallStageDirectory {
+<#
+.SYNOPSIS
+Returns the default Package install-stage root.
+
+.DESCRIPTION
+Builds the fallback local stage root for package extraction and installer
+execution when the shipped or external config does not define one explicitly.
+
+.EXAMPLE
+Get-PackageDefaultPackageInstallStageDirectory
+#>
+    [CmdletBinding()]
+    param()
+
+    return [System.IO.Path]::GetFullPath((Join-Path (Get-PackageLocalRoot) 'PackageInstallStage'))
 }
 
 function Get-PackageDefaultPreferredTargetInstallDirectory {
@@ -326,8 +344,11 @@ Resolve-PackageTemplateText -Text '{releaseTrack}\{version}\{flavor}' -PackageCo
         if ($PackageConfig.PSObject.Properties['PreferredTargetInstallRootDirectory']) {
             $tokens['preferredTargetInstallDirectory'] = $PackageConfig.PreferredTargetInstallRootDirectory
         }
-        if ($PackageConfig.PSObject.Properties['InstallWorkspaceRootDirectory']) {
-            $tokens['installWorkspaceDirectory'] = $PackageConfig.InstallWorkspaceRootDirectory
+        if ($PackageConfig.PSObject.Properties['PackageFileStagingRootDirectory']) {
+            $tokens['packageFileStagingDirectory'] = $PackageConfig.PackageFileStagingRootDirectory
+        }
+        if ($PackageConfig.PSObject.Properties['PackageInstallStageRootDirectory']) {
+            $tokens['packageInstallStageDirectory'] = $PackageConfig.PackageInstallStageRootDirectory
         }
         if ($PackageConfig.PSObject.Properties['DefaultPackageDepotDirectory']) {
             $tokens['defaultPackageDepotDirectory'] = $PackageConfig.DefaultPackageDepotDirectory
@@ -363,7 +384,7 @@ Builds the relative package-file directory for depot and workspace storage.
 
 .DESCRIPTION
 Derives the shared relative directory used below package depots and the
-install workspace from the definition id and selected release identity.
+package file staging from the definition id and selected release identity.
 
 .PARAMETER PackageConfig
 The resolved Package config object.
@@ -648,6 +669,49 @@ Assert-PackageDepotInventorySchema -DepotInventoryDocumentInfo $inventoryInfo
     if (-not $document.PSObject.Properties['acquisitionEnvironment'] -or $null -eq $document.acquisitionEnvironment) {
         throw "Package depot inventory '$($DepotInventoryDocumentInfo.Path)' is missing acquisitionEnvironment."
     }
+    if ($document.acquisitionEnvironment.PSObject.Properties['environmentSources']) {
+        foreach ($sourceProperty in @($document.acquisitionEnvironment.environmentSources.PSObject.Properties)) {
+            if ($sourceProperty.Value -and $sourceProperty.Value.PSObject.Properties['priority']) {
+                throw "Package depot inventory '$($DepotInventoryDocumentInfo.Path)' source '$($sourceProperty.Name)' still uses retired property 'priority'. Use 'searchOrder'."
+            }
+            if ($sourceProperty.Value -and -not $sourceProperty.Value.PSObject.Properties['searchOrder']) {
+                throw "Package depot inventory '$($DepotInventoryDocumentInfo.Path)' source '$($sourceProperty.Name)' is missing searchOrder."
+            }
+            Assert-PackageEnvironmentSourceCapabilities -SourceId $sourceProperty.Name -SourceValue $sourceProperty.Value -DocumentPath $DepotInventoryDocumentInfo.Path
+        }
+    }
+}
+
+function Assert-PackageEnvironmentSourceCapabilities {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$SourceId,
+
+        [Parameter(Mandatory = $true)]
+        [psobject]$SourceValue,
+
+        [Parameter(Mandatory = $true)]
+        [string]$DocumentPath
+    )
+
+    if (-not [string]::Equals([string]$SourceValue.kind, 'filesystem', [System.StringComparison]::OrdinalIgnoreCase)) {
+        return
+    }
+
+    foreach ($capabilityName in @('readable', 'writable', 'mirrorTarget', 'ensureExists')) {
+        if (-not $SourceValue.PSObject.Properties[$capabilityName]) {
+            throw "Package environment source '$SourceId' in '$DocumentPath' is missing capability '$capabilityName'."
+        }
+    }
+
+    $writable = [bool]$SourceValue.writable
+    if ([bool]$SourceValue.mirrorTarget -and -not $writable) {
+        throw "Package environment source '$SourceId' in '$DocumentPath' cannot use mirrorTarget=true with writable=false."
+    }
+    if ([bool]$SourceValue.ensureExists -and -not $writable) {
+        throw "Package environment source '$SourceId' in '$DocumentPath' cannot use ensureExists=true with writable=false."
+    }
 }
 
 function Get-PackageDepotInventoryInfo {
@@ -796,8 +860,14 @@ Assert-PackageGlobalConfigSchema -GlobalDocumentInfo $globalInfo
     if ($package.acquisitionEnvironment.stores.PSObject.Properties['defaultPackageDepotDirectory']) {
         throw "Package global config '$($GlobalDocumentInfo.Path)' still uses retired property 'acquisitionEnvironment.stores.defaultPackageDepotDirectory'. Use Configuration/Internal/DepotInventory.json environmentSources.defaultPackageDepot.basePath."
     }
+    if ($package.acquisitionEnvironment.stores.PSObject.Properties['installWorkspaceDirectory']) {
+        throw "Package global config '$($GlobalDocumentInfo.Path)' still uses retired property 'acquisitionEnvironment.stores.installWorkspaceDirectory'. Use 'acquisitionEnvironment.stores.packageFileStagingDirectory'."
+    }
+    if ($package.acquisitionEnvironment.stores.PSObject.Properties['installPreparationDirectory']) {
+        throw "Package global config '$($GlobalDocumentInfo.Path)' still uses retired property 'acquisitionEnvironment.stores.installPreparationDirectory'. Use 'acquisitionEnvironment.stores.packageFileStagingDirectory' and 'acquisitionEnvironment.stores.packageInstallStageDirectory'."
+    }
 
-    foreach ($requiredStoreProperty in @('installWorkspaceDirectory')) {
+    foreach ($requiredStoreProperty in @('packageFileStagingDirectory', 'packageInstallStageDirectory')) {
         if (-not $package.acquisitionEnvironment.stores.PSObject.Properties[$requiredStoreProperty]) {
             throw "Package global config '$($GlobalDocumentInfo.Path)' is missing acquisitionEnvironment.stores.$requiredStoreProperty."
         }
@@ -863,6 +933,13 @@ function Resolve-PackageEnvironmentSources {
             if (-not $enabled) {
                 continue
             }
+            if ($sourceValue.PSObject.Properties['priority']) {
+                throw "Package environment source '$($property.Name)' still uses retired property 'priority'. Use 'searchOrder'."
+            }
+            if (-not $sourceValue.PSObject.Properties['searchOrder']) {
+                throw "Package environment source '$($property.Name)' is missing searchOrder."
+            }
+            Assert-PackageEnvironmentSourceCapabilities -SourceId $property.Name -SourceValue $sourceValue -DocumentPath 'effective acquisition environment'
 
             $sourceSiteCodes = @()
             if ($sourceValue.PSObject.Properties['siteCodes'] -and $null -ne $sourceValue.siteCodes) {
@@ -890,7 +967,11 @@ function Resolve-PackageEnvironmentSources {
                 id       = $property.Name
                 kind     = if ($sourceValue.PSObject.Properties['kind']) { [string]$sourceValue.kind } else { $null }
                 enabled  = $true
-                priority = if ($sourceValue.PSObject.Properties['priority']) { [int]$sourceValue.priority } else { 1000 }
+                searchOrder = if ($sourceValue.PSObject.Properties['searchOrder']) { [int]$sourceValue.searchOrder } else { 1000 }
+                readable = if ($sourceValue.PSObject.Properties['readable']) { [bool]$sourceValue.readable } else { $true }
+                writable = if ($sourceValue.PSObject.Properties['writable']) { [bool]$sourceValue.writable } else { $false }
+                mirrorTarget = if ($sourceValue.PSObject.Properties['mirrorTarget']) { [bool]$sourceValue.mirrorTarget } else { $false }
+                ensureExists = if ($sourceValue.PSObject.Properties['ensureExists']) { [bool]$sourceValue.ensureExists } else { $false }
             }
 
             if ($sourceValue.PSObject.Properties['baseUri'] -and -not [string]::IsNullOrWhiteSpace([string]$sourceValue.baseUri)) {
@@ -980,12 +1061,20 @@ Resolve-PackageEffectiveAcquisitionEnvironment -GlobalConfiguration $global -Sou
 
     $acquisitionEnvironment = ConvertTo-PackageObject -InputObject $mergedAcquisitionEnvironment
 
-    $installWorkspaceDirectory = if ($acquisitionEnvironment.stores.PSObject.Properties['installWorkspaceDirectory'] -and
-        -not [string]::IsNullOrWhiteSpace([string]$acquisitionEnvironment.stores.installWorkspaceDirectory)) {
-        Resolve-PackagePathValue -PathValue ([string]$acquisitionEnvironment.stores.installWorkspaceDirectory)
+    $packageFileStagingDirectory = if ($acquisitionEnvironment.stores.PSObject.Properties['packageFileStagingDirectory'] -and
+        -not [string]::IsNullOrWhiteSpace([string]$acquisitionEnvironment.stores.packageFileStagingDirectory)) {
+        Resolve-PackagePathValue -PathValue ([string]$acquisitionEnvironment.stores.packageFileStagingDirectory)
     }
     else {
-        Get-PackageDefaultInstallWorkspaceDirectory
+        Get-PackageDefaultPackageFileStagingDirectory
+    }
+
+    $packageInstallStageDirectory = if ($acquisitionEnvironment.stores.PSObject.Properties['packageInstallStageDirectory'] -and
+        -not [string]::IsNullOrWhiteSpace([string]$acquisitionEnvironment.stores.packageInstallStageDirectory)) {
+        Resolve-PackagePathValue -PathValue ([string]$acquisitionEnvironment.stores.packageInstallStageDirectory)
+    }
+    else {
+        Get-PackageDefaultPackageInstallStageDirectory
     }
 
     $packageFileIndexFilePath = if ($acquisitionEnvironment.tracking.PSObject.Properties['packageFileIndexFilePath'] -and
@@ -1028,7 +1117,8 @@ Resolve-PackageEffectiveAcquisitionEnvironment -GlobalConfiguration $global -Sou
         SiteCode            = (@($activeSiteCodes) -join ';')
         SiteCodes           = @($activeSiteCodes)
         Stores              = [pscustomobject]@{
-            InstallWorkspaceDirectory = $installWorkspaceDirectory
+            PackageFileStagingDirectory  = $packageFileStagingDirectory
+            PackageInstallStageDirectory = $packageInstallStageDirectory
             DefaultPackageDepotDirectory = $defaultPackageDepotDirectory
         }
         Defaults            = [pscustomobject]@{
@@ -1438,6 +1528,12 @@ Assert-PackageDefinitionSchema -DefinitionDocumentInfo $definitionInfo -Definiti
                 if ($candidate.PSObject.Properties['sourceRef']) {
                     throw "Package release '$($release.id)' in '$($definition.id)' still uses retired property 'sourceRef'."
                 }
+                if ($candidate.PSObject.Properties['priority']) {
+                    throw "Package release '$($release.id)' in '$($definition.id)' acquisition candidate still uses retired property 'priority'. Use 'searchOrder'."
+                }
+                if (-not $candidate.PSObject.Properties['searchOrder']) {
+                    throw "Package release '$($release.id)' in '$($definition.id)' has an acquisition candidate without searchOrder."
+                }
                 if (-not $candidate.PSObject.Properties['kind'] -or [string]::IsNullOrWhiteSpace([string]$candidate.kind)) {
                     throw "Package release '$($release.id)' in '$($definition.id)' has an acquisition candidate without kind."
                 }
@@ -1672,7 +1768,8 @@ Get-PackageConfig -DefinitionId VSCodeRuntime
         OSVersion                          = $runtimeContext.OSVersion
         ReleaseTrack                       = $selectionReleaseTrack
         SelectionStrategy                  = $selectionStrategy
-        InstallWorkspaceRootDirectory      = $effectiveAcquisitionEnvironment.Stores.InstallWorkspaceDirectory
+        PackageFileStagingRootDirectory      = $effectiveAcquisitionEnvironment.Stores.PackageFileStagingDirectory
+        PackageInstallStageRootDirectory     = $effectiveAcquisitionEnvironment.Stores.PackageInstallStageDirectory
         DefaultPackageDepotDirectory       = $effectiveAcquisitionEnvironment.Stores.DefaultPackageDepotDirectory
         PreferredTargetInstallRootDirectory = $preferredTargetInstallDirectory
         LocalRepositoryRoot                = $localRepositoryRoot
@@ -1744,7 +1841,8 @@ Resolve-PackagePaths -PackageResult $result
         throw "Package definition '$($definition.id)' must use a relative package-file directory."
     }
 
-    $installWorkspaceDirectory = [System.IO.Path]::GetFullPath((Join-Path $packageConfig.InstallWorkspaceRootDirectory $normalizedPackageFileRelativeDirectory))
+    $packageFileStagingDirectory = [System.IO.Path]::GetFullPath((Join-Path $packageConfig.PackageFileStagingRootDirectory $normalizedPackageFileRelativeDirectory))
+    $packageInstallStageDirectory = [System.IO.Path]::GetFullPath((Join-Path $packageConfig.PackageInstallStageRootDirectory $normalizedPackageFileRelativeDirectory))
 
     $installDirectory = $null
     if (-not [string]::IsNullOrWhiteSpace($installDirectoryTemplate)) {
@@ -1763,14 +1861,15 @@ Resolve-PackagePaths -PackageResult $result
         $package.packageFile -and
         $package.packageFile.PSObject.Properties['fileName'] -and
         -not [string]::IsNullOrWhiteSpace([string]$package.packageFile.fileName)) {
-        $packageFilePath = Join-Path $installWorkspaceDirectory ([string]$package.packageFile.fileName)
+        $packageFilePath = Join-Path $packageFileStagingDirectory ([string]$package.packageFile.fileName)
         if (-not [string]::IsNullOrWhiteSpace([string]$packageConfig.DefaultPackageDepotDirectory)) {
             $defaultPackageDepotDirectory = [System.IO.Path]::GetFullPath((Join-Path $packageConfig.DefaultPackageDepotDirectory $normalizedPackageFileRelativeDirectory))
             $defaultPackageDepotFilePath = Join-Path $defaultPackageDepotDirectory ([string]$package.packageFile.fileName)
         }
     }
 
-    $PackageResult.InstallWorkspaceDirectory = $installWorkspaceDirectory
+    $PackageResult.PackageFileStagingDirectory = $packageFileStagingDirectory
+    $PackageResult.PackageInstallStageDirectory = $packageInstallStageDirectory
     $PackageResult.InstallDirectory = $installDirectory
     $PackageResult.PackageFileRelativeDirectory = $normalizedPackageFileRelativeDirectory
     $PackageResult.PackageFilePath = $packageFilePath
@@ -1780,7 +1879,8 @@ Resolve-PackagePaths -PackageResult $result
     $resolvedPackageFilePathText = if ([string]::IsNullOrWhiteSpace([string]$packageFilePath)) { '<none>' } else { $packageFilePath }
     $resolvedDefaultDepotFilePathText = if ([string]::IsNullOrWhiteSpace([string]$defaultPackageDepotFilePath)) { '<none>' } else { $defaultPackageDepotFilePath }
     Write-PackageExecutionMessage -Message '[STATE] Resolved paths:'
-    Write-PackageExecutionMessage -Message ("[PATH] Install workspace: {0}" -f $installWorkspaceDirectory)
+    Write-PackageExecutionMessage -Message ("[PATH] Package file staging: {0}" -f $packageFileStagingDirectory)
+    Write-PackageExecutionMessage -Message ("[PATH] Package install stage: {0}" -f $packageInstallStageDirectory)
     Write-PackageExecutionMessage -Message ("[PATH] Target install directory: {0}" -f $resolvedInstallDirectoryText)
     Write-PackageExecutionMessage -Message ("[PATH] Package file: {0}" -f $resolvedPackageFilePathText)
     Write-PackageExecutionMessage -Message ("[PATH] Default package depot file: {0}" -f $resolvedDefaultDepotFilePathText)
@@ -1831,7 +1931,8 @@ New-PackageResult -CommandName Invoke-VSCodeRuntime -PackageConfig $config
         ReleaseTrack                     = $PackageConfig.ReleaseTrack
         SourceInventoryPath              = $PackageConfig.SourceInventoryPath
         DepotInventoryPath               = $PackageConfig.DepotInventoryPath
-        InstallWorkspaceRootDirectory    = $PackageConfig.InstallWorkspaceRootDirectory
+        PackageFileStagingRootDirectory    = $PackageConfig.PackageFileStagingRootDirectory
+        PackageInstallStageRootDirectory   = $PackageConfig.PackageInstallStageRootDirectory
         DefaultPackageDepotDirectory     = $PackageConfig.DefaultPackageDepotDirectory
         PreferredTargetInstallRootDirectory = $PackageConfig.PreferredTargetInstallRootDirectory
         LocalRepositoryRoot              = $PackageConfig.LocalRepositoryRoot
@@ -1842,7 +1943,8 @@ New-PackageResult -CommandName Invoke-VSCodeRuntime -PackageConfig $config
         PackageId                        = $null
         PackageVersion                   = $null
         Compatibility                    = @()
-        InstallWorkspaceDirectory        = $null
+        PackageFileStagingDirectory        = $null
+        PackageInstallStageDirectory       = $null
         InstallDirectory                 = $null
         PackageFileRelativeDirectory     = $null
         PackageFilePath                  = $null
@@ -1851,7 +1953,7 @@ New-PackageResult -CommandName Invoke-VSCodeRuntime -PackageConfig $config
         ExistingPackage                  = $null
         Ownership                        = $null
         InstallOrigin                    = $null
-        PackageFileSave                  = $null
+        PackageFilePreparation                  = $null
         Dependencies                     = @()
         Install                          = $null
         Validation                       = $null
@@ -1860,4 +1962,5 @@ New-PackageResult -CommandName Invoke-VSCodeRuntime -PackageConfig $config
         PackageConfig               = $PackageConfig
     }
 }
+
 

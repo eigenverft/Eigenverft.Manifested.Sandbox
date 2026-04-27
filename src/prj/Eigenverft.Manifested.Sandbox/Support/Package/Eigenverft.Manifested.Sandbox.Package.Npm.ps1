@@ -20,8 +20,10 @@ function New-PackageNpmCacheDirectory {
         [psobject]$PackageResult
     )
 
+    $packageRoot = Get-PackageRootFromStateIndexPath -PackageStateIndexFilePath ([string]$PackageResult.PackageConfig.PackageStateIndexFilePath)
     $segments = @(
-        'npm-cache'
+        'Caches'
+        'npm'
         [string]$PackageResult.DefinitionId
         [string]$PackageResult.Package.releaseTrack
         [string]$PackageResult.Package.version
@@ -30,7 +32,7 @@ function New-PackageNpmCacheDirectory {
         ([string]$_).Trim() -replace '[\\/:\*\?"<>\|]', '-'
     }
 
-    $cacheDirectory = [System.IO.Path]::GetFullPath((Join-Path $PackageResult.PackageConfig.InstallWorkspaceRootDirectory ($segments -join '\')))
+    $cacheDirectory = [System.IO.Path]::GetFullPath((Join-Path $packageRoot ($segments -join '\')))
     $null = New-Item -ItemType Directory -Path $cacheDirectory -Force
     return $cacheDirectory
 }
@@ -94,7 +96,12 @@ Installs an exact npm package spec into a staged Package-owned prefix.
     $installerCommandInfo = Resolve-PackageNpmInstallerCommand -PackageResult $PackageResult
     $cacheDirectory = New-PackageNpmCacheDirectory -PackageResult $PackageResult
     $globalConfigPath = Initialize-PackageNpmGlobalConfig -GlobalConfigPath (Get-PackageNpmGlobalConfigPath -PackageResult $PackageResult)
-    $stagePath = New-TemporaryStageDirectory -Prefix ('npm-' + ([string]$PackageResult.DefinitionId).ToLowerInvariant())
+    if ([string]::IsNullOrWhiteSpace([string]$PackageResult.PackageInstallStageDirectory)) {
+        throw "Package npm global package install for '$($PackageResult.PackageId)' requires a package install stage directory."
+    }
+    $stagePath = [System.IO.Path]::GetFullPath([string]$PackageResult.PackageInstallStageDirectory)
+    Remove-PathIfExists -Path $stagePath | Out-Null
+    $null = New-Item -ItemType Directory -Path $stagePath -Force
     $stagePromoted = $false
 
     $commandArguments = @('install', '-g', '--prefix', $stagePath, '--cache', $cacheDirectory)
@@ -135,7 +142,7 @@ Installs an exact npm package spec into a staged Package-owned prefix.
     }
     finally {
         if (-not $stagePromoted) {
-            Remove-PathIfExists -Path $stagePath | Out-Null
+            Write-PackageExecutionMessage -Level 'WRN' -Message ("[WARN] Preserving failed npm package install stage '{0}' for inspection." -f $stagePath)
         }
     }
 
@@ -154,4 +161,5 @@ Installs an exact npm package spec into a staged Package-owned prefix.
         ExitCode         = $exitCode
     }
 }
+
 

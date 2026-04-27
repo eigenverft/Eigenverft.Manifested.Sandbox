@@ -131,7 +131,7 @@
       "acquisitionCandidates": [
         {
           "kind": "packageDepot",
-          "priority": 250,
+          "searchOrder": 100,
           "verification": {
             "mode": "optional"
           }
@@ -140,7 +140,7 @@
           "kind": "download",
           "sourceId": "nodeJsRelease",
           "sourcePath": "node-v24.15.0-win-x64.zip",
-          "priority": 200,
+          "searchOrder": 900,
           "verification": {
             "mode": "required"
           }
@@ -174,7 +174,7 @@
       "acquisitionCandidates": [
         {
           "kind": "packageDepot",
-          "priority": 250,
+          "searchOrder": 100,
           "verification": {
             "mode": "optional"
           }
@@ -183,7 +183,7 @@
           "kind": "download",
           "sourceId": "nodeJsRelease",
           "sourcePath": "node-v24.15.0-win-arm64.zip",
-          "priority": 200,
+          "searchOrder": 900,
           "verification": {
             "mode": "required"
           }

@@ -133,7 +133,7 @@
       "acquisitionCandidates": [
         {
           "kind": "packageDepot",
-          "priority": 250,
+          "searchOrder": 100,
           "verification": {
             "mode": "optional"
           }
@@ -141,7 +141,7 @@
         {
           "kind": "download",
           "sourceId": "llamaCppGitHub",
-          "priority": 200,
+          "searchOrder": 900,
           "verification": {
             "mode": "required"
           }
