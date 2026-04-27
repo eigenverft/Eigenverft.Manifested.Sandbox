@@ -40,6 +40,7 @@
 
 # Package commands
 . "$PSScriptRoot\Commands\Eigenverft.Manifested.Sandbox.Cmd.Qwen35_2B_Q8_0_Model.ps1"
+. "$PSScriptRoot\Commands\Eigenverft.Manifested.Sandbox.Cmd.Qwen35_9B_Q6_K_Model.ps1"
 . "$PSScriptRoot\Commands\Eigenverft.Manifested.Sandbox.Cmd.LlamaCppRuntime.ps1"
 . "$PSScriptRoot\Commands\Eigenverft.Manifested.Sandbox.Cmd.VisualCppRedistributable.ps1"
 . "$PSScriptRoot\Commands\Eigenverft.Manifested.Sandbox.Cmd.PowerShell7.ps1"
