@@ -13,7 +13,7 @@
 RootModule = 'Eigenverft.Manifested.Sandbox.psm1'
 
 # Version number of this module.
-  ModuleVersion = '1.20262.26621'
+  ModuleVersion = '1.20262.26626'
 
 # Supported PSEditions
 CompatiblePSEditions = @('Desktop', 'Core')
