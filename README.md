@@ -8,9 +8,9 @@ The primary intent is fast, repeatable setup inside Windows Sandbox. The same mo
 
 🚀 **Key Features:**
 - Ready-to-download Windows Sandbox profile in the repo for repeatable bring-up
-- Managed runtime provisioning for `python`, `pip`, `pwsh`, `git`, `gh`, `code`, `node`, `npm`, `opencode`, `gemini`, `qwen`, `codex`, and VC++ prerequisites
-- Runtime discovery that can reuse compatible external installs or refresh to sandbox-owned managed copies
-- Persisted command results plus live runtime snapshots through `Get-SandboxState`
+- Package-backed provisioning for `python`, `pwsh`, `git`, `gh`, `code`, `node`, `npm`, `opencode`, `gemini`, `qwen`, `codex`, Qwen GGUF model resources, llama.cpp, and VC++ prerequisites
+- Package state tracking through local package indexes under `%LOCALAPPDATA%\Eigenverft.Manifested.Sandbox`
+- Package/depot layout that can reuse local package files and later grow toward shared package repositories
 - Managed npm ownership under the sandbox Node runtime, including proxy-aware npm configuration when Windows resolves the npm registry through a proxy
 - Proxy-aware startup and download handling for managed or corporate Windows environments
 - Compacted embedded startup helpers so the `.wsb` `LogonCommand` fits within the practical 8 KB command-line limit
@@ -84,7 +84,7 @@ Use `$c` when you want startup to do more than just show the module version.
 $c='Get-SandboxVersion'
 
 # Bootstrap, then prepare a fuller sandbox toolset
-$c='Get-SandboxVersion; Initialize-VCRuntime; Initialize-PythonRuntime; Initialize-Ps7Runtime; Initialize-GitRuntime; Get-SandboxState'
+$c='Get-SandboxVersion; Invoke-VisualCppRedistributable; Invoke-PythonRuntime; Invoke-PowerShell7; Invoke-GitRuntime; Get-PackageState'
 
 # Bootstrap, then download and run another script
 $c='Invoke-WebRequestEx -Uri ''https://example.org/setup.ps1'' -OutFile ""$env:TEMP\setup.ps1""; powershell -ExecutionPolicy Bypass -File ""$env:TEMP\setup.ps1""'
@@ -108,26 +108,27 @@ The startup helpers are compacted and compressed so the Windows Sandbox `LogonCo
 
 The module currently exports these public commands:
 
-- `Get-SandboxState`
+- `Get-PackageState`
 - `Get-SandboxVersion`
-- `Initialize-CodexRuntime`
-- `Initialize-GeminiRuntime`
-- `Initialize-GHCliRuntime`
-- `Initialize-GitRuntime`
-- `Initialize-NodeRuntime`
-- `Initialize-OpenCodeRuntime`
 - `Initialize-ProxyAccessProfile`
-- `Initialize-Ps7Runtime`
-- `Initialize-PythonRuntime`
-- `Initialize-QwenRuntime`
-- `Initialize-VCRuntime`
-- `Initialize-VSCodeRuntime`
-- `Invoke-ConfigurationVSCodeRuntime`
+- `Invoke-CodexCli`
+- `Invoke-GeminiCli`
+- `Invoke-GitHubCli`
+- `Invoke-GitRuntime`
+- `Invoke-LlamaCppRuntime`
+- `Invoke-NodeRuntime`
+- `Invoke-OpenCodeCli`
+- `Invoke-PowerShell7`
+- `Invoke-PythonRuntime`
+- `Invoke-Qwen35-2B-Q8-0-Model`
+- `Invoke-QwenCli`
+- `Invoke-VisualCppRedistributable`
+- `Invoke-VSCodeRuntime`
 - `Invoke-WebRequestEx`
 
-There is not yet a single combined `Initialize-Sandbox` command. The current model is a set of small init commands that each read real state, plan from that state, perform bounded repair or install work, and persist the observed result.
+There is not yet a single unified package operation command. The current model is a set of small package wrapper commands that each load a shipped JSON definition, resolve dependencies and acquisition sources, perform bounded reuse/install/repair work, validate the result, and persist observed package state.
 
-The first `ConfigurationModel` entrypoint is `Invoke-ConfigurationVSCodeRuntime`. It reads a JSON document, inspects `features.vsCodeRuntime.kind`, and normalizes `features.vsCodeRuntime.data` into a new-command request without replacing the legacy `Initialize-VSCodeRuntime` flow.
+The intended long-term direction is one neutral package dispatcher such as `Invoke-PackageCommand`, with actions like ensure, update, remove, list, and state. The current `Invoke-*` commands are convenient shipped-package wrappers until that dispatcher exists.
 
 ---
 
@@ -137,51 +138,29 @@ After the repository's `.wsb` profile opens the new console, run:
 
 ```powershell
 Get-SandboxVersion
-Initialize-PythonRuntime
-Initialize-Ps7Runtime
-Initialize-GitRuntime
-Initialize-GHCliRuntime
-Initialize-VSCodeRuntime
-Invoke-ConfigurationVSCodeRuntime -ConfigurationPath .\sandbox.features.json
-Initialize-NodeRuntime
-Initialize-OpenCodeRuntime
-Initialize-GeminiRuntime
-Initialize-QwenRuntime
-Initialize-CodexRuntime
-Initialize-VCRuntime
-Get-SandboxState
+Invoke-VisualCppRedistributable
+Invoke-PythonRuntime
+Invoke-PowerShell7
+Invoke-GitRuntime
+Invoke-GitHubCli
+Invoke-VSCodeRuntime
+Invoke-NodeRuntime
+Invoke-OpenCodeCli
+Invoke-GeminiCli
+Invoke-QwenCli
+Invoke-CodexCli
+Invoke-LlamaCppRuntime
+Invoke-Qwen35-2B-Q8-0-Model
+Get-PackageState
 ```
 
 - `Get-SandboxVersion` is the quick way to show user-facing module info for the current session, including the resolved module version and the full exported command list in alphabetical order.
-- `Get-SandboxState` exposes both the persisted command document and live runtime snapshots, so it is the easiest way to see what the module believes is managed, external, missing, partial, or blocked right now.
-- `Initialize-PythonRuntime`, `Initialize-Ps7Runtime`, `Initialize-GitRuntime`, `Initialize-GHCliRuntime`, `Initialize-VSCodeRuntime`, `Initialize-NodeRuntime`, `Initialize-OpenCodeRuntime`, `Initialize-GeminiRuntime`, `Initialize-QwenRuntime`, and `Initialize-CodexRuntime` are intended to run in a normal user session. They prefer sandbox-managed portable runtimes under `LocalAppData`, using python.org for the CPython embeddable ZIP, GitHub as the download source for PowerShell 7, MinGit, and GitHub CLI, the official VS Code Windows ZIP archive with portable `data` mode for VS Code, and npm-based managed installs for OpenCode, Gemini, Qwen, and Codex.
-- Those commands also check for an already-usable `python`, `pwsh`, `git`, `gh`, `code`, `node`, `opencode`, `gemini`, `qwen`, or `codex` that exists outside prior sandbox state. If a compatible runtime is already available on `PATH` or in a common install location, the command can treat it as ready and persist it as an external runtime instead of downloading or installing a new copy. If you explicitly use a refresh switch such as `-RefreshPython`, `-RefreshGit`, `-RefreshGHCli`, `-RefreshPs7`, `-RefreshVSCode`, `-RefreshNode`, `-RefreshOpenCode`, `-RefreshGemini`, `-RefreshQwen`, or `-RefreshCodex`, the command will still acquire and install the sandbox-managed copy.
-- `Initialize-PythonRuntime` installs the official CPython Windows embeddable package into a sandbox-managed tools root, enables `import site`, bootstraps `pip`, and exposes `python`, `python.exe`, `pip.cmd`, and `pip3.cmd` from the managed runtime directory. When Windows resolves the package index through a proxy, it keeps proxy settings in a runtime-local `pip.ini` instead of writing to a machine-wide or user-wide pip config.
-- `Initialize-GHCliRuntime` installs a managed `gh.exe` from the official GitHub CLI Windows ZIP release and validates the package against GitHub's published checksum asset before making that runtime active on `PATH`.
-- `Initialize-NodeRuntime` installs the managed Node.js runtime and owns the sandbox-managed npm configuration. When Windows resolves the active npm registry through a proxy, it writes `proxy` and `https-proxy` into the managed runtime's global `npmrc`; when the route is direct, it leaves npm config unchanged.
-- `Initialize-OpenCodeRuntime`, `Initialize-GeminiRuntime`, `Initialize-QwenRuntime`, and `Initialize-CodexRuntime` install `opencode-ai`, `@google/gemini-cli`, `@qwen-code/qwen-code`, and `@openai/codex` into sandbox-managed tool roots and inherit the managed npm global config when they are using the sandbox-owned Node/npm runtime.
-- `Initialize-OpenCodeRuntime` installs `opencode-ai` and exposes `opencode` / `opencode.cmd` from the managed tool root when refreshed or newly installed.
-- `Initialize-GeminiRuntime` installs `@google/gemini-cli` into the sandbox-managed tool root and prefers that managed copy when refreshed. Gemini CLI's official docs currently recommend Node.js `20.0.0+` and Windows 11 `24H2+`; this module follows a best-effort Windows policy and ensures a compatible Node runtime before managed install when needed.
-- `Initialize-QwenRuntime` installs `@qwen-code/qwen-code` into the sandbox-managed tool root and prefers that managed copy when refreshed. Qwen Code's official quickstart currently requires Node.js `20+`; this module follows that requirement and ensures a compatible Node runtime before managed install when needed.
-- `Initialize-CodexRuntime` installs `@openai/codex` into the sandbox-managed tool root and prefers that managed copy when refreshed. It always ensures the VC runtime prerequisite before install, and if no usable Node/npm is available yet it also ensures the required Node runtime first.
-- `Initialize-VCRuntime` is different because the VC runtime is a machine/runtime prerequisite rather than a sandbox-managed portable tool.
-- `Initialize-VCRuntime` should be run in an elevated PowerShell process when the Microsoft Visual C++ Redistributable needs to be installed or repaired.
-- `Invoke-ConfigurationVSCodeRuntime` is the first config-driven wrapper in `ConfigurationModel`. Its current JSON contract is:
-
-```json
-{
-  "features": {
-    "vsCodeRuntime": {
-      "kind": "EnsureManagedRuntime",
-      "data": {
-        "refreshVSCode": true
-      }
-    }
-  }
-}
-```
-
-- `Invoke-ConfigurationVSCodeRuntime` currently establishes and validates the new `ConfigurationModel` contract for `vsCodeRuntime`; it does not replace or delegate into the legacy `Initialize-VSCodeRuntime` command.
+- `Get-PackageState` reads the local package state and package-file indexes, reports configured directories, and shows whether copied package definition JSON files and install directories still exist.
+- `Invoke-PythonRuntime`, `Invoke-PowerShell7`, `Invoke-GitRuntime`, `Invoke-GitHubCli`, `Invoke-VSCodeRuntime`, and `Invoke-NodeRuntime` ensure pinned package definitions are ready from the configured depot/download flow.
+- `Invoke-OpenCodeCli`, `Invoke-GeminiCli`, `Invoke-QwenCli`, and `Invoke-CodexCli` install pinned npm-backed CLI packages through the package npm backend. They depend on the packaged Node runtime, and Codex also ensures the Visual C++ Redistributable prerequisite.
+- `Invoke-VisualCppRedistributable` is different because the VC runtime is a machine prerequisite rather than a portable package directory. It can report already-satisfied state from registry validation and only runs the Microsoft installer when needed.
+- `Invoke-LlamaCppRuntime` installs the pinned llama.cpp runtime package.
+- `Invoke-Qwen35-2B-Q8-0-Model` places the pinned Qwen 3.5 2B Q8_0 GGUF model resource for llama.cpp-compatible runtimes.
 
 ## 📦 Direct Module Usage
 
@@ -196,15 +175,14 @@ Import-Module Eigenverft.Manifested.Sandbox
 
 ## 📝 Usage Tips
 
-- Use the refresh switches when you want the sandbox-managed runtime even if a compatible tool already exists elsewhere on the machine.
-- `Initialize-PythonRuntime` keeps pip cache and proxy state under the sandbox root, so it is a good fit for disposable or corporate-proxy sandbox sessions where you do not want pip config leaking into the wider user profile.
+- Current package wrapper commands are parameterless and idempotent: rerunning them should reuse, repair, or report already-satisfied state rather than blindly reinstalling.
 - OpenCode, Gemini, Qwen, and Codex are all opt-in in the example command chains; add the specific runtime init commands you want for a given sandbox profile.
-- The npm-based CLIs share the managed Node runtime when needed. If `Initialize-NodeRuntime` detects that the npm registry routes through a system proxy, it persists that proxy into the sandbox-owned npm config; if the route is direct, it makes no npm proxy changes.
+- The npm-based CLIs share the packaged Node runtime and write npm config under the module's local configuration area, not into a machine-wide npm config.
 - To test another branch, swap `main` in the raw `.wsb` download URL before launching the sandbox.
 - If you are working from a local checkout instead of the raw download, edit the tracked `.wsb` file directly and launch that local copy.
 - Keep `.wsb` files small and let versioned PowerShell own the real startup logic whenever you want a more maintainable sandbox launch path.
-- Run `Get-SandboxState` after a bootstrap chain when you want the quickest view of managed vs external runtimes and persisted command outcomes.
-- Run `Initialize-VCRuntime` in an elevated PowerShell session if the Microsoft Visual C++ Redistributable needs installation or repair.
+- Run `Get-PackageState` after a bootstrap chain when you want the quickest view of package records, package files, and local repository copies.
+- Run `Invoke-VisualCppRedistributable` in an elevated PowerShell session if the Microsoft Visual C++ Redistributable needs installation or repair.
 
 ## 📄 License
 
