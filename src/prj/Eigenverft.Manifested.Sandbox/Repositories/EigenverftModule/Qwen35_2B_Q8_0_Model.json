@@ -90,7 +90,7 @@
           "kind": "packageDepot",
           "searchOrder": 100,
           "verification": {
-            "mode": "none"
+            "mode": "required"
           }
         },
         {
@@ -99,7 +99,7 @@
           "searchOrder": 900,
           "sourcePath": "Qwen3.5-2B-Q8_0.gguf",
           "verification": {
-            "mode": "none"
+            "mode": "required"
           }
         }
       ]

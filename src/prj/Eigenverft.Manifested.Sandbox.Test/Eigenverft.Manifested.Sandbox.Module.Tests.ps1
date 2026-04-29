@@ -113,6 +113,7 @@ function global:New-TestPackageArchiveInfo {
 
 function global:New-TestPackageGlobalDocument {
     param(
+        [string]$ApplicationRootDirectory,
         [string]$PackageFileStagingDirectory,
         [string]$PackageInstallStageDirectory,
         [string]$DefaultPackageDepotDirectory,
@@ -120,6 +121,8 @@ function global:New-TestPackageGlobalDocument {
         [string]$LocalRepositoryRoot,
         [string]$PackageFileIndexFilePath,
         [string]$PackageStateIndexFilePath,
+        [string]$PackageDepotRelativePath = '{definitionId}/{releaseTrack}/{version}/{flavor}',
+        [string]$PackageWorkSlotDirectory = '{definitionId}-{slotHash}',
         [bool]$AllowFallback = $true,
         [bool]$MirrorDownloadedArtifactsToDefaultPackageDepot = $true,
         [string]$ReleaseTrack = 'stable',
@@ -129,15 +132,15 @@ function global:New-TestPackageGlobalDocument {
 
     $acquisitionEnvironment = @{
         stores = @{
-            packageFileStagingDirectory = if ($PSBoundParameters.ContainsKey('PackageFileStagingDirectory')) { $PackageFileStagingDirectory } else { '%LOCALAPPDATA%/Eigenverft.Manifested.Sandbox/PackageFileStaging' }
-            packageInstallStageDirectory = if ($PSBoundParameters.ContainsKey('PackageInstallStageDirectory')) { $PackageInstallStageDirectory } else { '%LOCALAPPDATA%/Eigenverft.Manifested.Sandbox/PackageInstallStage' }
+            packageFileStagingDirectory = if ($PSBoundParameters.ContainsKey('PackageFileStagingDirectory')) { $PackageFileStagingDirectory } else { '{applicationRootDirectory}/FileStaging' }
+            packageInstallStageDirectory = if ($PSBoundParameters.ContainsKey('PackageInstallStageDirectory')) { $PackageInstallStageDirectory } else { '{applicationRootDirectory}/InstallStaging' }
         }
         defaults = @{
             allowFallback = $AllowFallback
             mirrorDownloadedArtifactsToDefaultPackageDepot = $MirrorDownloadedArtifactsToDefaultPackageDepot
         }
         tracking = @{
-            packageFileIndexFilePath = if ($PSBoundParameters.ContainsKey('PackageFileIndexFilePath')) { $PackageFileIndexFilePath } else { '%LOCALAPPDATA%/Eigenverft.Manifested.Sandbox/State/package-file-index.json' }
+            packageFileIndexFilePath = if ($PSBoundParameters.ContainsKey('PackageFileIndexFilePath')) { $PackageFileIndexFilePath } else { '{applicationRootDirectory}/State/package-file-index.json' }
         }
     }
     if ($PSBoundParameters.ContainsKey('EnvironmentSources') -and $null -ne $EnvironmentSources) {
@@ -146,17 +149,22 @@ function global:New-TestPackageGlobalDocument {
 
     return @{
         package = @{
-            preferredTargetInstallDirectory = if ($PSBoundParameters.ContainsKey('PreferredTargetInstallDirectory')) { $PreferredTargetInstallDirectory } else { '%LOCALAPPDATA%/Eigenverft.Manifested.Sandbox/Installed' }
+            applicationRootDirectory = if ($PSBoundParameters.ContainsKey('ApplicationRootDirectory')) { $ApplicationRootDirectory } else { '%LOCALAPPDATA%/Eigenverft.Manifested.Sandbox' }
+            preferredTargetInstallDirectory = if ($PSBoundParameters.ContainsKey('PreferredTargetInstallDirectory')) { $PreferredTargetInstallDirectory } else { '{applicationRootDirectory}/Installed' }
             repositorySources = @{
                 EigenverftModule = @{
                     kind = 'moduleLocal'
                     definitionRoot = 'Repositories/EigenverftModule'
                 }
             }
-            localRepositoryRoot = if ($PSBoundParameters.ContainsKey('LocalRepositoryRoot')) { $LocalRepositoryRoot } else { '%LOCALAPPDATA%/Eigenverft.Manifested.Sandbox/PackageRepositories' }
+            localRepositoryRoot = if ($PSBoundParameters.ContainsKey('LocalRepositoryRoot')) { $LocalRepositoryRoot } else { '{applicationRootDirectory}/PackageRepositories' }
+            layout = @{
+                packageDepotRelativePath = $PackageDepotRelativePath
+                packageWorkSlotDirectory = $PackageWorkSlotDirectory
+            }
             acquisitionEnvironment = $acquisitionEnvironment
             packageState = @{
-                indexFilePath = if ($PSBoundParameters.ContainsKey('PackageStateIndexFilePath')) { $PackageStateIndexFilePath } else { '%LOCALAPPDATA%/Eigenverft.Manifested.Sandbox/State/package-state-index.json' }
+                indexFilePath = if ($PSBoundParameters.ContainsKey('PackageStateIndexFilePath')) { $PackageStateIndexFilePath } else { '{applicationRootDirectory}/State/package-state-index.json' }
             }
             selectionDefaults = @{
                 releaseTrack = $ReleaseTrack
@@ -639,6 +647,18 @@ Describe 'Eigenverft.Manifested.Sandbox Package' {
         $publicParameterNames.Count | Should -Be 0
     }
 
+    It 'exports Invoke-Qwen35-9B-Q6-K-Model and keeps it parameterless' {
+        $module = Import-Module -Name $script:ModuleManifestPath -Force -PassThru
+        $command = Get-Command -Name 'Invoke-Qwen35-9B-Q6-K-Model'
+
+        $command | Should -Not -BeNullOrEmpty
+        $publicParameterNames = @($command.Parameters.Keys | Where-Object {
+                $_ -notin [System.Management.Automation.PSCmdlet]::CommonParameters -and
+                $_ -notin [System.Management.Automation.PSCmdlet]::OptionalCommonParameters
+            })
+        $publicParameterNames.Count | Should -Be 0
+    }
+
     It 'exports Invoke-NodeRuntime and keeps it parameterless' {
         $module = Import-Module -Name $script:ModuleManifestPath -Force -PassThru
         $command = Get-Command -Name 'Invoke-NodeRuntime'
@@ -942,11 +962,17 @@ Describe 'Eigenverft.Manifested.Sandbox Package' {
         $globalInfo = Read-PackageJsonDocument -Path (Get-PackageShippedGlobalConfigPath)
 
         $globalInfo.Document.package.PSObject.Properties.Name | Should -Contain 'preferredTargetInstallDirectory'
+        $globalInfo.Document.package.PSObject.Properties.Name | Should -Contain 'applicationRootDirectory'
         $globalInfo.Document.package.PSObject.Properties.Name | Should -Contain 'repositorySources'
         $globalInfo.Document.package.PSObject.Properties.Name | Should -Contain 'localRepositoryRoot'
+        $globalInfo.Document.package.PSObject.Properties.Name | Should -Contain 'layout'
+        $globalInfo.Document.package.layout.packageDepotRelativePath | Should -Be '{definitionId}/{releaseTrack}/{version}/{flavor}'
+        $globalInfo.Document.package.layout.packageWorkSlotDirectory | Should -Be '{definitionId}-{slotHash}'
         $globalInfo.Document.package.PSObject.Properties.Name | Should -Contain 'packageState'
         $globalInfo.Document.package.acquisitionEnvironment.stores.PSObject.Properties.Name | Should -Contain 'packageFileStagingDirectory'
         $globalInfo.Document.package.acquisitionEnvironment.stores.PSObject.Properties.Name | Should -Contain 'packageInstallStageDirectory'
+        $globalInfo.Document.package.acquisitionEnvironment.stores.packageFileStagingDirectory | Should -Be '{applicationRootDirectory}/FileStaging'
+        $globalInfo.Document.package.acquisitionEnvironment.stores.packageInstallStageDirectory | Should -Be '{applicationRootDirectory}/InstallStaging'
         $globalInfo.Document.package.acquisitionEnvironment.stores.PSObject.Properties.Name | Should -Not -Contain 'defaultPackageDepotDirectory'
         $depotInfo = Read-PackageJsonDocument -Path (Get-PackageShippedDepotInventoryPath)
         $depotInfo.Document.acquisitionEnvironment.environmentSources.PSObject.Properties.Name | Should -Contain 'defaultPackageDepot'
@@ -970,6 +996,73 @@ Describe 'Eigenverft.Manifested.Sandbox Package' {
         $activeGlobalPath | Should -Be $localGlobalPath
         Test-Path -LiteralPath $localGlobalPath -PathType Leaf | Should -BeTrue
         $localInfo.Document.package.repositorySources.EigenverftModule.kind | Should -Be 'moduleLocal'
+    }
+
+    It 'resolves package config paths from applicationRootDirectory and supports missing applicationRootDirectory fallback' {
+        $rootPath = Join-Path $TestDrive 'application-root-config'
+        $applicationRootPath = Join-Path $rootPath 'AppRoot'
+        $globalDocument = New-TestPackageGlobalDocument -ApplicationRootDirectory $applicationRootPath
+        $definitionDocument = New-TestVSCodeDefinitionDocument -Releases @(
+            New-TestPackageRelease -Id 'vsCode-win-x64-stable' -Version '2.0.0' -Architecture 'x64' -Flavor 'win32-x64' -FileName 'VSCode-win32-x64-2.0.0.zip' -AcquisitionCandidates @(
+                @{
+                    kind        = 'packageDepot'
+                    searchOrder = 10
+                }
+            )
+        )
+        $documents = Write-TestPackageDocuments -RootPath $rootPath -GlobalDocument $globalDocument -DefinitionDocument $definitionDocument
+
+        [Environment]::SetEnvironmentVariable($script:SourceInventoryEnvVarName, (Join-Path $TestDrive 'missing-inventory.json'), 'Process')
+        Mock Get-PackageGlobalConfigPath { $documents.GlobalConfigPath }
+        Mock Get-PackageDefinitionPath { param($DefinitionId) $documents.DefinitionPath }
+
+        $config = Get-PackageConfig -DefinitionId 'VSCodeRuntime'
+
+        $config.ApplicationRootDirectory | Should -Be ([System.IO.Path]::GetFullPath($applicationRootPath))
+        $config.PreferredTargetInstallRootDirectory | Should -Be ([System.IO.Path]::GetFullPath((Join-Path $applicationRootPath 'Installed')))
+        $config.PackageFileStagingRootDirectory | Should -Be ([System.IO.Path]::GetFullPath((Join-Path $applicationRootPath 'FileStaging')))
+        $config.PackageInstallStageRootDirectory | Should -Be ([System.IO.Path]::GetFullPath((Join-Path $applicationRootPath 'InstallStaging')))
+        $config.LocalRepositoryRoot | Should -Be ([System.IO.Path]::GetFullPath((Join-Path $applicationRootPath 'PackageRepositories')))
+
+        $fallbackRootPath = Join-Path $TestDrive 'application-root-fallback'
+        $fallbackGlobalDocument = New-TestPackageGlobalDocument
+        $fallbackGlobalDocument.package.Remove('applicationRootDirectory')
+        $fallbackDocuments = Write-TestPackageDocuments -RootPath $fallbackRootPath -GlobalDocument $fallbackGlobalDocument -DefinitionDocument $definitionDocument
+        Mock Get-PackageGlobalConfigPath { $fallbackDocuments.GlobalConfigPath }
+        Mock Get-PackageDefinitionPath { param($DefinitionId) $fallbackDocuments.DefinitionPath }
+
+        $fallbackConfig = Get-PackageConfig -DefinitionId 'VSCodeRuntime'
+
+        $fallbackConfig.ApplicationRootDirectory | Should -Be (Get-PackageDefaultApplicationRootDirectory)
+        $fallbackConfig.PackageFileStagingRootDirectory | Should -Be ([System.IO.Path]::GetFullPath((Join-Path (Get-PackageDefaultApplicationRootDirectory) 'FileStaging')))
+    }
+
+    It 'resolves absolute configured paths without joining them under applicationRootDirectory' {
+        $rootPath = Join-Path $TestDrive 'absolute-config-paths'
+        $applicationRootPath = Join-Path $rootPath 'AppRoot'
+        $absoluteInstallPath = Join-Path $rootPath 'AbsoluteInstalled'
+        $absoluteFileStagingPath = Join-Path $rootPath 'AbsoluteFileStaging'
+        $absoluteInstallStagingPath = Join-Path $rootPath 'AbsoluteInstallStaging'
+        $globalDocument = New-TestPackageGlobalDocument -ApplicationRootDirectory $applicationRootPath -PreferredTargetInstallDirectory $absoluteInstallPath -PackageFileStagingDirectory $absoluteFileStagingPath -PackageInstallStageDirectory $absoluteInstallStagingPath
+        $definitionDocument = New-TestVSCodeDefinitionDocument -Releases @(
+            New-TestPackageRelease -Id 'vsCode-win-x64-stable' -Version '2.0.0' -Architecture 'x64' -Flavor 'win32-x64' -FileName 'VSCode-win32-x64-2.0.0.zip' -AcquisitionCandidates @(
+                @{
+                    kind        = 'packageDepot'
+                    searchOrder = 10
+                }
+            )
+        )
+        $documents = Write-TestPackageDocuments -RootPath $rootPath -GlobalDocument $globalDocument -DefinitionDocument $definitionDocument
+
+        [Environment]::SetEnvironmentVariable($script:SourceInventoryEnvVarName, (Join-Path $TestDrive 'missing-inventory.json'), 'Process')
+        Mock Get-PackageGlobalConfigPath { $documents.GlobalConfigPath }
+        Mock Get-PackageDefinitionPath { param($DefinitionId) $documents.DefinitionPath }
+
+        $config = Get-PackageConfig -DefinitionId 'VSCodeRuntime'
+
+        $config.PreferredTargetInstallRootDirectory | Should -Be ([System.IO.Path]::GetFullPath($absoluteInstallPath))
+        $config.PackageFileStagingRootDirectory | Should -Be ([System.IO.Path]::GetFullPath($absoluteFileStagingPath))
+        $config.PackageInstallStageRootDirectory | Should -Be ([System.IO.Path]::GetFullPath($absoluteInstallStagingPath))
     }
 
     It 'creates the local DepotInventory.json copy from shipped configuration when missing' {
@@ -1370,6 +1463,31 @@ Describe 'Eigenverft.Manifested.Sandbox Package' {
         $result.Package.packageFile.fileName | Should -Be 'Qwen3.5-2B-Q8_0.gguf'
         $result.Package.packageFile.integrity.algorithm | Should -Be 'sha256'
         $result.Package.packageFile.integrity.sha256 | Should -Be '1b04acba824817554f4ce23639bc8495ff70453b8fcb047900c731521021f2c1'
+        $result.Package.install.kind | Should -Be 'placePackageFile'
+        $result.Compatibility.Count | Should -Be 1
+        $result.Compatibility[0].Kind | Should -Be 'physicalOrVideoMemoryGiB'
+        $result.Compatibility[0].OnFail | Should -Be 'warn'
+        $result.Compatibility[0].Accepted | Should -BeFalse
+    }
+
+    It 'loads the shipped Qwen35_9B_Q6_K_Model definition and selects the fixed Hugging Face-backed resource release' {
+        [Environment]::SetEnvironmentVariable($script:SourceInventoryEnvVarName, (Join-Path $TestDrive 'missing-inventory.json'), 'Process')
+        Mock Get-PhysicalMemoryGiB { 8.0 }
+        Mock Get-VideoMemoryGiB { 2.0 }
+
+        $config = Get-PackageConfig -DefinitionId 'Qwen35_9B_Q6_K_Model'
+        $result = New-PackageResult -CommandName 'test' -PackageConfig $config
+        $result = Resolve-PackagePackage -PackageResult $result
+        $sourceDefinition = Get-PackageSourceDefinition -PackageConfig $config -SourceRef ([pscustomobject]@{ scope = 'definition'; id = 'huggingFaceDownload' })
+
+        $config.DefinitionId | Should -Be 'Qwen35_9B_Q6_K_Model'
+        $sourceDefinition.Kind | Should -Be 'download'
+        $sourceDefinition.BaseUri | Should -Be 'https://huggingface.co/unsloth/Qwen3.5-9B-GGUF/resolve/main/'
+        $result.PackageId | Should -Be 'qwen35-9b-q6-k-stable'
+        $result.Package.version | Should -Be '3.5.0'
+        $result.Package.packageFile.fileName | Should -Be 'Qwen3.5-9B-Q6_K.gguf'
+        $result.Package.packageFile.integrity.algorithm | Should -Be 'sha256'
+        $result.Package.packageFile.integrity.sha256 | Should -Be '91898433cf5ce0a8f45516a4cc3e9343b6e01d052d01f684309098c66a326c59'
         $result.Package.install.kind | Should -Be 'placePackageFile'
         $result.Compatibility.Count | Should -Be 1
         $result.Compatibility[0].Kind | Should -Be 'physicalOrVideoMemoryGiB'
@@ -1853,7 +1971,11 @@ Describe 'Eigenverft.Manifested.Sandbox Package' {
         $result.EffectiveRelease | Should -Not -BeNullOrEmpty
         $result.Package.install.kind | Should -Be 'expandArchive'
         $result.Package.validation.commandChecks[0].expectedValue | Should -Be '{version}'
-        $result.PackageFilePath | Should -Match '\\stable\\2\.0\.0\\win32-x64\\'
+        $result.PackageWorkSlotDirectory | Should -Match '^VSCodeRuntime-[0-9a-f]{8}$'
+        $result.PackageFilePath | Should -Match '\\FileStaging\\VSCodeRuntime-[0-9a-f]{8}\\'
+        $result.PackageInstallStageDirectory | Should -Match '\\InstallStaging\\VSCodeRuntime-[0-9a-f]{8}$'
+        (Split-Path -Leaf $result.PackageFileStagingDirectory) | Should -Be (Split-Path -Leaf $result.PackageInstallStageDirectory)
+        $result.PackageDepotRelativeDirectory | Should -Be 'VSCodeRuntime\stable\2.0.0\win32-x64'
         $result.DefaultPackageDepotFilePath | Should -Match '\\stable\\2\.0\.0\\win32-x64\\'
     }
 
@@ -1885,6 +2007,7 @@ Describe 'Eigenverft.Manifested.Sandbox Package' {
 
         @($messages) | Should -Contain '[STATE] Resolved paths:'
         @($messages | Where-Object { $_.StartsWith('[PATH] Package file staging:') }).Count | Should -Be 1
+        @($messages | Where-Object { $_.StartsWith('[PATH] Package install stage:') }).Count | Should -Be 1
         @($messages | Where-Object { $_.StartsWith('[PATH] Target install directory:') }).Count | Should -Be 1
         @($messages | Where-Object { $_.StartsWith('[PATH] Package file:') }).Count | Should -Be 1
         @($messages | Where-Object { $_.StartsWith('[PATH] Default package depot file:') }).Count | Should -Be 1
@@ -2760,10 +2883,16 @@ Describe 'Eigenverft.Manifested.Sandbox Package' {
         $getResolvedApplicationPath = Get-Command Get-ResolvedApplicationPath -CommandType Function
         $removePathIfExists = Get-Command Remove-PathIfExists -CommandType Function
         $copyFileToPath = Get-Command Copy-FileToPath -CommandType Function
+        $getStableShortHash = Get-Command Get-StableShortHash -CommandType Function
+        $resolveTemplateText = Get-Command Resolve-TemplateText -CommandType Function
+        $resolveConfiguredPath = Get-Command Resolve-ConfiguredPath -CommandType Function
 
         $getResolvedApplicationPath.ScriptBlock.File | Should -Match 'Support\\ExecutionEngine\\.*CommandResolution\.ps1$'
         $removePathIfExists.ScriptBlock.File | Should -Match 'Support\\ExecutionEngine\\.*FileSystem\.ps1$'
         $copyFileToPath.ScriptBlock.File | Should -Match 'Support\\ExecutionEngine\\.*FileSystem\.ps1$'
+        $getStableShortHash.ScriptBlock.File | Should -Match 'Support\\ExecutionEngine\\.*PathTemplate\.ps1$'
+        $resolveTemplateText.ScriptBlock.File | Should -Match 'Support\\ExecutionEngine\\.*PathTemplate\.ps1$'
+        $resolveConfiguredPath.ScriptBlock.File | Should -Match 'Support\\ExecutionEngine\\.*PathTemplate\.ps1$'
     }
 
     It 'loads generic npm helpers from ExecutionEngine and the Package npm adapter from Support Package' {
@@ -2842,6 +2971,38 @@ Describe 'Eigenverft.Manifested.Sandbox Package' {
         Copy-FileToPath -SourcePath $sourcePath -TargetPath $targetPath -Overwrite | Out-Null
 
         (Get-Content -LiteralPath $targetPath -Raw) | Should -Be 'version-b'
+    }
+
+    It 'creates deterministic stable short hashes with the requested length' {
+        $firstHash = Get-StableShortHash -InputText 'VSCodeRuntime|stable|1.116.0|win32-x64'
+        $secondHash = Get-StableShortHash -InputText 'VSCodeRuntime|stable|1.116.0|win32-x64'
+        $shortHash = Get-StableShortHash -InputText 'VSCodeRuntime|stable|1.116.0|win32-x64' -Length 6
+
+        $firstHash | Should -Be $secondHash
+        $firstHash | Should -Match '^[0-9a-f]{8}$'
+        $shortHash | Should -Match '^[0-9a-f]{6}$'
+        $firstHash.StartsWith($shortHash) | Should -BeTrue
+    }
+
+    It 'resolves template text while leaving unknown tokens visible' {
+        $resolvedText = Resolve-TemplateText -Text '{known}-{missing}-{empty}' -Tokens @{
+            known = 'value'
+            empty = $null
+        }
+
+        $resolvedText | Should -Be 'value-{missing}-{empty}'
+    }
+
+    It 'resolves configured paths with env vars, tokens, relative base paths, and absolute paths' {
+        $rootPath = Join-Path $TestDrive 'configured-path-root'
+        $env:EVF_TEST_PATH_SEGMENT = 'EnvSegment'
+
+        $relativePath = Resolve-ConfiguredPath -PathValue '%EVF_TEST_PATH_SEGMENT%/{name}/child' -BaseDirectory $rootPath -Tokens @{ name = 'TokenSegment' }
+        $absoluteTarget = Join-Path $rootPath 'absolute-target'
+        $absolutePath = Resolve-ConfiguredPath -PathValue $absoluteTarget -BaseDirectory (Join-Path $TestDrive 'other-root') -Tokens @{}
+
+        $relativePath | Should -Be ([System.IO.Path]::GetFullPath((Join-Path $rootPath 'EnvSegment\TokenSegment\child')))
+        $absolutePath | Should -Be ([System.IO.Path]::GetFullPath($absoluteTarget))
     }
 
     It 'extracts an archive into an empty destination directory' {

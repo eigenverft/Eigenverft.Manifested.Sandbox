@@ -13,6 +13,7 @@ $moduleProjectRoot = Join-Path (Split-Path -Parent $PSScriptRoot) 'Eigenverft.Ma
 . "$moduleProjectRoot\Support\ExecutionEngine\Eigenverft.Manifested.Sandbox.ExecutionEngine.Archive.ps1"
 . "$moduleProjectRoot\Support\ExecutionEngine\Eigenverft.Manifested.Sandbox.ExecutionEngine.CommandResolution.ps1"
 . "$moduleProjectRoot\Support\ExecutionEngine\Eigenverft.Manifested.Sandbox.ExecutionEngine.FileSystem.ps1"
+. "$moduleProjectRoot\Support\ExecutionEngine\Eigenverft.Manifested.Sandbox.ExecutionEngine.PathTemplate.ps1"
 . "$moduleProjectRoot\Support\ExecutionEngine\Eigenverft.Manifested.Sandbox.ExecutionEngine.Registry.ps1"
 . "$moduleProjectRoot\Support\ExecutionEngine\Eigenverft.Manifested.Sandbox.ExecutionEngine.SystemResources.ps1"
 . "$moduleProjectRoot\Support\ExecutionEngine\Eigenverft.Manifested.Sandbox.ExecutionEngine.Elevation.ps1"
@@ -43,6 +44,7 @@ $moduleProjectRoot = Join-Path (Split-Path -Parent $PSScriptRoot) 'Eigenverft.Ma
 
 # Package commands
 . "$moduleProjectRoot\Commands\Eigenverft.Manifested.Sandbox.Cmd.Qwen35_2B_Q8_0_Model.ps1"
+. "$moduleProjectRoot\Commands\Eigenverft.Manifested.Sandbox.Cmd.Qwen35_9B_Q6_K_Model.ps1"
 . "$moduleProjectRoot\Commands\Eigenverft.Manifested.Sandbox.Cmd.LlamaCppRuntime.ps1"
 . "$moduleProjectRoot\Commands\Eigenverft.Manifested.Sandbox.Cmd.VisualCppRedistributable.ps1"
 . "$moduleProjectRoot\Commands\Eigenverft.Manifested.Sandbox.Cmd.PowerShell7.ps1"

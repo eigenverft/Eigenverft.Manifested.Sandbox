@@ -10,6 +10,7 @@
 . "$PSScriptRoot\Support\ExecutionEngine\Eigenverft.Manifested.Sandbox.ExecutionEngine.Archive.ps1"
 . "$PSScriptRoot\Support\ExecutionEngine\Eigenverft.Manifested.Sandbox.ExecutionEngine.CommandResolution.ps1"
 . "$PSScriptRoot\Support\ExecutionEngine\Eigenverft.Manifested.Sandbox.ExecutionEngine.FileSystem.ps1"
+. "$PSScriptRoot\Support\ExecutionEngine\Eigenverft.Manifested.Sandbox.ExecutionEngine.PathTemplate.ps1"
 . "$PSScriptRoot\Support\ExecutionEngine\Eigenverft.Manifested.Sandbox.ExecutionEngine.Registry.ps1"
 . "$PSScriptRoot\Support\ExecutionEngine\Eigenverft.Manifested.Sandbox.ExecutionEngine.SystemResources.ps1"
 . "$PSScriptRoot\Support\ExecutionEngine\Eigenverft.Manifested.Sandbox.ExecutionEngine.Elevation.ps1"
@@ -53,4 +54,3 @@
 . "$PSScriptRoot\Commands\Eigenverft.Manifested.Sandbox.Cmd.GitHubCli.ps1"
 . "$PSScriptRoot\Commands\Eigenverft.Manifested.Sandbox.Cmd.GitRuntime.ps1"
 . "$PSScriptRoot\Commands\Eigenverft.Manifested.Sandbox.Cmd.VSCodeRuntime.ps1"
-

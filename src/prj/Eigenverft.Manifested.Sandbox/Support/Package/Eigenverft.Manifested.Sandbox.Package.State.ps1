@@ -111,34 +111,36 @@ function Get-PackageStateConfig {
     $sourceInventoryInfo = Get-PackageSourceInventoryInfo
     $packageGlobalConfig = $globalDocumentInfo.Document.package
     $effectiveAcquisitionEnvironment = Resolve-PackageEffectiveAcquisitionEnvironment -GlobalConfiguration $packageGlobalConfig -SourceInventoryInfo $sourceInventoryInfo -DepotInventoryInfo $depotInventoryInfo
+    $applicationRootDirectory = $effectiveAcquisitionEnvironment.ApplicationRootDirectory
 
     $preferredTargetInstallDirectory = if ($packageGlobalConfig.PSObject.Properties['preferredTargetInstallDirectory'] -and
         -not [string]::IsNullOrWhiteSpace([string]$packageGlobalConfig.preferredTargetInstallDirectory)) {
-        Resolve-PackagePathValue -PathValue ([string]$packageGlobalConfig.preferredTargetInstallDirectory)
+        Resolve-PackageConfiguredPath -PathValue ([string]$packageGlobalConfig.preferredTargetInstallDirectory) -ApplicationRootDirectory $applicationRootDirectory
     }
     else {
-        Get-PackageDefaultPreferredTargetInstallDirectory
+        Resolve-PackageConfiguredPath -PathValue 'Installed' -ApplicationRootDirectory $applicationRootDirectory
     }
 
     $packageStateIndexFilePath = if ($packageGlobalConfig.packageState.PSObject.Properties['indexFilePath'] -and
         -not [string]::IsNullOrWhiteSpace([string]$packageGlobalConfig.packageState.indexFilePath)) {
-        Resolve-PackagePathValue -PathValue ([string]$packageGlobalConfig.packageState.indexFilePath)
+        Resolve-PackageConfiguredPath -PathValue ([string]$packageGlobalConfig.packageState.indexFilePath) -ApplicationRootDirectory $applicationRootDirectory
     }
     else {
-        Get-PackageDefaultPackageStateIndexFilePath
+        Resolve-PackageConfiguredPath -PathValue 'State\package-state-index.json' -ApplicationRootDirectory $applicationRootDirectory
     }
 
     $localRepositoryRoot = if ($packageGlobalConfig.PSObject.Properties['localRepositoryRoot'] -and
         -not [string]::IsNullOrWhiteSpace([string]$packageGlobalConfig.localRepositoryRoot)) {
-        Resolve-PackagePathValue -PathValue ([string]$packageGlobalConfig.localRepositoryRoot)
+        Resolve-PackageConfiguredPath -PathValue ([string]$packageGlobalConfig.localRepositoryRoot) -ApplicationRootDirectory $applicationRootDirectory
     }
     else {
-        Get-PackageDefaultLocalRepositoryRoot
+        Resolve-PackageConfiguredPath -PathValue 'PackageRepositories' -ApplicationRootDirectory $applicationRootDirectory
     }
 
     return [pscustomobject]@{
         GlobalConfigurationPath             = $globalDocumentInfo.Path
         GlobalConfiguration                 = $packageGlobalConfig
+        ApplicationRootDirectory            = $applicationRootDirectory
         LocalConfigurationPath              = Get-PackageLocalGlobalConfigPath
         LocalDepotInventoryPath             = Get-PackageLocalDepotInventoryPath
         DepotInventoryPath                  = $effectiveAcquisitionEnvironment.DepotInventoryPath
@@ -200,6 +202,7 @@ function Get-PackageState {
 
     return [pscustomobject]@{
         LocalRoot                 = $localRoot
+        ApplicationRootDirectory  = $config.ApplicationRootDirectory
         LocalConfigurationPath    = $config.LocalConfigurationPath
         LocalConfigurationExists  = Test-PackageStateLeafPath -Path $config.LocalConfigurationPath
         LocalDepotInventoryPath   = $config.LocalDepotInventoryPath

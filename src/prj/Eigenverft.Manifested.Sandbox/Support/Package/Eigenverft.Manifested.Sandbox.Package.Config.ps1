@@ -63,17 +63,75 @@ Resolve-PackagePathValue -PathValue '%USERPROFILE%/Downloads/Test'
         [string]$PathValue
     )
 
-    $expandedPath = [Environment]::ExpandEnvironmentVariables($PathValue).Trim()
-    if ([string]::IsNullOrWhiteSpace($expandedPath)) {
-        throw 'Package path values must not be empty.'
+    return Resolve-ConfiguredPath -PathValue $PathValue -BaseDirectory (Get-Location).Path -Tokens @{}
+}
+
+function Get-PackageDefaultApplicationRootDirectory {
+<#
+.SYNOPSIS
+Returns the default Package application root.
+
+.DESCRIPTION
+Builds the fallback local application root used when Config.json does not
+define package.applicationRootDirectory.
+#>
+    [CmdletBinding()]
+    param()
+
+    return [System.IO.Path]::GetFullPath((Get-PackageLocalRoot))
+}
+
+function Resolve-PackageApplicationRootDirectory {
+    [CmdletBinding()]
+    param(
+        [AllowNull()]
+        [psobject]$GlobalConfiguration
+    )
+
+    if ($GlobalConfiguration -and
+        $GlobalConfiguration.PSObject.Properties['applicationRootDirectory'] -and
+        -not [string]::IsNullOrWhiteSpace([string]$GlobalConfiguration.applicationRootDirectory)) {
+        return Resolve-ConfiguredPath -PathValue ([string]$GlobalConfiguration.applicationRootDirectory) -BaseDirectory (Get-PackageLocalRoot) -Tokens @{}
     }
 
-    $normalizedPath = $expandedPath -replace '/', '\'
-    if ([System.IO.Path]::IsPathRooted($normalizedPath)) {
-        return [System.IO.Path]::GetFullPath($normalizedPath)
+    return Get-PackageDefaultApplicationRootDirectory
+}
+
+function Get-PackageApplicationPathTokens {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$ApplicationRootDirectory
+    )
+
+    return [ordered]@{
+        applicationRootDirectory = [System.IO.Path]::GetFullPath($ApplicationRootDirectory)
+    }
+}
+
+function Resolve-PackageConfiguredPath {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$PathValue,
+
+        [Parameter(Mandatory = $true)]
+        [string]$ApplicationRootDirectory,
+
+        [System.Collections.IDictionary]$Tokens = $null
+    )
+
+    $pathTokens = [ordered]@{}
+    foreach ($property in @((Get-PackageApplicationPathTokens -ApplicationRootDirectory $ApplicationRootDirectory).GetEnumerator())) {
+        $pathTokens[$property.Key] = $property.Value
+    }
+    if ($Tokens) {
+        foreach ($key in @($Tokens.Keys)) {
+            $pathTokens[$key] = $Tokens[$key]
+        }
     }
 
-    return [System.IO.Path]::GetFullPath((Join-Path (Get-Location) $normalizedPath))
+    return Resolve-ConfiguredPath -PathValue $PathValue -BaseDirectory $ApplicationRootDirectory -Tokens $pathTokens
 }
 
 function Get-PackageRuntimeContext {
@@ -136,7 +194,7 @@ Get-PackageDefaultPackageFileStagingDirectory
     [CmdletBinding()]
     param()
 
-    return [System.IO.Path]::GetFullPath((Join-Path (Get-PackageLocalRoot) 'PackageFileStaging'))
+    return [System.IO.Path]::GetFullPath((Join-Path (Get-PackageDefaultApplicationRootDirectory) 'FileStaging'))
 }
 
 function Get-PackageDefaultPackageInstallStageDirectory {
@@ -154,7 +212,7 @@ Get-PackageDefaultPackageInstallStageDirectory
     [CmdletBinding()]
     param()
 
-    return [System.IO.Path]::GetFullPath((Join-Path (Get-PackageLocalRoot) 'PackageInstallStage'))
+    return [System.IO.Path]::GetFullPath((Join-Path (Get-PackageDefaultApplicationRootDirectory) 'InstallStaging'))
 }
 
 function Get-PackageDefaultPreferredTargetInstallDirectory {
@@ -172,7 +230,7 @@ Get-PackageDefaultPreferredTargetInstallDirectory
     [CmdletBinding()]
     param()
 
-    return [System.IO.Path]::GetFullPath((Join-Path (Get-PackageLocalRoot) 'Installed'))
+    return [System.IO.Path]::GetFullPath((Join-Path (Get-PackageDefaultApplicationRootDirectory) 'Installed'))
 }
 
 function Get-PackageDefaultPackageFileIndexFilePath {
@@ -190,7 +248,7 @@ Get-PackageDefaultPackageFileIndexFilePath
     [CmdletBinding()]
     param()
 
-    return [System.IO.Path]::GetFullPath((Join-Path (Join-Path (Get-PackageLocalRoot) 'State') 'package-file-index.json'))
+    return [System.IO.Path]::GetFullPath((Join-Path (Join-Path (Get-PackageDefaultApplicationRootDirectory) 'State') 'package-file-index.json'))
 }
 
 function Get-PackageDefaultPackageStateIndexFilePath {
@@ -208,7 +266,7 @@ Get-PackageDefaultPackageStateIndexFilePath
     [CmdletBinding()]
     param()
 
-    return [System.IO.Path]::GetFullPath((Join-Path (Join-Path (Get-PackageLocalRoot) 'State') 'package-state-index.json'))
+    return [System.IO.Path]::GetFullPath((Join-Path (Join-Path (Get-PackageDefaultApplicationRootDirectory) 'State') 'package-state-index.json'))
 }
 
 function Get-PackageDefaultLocalRepositoryRoot {
@@ -226,7 +284,7 @@ Get-PackageDefaultLocalRepositoryRoot
     [CmdletBinding()]
     param()
 
-    return [System.IO.Path]::GetFullPath((Join-Path (Get-PackageLocalRoot) 'PackageRepositories'))
+    return [System.IO.Path]::GetFullPath((Join-Path (Get-PackageDefaultApplicationRootDirectory) 'PackageRepositories'))
 }
 
 function Get-PackageDefaultSourceInventoryPath {
@@ -244,7 +302,7 @@ Get-PackageDefaultSourceInventoryPath
     [CmdletBinding()]
     param()
 
-    return [System.IO.Path]::GetFullPath((Join-Path (Join-Path (Get-PackageLocalRoot) 'Configuration\External') 'SourceInventory.json'))
+    return [System.IO.Path]::GetFullPath((Join-Path (Join-Path (Get-PackageDefaultApplicationRootDirectory) 'Configuration\External') 'SourceInventory.json'))
 }
 
 function Get-PackageDefaultLogRootDirectory {
@@ -261,7 +319,7 @@ Get-PackageDefaultLogRootDirectory
     [CmdletBinding()]
     param()
 
-    return [System.IO.Path]::GetFullPath((Join-Path (Get-PackageLocalRoot) 'Logs'))
+    return [System.IO.Path]::GetFullPath((Join-Path (Get-PackageDefaultApplicationRootDirectory) 'Logs'))
 }
 
 function Get-PackageRootFromStateIndexPath {
@@ -335,12 +393,48 @@ Resolve-PackageTemplateText -Text '{releaseTrack}\{version}\{flavor}' -PackageCo
         return $null
     }
 
+    $tokens = Get-PackageTemplateTokenMap -PackageConfig $PackageConfig -Package $Package -ExtraTokens $ExtraTokens
+    return Resolve-TemplateText -Text $Text -Tokens $tokens
+}
+
+function ConvertTo-PackageSafePathSegment {
+    [CmdletBinding()]
+    param(
+        [AllowNull()]
+        [string]$Value
+    )
+
+    $segmentText = ([string]$Value).Trim() -replace '[\\/:\*\?"<>\|]', '-'
+    if ([string]::IsNullOrWhiteSpace($segmentText)) {
+        throw 'Package path layout produced an empty path segment.'
+    }
+
+    return $segmentText
+}
+
+function Get-PackageTemplateTokenMap {
+    [CmdletBinding()]
+    param(
+        [AllowNull()]
+        [psobject]$PackageConfig,
+
+        [AllowNull()]
+        [psobject]$Package,
+
+        [hashtable]$ExtraTokens = @{},
+
+        [switch]$SanitizePathSegments
+    )
+
     $tokens = [ordered]@{}
     if ($PackageConfig) {
         $tokens['definitionId'] = $PackageConfig.DefinitionId
         $tokens['platform'] = $PackageConfig.Platform
         $tokens['architecture'] = $PackageConfig.Architecture
         $tokens['releaseTrack'] = $PackageConfig.ReleaseTrack
+        if ($PackageConfig.PSObject.Properties['ApplicationRootDirectory']) {
+            $tokens['applicationRootDirectory'] = $PackageConfig.ApplicationRootDirectory
+        }
         if ($PackageConfig.PSObject.Properties['PreferredTargetInstallRootDirectory']) {
             $tokens['preferredTargetInstallDirectory'] = $PackageConfig.PreferredTargetInstallRootDirectory
         }
@@ -365,26 +459,57 @@ Resolve-PackageTemplateText -Text '{releaseTrack}\{version}\{flavor}' -PackageCo
         $tokens[$key] = $ExtraTokens[$key]
     }
 
-    $resolvedText = [string]$Text
-    foreach ($key in @($tokens.Keys)) {
-        if ($null -eq $tokens[$key]) {
-            continue
+    if ($SanitizePathSegments) {
+        foreach ($key in @($tokens.Keys)) {
+            if ($null -eq $tokens[$key]) {
+                continue
+            }
+            $tokens[$key] = ConvertTo-PackageSafePathSegment -Value ([string]$tokens[$key])
         }
-
-        $resolvedText = $resolvedText.Replace(('{' + [string]$key + '}'), [string]$tokens[$key])
     }
 
-    return $resolvedText
+    return $tokens
 }
 
-function Get-PackagePackageFileRelativeDirectory {
+function Resolve-PackageLayoutRelativeDirectory {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Template,
+
+        [Parameter(Mandatory = $true)]
+        [psobject]$PackageConfig,
+
+        [Parameter(Mandatory = $true)]
+        [psobject]$Package,
+
+        [hashtable]$ExtraTokens = @{}
+    )
+
+    $tokens = Get-PackageTemplateTokenMap -PackageConfig $PackageConfig -Package $Package -ExtraTokens $ExtraTokens -SanitizePathSegments
+    $resolvedPath = (Resolve-TemplateText -Text $Template -Tokens $tokens).Trim() -replace '/', '\'
+    if ([string]::IsNullOrWhiteSpace($resolvedPath)) {
+        throw 'Package layout template produced an empty relative path.'
+    }
+    if ([System.IO.Path]::IsPathRooted($resolvedPath)) {
+        throw "Package layout template '$Template' produced rooted path '$resolvedPath'. Layout values must be relative."
+    }
+
+    $safeSegments = foreach ($segment in @($resolvedPath -split '\\')) {
+        ConvertTo-PackageSafePathSegment -Value $segment
+    }
+
+    return (($safeSegments -join '\') -replace '/', '\')
+}
+
+function Get-PackagePackageDepotRelativeDirectory {
 <#
 .SYNOPSIS
-Builds the relative package-file directory for depot and workspace storage.
+Builds the relative package-file directory for depot storage.
 
 .DESCRIPTION
-Derives the shared relative directory used below package depots and the
-package file staging from the definition id and selected release identity.
+Derives the durable relative directory used below package depots from the
+configured depot layout template.
 
 .PARAMETER PackageConfig
 The resolved Package config object.
@@ -393,8 +518,29 @@ The resolved Package config object.
 The selected release object.
 
 .EXAMPLE
-Get-PackagePackageFileRelativeDirectory -PackageConfig $config -Package $package
+Get-PackagePackageDepotRelativeDirectory -PackageConfig $config -Package $package
 #>
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [psobject]$PackageConfig,
+
+        [Parameter(Mandatory = $true)]
+        [psobject]$Package
+    )
+
+    $template = if ($PackageConfig.PSObject.Properties['PackageDepotRelativePathTemplate'] -and
+        -not [string]::IsNullOrWhiteSpace([string]$PackageConfig.PackageDepotRelativePathTemplate)) {
+        [string]$PackageConfig.PackageDepotRelativePathTemplate
+    }
+    else {
+        '{definitionId}/{releaseTrack}/{version}/{flavor}'
+    }
+
+    return Resolve-PackageLayoutRelativeDirectory -Template $template -PackageConfig $PackageConfig -Package $Package
+}
+
+function Get-PackagePackageWorkSlotDirectory {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true)]
@@ -408,22 +554,23 @@ Get-PackagePackageFileRelativeDirectory -PackageConfig $config -Package $package
     $releaseTrack = if ($Package.PSObject.Properties['releaseTrack']) { [string]$Package.releaseTrack } else { [string]$PackageConfig.ReleaseTrack }
     $version = if ($Package.PSObject.Properties['version']) { [string]$Package.version } else { $null }
     $flavor = if ($Package.PSObject.Properties['flavor']) { [string]$Package.flavor } else { $null }
-
     foreach ($requiredValue in @($definitionId, $releaseTrack, $version, $flavor)) {
         if ([string]::IsNullOrWhiteSpace($requiredValue)) {
-            throw 'Package package-file directory derivation requires definition id, releaseTrack, version, and flavor.'
+            throw 'Package work slot derivation requires definition id, releaseTrack, version, and flavor.'
         }
     }
 
-    $pathSegments = @('packages', $definitionId, $releaseTrack, $version, $flavor) | ForEach-Object {
-        $segmentText = ([string]$_).Trim() -replace '[\\/:\*\?"<>\|]', '-'
-        if ([string]::IsNullOrWhiteSpace($segmentText)) {
-            throw 'Package package-file directory derivation produced an empty path segment.'
-        }
-        $segmentText
+    $slotIdentity = '{0}|{1}|{2}|{3}' -f $definitionId, $releaseTrack, $version, $flavor
+    $slotHash = Get-StableShortHash -InputText $slotIdentity -Length 8
+    $template = if ($PackageConfig.PSObject.Properties['PackageWorkSlotDirectoryTemplate'] -and
+        -not [string]::IsNullOrWhiteSpace([string]$PackageConfig.PackageWorkSlotDirectoryTemplate)) {
+        [string]$PackageConfig.PackageWorkSlotDirectoryTemplate
+    }
+    else {
+        '{definitionId}-{slotHash}'
     }
 
-    return (($pathSegments -join '\') -replace '/', '\')
+    return Resolve-PackageLayoutRelativeDirectory -Template $template -PackageConfig $PackageConfig -Package $Package -ExtraTokens @{ slotHash = $slotHash }
 }
 
 function ConvertTo-PackageMergeValue {
@@ -850,6 +997,18 @@ Assert-PackageGlobalConfigSchema -GlobalDocumentInfo $globalInfo
     if ([string]::IsNullOrWhiteSpace([string]$package.preferredTargetInstallDirectory)) {
         throw "Package global config '$($GlobalDocumentInfo.Path)' is missing preferredTargetInstallDirectory."
     }
+    if ($package.PSObject.Properties['applicationRootDirectory'] -and
+        [string]::IsNullOrWhiteSpace([string]$package.applicationRootDirectory)) {
+        throw "Package global config '$($GlobalDocumentInfo.Path)' defines an empty applicationRootDirectory."
+    }
+    if ($package.PSObject.Properties['layout'] -and $package.layout) {
+        foreach ($layoutProperty in @('packageDepotRelativePath', 'packageWorkSlotDirectory')) {
+            if ($package.layout.PSObject.Properties[$layoutProperty] -and
+                [string]::IsNullOrWhiteSpace([string]$package.layout.$layoutProperty)) {
+                throw "Package global config '$($GlobalDocumentInfo.Path)' defines an empty layout.$layoutProperty."
+            }
+        }
+    }
 
     foreach ($requiredAcquisitionProperty in @('stores', 'defaults', 'tracking')) {
         if (-not $package.acquisitionEnvironment.PSObject.Properties[$requiredAcquisitionProperty]) {
@@ -1060,29 +1219,30 @@ Resolve-PackageEffectiveAcquisitionEnvironment -GlobalConfiguration $global -Sou
     }
 
     $acquisitionEnvironment = ConvertTo-PackageObject -InputObject $mergedAcquisitionEnvironment
+    $applicationRootDirectory = Resolve-PackageApplicationRootDirectory -GlobalConfiguration $GlobalConfiguration
 
     $packageFileStagingDirectory = if ($acquisitionEnvironment.stores.PSObject.Properties['packageFileStagingDirectory'] -and
         -not [string]::IsNullOrWhiteSpace([string]$acquisitionEnvironment.stores.packageFileStagingDirectory)) {
-        Resolve-PackagePathValue -PathValue ([string]$acquisitionEnvironment.stores.packageFileStagingDirectory)
+        Resolve-PackageConfiguredPath -PathValue ([string]$acquisitionEnvironment.stores.packageFileStagingDirectory) -ApplicationRootDirectory $applicationRootDirectory
     }
     else {
-        Get-PackageDefaultPackageFileStagingDirectory
+        Resolve-PackageConfiguredPath -PathValue 'FileStaging' -ApplicationRootDirectory $applicationRootDirectory
     }
 
     $packageInstallStageDirectory = if ($acquisitionEnvironment.stores.PSObject.Properties['packageInstallStageDirectory'] -and
         -not [string]::IsNullOrWhiteSpace([string]$acquisitionEnvironment.stores.packageInstallStageDirectory)) {
-        Resolve-PackagePathValue -PathValue ([string]$acquisitionEnvironment.stores.packageInstallStageDirectory)
+        Resolve-PackageConfiguredPath -PathValue ([string]$acquisitionEnvironment.stores.packageInstallStageDirectory) -ApplicationRootDirectory $applicationRootDirectory
     }
     else {
-        Get-PackageDefaultPackageInstallStageDirectory
+        Resolve-PackageConfiguredPath -PathValue 'InstallStaging' -ApplicationRootDirectory $applicationRootDirectory
     }
 
     $packageFileIndexFilePath = if ($acquisitionEnvironment.tracking.PSObject.Properties['packageFileIndexFilePath'] -and
         -not [string]::IsNullOrWhiteSpace([string]$acquisitionEnvironment.tracking.packageFileIndexFilePath)) {
-        Resolve-PackagePathValue -PathValue ([string]$acquisitionEnvironment.tracking.packageFileIndexFilePath)
+        Resolve-PackageConfiguredPath -PathValue ([string]$acquisitionEnvironment.tracking.packageFileIndexFilePath) -ApplicationRootDirectory $applicationRootDirectory
     }
     else {
-        Get-PackageDefaultPackageFileIndexFilePath
+        Resolve-PackageConfiguredPath -PathValue 'State\package-file-index.json' -ApplicationRootDirectory $applicationRootDirectory
     }
 
     $allowFallback = $true
@@ -1116,6 +1276,7 @@ Resolve-PackageEffectiveAcquisitionEnvironment -GlobalConfiguration $global -Sou
         DepotInventoryPath  = $DepotInventoryInfo.Path
         SiteCode            = (@($activeSiteCodes) -join ';')
         SiteCodes           = @($activeSiteCodes)
+        ApplicationRootDirectory = $applicationRootDirectory
         Stores              = [pscustomobject]@{
             PackageFileStagingDirectory  = $packageFileStagingDirectory
             PackageInstallStageDirectory = $packageInstallStageDirectory
@@ -1700,6 +1861,7 @@ Get-PackageConfig -DefinitionId VSCodeRuntime
     $runtimeContext = Get-PackageRuntimeContext
     $definition = $definitionDocumentInfo.Document
     $effectiveAcquisitionEnvironment = Resolve-PackageEffectiveAcquisitionEnvironment -GlobalConfiguration $packageGlobalConfig -SourceInventoryInfo $sourceInventoryInfo -DepotInventoryInfo $depotInventoryInfo
+    $applicationRootDirectory = $effectiveAcquisitionEnvironment.ApplicationRootDirectory
 
     $selectionReleaseTrack = 'none'
     if ($packageGlobalConfig.selectionDefaults.PSObject.Properties['releaseTrack'] -and
@@ -1715,26 +1877,39 @@ Get-PackageConfig -DefinitionId VSCodeRuntime
 
     $preferredTargetInstallDirectory = if ($packageGlobalConfig.PSObject.Properties['preferredTargetInstallDirectory'] -and
         -not [string]::IsNullOrWhiteSpace([string]$packageGlobalConfig.preferredTargetInstallDirectory)) {
-        Resolve-PackagePathValue -PathValue ([string]$packageGlobalConfig.preferredTargetInstallDirectory)
+        Resolve-PackageConfiguredPath -PathValue ([string]$packageGlobalConfig.preferredTargetInstallDirectory) -ApplicationRootDirectory $applicationRootDirectory
     }
     else {
-        Get-PackageDefaultPreferredTargetInstallDirectory
+        Resolve-PackageConfiguredPath -PathValue 'Installed' -ApplicationRootDirectory $applicationRootDirectory
     }
 
     $packageStateIndexFilePath = if ($packageGlobalConfig.packageState.PSObject.Properties['indexFilePath'] -and
         -not [string]::IsNullOrWhiteSpace([string]$packageGlobalConfig.packageState.indexFilePath)) {
-        Resolve-PackagePathValue -PathValue ([string]$packageGlobalConfig.packageState.indexFilePath)
+        Resolve-PackageConfiguredPath -PathValue ([string]$packageGlobalConfig.packageState.indexFilePath) -ApplicationRootDirectory $applicationRootDirectory
     }
     else {
-        Get-PackageDefaultPackageStateIndexFilePath
+        Resolve-PackageConfiguredPath -PathValue 'State\package-state-index.json' -ApplicationRootDirectory $applicationRootDirectory
     }
 
     $localRepositoryRoot = if ($packageGlobalConfig.PSObject.Properties['localRepositoryRoot'] -and
         -not [string]::IsNullOrWhiteSpace([string]$packageGlobalConfig.localRepositoryRoot)) {
-        Resolve-PackagePathValue -PathValue ([string]$packageGlobalConfig.localRepositoryRoot)
+        Resolve-PackageConfiguredPath -PathValue ([string]$packageGlobalConfig.localRepositoryRoot) -ApplicationRootDirectory $applicationRootDirectory
     }
     else {
-        Get-PackageDefaultLocalRepositoryRoot
+        Resolve-PackageConfiguredPath -PathValue 'PackageRepositories' -ApplicationRootDirectory $applicationRootDirectory
+    }
+
+    $packageDepotRelativePathTemplate = '{definitionId}/{releaseTrack}/{version}/{flavor}'
+    $packageWorkSlotDirectoryTemplate = '{definitionId}-{slotHash}'
+    if ($packageGlobalConfig.PSObject.Properties['layout'] -and $packageGlobalConfig.layout) {
+        if ($packageGlobalConfig.layout.PSObject.Properties['packageDepotRelativePath'] -and
+            -not [string]::IsNullOrWhiteSpace([string]$packageGlobalConfig.layout.packageDepotRelativePath)) {
+            $packageDepotRelativePathTemplate = [string]$packageGlobalConfig.layout.packageDepotRelativePath
+        }
+        if ($packageGlobalConfig.layout.PSObject.Properties['packageWorkSlotDirectory'] -and
+            -not [string]::IsNullOrWhiteSpace([string]$packageGlobalConfig.layout.packageWorkSlotDirectory)) {
+            $packageWorkSlotDirectoryTemplate = [string]$packageGlobalConfig.layout.packageWorkSlotDirectory
+        }
     }
 
     $definitionRepositoryId = Get-PackageDefaultRepositoryId
@@ -1750,6 +1925,7 @@ Get-PackageConfig -DefinitionId VSCodeRuntime
     return [pscustomobject]@{
         GlobalConfigurationPath            = $globalDocumentInfo.Path
         GlobalConfiguration                = $packageGlobalConfig
+        ApplicationRootDirectory           = $applicationRootDirectory
         SourceInventoryPath                = $effectiveAcquisitionEnvironment.SourceInventoryPath
         SourceInventory                    = $sourceInventoryInfo.Document
         DepotInventoryPath                 = $effectiveAcquisitionEnvironment.DepotInventoryPath
@@ -1773,6 +1949,8 @@ Get-PackageConfig -DefinitionId VSCodeRuntime
         DefaultPackageDepotDirectory       = $effectiveAcquisitionEnvironment.Stores.DefaultPackageDepotDirectory
         PreferredTargetInstallRootDirectory = $preferredTargetInstallDirectory
         LocalRepositoryRoot                = $localRepositoryRoot
+        PackageDepotRelativePathTemplate   = $packageDepotRelativePathTemplate
+        PackageWorkSlotDirectoryTemplate   = $packageWorkSlotDirectoryTemplate
         PackageFileIndexFilePath           = $effectiveAcquisitionEnvironment.Tracking.PackageFileIndexFilePath
         PackageStateIndexFilePath          = $packageStateIndexFilePath
         AllowAcquisitionFallback           = $effectiveAcquisitionEnvironment.Defaults.AllowFallback
@@ -1824,7 +2002,8 @@ Resolve-PackagePaths -PackageResult $result
         'directory'
     }
 
-    $packageFileRelativeDirectory = Get-PackagePackageFileRelativeDirectory -PackageConfig $packageConfig -Package $package
+    $packageDepotRelativeDirectory = Get-PackagePackageDepotRelativeDirectory -PackageConfig $packageConfig -Package $package
+    $packageWorkSlotDirectory = Get-PackagePackageWorkSlotDirectory -PackageConfig $packageConfig -Package $package
     $installDirectoryTemplate = $null
     if ($package.PSObject.Properties['install'] -and $package.install -and
         $package.install.PSObject.Properties['installDirectory'] -and
@@ -1836,13 +2015,17 @@ Resolve-PackagePaths -PackageResult $result
         throw "Package definition '$($definition.id)' does not define an install target path. Use install.installDirectory."
     }
 
-    $normalizedPackageFileRelativeDirectory = $packageFileRelativeDirectory.Trim() -replace '/', '\'
-    if ([System.IO.Path]::IsPathRooted($normalizedPackageFileRelativeDirectory)) {
-        throw "Package definition '$($definition.id)' must use a relative package-file directory."
+    $normalizedPackageDepotRelativeDirectory = $packageDepotRelativeDirectory.Trim() -replace '/', '\'
+    if ([System.IO.Path]::IsPathRooted($normalizedPackageDepotRelativeDirectory)) {
+        throw "Package definition '$($definition.id)' must use a relative package depot directory."
+    }
+    $normalizedPackageWorkSlotDirectory = $packageWorkSlotDirectory.Trim() -replace '/', '\'
+    if ([System.IO.Path]::IsPathRooted($normalizedPackageWorkSlotDirectory)) {
+        throw "Package definition '$($definition.id)' must use a relative package work slot directory."
     }
 
-    $packageFileStagingDirectory = [System.IO.Path]::GetFullPath((Join-Path $packageConfig.PackageFileStagingRootDirectory $normalizedPackageFileRelativeDirectory))
-    $packageInstallStageDirectory = [System.IO.Path]::GetFullPath((Join-Path $packageConfig.PackageInstallStageRootDirectory $normalizedPackageFileRelativeDirectory))
+    $packageFileStagingDirectory = [System.IO.Path]::GetFullPath((Join-Path $packageConfig.PackageFileStagingRootDirectory $normalizedPackageWorkSlotDirectory))
+    $packageInstallStageDirectory = [System.IO.Path]::GetFullPath((Join-Path $packageConfig.PackageInstallStageRootDirectory $normalizedPackageWorkSlotDirectory))
 
     $installDirectory = $null
     if (-not [string]::IsNullOrWhiteSpace($installDirectoryTemplate)) {
@@ -1863,7 +2046,7 @@ Resolve-PackagePaths -PackageResult $result
         -not [string]::IsNullOrWhiteSpace([string]$package.packageFile.fileName)) {
         $packageFilePath = Join-Path $packageFileStagingDirectory ([string]$package.packageFile.fileName)
         if (-not [string]::IsNullOrWhiteSpace([string]$packageConfig.DefaultPackageDepotDirectory)) {
-            $defaultPackageDepotDirectory = [System.IO.Path]::GetFullPath((Join-Path $packageConfig.DefaultPackageDepotDirectory $normalizedPackageFileRelativeDirectory))
+            $defaultPackageDepotDirectory = [System.IO.Path]::GetFullPath((Join-Path $packageConfig.DefaultPackageDepotDirectory $normalizedPackageDepotRelativeDirectory))
             $defaultPackageDepotFilePath = Join-Path $defaultPackageDepotDirectory ([string]$package.packageFile.fileName)
         }
     }
@@ -1871,7 +2054,8 @@ Resolve-PackagePaths -PackageResult $result
     $PackageResult.PackageFileStagingDirectory = $packageFileStagingDirectory
     $PackageResult.PackageInstallStageDirectory = $packageInstallStageDirectory
     $PackageResult.InstallDirectory = $installDirectory
-    $PackageResult.PackageFileRelativeDirectory = $normalizedPackageFileRelativeDirectory
+    $PackageResult.PackageDepotRelativeDirectory = $normalizedPackageDepotRelativeDirectory
+    $PackageResult.PackageWorkSlotDirectory = $normalizedPackageWorkSlotDirectory
     $PackageResult.PackageFilePath = $packageFilePath
     $PackageResult.DefaultPackageDepotFilePath = $defaultPackageDepotFilePath
 
@@ -1946,7 +2130,8 @@ New-PackageResult -CommandName Invoke-VSCodeRuntime -PackageConfig $config
         PackageFileStagingDirectory        = $null
         PackageInstallStageDirectory       = $null
         InstallDirectory                 = $null
-        PackageFileRelativeDirectory     = $null
+        PackageDepotRelativeDirectory    = $null
+        PackageWorkSlotDirectory         = $null
         PackageFilePath                  = $null
         DefaultPackageDepotFilePath      = $null
         AcquisitionPlan                  = $null

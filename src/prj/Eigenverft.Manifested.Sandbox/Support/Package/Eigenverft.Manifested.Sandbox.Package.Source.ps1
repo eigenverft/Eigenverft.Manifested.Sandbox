@@ -836,7 +836,7 @@ function Copy-PackageFileToMirrorDepots {
     }
 
     foreach ($mirrorSource in @(Get-PackageWritableMirrorDepotSources -PackageConfig $PackageResult.PackageConfig)) {
-        $targetDirectory = [System.IO.Path]::GetFullPath((Join-Path $mirrorSource.basePath $PackageResult.PackageFileRelativeDirectory))
+        $targetDirectory = [System.IO.Path]::GetFullPath((Join-Path $mirrorSource.basePath $PackageResult.PackageDepotRelativeDirectory))
         $targetPath = Join-Path $targetDirectory ([string]$PackageResult.Package.packageFile.fileName)
         try {
             if ($mirrorSource.ensureExists) {
@@ -897,7 +897,7 @@ Build-PackageAcquisitionPlan -PackageResult $result
             $resolvedVerification = Resolve-PackageAcquisitionCandidateVerification -Package $package -AcquisitionCandidate $candidate
             switch -Exact ([string]$candidate.kind) {
                 'packageDepot' {
-                    $resolvedDepotSourcePath = Join-Path $PackageResult.PackageFileRelativeDirectory ([string]$package.packageFile.fileName)
+                    $resolvedDepotSourcePath = Join-Path $PackageResult.PackageDepotRelativeDirectory ([string]$package.packageFile.fileName)
                     foreach ($depotSource in @(Get-PackagePackageDepotSources -PackageConfig $PackageResult.PackageConfig)) {
                         $orderedCandidates.Add([pscustomobject]@{
                             kind         = 'packageDepot'
