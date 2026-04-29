@@ -19,8 +19,7 @@
         "packageInstallStageDirectory": "{applicationRootDirectory}/InstallStaging"
       },
       "defaults": {
-        "allowFallback": true,
-        "mirrorDownloadedArtifactsToDefaultPackageDepot": true
+        "allowFallback": true
       },
       "tracking": {
         "packageFileIndexFilePath": "{applicationRootDirectory}/State/package-file-index.json"

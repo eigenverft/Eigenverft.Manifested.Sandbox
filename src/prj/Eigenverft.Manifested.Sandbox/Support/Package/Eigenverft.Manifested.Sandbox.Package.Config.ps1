@@ -1025,6 +1025,9 @@ Assert-PackageGlobalConfigSchema -GlobalDocumentInfo $globalInfo
     if ($package.acquisitionEnvironment.stores.PSObject.Properties['installPreparationDirectory']) {
         throw "Package global config '$($GlobalDocumentInfo.Path)' still uses retired property 'acquisitionEnvironment.stores.installPreparationDirectory'. Use 'acquisitionEnvironment.stores.packageFileStagingDirectory' and 'acquisitionEnvironment.stores.packageInstallStageDirectory'."
     }
+    if ($package.acquisitionEnvironment.defaults.PSObject.Properties['mirrorDownloadedArtifactsToDefaultPackageDepot']) {
+        throw "Package global config '$($GlobalDocumentInfo.Path)' still uses retired property 'acquisitionEnvironment.defaults.mirrorDownloadedArtifactsToDefaultPackageDepot'. Use Configuration/Internal/DepotInventory.json environmentSources.<depotId>.mirrorTarget with writable=true."
+    }
 
     foreach ($requiredStoreProperty in @('packageFileStagingDirectory', 'packageInstallStageDirectory')) {
         if (-not $package.acquisitionEnvironment.stores.PSObject.Properties[$requiredStoreProperty]) {
@@ -1032,7 +1035,7 @@ Assert-PackageGlobalConfigSchema -GlobalDocumentInfo $globalInfo
         }
     }
 
-    foreach ($requiredDefaultProperty in @('allowFallback', 'mirrorDownloadedArtifactsToDefaultPackageDepot')) {
+    foreach ($requiredDefaultProperty in @('allowFallback')) {
         if (-not $package.acquisitionEnvironment.defaults.PSObject.Properties[$requiredDefaultProperty]) {
             throw "Package global config '$($GlobalDocumentInfo.Path)' is missing acquisitionEnvironment.defaults.$requiredDefaultProperty."
         }
@@ -1250,11 +1253,6 @@ Resolve-PackageEffectiveAcquisitionEnvironment -GlobalConfiguration $global -Sou
         $allowFallback = [bool]$acquisitionEnvironment.defaults.allowFallback
     }
 
-    $mirrorDownloadedArtifacts = $true
-    if ($acquisitionEnvironment.defaults.PSObject.Properties['mirrorDownloadedArtifactsToDefaultPackageDepot']) {
-        $mirrorDownloadedArtifacts = [bool]$acquisitionEnvironment.defaults.mirrorDownloadedArtifactsToDefaultPackageDepot
-    }
-
     $configuredEnvironmentSources = $null
     if ($acquisitionEnvironment.PSObject.Properties['environmentSources']) {
         $configuredEnvironmentSources = $acquisitionEnvironment.environmentSources
@@ -1284,7 +1282,6 @@ Resolve-PackageEffectiveAcquisitionEnvironment -GlobalConfiguration $global -Sou
         }
         Defaults            = [pscustomobject]@{
             AllowFallback = $allowFallback
-            MirrorDownloadedArtifactsToDefaultPackageDepot = $mirrorDownloadedArtifacts
         }
         EnvironmentSources  = $environmentSources
         Tracking            = [pscustomobject]@{
@@ -1954,7 +1951,6 @@ Get-PackageConfig -DefinitionId VSCodeRuntime
         PackageFileIndexFilePath           = $effectiveAcquisitionEnvironment.Tracking.PackageFileIndexFilePath
         PackageStateIndexFilePath          = $packageStateIndexFilePath
         AllowAcquisitionFallback           = $effectiveAcquisitionEnvironment.Defaults.AllowFallback
-        MirrorDownloadedArtifactsToDefaultPackageDepot = $effectiveAcquisitionEnvironment.Defaults.MirrorDownloadedArtifactsToDefaultPackageDepot
         EnvironmentSources                 = $effectiveAcquisitionEnvironment.EnvironmentSources
     }
 }

@@ -823,9 +823,6 @@ function Copy-PackageFileToMirrorDepots {
         [psobject]$SourceDefinition
     )
 
-    if (-not $PackageResult.PackageConfig.MirrorDownloadedArtifactsToDefaultPackageDepot) {
-        return
-    }
     if ([string]::IsNullOrWhiteSpace([string]$PackageResult.PackageFilePath) -or
         -not (Test-Path -LiteralPath $PackageResult.PackageFilePath -PathType Leaf)) {
         return
