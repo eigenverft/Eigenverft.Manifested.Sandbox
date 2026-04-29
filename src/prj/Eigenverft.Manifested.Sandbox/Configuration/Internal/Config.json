@@ -15,8 +15,8 @@
     },
     "acquisitionEnvironment": {
       "stores": {
-        "packageFileStagingDirectory": "{applicationRootDirectory}/FileStaging",
-        "packageInstallStageDirectory": "{applicationRootDirectory}/InstallStaging"
+        "packageFileStagingDirectory": "{applicationRootDirectory}/FileStage",
+        "packageInstallStageDirectory": "{applicationRootDirectory}/InstStage"
       },
       "defaults": {
         "allowFallback": true
