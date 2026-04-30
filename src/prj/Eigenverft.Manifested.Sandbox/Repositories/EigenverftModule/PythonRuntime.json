@@ -109,10 +109,9 @@
         "fileName": "python.3.13.13.nupkg",
         "format": "nupkg",
         "portable": true,
-        "autoUpdateSupported": false,
-        "integrity": {
+        "contentHash": {
           "algorithm": "sha256",
-          "sha256": "c2347c2975f661b2dafceacc94218dfe87781955a3cd309c633d343b8c8dac31"
+          "value": "c2347c2975f661b2dafceacc94218dfe87781955a3cd309c633d343b8c8dac31"
         }
       },
       "acquisitionCandidates": [
@@ -152,10 +151,9 @@
         "fileName": "pythonarm64.3.13.13.nupkg",
         "format": "nupkg",
         "portable": true,
-        "autoUpdateSupported": false,
-        "integrity": {
+        "contentHash": {
           "algorithm": "sha256",
-          "sha256": "2a0406b834d4ff33414f70597b67797466ba2344baa534ab8f62c4eae1c3e599"
+          "value": "2a0406b834d4ff33414f70597b67797466ba2344baa534ab8f62c4eae1c3e599"
         }
       },
       "acquisitionCandidates": [

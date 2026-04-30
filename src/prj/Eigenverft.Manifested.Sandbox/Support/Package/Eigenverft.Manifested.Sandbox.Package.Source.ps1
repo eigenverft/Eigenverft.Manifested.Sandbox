@@ -646,8 +646,8 @@ Builds the effective verification policy for one acquisition candidate.
 
 .DESCRIPTION
 Combines acquisition-candidate verification mode with canonical package-file
-integrity metadata when present, while remaining compatible with older
-candidate-local hash definitions.
+content hash and publisher-signature metadata when present, while remaining
+compatible with candidate-local hash definitions.
 
 .PARAMETER Package
 The selected effective release.
@@ -674,30 +674,30 @@ The raw acquisition candidate.
         $candidateVerification = [pscustomobject]$candidateVerification
     }
 
-    $packageIntegrity = if ($Package -and
+    $packageContentHash = if ($Package -and
         $Package.PSObject.Properties['packageFile'] -and
         $Package.packageFile -and
-        $Package.packageFile.PSObject.Properties['integrity']) {
-        $Package.packageFile.integrity
+        $Package.packageFile.PSObject.Properties['contentHash']) {
+        $Package.packageFile.contentHash
     }
     else {
         $null
     }
-    if ($packageIntegrity -is [System.Collections.IDictionary]) {
-        $packageIntegrity = [pscustomobject]$packageIntegrity
+    if ($packageContentHash -is [System.Collections.IDictionary]) {
+        $packageContentHash = [pscustomobject]$packageContentHash
     }
 
-    $packageAuthenticode = if ($Package -and
+    $packagePublisherSignature = if ($Package -and
         $Package.PSObject.Properties['packageFile'] -and
         $Package.packageFile -and
-        $Package.packageFile.PSObject.Properties['authenticode']) {
-        $Package.packageFile.authenticode
+        $Package.packageFile.PSObject.Properties['publisherSignature']) {
+        $Package.packageFile.publisherSignature
     }
     else {
         $null
     }
-    if ($packageAuthenticode -is [System.Collections.IDictionary]) {
-        $packageAuthenticode = [pscustomobject]$packageAuthenticode
+    if ($packagePublisherSignature -is [System.Collections.IDictionary]) {
+        $packagePublisherSignature = [pscustomobject]$packagePublisherSignature
     }
 
     $mode = if ($candidateVerification -and $candidateVerification.PSObject.Properties['mode'] -and -not [string]::IsNullOrWhiteSpace([string]$candidateVerification.mode)) {
@@ -707,8 +707,8 @@ The raw acquisition candidate.
         'none'
     }
 
-    $algorithm = if ($packageIntegrity -and $packageIntegrity.PSObject.Properties['algorithm'] -and -not [string]::IsNullOrWhiteSpace([string]$packageIntegrity.algorithm)) {
-        [string]$packageIntegrity.algorithm
+    $algorithm = if ($packageContentHash -and $packageContentHash.PSObject.Properties['algorithm'] -and -not [string]::IsNullOrWhiteSpace([string]$packageContentHash.algorithm)) {
+        [string]$packageContentHash.algorithm
     }
     elseif ($candidateVerification -and $candidateVerification.PSObject.Properties['algorithm'] -and -not [string]::IsNullOrWhiteSpace([string]$candidateVerification.algorithm)) {
         [string]$candidateVerification.algorithm
@@ -717,8 +717,8 @@ The raw acquisition candidate.
         'sha256'
     }
 
-    $sha256 = if ($packageIntegrity -and $packageIntegrity.PSObject.Properties['sha256'] -and -not [string]::IsNullOrWhiteSpace([string]$packageIntegrity.sha256)) {
-        [string]$packageIntegrity.sha256
+    $sha256 = if ($packageContentHash -and $packageContentHash.PSObject.Properties['value'] -and -not [string]::IsNullOrWhiteSpace([string]$packageContentHash.value)) {
+        [string]$packageContentHash.value
     }
     elseif ($candidateVerification -and $candidateVerification.PSObject.Properties['sha256'] -and -not [string]::IsNullOrWhiteSpace([string]$candidateVerification.sha256)) {
         [string]$candidateVerification.sha256
@@ -736,8 +736,8 @@ The raw acquisition candidate.
     if (-not [string]::IsNullOrWhiteSpace($sha256)) {
         $verification.sha256 = $sha256
     }
-    if ($packageAuthenticode) {
-        $verification.authenticode = $packageAuthenticode
+    if ($packagePublisherSignature) {
+        $verification.authenticode = $packagePublisherSignature
     }
 
     return [pscustomobject]$verification

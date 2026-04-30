@@ -21,7 +21,11 @@ recursively and forcefully, then returns `$true`.
         return $false
     }
 
-    Remove-Item -LiteralPath $Path -Recurse -Force -ErrorAction SilentlyContinue
+    Remove-Item -LiteralPath $Path -Recurse -Force -ErrorAction Stop
+    if (Test-Path -LiteralPath $Path) {
+        throw "Could not remove path '$Path'."
+    }
+
     return $true
 }
 

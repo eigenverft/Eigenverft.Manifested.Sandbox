@@ -129,10 +129,9 @@
         "fileName": "llama-b8863-bin-win-cpu-x64.zip",
         "format": "zip",
         "portable": true,
-        "autoUpdateSupported": false,
-        "integrity": {
+        "contentHash": {
           "algorithm": "sha256",
-          "sha256": "5a0c3bbd25c29185116ca24a10e9f124c5e4fc170822be82634bd543d8e91c0e"
+          "value": "5a0c3bbd25c29185116ca24a10e9f124c5e4fc170822be82634bd543d8e91c0e"
         }
       },
       "acquisitionCandidates": [

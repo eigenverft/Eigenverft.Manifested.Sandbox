@@ -1659,34 +1659,52 @@ Assert-PackageDefinitionSchema -DefinitionDocumentInfo $definitionInfo -Definiti
             (-not $effectiveRelease.packageFile.PSObject.Properties['fileName'] -or [string]::IsNullOrWhiteSpace([string]$effectiveRelease.packageFile.fileName))) {
             throw "Package release '$($release.id)' in '$($definition.id)' defines packageFile without packageFile.fileName."
         }
-        if ($effectiveRelease.PSObject.Properties['packageFile'] -and
-            $effectiveRelease.packageFile -and
-            $effectiveRelease.packageFile.PSObject.Properties['integrity'] -and
-            $null -ne $effectiveRelease.packageFile.integrity) {
-            $integrity = $effectiveRelease.packageFile.integrity
-            if (-not $integrity.PSObject.Properties['algorithm'] -or [string]::IsNullOrWhiteSpace([string]$integrity.algorithm)) {
-                throw "Package release '$($release.id)' in '$($definition.id)' defines packageFile.integrity without algorithm."
+        if ($effectiveRelease.PSObject.Properties['packageFile'] -and $effectiveRelease.packageFile) {
+            if ($effectiveRelease.packageFile.PSObject.Properties['autoUpdateSupported']) {
+                throw "Package release '$($release.id)' in '$($definition.id)' still uses retired property 'packageFile.autoUpdateSupported'."
             }
-            if (-not $integrity.PSObject.Properties['sha256'] -or [string]::IsNullOrWhiteSpace([string]$integrity.sha256)) {
-                throw "Package release '$($release.id)' in '$($definition.id)' defines packageFile.integrity without sha256."
+            if ($effectiveRelease.packageFile.PSObject.Properties['integrity']) {
+                throw "Package release '$($release.id)' in '$($definition.id)' still uses retired property 'packageFile.integrity'. Use 'packageFile.contentHash'."
             }
-            if (-not [string]::Equals([string]$integrity.algorithm, 'sha256', [System.StringComparison]::OrdinalIgnoreCase)) {
-                throw "Package release '$($release.id)' in '$($definition.id)' uses unsupported packageFile.integrity.algorithm '$($integrity.algorithm)'."
+            if ($effectiveRelease.packageFile.PSObject.Properties['authenticode']) {
+                throw "Package release '$($release.id)' in '$($definition.id)' still uses retired property 'packageFile.authenticode'. Use 'packageFile.publisherSignature'."
             }
         }
 
         if ($effectiveRelease.PSObject.Properties['packageFile'] -and
             $effectiveRelease.packageFile -and
-            $effectiveRelease.packageFile.PSObject.Properties['authenticode'] -and
-            $null -ne $effectiveRelease.packageFile.authenticode) {
-            $authenticode = $effectiveRelease.packageFile.authenticode
-            if ($authenticode.PSObject.Properties['requireValid'] -and
-                $null -eq $authenticode.requireValid) {
-                throw "Package release '$($release.id)' in '$($definition.id)' defines packageFile.authenticode.requireValid without a value."
+            $effectiveRelease.packageFile.PSObject.Properties['contentHash'] -and
+            $null -ne $effectiveRelease.packageFile.contentHash) {
+            $contentHash = $effectiveRelease.packageFile.contentHash
+            if (-not $contentHash.PSObject.Properties['algorithm'] -or [string]::IsNullOrWhiteSpace([string]$contentHash.algorithm)) {
+                throw "Package release '$($release.id)' in '$($definition.id)' defines packageFile.contentHash without algorithm."
             }
-            if ($authenticode.PSObject.Properties['subjectContains'] -and
-                [string]::IsNullOrWhiteSpace([string]$authenticode.subjectContains)) {
-                throw "Package release '$($release.id)' in '$($definition.id)' defines packageFile.authenticode.subjectContains without a value."
+            if (-not $contentHash.PSObject.Properties['value'] -or [string]::IsNullOrWhiteSpace([string]$contentHash.value)) {
+                throw "Package release '$($release.id)' in '$($definition.id)' defines packageFile.contentHash without value."
+            }
+            if (-not [string]::Equals([string]$contentHash.algorithm, 'sha256', [System.StringComparison]::OrdinalIgnoreCase)) {
+                throw "Package release '$($release.id)' in '$($definition.id)' uses unsupported packageFile.contentHash.algorithm '$($contentHash.algorithm)'."
+            }
+        }
+
+        if ($effectiveRelease.PSObject.Properties['packageFile'] -and
+            $effectiveRelease.packageFile -and
+            $effectiveRelease.packageFile.PSObject.Properties['publisherSignature'] -and
+            $null -ne $effectiveRelease.packageFile.publisherSignature) {
+            $publisherSignature = $effectiveRelease.packageFile.publisherSignature
+            if (-not $publisherSignature.PSObject.Properties['kind'] -or [string]::IsNullOrWhiteSpace([string]$publisherSignature.kind)) {
+                throw "Package release '$($release.id)' in '$($definition.id)' defines packageFile.publisherSignature without kind."
+            }
+            if (-not [string]::Equals([string]$publisherSignature.kind, 'authenticode', [System.StringComparison]::OrdinalIgnoreCase)) {
+                throw "Package release '$($release.id)' in '$($definition.id)' uses unsupported packageFile.publisherSignature.kind '$($publisherSignature.kind)'."
+            }
+            if ($publisherSignature.PSObject.Properties['requireValid'] -and
+                $null -eq $publisherSignature.requireValid) {
+                throw "Package release '$($release.id)' in '$($definition.id)' defines packageFile.publisherSignature.requireValid without a value."
+            }
+            if ($publisherSignature.PSObject.Properties['subjectContains'] -and
+                [string]::IsNullOrWhiteSpace([string]$publisherSignature.subjectContains)) {
+                throw "Package release '$($release.id)' in '$($definition.id)' defines packageFile.publisherSignature.subjectContains without a value."
             }
         }
 
@@ -2178,6 +2196,7 @@ New-PackageResult -CommandName Invoke-VSCodeRuntime -PackageConfig $config
         LocalRepositoryRoot              = $PackageConfig.LocalRepositoryRoot
         PackageFileIndexFilePath         = $PackageConfig.PackageFileIndexFilePath
         PackageStateIndexFilePath        = $PackageConfig.PackageStateIndexFilePath
+        LocalEnvironment                 = $null
         Package                          = $null
         EffectiveRelease                 = $null
         PackageId                        = $null

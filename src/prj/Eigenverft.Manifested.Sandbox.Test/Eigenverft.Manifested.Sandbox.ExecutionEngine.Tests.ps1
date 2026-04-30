@@ -111,6 +111,16 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - execut
         Test-Path -LiteralPath $directoryPath | Should -BeFalse
     }
 
+    It 'throws when Remove-PathIfExists cannot remove an existing path' {
+        $directoryPath = Join-Path $TestDrive 'remove-directory-failed'
+        Write-TestTextFile -Path (Join-Path $directoryPath 'test.txt') -Content 'content'
+        Mock Remove-Item {}
+
+        { Remove-PathIfExists -Path $directoryPath } | Should -Throw '*Could not remove path*'
+
+        Test-Path -LiteralPath $directoryPath | Should -BeTrue
+    }
+
     It 'copies a file to a target path and returns the resolved target path' {
         $sourcePath = Join-Path $TestDrive 'copy-file\source.txt'
         $targetPath = Join-Path $TestDrive 'copy-file\target.txt'

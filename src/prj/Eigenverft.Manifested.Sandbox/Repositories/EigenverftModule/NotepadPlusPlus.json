@@ -122,12 +122,12 @@
         "fileName": "npp.8.9.4.Installer.x64.exe",
         "format": "exe",
         "portable": false,
-        "autoUpdateSupported": false,
-        "integrity": {
+        "contentHash": {
           "algorithm": "sha256",
-          "sha256": "f3629f500d0754d8e870255fff0e00384a37f5402d6f3ad8dd1f4f67d707b593"
+          "value": "f3629f500d0754d8e870255fff0e00384a37f5402d6f3ad8dd1f4f67d707b593"
         },
-        "authenticode": {
+        "publisherSignature": {
+          "kind": "authenticode",
           "requireValid": true,
           "subjectContains": "NOTEPAD++"
         }
@@ -168,12 +168,12 @@
         "fileName": "npp.8.9.4.Installer.arm64.exe",
         "format": "exe",
         "portable": false,
-        "autoUpdateSupported": false,
-        "integrity": {
+        "contentHash": {
           "algorithm": "sha256",
-          "sha256": "7d59f0c62caa4d2366f900ca8169fb37cf1dcfce5c79cb3ccb08089b1adbc91"
+          "value": "7d59f0c62caa4d2366f900ca8169fb37cf1dcfce5c79cb3ccb08089b1adbc91"
         },
-        "authenticode": {
+        "publisherSignature": {
+          "kind": "authenticode",
           "requireValid": true,
           "subjectContains": "NOTEPAD++"
         }

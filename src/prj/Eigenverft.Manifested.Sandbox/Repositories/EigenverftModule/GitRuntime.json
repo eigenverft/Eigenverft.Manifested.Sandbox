@@ -101,10 +101,9 @@
         "fileName": "MinGit-2.54.0-64-bit.zip",
         "format": "zip",
         "portable": true,
-        "autoUpdateSupported": false,
-        "integrity": {
+        "contentHash": {
           "algorithm": "sha256",
-          "sha256": "04f937e1f0918b17b9be6f2294cb2bb66e96e1d9832d1c298e2de088a1d0e668"
+          "value": "04f937e1f0918b17b9be6f2294cb2bb66e96e1d9832d1c298e2de088a1d0e668"
         }
       },
       "acquisitionCandidates": [
@@ -143,10 +142,9 @@
         "fileName": "MinGit-2.54.0-arm64.zip",
         "format": "zip",
         "portable": true,
-        "autoUpdateSupported": false,
-        "integrity": {
+        "contentHash": {
           "algorithm": "sha256",
-          "sha256": "68f6bdda5b58f4e40f431c0da48b05ba5596445314d5e491e7b4aebb1ec2e985"
+          "value": "68f6bdda5b58f4e40f431c0da48b05ba5596445314d5e491e7b4aebb1ec2e985"
         }
       },
       "acquisitionCandidates": [

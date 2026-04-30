@@ -24,6 +24,7 @@
 . "$PSScriptRoot\Support\Package\Eigenverft.Manifested.Sandbox.Package.ExecutionMessage.ps1"
 . "$PSScriptRoot\Support\Package\Eigenverft.Manifested.Sandbox.Package.Bootstrap.ps1"
 . "$PSScriptRoot\Support\Package\Eigenverft.Manifested.Sandbox.Package.Config.ps1"
+. "$PSScriptRoot\Support\Package\Eigenverft.Manifested.Sandbox.Package.LocalEnvironment.ps1"
 . "$PSScriptRoot\Support\Package\Eigenverft.Manifested.Sandbox.Package.Selection.ps1"
 . "$PSScriptRoot\Support\Package\Eigenverft.Manifested.Sandbox.Package.Dependencies.ps1"
 . "$PSScriptRoot\Support\Package\Eigenverft.Manifested.Sandbox.Package.Source.ps1"

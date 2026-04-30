@@ -79,10 +79,9 @@
         "fileName": "Qwen3.5-2B-Q8_0.gguf",
         "format": "gguf",
         "portable": true,
-        "autoUpdateSupported": false,
-        "integrity": {
+        "contentHash": {
           "algorithm": "sha256",
-          "sha256": "1b04acba824817554f4ce23639bc8495ff70453b8fcb047900c731521021f2c1"
+          "value": "1b04acba824817554f4ce23639bc8495ff70453b8fcb047900c731521021f2c1"
         }
       },
       "acquisitionCandidates": [

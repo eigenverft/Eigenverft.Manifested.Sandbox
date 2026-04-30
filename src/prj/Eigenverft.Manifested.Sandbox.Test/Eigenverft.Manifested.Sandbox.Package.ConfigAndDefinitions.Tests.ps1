@@ -130,6 +130,139 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
         $localInfo.Document.acquisitionEnvironment.environmentSources.defaultPackageDepot.enabled | Should -BeTrue
     }
 
+    It 'initializes the local package environment once and creates only eligible depot roots' {
+        $rootPath = Join-Path $TestDrive 'local-environment-init'
+        $applicationRootPath = Join-Path $rootPath 'AppRoot'
+        $defaultDepotPath = Join-Path $rootPath 'DefaultPackageDepot'
+        $readOnlyDepotPath = Join-Path $rootPath 'ReadOnlyPackageDepot'
+        $disabledDepotPath = Join-Path $rootPath 'DisabledPackageDepot'
+        $globalDocument = New-TestPackageGlobalDocument -ApplicationRootDirectory $applicationRootPath
+        $depotInventory = New-TestDepotInventoryDocument -DefaultPackageDepotDirectory $defaultDepotPath -EnvironmentSources @{
+            readOnlyPackageDepot = @{
+                kind         = 'filesystem'
+                enabled      = $true
+                searchOrder  = 400
+                basePath     = $readOnlyDepotPath
+                readable     = $true
+                writable     = $false
+                mirrorTarget = $false
+                ensureExists = $false
+            }
+            disabledPackageDepot = @{
+                kind         = 'filesystem'
+                enabled      = $false
+                searchOrder  = 500
+                basePath     = $disabledDepotPath
+                readable     = $true
+                writable     = $true
+                mirrorTarget = $true
+                ensureExists = $true
+            }
+        }
+        $definitionDocument = New-TestVSCodeDefinitionDocument -Releases @(
+            New-TestPackageRelease -Id 'vsCode-win-x64-stable' -Version '2.0.0' -Architecture 'x64' -Flavor 'win32-x64' -FileName 'VSCode-win32-x64-2.0.0.zip' -AcquisitionCandidates @(
+                @{
+                    kind        = 'packageDepot'
+                    searchOrder = 10
+                }
+            )
+        )
+        $documents = Write-TestPackageDocuments -RootPath $rootPath -GlobalDocument $globalDocument -DepotInventoryDocument $depotInventory -DefinitionDocument $definitionDocument
+
+        [Environment]::SetEnvironmentVariable($script:SourceInventoryEnvVarName, (Join-Path $TestDrive 'missing-inventory.json'), 'Process')
+        Mock Get-PackageGlobalConfigPath { $documents.GlobalConfigPath }
+        Mock Get-PackageDepotInventoryPath { $documents.DepotInventoryPath }
+        Mock Get-PackageDefinitionPath { param($DefinitionId) $documents.DefinitionPath }
+
+        $config = Get-PackageConfig -DefinitionId 'VSCodeRuntime'
+        $environment = Initialize-PackageLocalEnvironment -PackageConfig $config
+        $markerPath = Join-Path (Join-Path $applicationRootPath 'State') 'package-local-environment.json'
+        $localConfigDirectory = Split-Path -Parent (Get-PackageLocalGlobalConfigPath)
+        $localDepotInventoryDirectory = Split-Path -Parent (Get-PackageLocalDepotInventoryPath)
+
+        $environment.Status | Should -Be 'Initialized'
+        $environment.InitializedNow | Should -BeTrue
+        $environment.MarkerPath | Should -Be ([System.IO.Path]::GetFullPath($markerPath))
+        Test-Path -LiteralPath $markerPath -PathType Leaf | Should -BeTrue
+        Test-Path -LiteralPath $applicationRootPath -PathType Container | Should -BeTrue
+        Test-Path -LiteralPath $localConfigDirectory -PathType Container | Should -BeTrue
+        Test-Path -LiteralPath $localDepotInventoryDirectory -PathType Container | Should -BeTrue
+        Test-Path -LiteralPath (Join-Path (Join-Path $applicationRootPath 'Configuration') 'External') -PathType Container | Should -BeTrue
+        Test-Path -LiteralPath (Join-Path $applicationRootPath 'Installed') -PathType Container | Should -BeTrue
+        Test-Path -LiteralPath (Join-Path $applicationRootPath 'FileStage') -PathType Container | Should -BeTrue
+        Test-Path -LiteralPath (Join-Path $applicationRootPath 'InstStage') -PathType Container | Should -BeTrue
+        Test-Path -LiteralPath (Join-Path $applicationRootPath 'PackageRepositories') -PathType Container | Should -BeTrue
+        Test-Path -LiteralPath (Join-Path (Join-Path $applicationRootPath 'Caches') 'npm') -PathType Container | Should -BeTrue
+        Test-Path -LiteralPath $defaultDepotPath -PathType Container | Should -BeTrue
+        Test-Path -LiteralPath $readOnlyDepotPath -PathType Container | Should -BeFalse
+        Test-Path -LiteralPath $disabledDepotPath -PathType Container | Should -BeFalse
+        @($environment.SkippedSources | Where-Object { $_.SourceId -eq 'readOnlyPackageDepot' }).Count | Should -Be 1
+    }
+
+    It 'skips all directory verification when the local environment marker already exists' {
+        $rootPath = Join-Path $TestDrive 'local-environment-marker-skip'
+        $applicationRootPath = Join-Path $rootPath 'AppRoot'
+        $markerPath = Join-Path (Join-Path $applicationRootPath 'State') 'package-local-environment.json'
+        Write-TestJsonDocument -Path $markerPath -Document @{
+            schemaVersion = 1
+            initializedAtUtc = [DateTime]::UtcNow.ToString('o')
+            applicationRootDirectory = $applicationRootPath
+            directoryVersion = 1
+        }
+        $globalDocument = New-TestPackageGlobalDocument -ApplicationRootDirectory $applicationRootPath
+        $definitionDocument = New-TestVSCodeDefinitionDocument -Releases @(
+            New-TestPackageRelease -Id 'vsCode-win-x64-stable' -Version '2.0.0' -Architecture 'x64' -Flavor 'win32-x64' -FileName 'VSCode-win32-x64-2.0.0.zip' -AcquisitionCandidates @(
+                @{
+                    kind        = 'packageDepot'
+                    searchOrder = 10
+                }
+            )
+        )
+        $documents = Write-TestPackageDocuments -RootPath $rootPath -GlobalDocument $globalDocument -DefinitionDocument $definitionDocument
+
+        [Environment]::SetEnvironmentVariable($script:SourceInventoryEnvVarName, (Join-Path $TestDrive 'missing-inventory.json'), 'Process')
+        Mock Get-PackageGlobalConfigPath { $documents.GlobalConfigPath }
+        Mock Get-PackageDepotInventoryPath { $documents.DepotInventoryPath }
+        Mock Get-PackageDefinitionPath { param($DefinitionId) $documents.DefinitionPath }
+
+        $config = Get-PackageConfig -DefinitionId 'VSCodeRuntime'
+        $environment = Initialize-PackageLocalEnvironment -PackageConfig $config
+
+        $environment.Status | Should -Be 'AlreadyInitialized'
+        $environment.InitializedNow | Should -BeFalse
+        @($environment.CreatedDirectories).Count | Should -Be 0
+        @($environment.ExistingDirectories).Count | Should -Be 0
+        @($environment.SkippedSources).Count | Should -Be 0
+        Test-Path -LiteralPath $config.LocalRepositoryRoot -PathType Container | Should -BeFalse
+        Test-Path -LiteralPath $config.DefaultPackageDepotDirectory -PathType Container | Should -BeFalse
+    }
+
+    It 'reports local environment initialization failures through the package command result' {
+        $rootPath = Join-Path $TestDrive 'local-environment-command-failure'
+        $globalDocument = New-TestPackageGlobalDocument -ApplicationRootDirectory (Join-Path $rootPath 'AppRoot')
+        $definitionDocument = New-TestVSCodeDefinitionDocument -Releases @(
+            New-TestPackageRelease -Id 'vsCode-win-x64-stable' -Version '2.0.0' -Architecture 'x64' -Flavor 'win32-x64' -FileName 'VSCode-win32-x64-2.0.0.zip' -AcquisitionCandidates @(
+                @{
+                    kind        = 'packageDepot'
+                    searchOrder = 10
+                }
+            )
+        )
+        $documents = Write-TestPackageDocuments -RootPath $rootPath -GlobalDocument $globalDocument -DefinitionDocument $definitionDocument
+
+        [Environment]::SetEnvironmentVariable($script:SourceInventoryEnvVarName, (Join-Path $TestDrive 'missing-inventory.json'), 'Process')
+        Mock Get-PackageGlobalConfigPath { $documents.GlobalConfigPath }
+        Mock Get-PackageDepotInventoryPath { $documents.DepotInventoryPath }
+        Mock Get-PackageDefinitionPath { param($DefinitionId) $documents.DefinitionPath }
+        Mock Initialize-PackageLocalEnvironment { throw 'local environment boom' }
+
+        $result = Invoke-PackageDefinitionCommand -DefinitionId 'VSCodeRuntime' -CommandName 'Invoke-VSCodeRuntime'
+
+        $result.Status | Should -Be 'Failed'
+        $result.FailureReason | Should -Be 'LocalEnvironmentInitializationFailed'
+        $result.ErrorMessage | Should -Be 'local environment boom'
+    }
+
     It 'fails clearly when global config still uses retired ownershipTracking' {
         $globalConfigPath = Join-Path $TestDrive 'Global-old-ownership.json'
         $badGlobal = New-TestPackageGlobalDocument
@@ -260,7 +393,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
         $result.Package.version | Should -Be '2.54.0'
         $result.Package.releaseTag | Should -Be 'v2.54.0.windows.1'
         $result.Package.packageFile.fileName | Should -Be $expectedFileName
-        $result.Package.packageFile.integrity.sha256 | Should -Be $expectedSha256
+        $result.Package.packageFile.contentHash.value | Should -Be $expectedSha256
         $result.Package.install.pathRegistration.source.value | Should -Be 'git'
     }
 
@@ -292,7 +425,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
         $result.Package.version | Should -Be '2.91.0'
         $result.Package.releaseTag | Should -Be 'v2.91.0'
         $result.Package.packageFile.fileName | Should -Be $expectedFileName
-        $result.Package.packageFile.integrity.sha256 | Should -Be $expectedSha256
+        $result.Package.packageFile.contentHash.value | Should -Be $expectedSha256
         $result.Package.install.pathRegistration.source.value | Should -Be 'gh'
     }
 
@@ -326,7 +459,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
         $result.Package.existingInstallDiscovery.searchLocations[0].kind | Should -Be 'windowsUninstallRegistryKey'
         $result.Package.existingInstallDiscovery.searchLocations[0].installDirectorySource | Should -Be 'displayIconDirectory'
         $result.Package.packageFile.fileName | Should -Be $expectedFileName
-        $result.Package.packageFile.integrity.sha256 | Should -Be $expectedSha256
+        $result.Package.packageFile.contentHash.value | Should -Be $expectedSha256
     }
 
     It 'loads the shipped NodeRuntime definition and selects the fixed Node.js archive release' {
@@ -356,7 +489,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
         $result.Package.version | Should -Be '24.15.0'
         $result.Package.releaseTag | Should -Be 'v24.15.0'
         $result.Package.packageFile.fileName | Should -Be $expectedFileName
-        $result.Package.packageFile.integrity.sha256 | Should -Be $expectedSha256
+        $result.Package.packageFile.contentHash.value | Should -Be $expectedSha256
         $result.Package.install.pathRegistration.source.value | Should -Be 'node'
     }
 
@@ -482,7 +615,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
         $result.Package.version | Should -Be '3.13.13'
         $result.Package.releaseTag | Should -Be '3.13.13'
         $result.Package.packageFile.fileName | Should -Be $expectedFileName
-        $result.Package.packageFile.integrity.sha256 | Should -Be $expectedSha256
+        $result.Package.packageFile.contentHash.value | Should -Be $expectedSha256
         $result.Package.install.expandedRoot | Should -Be 'tools'
         $result.Package.install.pathRegistration.source.value | Should -Be 'python'
         $result.Package.validation.commandChecks[1].arguments | Should -Be @('-m', 'pip', '--version')
@@ -516,7 +649,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
         $result.Package.version | Should -Be '7.6.1'
         $result.Package.releaseTag | Should -Be 'v7.6.1'
         $result.Package.packageFile.fileName | Should -Be $expectedFileName
-        $result.Package.packageFile.integrity.sha256 | Should -Be $expectedSha256
+        $result.Package.packageFile.contentHash.value | Should -Be $expectedSha256
         $result.Package.install.pathRegistration.source.value | Should -Be 'pwsh'
     }
 
@@ -537,7 +670,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
         $result.Package.install.elevation | Should -Be 'required'
         $result.Package.install.commandArguments | Should -Be @('/install', '/quiet', '/norestart', '/log', '{logPath}')
         $result.Package.packageFile.fileName | Should -Be 'vc_redist.x64.exe'
-        $result.Package.packageFile.authenticode.subjectContains | Should -Be 'Microsoft Corporation'
+        $result.Package.packageFile.publisherSignature.subjectContains | Should -Be 'Microsoft Corporation'
     }
 
     It 'loads the shipped Qwen35_2B_Q8_0_Model definition and selects the fixed Hugging Face-backed resource release' {
@@ -556,8 +689,8 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
         $result.PackageId | Should -Be 'qwen35-2b-q8-0-stable'
         $result.Package.version | Should -Be '3.5.0'
         $result.Package.packageFile.fileName | Should -Be 'Qwen3.5-2B-Q8_0.gguf'
-        $result.Package.packageFile.integrity.algorithm | Should -Be 'sha256'
-        $result.Package.packageFile.integrity.sha256 | Should -Be '1b04acba824817554f4ce23639bc8495ff70453b8fcb047900c731521021f2c1'
+        $result.Package.packageFile.contentHash.algorithm | Should -Be 'sha256'
+        $result.Package.packageFile.contentHash.value | Should -Be '1b04acba824817554f4ce23639bc8495ff70453b8fcb047900c731521021f2c1'
         $result.Package.install.kind | Should -Be 'placePackageFile'
         $result.Compatibility.Count | Should -Be 1
         $result.Compatibility[0].Kind | Should -Be 'physicalOrVideoMemoryGiB'
@@ -581,8 +714,8 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
         $result.PackageId | Should -Be 'qwen35-9b-q6-k-stable'
         $result.Package.version | Should -Be '3.5.0'
         $result.Package.packageFile.fileName | Should -Be 'Qwen3.5-9B-Q6_K.gguf'
-        $result.Package.packageFile.integrity.algorithm | Should -Be 'sha256'
-        $result.Package.packageFile.integrity.sha256 | Should -Be '91898433cf5ce0a8f45516a4cc3e9343b6e01d052d01f684309098c66a326c59'
+        $result.Package.packageFile.contentHash.algorithm | Should -Be 'sha256'
+        $result.Package.packageFile.contentHash.value | Should -Be '91898433cf5ce0a8f45516a4cc3e9343b6e01d052d01f684309098c66a326c59'
         $result.Package.install.kind | Should -Be 'placePackageFile'
         $result.Compatibility.Count | Should -Be 1
         $result.Compatibility[0].Kind | Should -Be 'physicalOrVideoMemoryGiB'
@@ -673,6 +806,67 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
         }
 
         { Assert-PackageDefinitionSchema -DefinitionDocumentInfo $definitionInfo -DefinitionId 'VSCodeRuntime' } | Should -Throw '*priority*'
+    }
+
+    It 'fails clearly when packageFile still uses retired raw-file trust properties' {
+        $release = New-TestPackageRelease -Id 'vsCode-win-x64-stable' -Version '2.0.0' -Architecture 'x64' -Flavor 'win32-x64' -FileName 'VSCode-win32-x64-2.0.0.zip' -AcquisitionCandidates @(
+            @{
+                kind         = 'packageDepot'
+                searchOrder  = 100
+                verification = @{ mode = 'required' }
+            }
+        )
+        $release.packageFile | Add-Member -NotePropertyName integrity -NotePropertyValue @{
+            algorithm = 'sha256'
+            sha256    = '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef'
+        }
+        $release.packageFile | Add-Member -NotePropertyName authenticode -NotePropertyValue @{
+            requireValid = $true
+        }
+        $release.packageFile | Add-Member -NotePropertyName autoUpdateSupported -NotePropertyValue $false
+        $definitionDocument = New-TestVSCodeDefinitionDocument -Releases @($release)
+        $definitionInfo = [pscustomobject]@{
+            Path     = Join-Path $TestDrive 'VSCodeRuntime.json'
+            Document = ConvertTo-TestPsObject -InputObject $definitionDocument
+        }
+
+        { Assert-PackageDefinitionSchema -DefinitionDocumentInfo $definitionInfo -DefinitionId 'VSCodeRuntime' } | Should -Throw '*packageFile.autoUpdateSupported*'
+        $release.packageFile.PSObject.Properties.Remove('autoUpdateSupported')
+        $definitionInfo.Document = ConvertTo-TestPsObject -InputObject $definitionDocument
+        { Assert-PackageDefinitionSchema -DefinitionDocumentInfo $definitionInfo -DefinitionId 'VSCodeRuntime' } | Should -Throw '*packageFile.integrity*'
+        $release.packageFile.PSObject.Properties.Remove('integrity')
+        $definitionInfo.Document = ConvertTo-TestPsObject -InputObject $definitionDocument
+        { Assert-PackageDefinitionSchema -DefinitionDocumentInfo $definitionInfo -DefinitionId 'VSCodeRuntime' } | Should -Throw '*packageFile.authenticode*'
+    }
+
+    It 'rejects incomplete packageFile.contentHash and publisherSignature metadata' {
+        $release = New-TestPackageRelease -Id 'vsCode-win-x64-stable' -Version '2.0.0' -Architecture 'x64' -Flavor 'win32-x64' -FileName 'VSCode-win32-x64-2.0.0.zip' -AcquisitionCandidates @(
+            @{
+                kind         = 'packageDepot'
+                searchOrder  = 100
+                verification = @{ mode = 'required' }
+            }
+        )
+        $release.packageFile | Add-Member -NotePropertyName contentHash -NotePropertyValue @{
+            algorithm = 'sha256'
+        }
+        $definitionDocument = New-TestVSCodeDefinitionDocument -Releases @($release)
+        $definitionInfo = [pscustomobject]@{
+            Path     = Join-Path $TestDrive 'VSCodeRuntime.json'
+            Document = ConvertTo-TestPsObject -InputObject $definitionDocument
+        }
+
+        { Assert-PackageDefinitionSchema -DefinitionDocumentInfo $definitionInfo -DefinitionId 'VSCodeRuntime' } | Should -Throw '*packageFile.contentHash without value*'
+        $release.packageFile.PSObject.Properties.Remove('contentHash')
+        $release.packageFile | Add-Member -NotePropertyName contentHash -NotePropertyValue @{
+            algorithm = 'sha256'
+            value     = '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef'
+        }
+        $release.packageFile | Add-Member -NotePropertyName publisherSignature -NotePropertyValue @{
+            requireValid = $true
+        }
+        $definitionInfo.Document = ConvertTo-TestPsObject -InputObject $definitionDocument
+        { Assert-PackageDefinitionSchema -DefinitionDocumentInfo $definitionInfo -DefinitionId 'VSCodeRuntime' } | Should -Throw '*packageFile.publisherSignature without kind*'
     }
 
     It 'uses the default source inventory path when the env var is unset' {

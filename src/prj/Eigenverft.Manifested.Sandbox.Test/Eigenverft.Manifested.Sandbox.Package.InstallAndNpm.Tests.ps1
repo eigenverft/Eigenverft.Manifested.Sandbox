@@ -661,7 +661,6 @@ exit /b 0
                         fileName = 'Qwen3.5-2B-Q8_0.gguf'
                         format = 'gguf'
                         portable = $true
-                        autoUpdateSupported = $false
                     }
                     acquisitionCandidates = @(
                         @{
@@ -719,6 +718,49 @@ exit /b 0
         Test-Path -LiteralPath $preparationDirectory | Should -BeFalse
         Test-Path -LiteralPath $installStageDirectory | Should -BeFalse
         Test-Path -LiteralPath $npmCacheDirectory -PathType Container | Should -BeTrue
+    }
+
+    It 'fails before ownership and cleanup when installed package validation fails' {
+        $rootPath = Join-Path $TestDrive 'validation-failure-preserves-staging'
+        $archiveInfo = New-TestPackageArchiveInfo -RootPath $rootPath -Version '2.0.0' -ArchiveFileName 'VSCode-win32-x64-2.0.0.zip'
+        $packageFileStagingDirectory = Join-Path $rootPath 'FileStage'
+        $packageInstallStageDirectory = Join-Path $rootPath 'InstStage'
+        $defaultPackageDepotDirectory = Join-Path $rootPath 'DefaultPackageDepot'
+        $packageStateIndexFilePath = Join-Path $rootPath 'State\package-state-index.json'
+        $badValidation = New-TestValidation -Version '2.0.0'
+        $badValidation.files = @('missing-after-install.exe')
+        $definitionDocument = New-TestVSCodeDefinitionDocument -ReleaseDefaultsValidation $badValidation -Releases @(
+            New-TestPackageRelease -Id 'vsCode-win-x64-stable' -Version '2.0.0' -Architecture 'x64' -Flavor 'win32-x64' -FileName 'VSCode-win32-x64-2.0.0.zip' -PackageFileSha256 $archiveInfo.Sha256 -AcquisitionCandidates @(
+                @{
+                    kind        = 'packageDepot'
+                    searchOrder = 10
+                    verification = @{
+                        mode = 'required'
+                    }
+                }
+            )
+        )
+        $documents = Write-TestPackageDocuments -RootPath $rootPath -GlobalDocument (New-TestPackageGlobalDocument -PackageFileStagingDirectory $packageFileStagingDirectory -PackageInstallStageDirectory $packageInstallStageDirectory -DefaultPackageDepotDirectory $defaultPackageDepotDirectory -PackageStateIndexFilePath $packageStateIndexFilePath) -DefinitionDocument $definitionDocument
+        $depotFilePath = Join-Path $defaultPackageDepotDirectory 'VSCodeRuntime\stable\2.0.0\win32-x64\VSCode-win32-x64-2.0.0.zip'
+        $null = New-Item -ItemType Directory -Path (Split-Path -Parent $depotFilePath) -Force
+        Copy-FileToPath -SourcePath $archiveInfo.ZipPath -TargetPath $depotFilePath -Overwrite | Out-Null
+
+        [Environment]::SetEnvironmentVariable($script:SourceInventoryEnvVarName, (Join-Path $TestDrive 'missing-inventory.json'), 'Process')
+        Mock Get-PackageGlobalConfigPath { $documents.GlobalConfigPath }
+        Mock Get-PackageDepotInventoryPath { $documents.DepotInventoryPath }
+        Mock Get-PackageDefinitionPath { param($DefinitionId) $documents.DefinitionPath }
+
+        $result = Invoke-PackageDefinitionCommand -DefinitionId 'VSCodeRuntime' -CommandName 'Invoke-VSCodeRuntime'
+
+        $result.Status | Should -Be 'Failed'
+        $result.FailureReason | Should -Be 'InstalledPackageValidationFailed'
+        $result.ErrorMessage | Should -Match 'Package validation failed'
+        @($result.Validation.FailedChecks).Count | Should -Be 1
+        $result.Validation.FailedChecks[0].Kind | Should -Be 'files'
+        Test-Path -LiteralPath $result.PackageFileStagingDirectory -PathType Container | Should -BeTrue
+        Test-Path -LiteralPath $result.PackageFilePath -PathType Leaf | Should -BeTrue
+        Test-Path -LiteralPath $result.PackageInstallStageDirectory -PathType Container | Should -BeTrue
+        Test-Path -LiteralPath $packageStateIndexFilePath -PathType Leaf | Should -BeFalse
     }
 
     It 'discovers command-based existing installs through Get-ResolvedApplicationPath' {

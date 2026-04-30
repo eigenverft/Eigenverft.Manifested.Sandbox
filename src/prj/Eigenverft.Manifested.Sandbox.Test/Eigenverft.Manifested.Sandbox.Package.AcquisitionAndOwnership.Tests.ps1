@@ -159,8 +159,8 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - acquis
         Assert-MockCalled Save-PackageDownloadFile -Times 0
     }
 
-    It 'uses packageFile.integrity when acquisition candidates only declare verification mode' {
-        $rootPath = Join-Path $TestDrive 'packagefile-integrity'
+    It 'uses packageFile.contentHash when acquisition candidates only declare verification mode' {
+        $rootPath = Join-Path $TestDrive 'packagefile-contenthash'
         $packageArchive = New-TestPackageArchiveInfo -RootPath (Join-Path $rootPath 'archive') -Version '2.0.0' -ArchiveFileName 'VSCode-win32-x64-2.0.0.zip'
         $globalDocument = New-TestPackageGlobalDocument -PackageFileStagingDirectory (Join-Path $rootPath 'workspace') -DefaultPackageDepotDirectory (Join-Path $rootPath 'default-depot')
         $release = New-TestPackageRelease -Id 'vsCode-win-x64-stable' -Version '2.0.0' -Architecture 'x64' -Flavor 'win32-x64' -FileName 'VSCode-win32-x64-2.0.0.zip' -PackageFileSha256 $packageArchive.Sha256 -AcquisitionCandidates @(

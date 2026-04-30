@@ -424,15 +424,14 @@ function global:New-TestPackageRelease {
         }
         else {
             $packageFile = @{
-                fileName            = $FileName
-                format              = 'zip'
-                portable            = $true
-                autoUpdateSupported = $false
+                fileName = $FileName
+                format   = 'zip'
+                portable = $true
             }
             if (-not [string]::IsNullOrWhiteSpace($PackageFileSha256)) {
-                $packageFile.integrity = @{
+                $packageFile.contentHash = @{
                     algorithm = 'sha256'
-                    sha256    = $PackageFileSha256
+                    value     = $PackageFileSha256
                 }
             }
             $packageFile

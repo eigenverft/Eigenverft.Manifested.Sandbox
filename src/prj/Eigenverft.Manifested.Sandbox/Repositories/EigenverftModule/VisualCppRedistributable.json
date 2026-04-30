@@ -112,9 +112,8 @@
         "fileName": "vc_redist.x64.exe",
         "format": "exe",
         "portable": false,
-        "autoUpdateSupported": false,
-        "integrity": null,
-        "authenticode": {
+        "publisherSignature": {
+          "kind": "authenticode",
           "requireValid": true,
           "subjectContains": "Microsoft Corporation"
         }

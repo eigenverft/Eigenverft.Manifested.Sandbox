@@ -160,6 +160,48 @@ function Test-PackageValidationValueComparison {
     }
 }
 
+function New-PackageValidationFailedCheckRecord {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Kind,
+
+        [Parameter(Mandatory = $true)]
+        [psobject]$Check
+    )
+
+    $actual = switch -Exact ($Kind) {
+        'files' { "exists=$($Check.Exists)" }
+        'directories' { "exists=$($Check.Exists)" }
+        'commands' { "exitCode=$($Check.ExitCode); actual='$($Check.ActualValue)'" }
+        'metadataFiles' { "value='$($Check.Value)'" }
+        'signatures' { "signatureStatus='$($Check.SignatureStatus)'; signerSubject='$($Check.SignerSubject)'" }
+        'fileDetails' { "productName='$($Check.ProductName)'; fileDescription='$($Check.FileDescription)'; fileVersion='$($Check.FileVersion)'; productVersion='$($Check.ProductVersion)'" }
+        'registryChecks' { "actual='$($Check.ActualValue)'" }
+        default { $null }
+    }
+
+    $expected = switch -Exact ($Kind) {
+        'files' { 'file exists' }
+        'directories' { 'directory exists' }
+        'commands' { if ([string]::IsNullOrWhiteSpace([string]$Check.ExpectedValue)) { 'exitCode=0 and non-empty matching output' } else { "expected='$($Check.ExpectedValue)'" } }
+        'metadataFiles' { "expected='$($Check.ExpectedValue)'" }
+        'signatures' { "requireValid='$($Check.RequireValid)'; subjectContains='$($Check.ExpectedSubjectContains)'" }
+        'fileDetails' { "productName='$($Check.ExpectedProductName)'; fileDescription='$($Check.ExpectedFileDescription)'; fileVersion='$($Check.ExpectedFileVersion)'; productVersion='$($Check.ExpectedProductVersion)'" }
+        'registryChecks' { if ([string]::IsNullOrWhiteSpace([string]$Check.ExpectedValue)) { 'registry value exists' } else { "expected='$($Check.ExpectedValue)'" } }
+        default { $null }
+    }
+
+    return [pscustomobject]@{
+        Kind         = $Kind
+        Status       = $Check.Status
+        RelativePath = if ($Check.PSObject.Properties['RelativePath']) { $Check.RelativePath } else { $null }
+        Path         = if ($Check.PSObject.Properties['Path']) { $Check.Path } else { $null }
+        Actual       = $actual
+        Expected     = $expected
+    }
+}
+
 function Test-PackageInstalledPackage {
 <#
 .SYNOPSIS
@@ -356,16 +398,17 @@ Test-PackageInstalledPackage -PackageResult $result
         $status = 'Missing'
         $signatureStatus = $null
         $signerSubject = $null
+        $requiresValid = $true
+        if ($signatureCheck.PSObject.Properties['requireValid']) {
+            $requiresValid = [bool]$signatureCheck.requireValid
+        }
+        $expectedSubjectContains = if ($signatureCheck.PSObject.Properties['subjectContains']) { [string]$signatureCheck.subjectContains } else { $null }
 
         if (Test-Path -LiteralPath $path -PathType Leaf) {
             try {
                 $signature = Get-AuthenticodeSignature -FilePath $path
                 $signatureStatus = $signature.Status.ToString()
                 $signerSubject = if ($signature.SignerCertificate) { $signature.SignerCertificate.Subject } else { $null }
-                $requiresValid = $true
-                if ($signatureCheck.PSObject.Properties['requireValid']) {
-                    $requiresValid = [bool]$signatureCheck.requireValid
-                }
                 $status = 'Ready'
                 if ($requiresValid -and $signature.Status -ne [System.Management.Automation.SignatureStatus]::Valid) {
                     $status = 'Failed'
@@ -386,6 +429,8 @@ Test-PackageInstalledPackage -PackageResult $result
             Path             = $path
             SignatureStatus  = $signatureStatus
             SignerSubject    = $signerSubject
+            RequireValid     = $requiresValid
+            ExpectedSubjectContains = $expectedSubjectContains
             Status           = $status
         }) | Out-Null
     }
@@ -401,6 +446,10 @@ Test-PackageInstalledPackage -PackageResult $result
         $fileVersion = $null
         $productVersion = $null
         $status = 'Missing'
+        $expectedProductName = if ($detailCheck.PSObject.Properties['productName']) { [string]$detailCheck.productName } else { $null }
+        $expectedFileDescription = if ($detailCheck.PSObject.Properties['fileDescription']) { [string]$detailCheck.fileDescription } else { $null }
+        $expectedFileVersion = if ($detailCheck.PSObject.Properties['fileVersion']) { Resolve-PackageTemplateText -Text ([string]$detailCheck.fileVersion) -PackageConfig $PackageResult.PackageConfig -Package $package } else { $null }
+        $expectedProductVersion = if ($detailCheck.PSObject.Properties['productVersion']) { Resolve-PackageTemplateText -Text ([string]$detailCheck.productVersion) -PackageConfig $PackageResult.PackageConfig -Package $package } else { $null }
 
         if (Test-Path -LiteralPath $path -PathType Leaf) {
             try {
@@ -421,13 +470,13 @@ Test-PackageInstalledPackage -PackageResult $result
                     $status = 'Failed'
                 }
                 if ($status -eq 'Ready' -and $detailCheck.PSObject.Properties['fileVersion'] -and
-                    -not [string]::IsNullOrWhiteSpace([string]$detailCheck.fileVersion) -and
-                    -not [string]::Equals([string]$fileVersion, [string]$detailCheck.fileVersion, [System.StringComparison]::OrdinalIgnoreCase)) {
+                    -not [string]::IsNullOrWhiteSpace($expectedFileVersion) -and
+                    -not [string]::Equals([string]$fileVersion, $expectedFileVersion, [System.StringComparison]::OrdinalIgnoreCase)) {
                     $status = 'Failed'
                 }
                 if ($status -eq 'Ready' -and $detailCheck.PSObject.Properties['productVersion'] -and
-                    -not [string]::IsNullOrWhiteSpace([string]$detailCheck.productVersion) -and
-                    -not [string]::Equals([string]$productVersion, [string]$detailCheck.productVersion, [System.StringComparison]::OrdinalIgnoreCase)) {
+                    -not [string]::IsNullOrWhiteSpace($expectedProductVersion) -and
+                    -not [string]::Equals([string]$productVersion, $expectedProductVersion, [System.StringComparison]::OrdinalIgnoreCase)) {
                     $status = 'Failed'
                 }
             }
@@ -443,6 +492,10 @@ Test-PackageInstalledPackage -PackageResult $result
             FileDescription = $fileDescription
             FileVersion     = $fileVersion
             ProductVersion  = $productVersion
+            ExpectedProductName = $expectedProductName
+            ExpectedFileDescription = $expectedFileDescription
+            ExpectedFileVersion = $expectedFileVersion
+            ExpectedProductVersion = $expectedProductVersion
             Status          = $status
         }) | Out-Null
     }
@@ -498,6 +551,15 @@ Test-PackageInstalledPackage -PackageResult $result
 
     $allResults = @($fileResults.ToArray()) + @($directoryResults.ToArray()) + @($commandResults.ToArray()) + @($metadataResults.ToArray()) + @($signatureResults.ToArray()) + @($fileDetailResults.ToArray()) + @($registryResults.ToArray())
     $accepted = (@($allResults | Where-Object { $_.Status -ne 'Ready' }).Count -eq 0)
+    $failedChecks = @(
+        foreach ($item in @($fileResults.ToArray() | Where-Object { $_.Status -ne 'Ready' })) { New-PackageValidationFailedCheckRecord -Kind 'files' -Check $item }
+        foreach ($item in @($directoryResults.ToArray() | Where-Object { $_.Status -ne 'Ready' })) { New-PackageValidationFailedCheckRecord -Kind 'directories' -Check $item }
+        foreach ($item in @($commandResults.ToArray() | Where-Object { $_.Status -ne 'Ready' })) { New-PackageValidationFailedCheckRecord -Kind 'commands' -Check $item }
+        foreach ($item in @($metadataResults.ToArray() | Where-Object { $_.Status -ne 'Ready' })) { New-PackageValidationFailedCheckRecord -Kind 'metadataFiles' -Check $item }
+        foreach ($item in @($signatureResults.ToArray() | Where-Object { $_.Status -ne 'Ready' })) { New-PackageValidationFailedCheckRecord -Kind 'signatures' -Check $item }
+        foreach ($item in @($fileDetailResults.ToArray() | Where-Object { $_.Status -ne 'Ready' })) { New-PackageValidationFailedCheckRecord -Kind 'fileDetails' -Check $item }
+        foreach ($item in @($registryResults.ToArray() | Where-Object { $_.Status -ne 'Ready' })) { New-PackageValidationFailedCheckRecord -Kind 'registryChecks' -Check $item }
+    )
 
     $PackageResult.Validation = [pscustomobject]@{
         Status           = if ($accepted) { 'Ready' } else { 'Failed' }
@@ -511,10 +573,23 @@ Test-PackageInstalledPackage -PackageResult $result
         Signatures       = @($signatureResults.ToArray())
         FileDetails      = @($fileDetailResults.ToArray())
         Registry         = @($registryResults.ToArray())
+        FailedChecks     = @($failedChecks)
     }
 
     $failedCount = @($allResults | Where-Object { $_.Status -ne 'Ready' }).Count
     Write-PackageExecutionMessage -Message ("[STATE] Validation completed for '{0}' with accepted='{1}', failedChecks={2}." -f $installDirectory, $accepted, $failedCount)
+    foreach ($failedCheck in @($failedChecks)) {
+        $targetText = if (-not [string]::IsNullOrWhiteSpace([string]$failedCheck.RelativePath)) {
+            [string]$failedCheck.RelativePath
+        }
+        elseif (-not [string]::IsNullOrWhiteSpace([string]$failedCheck.Path)) {
+            [string]$failedCheck.Path
+        }
+        else {
+            '<none>'
+        }
+        Write-PackageExecutionMessage -Level 'WRN' -Message ('[VALIDATION] {0} failed for ''{1}'' with status=''{2}'', actual="{3}", expected="{4}".' -f $failedCheck.Kind, $targetText, $failedCheck.Status, $failedCheck.Actual, $failedCheck.Expected)
+    }
 
     return $PackageResult
 }

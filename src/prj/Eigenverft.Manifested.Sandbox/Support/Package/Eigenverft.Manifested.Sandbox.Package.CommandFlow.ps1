@@ -56,6 +56,7 @@ function Get-PackageCommandFailureReason {
     )
 
     switch -Exact ($CurrentStep) {
+        'InitializeLocalEnvironment' { return 'LocalEnvironmentInitializationFailed' }
         'ResolvePackage' { return 'PackageSelectionFailed' }
         'ResolveDependencies' { return 'PackageDependencyFailed' }
         'ResolvePaths' { return 'PackagePathResolutionFailed' }
@@ -144,10 +145,24 @@ function Invoke-PackageDefinitionCommand {
 
     try {
         Write-PackageExecutionMessage -Message ("[START] {0}" -f $CommandName)
+        $result.CurrentStep = 'InitializeLocalEnvironment'
+        Write-PackageExecutionMessage -Message '[STEP] Initializing local package environment.'
+        $result.LocalEnvironment = Initialize-PackageLocalEnvironment -PackageConfig $packageConfig
+        if ($result.LocalEnvironment.InitializedNow) {
+            Write-PackageExecutionMessage -Message ("[STATE] Local package environment initialized: created={0}, existing={1}, skippedSources={2}." -f @($result.LocalEnvironment.CreatedDirectories).Count, @($result.LocalEnvironment.ExistingDirectories).Count, @($result.LocalEnvironment.SkippedSources).Count)
+        }
+        else {
+            Write-PackageExecutionMessage -Message '[STATE] Local package environment already initialized.'
+        }
+
         foreach ($step in $steps) {
             $result.CurrentStep = $step.Name
             Write-PackageExecutionMessage -Message $step.Message
             $result = & $step.Action $result
+            if ($step.Name -eq 'ValidateInstalledPackage' -and (-not $result.Validation -or -not $result.Validation.Accepted)) {
+                $failedCount = if ($result.Validation -and $result.Validation.PSObject.Properties['FailedChecks']) { @($result.Validation.FailedChecks).Count } else { 0 }
+                throw ("Package validation failed for '{0}' with {1} failed check(s)." -f $result.PackageId, $failedCount)
+            }
         }
         Write-PackageExecutionMessage -Message (Get-PackageOutcomeSummary -PackageResult $result)
         Write-PackageExecutionMessage -Message ("[OK] Package completed with InstallOrigin='{0}' and InstallStatus='{1}'." -f $result.InstallOrigin, $result.Install.Status)

@@ -101,10 +101,9 @@
         "fileName": "gh_2.91.0_windows_amd64.zip",
         "format": "zip",
         "portable": true,
-        "autoUpdateSupported": false,
-        "integrity": {
+        "contentHash": {
           "algorithm": "sha256",
-          "sha256": "ced3e6f4bb5a9865056b594b7ad0cf42137dc92c494346f1ca705b5dbf14c88e"
+          "value": "ced3e6f4bb5a9865056b594b7ad0cf42137dc92c494346f1ca705b5dbf14c88e"
         }
       },
       "acquisitionCandidates": [
@@ -143,10 +142,9 @@
         "fileName": "gh_2.91.0_windows_arm64.zip",
         "format": "zip",
         "portable": true,
-        "autoUpdateSupported": false,
-        "integrity": {
+        "contentHash": {
           "algorithm": "sha256",
-          "sha256": "ae0333d2f9b13fc28f785ca7379514f9a1cea382cd4726abb6e6f4d2a874dd15"
+          "value": "ae0333d2f9b13fc28f785ca7379514f9a1cea382cd4726abb6e6f4d2a874dd15"
         }
       },
       "acquisitionCandidates": [
