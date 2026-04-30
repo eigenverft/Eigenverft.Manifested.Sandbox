@@ -107,11 +107,11 @@ function Get-PackageStateConfig {
     $globalDocumentInfo = Read-PackageJsonDocument -Path (Get-PackageGlobalConfigPath)
     Assert-PackageGlobalConfigSchema -GlobalDocumentInfo $globalDocumentInfo
 
-    $depotInventoryInfo = Get-PackageDepotInventoryInfo
-    $sourceInventoryInfo = Get-PackageSourceInventoryInfo
     $packageGlobalConfig = $globalDocumentInfo.Document.package
+    $applicationRootDirectory = Resolve-PackageApplicationRootDirectory -GlobalConfiguration $packageGlobalConfig
+    $depotInventoryInfo = Get-PackageDepotInventoryInfo
+    $sourceInventoryInfo = Get-PackageSourceInventoryInfo -ApplicationRootDirectory $applicationRootDirectory
     $effectiveAcquisitionEnvironment = Resolve-PackageEffectiveAcquisitionEnvironment -GlobalConfiguration $packageGlobalConfig -SourceInventoryInfo $sourceInventoryInfo -DepotInventoryInfo $depotInventoryInfo
-    $applicationRootDirectory = $effectiveAcquisitionEnvironment.ApplicationRootDirectory
 
     $preferredTargetInstallDirectory = if ($packageGlobalConfig.PSObject.Properties['preferredTargetInstallDirectory'] -and
         -not [string]::IsNullOrWhiteSpace([string]$packageGlobalConfig.preferredTargetInstallDirectory)) {

@@ -9,7 +9,7 @@ The primary intent is fast, repeatable setup inside Windows Sandbox. The same mo
 🚀 **Key Features:**
 - Ready-to-download Windows Sandbox profile in the repo for repeatable bring-up
 - Package-backed provisioning for `python`, `pwsh`, `git`, `gh`, `code`, `notepad++`, `node`, `npm`, `opencode`, `gemini`, `qwen`, `codex`, Qwen GGUF model resources, llama.cpp, and VC++ prerequisites
-- Package state tracking through local package indexes under `%LOCALAPPDATA%\Programs\EVF.Sandbox`
+- Package state tracking through local package indexes under `%LOCALAPPDATA%\Programs\Evf.Sandbox`
 - Package/depot layout that can reuse local package files and later grow toward shared package repositories
 - Managed npm ownership under the sandbox Node runtime, including proxy-aware npm configuration when Windows resolves the npm registry through a proxy
 - Proxy-aware startup and download handling for managed or corporate Windows environments

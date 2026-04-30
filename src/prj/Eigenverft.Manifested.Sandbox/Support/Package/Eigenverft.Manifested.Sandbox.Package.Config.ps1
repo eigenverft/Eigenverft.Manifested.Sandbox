@@ -718,12 +718,19 @@ well-known local inventory path.
 Get-PackageSourceInventoryPath
 #>
     [CmdletBinding()]
-    param()
+    param(
+        [AllowNull()]
+        [string]$ApplicationRootDirectory
+    )
 
     $environmentVariableName = Get-PackageSourceInventoryPathEnvironmentVariableName
     $configuredPath = [Environment]::GetEnvironmentVariable($environmentVariableName)
     if (-not [string]::IsNullOrWhiteSpace($configuredPath)) {
         return (Resolve-PackagePathValue -PathValue $configuredPath)
+    }
+
+    if (-not [string]::IsNullOrWhiteSpace($ApplicationRootDirectory)) {
+        return (Resolve-PackageConfiguredPath -PathValue 'Configuration\External\SourceInventory.json' -ApplicationRootDirectory $ApplicationRootDirectory)
     }
 
     return (Get-PackageDefaultSourceInventoryPath)
@@ -932,9 +939,12 @@ schema, and otherwise returns a null document marker.
 Get-PackageSourceInventoryInfo
 #>
     [CmdletBinding()]
-    param()
+    param(
+        [AllowNull()]
+        [string]$ApplicationRootDirectory
+    )
 
-    $inventoryPath = Get-PackageSourceInventoryPath
+    $inventoryPath = Get-PackageSourceInventoryPath -ApplicationRootDirectory $ApplicationRootDirectory
     if (-not (Test-Path -LiteralPath $inventoryPath -PathType Leaf)) {
         return [pscustomobject]@{
             Path     = $inventoryPath
@@ -1926,17 +1936,17 @@ Get-PackageConfig -DefinitionId VSCodeRuntime
     $globalDocumentInfo = Read-PackageJsonDocument -Path (Get-PackageGlobalConfigPath)
     Assert-PackageGlobalConfigSchema -GlobalDocumentInfo $globalDocumentInfo
 
-    $depotInventoryInfo = Get-PackageDepotInventoryInfo
-    $sourceInventoryInfo = Get-PackageSourceInventoryInfo
-
     $definitionDocumentInfo = Read-PackageJsonDocument -Path (Get-PackageDefinitionPath -DefinitionId $DefinitionId)
     Assert-PackageDefinitionSchema -DefinitionDocumentInfo $definitionDocumentInfo -DefinitionId $DefinitionId
 
     $packageGlobalConfig = $globalDocumentInfo.Document.package
+    $applicationRootDirectory = Resolve-PackageApplicationRootDirectory -GlobalConfiguration $packageGlobalConfig
+    $depotInventoryInfo = Get-PackageDepotInventoryInfo
+    $sourceInventoryInfo = Get-PackageSourceInventoryInfo -ApplicationRootDirectory $applicationRootDirectory
+
     $runtimeContext = Get-PackageRuntimeContext
     $definition = $definitionDocumentInfo.Document
     $effectiveAcquisitionEnvironment = Resolve-PackageEffectiveAcquisitionEnvironment -GlobalConfiguration $packageGlobalConfig -SourceInventoryInfo $sourceInventoryInfo -DepotInventoryInfo $depotInventoryInfo
-    $applicationRootDirectory = $effectiveAcquisitionEnvironment.ApplicationRootDirectory
 
     $selectionReleaseTrack = 'none'
     if ($packageGlobalConfig.selectionDefaults.PSObject.Properties['releaseTrack'] -and

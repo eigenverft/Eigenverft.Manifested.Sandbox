@@ -34,6 +34,31 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
         $globalInfo.Document.package.acquisitionEnvironment.PSObject.Properties['environmentSources'] | Should -BeNullOrEmpty
     }
 
+    It 'resolves the bootstrap local root from shipped Config.json' {
+        $rootPath = Join-Path $TestDrive 'bootstrap-root-config'
+        $applicationRootPath = Join-Path $rootPath 'AppRoot'
+        $shippedConfigPath = Join-Path $rootPath 'Configuration\Internal\Config.json'
+        Write-TestJsonDocument -Path $shippedConfigPath -Document (New-TestPackageGlobalDocument -ApplicationRootDirectory $applicationRootPath)
+        Mock Get-PackageShippedGlobalConfigPath { $shippedConfigPath }
+
+        Get-PackageLocalRoot | Should -Be ([System.IO.Path]::GetFullPath($applicationRootPath))
+    }
+
+    It 'fails clearly when shipped Config.json cannot provide an absolute bootstrap root' {
+        $missingRootConfigPath = Join-Path $TestDrive 'missing-root\Config.json'
+        Write-TestJsonDocument -Path $missingRootConfigPath -Document @{ package = @{} }
+        $mockShippedConfigPath = $missingRootConfigPath
+        Mock Get-PackageShippedGlobalConfigPath { $mockShippedConfigPath }
+
+        { Get-PackageLocalRoot } | Should -Throw '*must define package.applicationRootDirectory*'
+
+        $relativeRootConfigPath = Join-Path $TestDrive 'relative-root\Config.json'
+        Write-TestJsonDocument -Path $relativeRootConfigPath -Document (New-TestPackageGlobalDocument -ApplicationRootDirectory 'relative-root')
+        $mockShippedConfigPath = $relativeRootConfigPath
+
+        { Get-PackageLocalRoot } | Should -Throw '*does not resolve to an absolute path*'
+    }
+
     It 'creates the local Config.json copy from shipped configuration when missing' {
         $localGlobalPath = Get-PackageLocalGlobalConfigPath
         if (Test-Path -LiteralPath $localGlobalPath -PathType Leaf) {
@@ -872,6 +897,13 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
     It 'uses the default source inventory path when the env var is unset' {
         [Environment]::SetEnvironmentVariable($script:SourceInventoryEnvVarName, $null, 'Process')
         (Get-PackageSourceInventoryPath) | Should -Be (Get-PackageDefaultSourceInventoryPath)
+    }
+
+    It 'resolves the default source inventory path under applicationRootDirectory when provided' {
+        [Environment]::SetEnvironmentVariable($script:SourceInventoryEnvVarName, $null, 'Process')
+        $applicationRootPath = Join-Path $TestDrive 'custom-app-root'
+        Get-PackageSourceInventoryPath -ApplicationRootDirectory $applicationRootPath |
+            Should -Be ([System.IO.Path]::GetFullPath((Join-Path (Join-Path $applicationRootPath 'Configuration\External') 'SourceInventory.json')))
     }
 
     It 'loads source inventory from the env-var path and applies the inventory global overlay when no site code is set' {

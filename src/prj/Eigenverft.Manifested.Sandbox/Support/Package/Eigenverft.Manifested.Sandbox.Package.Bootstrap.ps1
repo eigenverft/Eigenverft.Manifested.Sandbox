@@ -104,8 +104,9 @@ function Get-PackageLocalRoot {
 Returns the Package local application-data root.
 
 .DESCRIPTION
-Builds the local application-data directory used for Package state,
-configuration, repositories, workspaces, depots, and installs.
+Resolves the local Package root from the shipped Config.json. This bootstrap
+step intentionally does not read the local Config.json because the local root
+is needed before the local config path can be known.
 
 .EXAMPLE
 Get-PackageLocalRoot
@@ -113,15 +114,32 @@ Get-PackageLocalRoot
     [CmdletBinding()]
     param()
 
-    $localApplicationData = $env:LOCALAPPDATA
-    if ([string]::IsNullOrWhiteSpace($localApplicationData)) {
-        $localApplicationData = [Environment]::GetFolderPath('LocalApplicationData')
-    }
-    if ([string]::IsNullOrWhiteSpace($localApplicationData)) {
-        throw 'Could not resolve the LocalApplicationData directory for Package.'
+    $shippedConfigPath = Get-PackageShippedGlobalConfigPath
+    if (-not (Test-Path -LiteralPath $shippedConfigPath -PathType Leaf)) {
+        throw "Package shipped config '$shippedConfigPath' does not exist. Cannot resolve the local Package root."
     }
 
-    return [System.IO.Path]::GetFullPath((Join-Path (Join-Path $localApplicationData 'Programs') 'EVF.Sandbox'))
+    $rawContent = Get-Content -LiteralPath $shippedConfigPath -Raw -ErrorAction Stop
+    try {
+        $document = $rawContent | ConvertFrom-Json -ErrorAction Stop
+    }
+    catch {
+        throw "Package shipped config '$shippedConfigPath' could not be parsed. Cannot resolve the local Package root. $($_.Exception.Message)"
+    }
+
+    if (-not $document.PSObject.Properties['package'] -or
+        -not $document.package.PSObject.Properties['applicationRootDirectory'] -or
+        [string]::IsNullOrWhiteSpace([string]$document.package.applicationRootDirectory)) {
+        throw "Package shipped config '$shippedConfigPath' must define package.applicationRootDirectory to resolve the local Package root."
+    }
+
+    $applicationRootDirectory = [string]$document.package.applicationRootDirectory
+    try {
+        return (Resolve-ConfiguredPath -PathValue $applicationRootDirectory -BaseDirectory $null -Tokens @{})
+    }
+    catch {
+        throw "Package shipped config '$shippedConfigPath' defines package.applicationRootDirectory '$applicationRootDirectory', but it does not resolve to an absolute path. $($_.Exception.Message)"
+    }
 }
 
 function Get-PackageLocalGlobalConfigPath {
