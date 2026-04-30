@@ -2,14 +2,14 @@
 
 [![PowerShell Gallery Version](https://img.shields.io/powershellgallery/v/Eigenverft.Manifested.Sandbox?label=PSGallery&logo=powershell)](https://www.powershellgallery.com/packages/Eigenverft.Manifested.Sandbox) [![PowerShell Gallery Downloads](https://img.shields.io/powershellgallery/dt/Eigenverft.Manifested.Sandbox?label=Downloads&logo=powershell)](https://www.powershellgallery.com/packages/Eigenverft.Manifested.Sandbox) [![PowerShell Support](https://img.shields.io/badge/PowerShell-5.1%2B%20Desktop%2FCore-5391FE?logo=powershell&logoColor=white)](src/prj/Eigenverft.Manifested.Sandbox/Eigenverft.Manifested.Sandbox.psd1) [![Build Status](https://img.shields.io/github/actions/workflow/status/eigenverft/Eigenverft.Manifested.Sandbox/cicd.yml?branch=main&label=build)](https://github.com/eigenverft/Eigenverft.Manifested.Sandbox/actions/workflows/cicd.yml) [![License](https://img.shields.io/github/license/eigenverft/Eigenverft.Manifested.Sandbox?logo=mit)](LICENSE)
 
-Windows-focused PowerShell module and repository-shipped Windows Sandbox profile for quickly turning a fresh Windows Sandbox session into a usable development environment. The primary user entrypoint is the downloadable `.wsb` file in this repo, backed by a PowerShell module that can provision managed Python, PowerShell 7, Node.js, OpenCode CLI, Gemini CLI, Qwen CLI, Codex CLI, GitHub CLI, MinGit, VS Code, and Microsoft Visual C++ runtime prerequisites when you want them.
+Windows-focused PowerShell module and repository-shipped Windows Sandbox profile for quickly turning a fresh Windows Sandbox session into a usable development environment. The primary user entrypoint is the downloadable `.wsb` file in this repo, backed by a PowerShell module that can provision managed Python, PowerShell 7, Node.js, OpenCode CLI, Gemini CLI, Qwen CLI, Codex CLI, GitHub CLI, MinGit, VS Code, Notepad++, and Microsoft Visual C++ runtime prerequisites when you want them.
 
 The primary intent is fast, repeatable setup inside Windows Sandbox. The same module can also run on a normal Windows machine, but that is a secondary use case rather than the main focus of this repo.
 
 🚀 **Key Features:**
 - Ready-to-download Windows Sandbox profile in the repo for repeatable bring-up
-- Package-backed provisioning for `python`, `pwsh`, `git`, `gh`, `code`, `node`, `npm`, `opencode`, `gemini`, `qwen`, `codex`, Qwen GGUF model resources, llama.cpp, and VC++ prerequisites
-- Package state tracking through local package indexes under `%LOCALAPPDATA%\Eigenverft.Manifested.Sandbox`
+- Package-backed provisioning for `python`, `pwsh`, `git`, `gh`, `code`, `notepad++`, `node`, `npm`, `opencode`, `gemini`, `qwen`, `codex`, Qwen GGUF model resources, llama.cpp, and VC++ prerequisites
+- Package state tracking through local package indexes under `%LOCALAPPDATA%\Programs\EVF.Sandbox`
 - Package/depot layout that can reuse local package files and later grow toward shared package repositories
 - Managed npm ownership under the sandbox Node runtime, including proxy-aware npm configuration when Windows resolves the npm registry through a proxy
 - Proxy-aware startup and download handling for managed or corporate Windows environments
@@ -117,10 +117,12 @@ The module currently exports these public commands:
 - `Invoke-GitRuntime`
 - `Invoke-LlamaCppRuntime`
 - `Invoke-NodeRuntime`
+- `Invoke-NotepadPlusPlus`
 - `Invoke-OpenCodeCli`
 - `Invoke-PowerShell7`
 - `Invoke-PythonRuntime`
 - `Invoke-Qwen35-2B-Q8-0-Model`
+- `Invoke-Qwen35-9B-Q6-K-Model`
 - `Invoke-QwenCli`
 - `Invoke-VisualCppRedistributable`
 - `Invoke-VSCodeRuntime`
@@ -144,6 +146,7 @@ Invoke-PowerShell7
 Invoke-GitRuntime
 Invoke-GitHubCli
 Invoke-VSCodeRuntime
+Invoke-NotepadPlusPlus
 Invoke-NodeRuntime
 Invoke-OpenCodeCli
 Invoke-GeminiCli
@@ -151,16 +154,17 @@ Invoke-QwenCli
 Invoke-CodexCli
 Invoke-LlamaCppRuntime
 Invoke-Qwen35-2B-Q8-0-Model
+Invoke-Qwen35-9B-Q6-K-Model
 Get-PackageState
 ```
 
 - `Get-SandboxVersion` is the quick way to show user-facing module info for the current session, including the resolved module version and the full exported command list in alphabetical order.
 - `Get-PackageState` reads the local package state and package-file indexes, reports configured directories, and shows whether copied package definition JSON files and install directories still exist.
-- `Invoke-PythonRuntime`, `Invoke-PowerShell7`, `Invoke-GitRuntime`, `Invoke-GitHubCli`, `Invoke-VSCodeRuntime`, and `Invoke-NodeRuntime` ensure pinned package definitions are ready from the configured depot/download flow.
+- `Invoke-PythonRuntime`, `Invoke-PowerShell7`, `Invoke-GitRuntime`, `Invoke-GitHubCli`, `Invoke-VSCodeRuntime`, `Invoke-NotepadPlusPlus`, and `Invoke-NodeRuntime` ensure pinned package definitions are ready from the configured depot/download flow.
 - `Invoke-OpenCodeCli`, `Invoke-GeminiCli`, `Invoke-QwenCli`, and `Invoke-CodexCli` install pinned npm-backed CLI packages through the package npm backend. They depend on the packaged Node runtime, and Codex also ensures the Visual C++ Redistributable prerequisite.
 - `Invoke-VisualCppRedistributable` is different because the VC runtime is a machine prerequisite rather than a portable package directory. It can report already-satisfied state from registry validation and only runs the Microsoft installer when needed.
 - `Invoke-LlamaCppRuntime` installs the pinned llama.cpp runtime package.
-- `Invoke-Qwen35-2B-Q8-0-Model` places the pinned Qwen 3.5 2B Q8_0 GGUF model resource for llama.cpp-compatible runtimes.
+- `Invoke-Qwen35-2B-Q8-0-Model` and `Invoke-Qwen35-9B-Q6-K-Model` place pinned Qwen 3.5 GGUF model resources for llama.cpp-compatible runtimes.
 
 ## 📦 Direct Module Usage
 
