@@ -615,6 +615,7 @@ Test-PackagePackageFileAcquisitionRequired -Package $package
     switch -Exact ($installKind) {
         'expandArchive' { return $true }
         'placePackageFile' { return $true }
+        'nsisInstaller' { return $true }
         'runInstaller' {
             return (-not $Package.install.PSObject.Properties['commandPath'] -or [string]::IsNullOrWhiteSpace([string]$Package.install.commandPath))
         }

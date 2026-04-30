@@ -86,6 +86,7 @@ FunctionsToExport = @(
     'Invoke-LlamaCppRuntime',
     'Invoke-GitHubCli',
     'Invoke-GitRuntime',
+    'Invoke-NotepadPlusPlus',
     'Invoke-VSCodeRuntime',
     'Invoke-WebRequestEx',
     'Initialize-ProxyAccessProfile'
@@ -151,6 +152,7 @@ FileList = @(
     'Repositories\EigenverftModule\QwenCli.json',
     'Repositories\EigenverftModule\GitHubCli.json',
     'Repositories\EigenverftModule\GitRuntime.json',
+    'Repositories\EigenverftModule\NotepadPlusPlus.json',
     'Repositories\EigenverftModule\VSCodeRuntime.json',
     'Commands\Eigenverft.Manifested.Sandbox.Cmd.Qwen35_2B_Q8_0_Model.ps1',
     'Commands\Eigenverft.Manifested.Sandbox.Cmd.Qwen35_9B_Q6_K_Model.ps1',
@@ -165,6 +167,7 @@ FileList = @(
     'Commands\Eigenverft.Manifested.Sandbox.Cmd.QwenCli.ps1',
     'Commands\Eigenverft.Manifested.Sandbox.Cmd.GitHubCli.ps1',
     'Commands\Eigenverft.Manifested.Sandbox.Cmd.GitRuntime.ps1',
+    'Commands\Eigenverft.Manifested.Sandbox.Cmd.NotepadPlusPlus.ps1',
     'Commands\Eigenverft.Manifested.Sandbox.Cmd.VSCodeRuntime.ps1',
     'Eigenverft.Manifested.Sandbox.psm1',
     'Eigenverft.Manifested.Sandbox.psd1',

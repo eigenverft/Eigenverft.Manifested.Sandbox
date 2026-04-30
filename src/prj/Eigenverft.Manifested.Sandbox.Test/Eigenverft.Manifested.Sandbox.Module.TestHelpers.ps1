@@ -2,6 +2,40 @@
     Package-focused Pester coverage for the module.
 #>
 
+function global:Invoke-TestPackageDescribe {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Name,
+
+        [Parameter(Mandatory = $true)]
+        [scriptblock]$Body
+    )
+
+    Describe $Name {
+        BeforeAll {
+            . "$PSScriptRoot\Eigenverft.Manifested.Sandbox.TestImports.ps1"
+            $script:ModuleManifestPath = Join-Path (Split-Path -Parent $PSScriptRoot) 'Eigenverft.Manifested.Sandbox\Eigenverft.Manifested.Sandbox.psd1'
+            $script:SourceInventoryEnvVarName = Get-PackageSourceInventoryPathEnvironmentVariableName
+            $script:SiteCodeEnvVarName = Get-PackageSiteCodeEnvironmentVariableName
+        }
+
+        BeforeEach {
+            $script:OriginalSourceInventoryPath = [Environment]::GetEnvironmentVariable($script:SourceInventoryEnvVarName, 'Process')
+            $script:OriginalSiteCode = [Environment]::GetEnvironmentVariable($script:SiteCodeEnvVarName, 'Process')
+            $script:OriginalLocalAppData = [Environment]::GetEnvironmentVariable('LOCALAPPDATA', 'Process')
+            [Environment]::SetEnvironmentVariable('LOCALAPPDATA', (Join-Path $TestDrive 'LocalAppData'), 'Process')
+        }
+
+        AfterEach {
+            [Environment]::SetEnvironmentVariable($script:SourceInventoryEnvVarName, $script:OriginalSourceInventoryPath, 'Process')
+            [Environment]::SetEnvironmentVariable($script:SiteCodeEnvVarName, $script:OriginalSiteCode, 'Process')
+            [Environment]::SetEnvironmentVariable('LOCALAPPDATA', $script:OriginalLocalAppData, 'Process')
+        }
+
+        & $Body
+    }
+}
+
 function global:ConvertTo-TestPsObject {
     param(
         [Parameter(Mandatory = $true)]
@@ -131,8 +165,8 @@ function global:New-TestPackageGlobalDocument {
 
     $acquisitionEnvironment = @{
         stores = @{
-            packageFileStagingDirectory = if ($PSBoundParameters.ContainsKey('PackageFileStagingDirectory')) { $PackageFileStagingDirectory } else { '{applicationRootDirectory}/FileStaging' }
-            packageInstallStageDirectory = if ($PSBoundParameters.ContainsKey('PackageInstallStageDirectory')) { $PackageInstallStageDirectory } else { '{applicationRootDirectory}/InstallStaging' }
+            packageFileStagingDirectory = if ($PSBoundParameters.ContainsKey('PackageFileStagingDirectory')) { $PackageFileStagingDirectory } else { '{applicationRootDirectory}/FileStage' }
+            packageInstallStageDirectory = if ($PSBoundParameters.ContainsKey('PackageInstallStageDirectory')) { $PackageInstallStageDirectory } else { '{applicationRootDirectory}/InstStage' }
         }
         defaults = @{
             allowFallback = $AllowFallback
@@ -147,7 +181,7 @@ function global:New-TestPackageGlobalDocument {
 
     return @{
         package = @{
-            applicationRootDirectory = if ($PSBoundParameters.ContainsKey('ApplicationRootDirectory')) { $ApplicationRootDirectory } else { '%LOCALAPPDATA%/Eigenverft.Manifested.Sandbox' }
+            applicationRootDirectory = if ($PSBoundParameters.ContainsKey('ApplicationRootDirectory')) { $ApplicationRootDirectory } else { '%LOCALAPPDATA%/Programs/EVF.Sandbox' }
             preferredTargetInstallDirectory = if ($PSBoundParameters.ContainsKey('PreferredTargetInstallDirectory')) { $PreferredTargetInstallDirectory } else { '{applicationRootDirectory}/Installed' }
             repositorySources = @{
                 EigenverftModule = @{
@@ -210,7 +244,7 @@ function global:New-TestDepotInventoryDocument {
         kind         = 'filesystem'
         enabled      = $true
         searchOrder  = 300
-        basePath     = if ($PSBoundParameters.ContainsKey('DefaultPackageDepotDirectory')) { $DefaultPackageDepotDirectory } else { '%LOCALAPPDATA%/Eigenverft.Manifested.Sandbox/DefaultPackageDepot' }
+        basePath     = if ($PSBoundParameters.ContainsKey('DefaultPackageDepotDirectory')) { $DefaultPackageDepotDirectory } else { '{applicationRootDirectory}/DefaultPackageDepot' }
     } -Writable $true -MirrorTarget $true -EnsureExists $true
     foreach ($key in @($EnvironmentSources.Keys)) {
         $sources[$key] = if ([string]::Equals([string]$EnvironmentSources[$key].kind, 'filesystem', [System.StringComparison]::OrdinalIgnoreCase)) {

@@ -194,7 +194,7 @@ Get-PackageDefaultPackageFileStagingDirectory
     [CmdletBinding()]
     param()
 
-    return [System.IO.Path]::GetFullPath((Join-Path (Get-PackageDefaultApplicationRootDirectory) 'FileStaging'))
+    return [System.IO.Path]::GetFullPath((Join-Path (Get-PackageDefaultApplicationRootDirectory) 'FileStage'))
 }
 
 function Get-PackageDefaultPackageInstallStageDirectory {
@@ -212,7 +212,7 @@ Get-PackageDefaultPackageInstallStageDirectory
     [CmdletBinding()]
     param()
 
-    return [System.IO.Path]::GetFullPath((Join-Path (Get-PackageDefaultApplicationRootDirectory) 'InstallStaging'))
+    return [System.IO.Path]::GetFullPath((Join-Path (Get-PackageDefaultApplicationRootDirectory) 'InstStage'))
 }
 
 function Get-PackageDefaultPreferredTargetInstallDirectory {
@@ -1080,7 +1080,10 @@ function Resolve-PackageEnvironmentSources {
         [psobject]$EnvironmentSources,
 
         [AllowNull()]
-        [string[]]$ActiveSiteCodes = @()
+        [string[]]$ActiveSiteCodes = @(),
+
+        [AllowNull()]
+        [string]$ApplicationRootDirectory
     )
 
     $resolvedSources = [ordered]@{}
@@ -1140,7 +1143,12 @@ function Resolve-PackageEnvironmentSources {
                 $resolvedSource.baseUri = [string]$sourceValue.baseUri
             }
             if ($sourceValue.PSObject.Properties['basePath'] -and -not [string]::IsNullOrWhiteSpace([string]$sourceValue.basePath)) {
-                $resolvedSource.basePath = Resolve-PackagePathValue -PathValue ([string]$sourceValue.basePath)
+                $resolvedSource.basePath = if (-not [string]::IsNullOrWhiteSpace($ApplicationRootDirectory)) {
+                    Resolve-PackageConfiguredPath -PathValue ([string]$sourceValue.basePath) -ApplicationRootDirectory $ApplicationRootDirectory
+                }
+                else {
+                    Resolve-PackagePathValue -PathValue ([string]$sourceValue.basePath)
+                }
             }
             if ($sourceSiteCodes.Count -gt 0) {
                 $resolvedSource.siteCodes = @($sourceSiteCodes)
@@ -1229,7 +1237,7 @@ Resolve-PackageEffectiveAcquisitionEnvironment -GlobalConfiguration $global -Sou
         Resolve-PackageConfiguredPath -PathValue ([string]$acquisitionEnvironment.stores.packageFileStagingDirectory) -ApplicationRootDirectory $applicationRootDirectory
     }
     else {
-        Resolve-PackageConfiguredPath -PathValue 'FileStaging' -ApplicationRootDirectory $applicationRootDirectory
+        Resolve-PackageConfiguredPath -PathValue 'FileStage' -ApplicationRootDirectory $applicationRootDirectory
     }
 
     $packageInstallStageDirectory = if ($acquisitionEnvironment.stores.PSObject.Properties['packageInstallStageDirectory'] -and
@@ -1237,7 +1245,7 @@ Resolve-PackageEffectiveAcquisitionEnvironment -GlobalConfiguration $global -Sou
         Resolve-PackageConfiguredPath -PathValue ([string]$acquisitionEnvironment.stores.packageInstallStageDirectory) -ApplicationRootDirectory $applicationRootDirectory
     }
     else {
-        Resolve-PackageConfiguredPath -PathValue 'InstallStaging' -ApplicationRootDirectory $applicationRootDirectory
+        Resolve-PackageConfiguredPath -PathValue 'InstStage' -ApplicationRootDirectory $applicationRootDirectory
     }
 
     $packageFileIndexFilePath = if ($acquisitionEnvironment.tracking.PSObject.Properties['packageFileIndexFilePath'] -and
@@ -1258,7 +1266,7 @@ Resolve-PackageEffectiveAcquisitionEnvironment -GlobalConfiguration $global -Sou
         $configuredEnvironmentSources = $acquisitionEnvironment.environmentSources
     }
 
-    $environmentSources = Resolve-PackageEnvironmentSources -EnvironmentSources $configuredEnvironmentSources -ActiveSiteCodes $activeSiteCodes
+    $environmentSources = Resolve-PackageEnvironmentSources -EnvironmentSources $configuredEnvironmentSources -ActiveSiteCodes $activeSiteCodes -ApplicationRootDirectory $applicationRootDirectory
     $defaultPackageDepotDirectory = $null
     if ($environmentSources -and $environmentSources.PSObject.Properties['defaultPackageDepot']) {
         $defaultPackageDepot = $environmentSources.defaultPackageDepot
@@ -1537,7 +1545,7 @@ Assert-PackageDefinitionSchema -DefinitionDocumentInfo $definitionInfo -Definiti
             throw "Package release '$($release.id)' in '$($definition.id)' is missing install.kind."
         }
 
-        if ($installKind -notin @('expandArchive', 'placePackageFile', 'runInstaller', 'npmGlobalPackage', 'reuseExisting')) {
+        if ($installKind -notin @('expandArchive', 'placePackageFile', 'runInstaller', 'nsisInstaller', 'npmGlobalPackage', 'reuseExisting')) {
             throw "Package release '$($release.id)' in '$($definition.id)' uses unsupported install.kind '$installKind'."
         }
 
@@ -1565,6 +1573,15 @@ Assert-PackageDefinitionSchema -DefinitionDocumentInfo $definitionInfo -Definiti
             }
             if (-not $effectiveRelease.install.PSObject.Properties['installerCommand'] -or [string]::IsNullOrWhiteSpace([string]$effectiveRelease.install.installerCommand)) {
                 throw "Package release '$($release.id)' in '$($definition.id)' uses install.kind 'npmGlobalPackage' without install.installerCommand."
+            }
+        }
+
+        if ([string]::Equals($installKind, 'nsisInstaller', [System.StringComparison]::OrdinalIgnoreCase)) {
+            if ($effectiveRelease.install.PSObject.Properties['targetDirectoryArgument'] -and $null -ne $effectiveRelease.install.targetDirectoryArgument) {
+                $targetDirectoryArgument = $effectiveRelease.install.targetDirectoryArgument
+                if ($targetDirectoryArgument.PSObject.Properties['prefix'] -and [string]::IsNullOrWhiteSpace([string]$targetDirectoryArgument.prefix)) {
+                    throw "Package release '$($release.id)' in '$($definition.id)' defines install.targetDirectoryArgument.prefix without a value."
+                }
             }
         }
 
@@ -1622,6 +1639,10 @@ Assert-PackageDefinitionSchema -DefinitionDocumentInfo $definitionInfo -Definiti
                     $requiresPackageFile = $true
                     $requiresAcquisitionCandidates = $true
                 }
+            }
+            'nsisInstaller' {
+                $requiresPackageFile = $true
+                $requiresAcquisitionCandidates = $true
             }
         }
 
@@ -1758,6 +1779,45 @@ Assert-PackageDefinitionSchema -DefinitionDocumentInfo $definitionInfo -Definiti
             }
             if (-not $existingInstallDiscovery.PSObject.Properties['installRootRules']) {
                 throw "Package release '$($release.id)' in '$($definition.id)' is missing existingInstallDiscovery.installRootRules."
+            }
+            foreach ($searchLocation in @($existingInstallDiscovery.searchLocations)) {
+                if ($null -eq $searchLocation) {
+                    continue
+                }
+                if (-not $searchLocation.PSObject.Properties['kind'] -or [string]::IsNullOrWhiteSpace([string]$searchLocation.kind)) {
+                    throw "Package release '$($release.id)' in '$($definition.id)' has an existingInstallDiscovery.searchLocation without kind."
+                }
+                switch -Exact ([string]$searchLocation.kind) {
+                    'command' {
+                        if (-not $searchLocation.PSObject.Properties['name'] -or [string]::IsNullOrWhiteSpace([string]$searchLocation.name)) {
+                            throw "Package release '$($release.id)' in '$($definition.id)' has a command searchLocation without name."
+                        }
+                    }
+                    'path' {
+                        if (-not $searchLocation.PSObject.Properties['path'] -or [string]::IsNullOrWhiteSpace([string]$searchLocation.path)) {
+                            throw "Package release '$($release.id)' in '$($definition.id)' has a path searchLocation without path."
+                        }
+                    }
+                    'directory' {
+                        if (-not $searchLocation.PSObject.Properties['path'] -or [string]::IsNullOrWhiteSpace([string]$searchLocation.path)) {
+                            throw "Package release '$($release.id)' in '$($definition.id)' has a directory searchLocation without path."
+                        }
+                    }
+                    'windowsUninstallRegistryKey' {
+                        if (-not $searchLocation.PSObject.Properties['paths'] -or @($searchLocation.paths).Count -eq 0) {
+                            throw "Package release '$($release.id)' in '$($definition.id)' has a windowsUninstallRegistryKey searchLocation without paths."
+                        }
+                        if (-not $searchLocation.PSObject.Properties['installDirectorySource'] -or [string]::IsNullOrWhiteSpace([string]$searchLocation.installDirectorySource)) {
+                            throw "Package release '$($release.id)' in '$($definition.id)' has a windowsUninstallRegistryKey searchLocation without installDirectorySource."
+                        }
+                        if ([string]$searchLocation.installDirectorySource -notin @('installLocation', 'displayIconDirectory', 'uninstallStringDirectory')) {
+                            throw "Package release '$($release.id)' in '$($definition.id)' uses unsupported windowsUninstallRegistryKey installDirectorySource '$($searchLocation.installDirectorySource)'."
+                        }
+                    }
+                    default {
+                        throw "Package release '$($release.id)' in '$($definition.id)' uses unsupported existingInstallDiscovery.searchLocation kind '$($searchLocation.kind)'."
+                    }
+                }
             }
             foreach ($rule in @($existingInstallDiscovery.installRootRules)) {
                 if ($null -eq $rule) {

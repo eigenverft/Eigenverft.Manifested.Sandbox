@@ -398,6 +398,8 @@ Test-PackageInstalledPackage -PackageResult $result
         $path = Join-Path $installDirectory (([string]$detailCheck.relativePath) -replace '/', '\')
         $productName = $null
         $fileDescription = $null
+        $fileVersion = $null
+        $productVersion = $null
         $status = 'Missing'
 
         if (Test-Path -LiteralPath $path -PathType Leaf) {
@@ -405,6 +407,8 @@ Test-PackageInstalledPackage -PackageResult $result
                 $item = Get-Item -LiteralPath $path -ErrorAction Stop
                 $productName = if ($item.PSObject.Properties['VersionInfo'] -and $item.VersionInfo) { $item.VersionInfo.ProductName } else { $null }
                 $fileDescription = if ($item.PSObject.Properties['VersionInfo'] -and $item.VersionInfo) { $item.VersionInfo.FileDescription } else { $null }
+                $fileVersion = if ($item.PSObject.Properties['VersionInfo'] -and $item.VersionInfo) { $item.VersionInfo.FileVersion } else { $null }
+                $productVersion = if ($item.PSObject.Properties['VersionInfo'] -and $item.VersionInfo) { $item.VersionInfo.ProductVersion } else { $null }
                 $status = 'Ready'
                 if ($detailCheck.PSObject.Properties['productName'] -and
                     -not [string]::IsNullOrWhiteSpace([string]$detailCheck.productName) -and
@@ -414,6 +418,16 @@ Test-PackageInstalledPackage -PackageResult $result
                 if ($status -eq 'Ready' -and $detailCheck.PSObject.Properties['fileDescription'] -and
                     -not [string]::IsNullOrWhiteSpace([string]$detailCheck.fileDescription) -and
                     -not [string]::Equals([string]$fileDescription, [string]$detailCheck.fileDescription, [System.StringComparison]::OrdinalIgnoreCase)) {
+                    $status = 'Failed'
+                }
+                if ($status -eq 'Ready' -and $detailCheck.PSObject.Properties['fileVersion'] -and
+                    -not [string]::IsNullOrWhiteSpace([string]$detailCheck.fileVersion) -and
+                    -not [string]::Equals([string]$fileVersion, [string]$detailCheck.fileVersion, [System.StringComparison]::OrdinalIgnoreCase)) {
+                    $status = 'Failed'
+                }
+                if ($status -eq 'Ready' -and $detailCheck.PSObject.Properties['productVersion'] -and
+                    -not [string]::IsNullOrWhiteSpace([string]$detailCheck.productVersion) -and
+                    -not [string]::Equals([string]$productVersion, [string]$detailCheck.productVersion, [System.StringComparison]::OrdinalIgnoreCase)) {
                     $status = 'Failed'
                 }
             }
@@ -427,6 +441,8 @@ Test-PackageInstalledPackage -PackageResult $result
             Path            = $path
             ProductName     = $productName
             FileDescription = $fileDescription
+            FileVersion     = $fileVersion
+            ProductVersion  = $productVersion
             Status          = $status
         }) | Out-Null
     }

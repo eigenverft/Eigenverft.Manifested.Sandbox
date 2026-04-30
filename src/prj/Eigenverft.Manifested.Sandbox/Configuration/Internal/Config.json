@@ -1,6 +1,6 @@
 {
   "package": {
-    "applicationRootDirectory": "%LOCALAPPDATA%/Eigenverft.Manifested.Sandbox",
+    "applicationRootDirectory": "%LOCALAPPDATA%/Programs/EVF.Sandbox",
     "preferredTargetInstallDirectory": "{applicationRootDirectory}/Installed",
     "repositorySources": {
       "EigenverftModule": {
@@ -34,4 +34,3 @@
     }
   }
 }
-

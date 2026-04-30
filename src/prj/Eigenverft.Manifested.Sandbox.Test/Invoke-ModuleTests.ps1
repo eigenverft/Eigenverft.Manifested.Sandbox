@@ -23,7 +23,7 @@ Set-StrictMode -Version 3
 $ErrorActionPreference = 'Stop'
 
 if ([string]::IsNullOrWhiteSpace($Path)) {
-    $Path = Join-Path $PSScriptRoot 'Eigenverft.Manifested.Sandbox.Module.Tests.ps1'
+    $Path = $PSScriptRoot
 }
 
 $resolvedTestPath = (Resolve-Path -LiteralPath $Path -ErrorAction Stop).Path

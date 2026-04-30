@@ -52,6 +52,76 @@ Resolve-PackageExistingInstallRoot -ExistingInstallDiscovery $package.existingIn
     return (Split-Path -Parent $CandidatePath)
 }
 
+function Resolve-PackageExistingUninstallRegistryCandidate {
+<#
+.SYNOPSIS
+Resolves an existing-install candidate from Windows uninstall registry keys.
+
+.DESCRIPTION
+Keeps Package JSON mapping separate from the generic registry helpers. The
+search location provides concrete registry paths and the path source that should
+be interpreted as the install directory.
+#>
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [psobject]$SearchLocation
+    )
+
+    if (-not $SearchLocation.PSObject.Properties['paths'] -or @($SearchLocation.paths).Count -eq 0) {
+        throw "Package existingInstallDiscovery windowsUninstallRegistryKey search is missing paths."
+    }
+    if (-not $SearchLocation.PSObject.Properties['installDirectorySource'] -or [string]::IsNullOrWhiteSpace([string]$SearchLocation.installDirectorySource)) {
+        throw "Package existingInstallDiscovery windowsUninstallRegistryKey search is missing installDirectorySource."
+    }
+
+    foreach ($registryPath in @($SearchLocation.paths | ForEach-Object { [string]$_ } | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })) {
+        $entry = Get-WindowsUninstallRegistryEntry -Path $registryPath
+        if (-not $entry -or -not [string]::Equals([string]$entry.Status, 'Ready', [System.StringComparison]::OrdinalIgnoreCase)) {
+            continue
+        }
+
+        $pathResolution = Resolve-WindowsUninstallRegistryEntryPath -Entry $entry -Source ([string]$SearchLocation.installDirectorySource)
+        if (-not $pathResolution -or -not [string]::Equals([string]$pathResolution.Status, 'Ready', [System.StringComparison]::OrdinalIgnoreCase)) {
+            continue
+        }
+
+        if (Test-Path -LiteralPath $pathResolution.ResolvedPath -PathType Container) {
+            return [pscustomobject]@{
+                CandidatePath     = $pathResolution.ResolvedPath
+                RegistryEntry     = $entry
+                PathResolution    = $pathResolution
+            }
+        }
+    }
+
+    return $null
+}
+
+function Get-PackageExistingInstallSearchLocations {
+    [CmdletBinding()]
+    param(
+        [AllowNull()]
+        [object[]]$SearchLocations
+    )
+
+    $indexedLocations = New-Object System.Collections.Generic.List[object]
+    $index = 0
+    foreach ($searchLocation in @($SearchLocations)) {
+        if ($null -eq $searchLocation) {
+            continue
+        }
+        $indexedLocations.Add([pscustomobject]@{
+            SearchLocation = $searchLocation
+            SearchOrder    = if ($searchLocation.PSObject.Properties['searchOrder']) { [int]$searchLocation.searchOrder } else { [int]::MaxValue }
+            Index          = $index
+        }) | Out-Null
+        $index++
+    }
+
+    return @($indexedLocations.ToArray() | Sort-Object -Property SearchOrder, Index | ForEach-Object { $_.SearchLocation })
+}
+
 function Find-PackageExistingPackage {
 <#
 .SYNOPSIS
@@ -100,8 +170,9 @@ Find-PackageExistingPackage -PackageResult $result
         return $PackageResult
     }
 
-    foreach ($searchLocation in @($existingInstallDiscovery.searchLocations)) {
+    foreach ($searchLocation in @(Get-PackageExistingInstallSearchLocations -SearchLocations @($existingInstallDiscovery.searchLocations))) {
         $candidatePath = $null
+        $discoveryDetails = $null
         switch -Exact ([string]$searchLocation.kind) {
             'command' {
                 if (-not $searchLocation.PSObject.Properties['name'] -or [string]::IsNullOrWhiteSpace([string]$searchLocation.name)) {
@@ -127,6 +198,13 @@ Find-PackageExistingPackage -PackageResult $result
                     $candidatePath = $resolvedPath
                 }
             }
+            'windowsUninstallRegistryKey' {
+                $registryCandidate = Resolve-PackageExistingUninstallRegistryCandidate -SearchLocation $searchLocation
+                if ($registryCandidate) {
+                    $candidatePath = $registryCandidate.CandidatePath
+                    $discoveryDetails = $registryCandidate
+                }
+            }
             default {
                 throw "Unsupported Package existingInstallDiscovery search kind '$($searchLocation.kind)'."
             }
@@ -149,6 +227,7 @@ Find-PackageExistingPackage -PackageResult $result
             Validation       = $null
             Classification   = $null
             OwnershipRecord  = $null
+            DiscoveryDetails = $discoveryDetails
         }
         Write-PackageExecutionMessage -Message ("[DISCOVERY] Found existing package candidate '{0}' via '{1}'." -f $candidatePath, $searchLocation.kind)
         return $PackageResult
@@ -598,6 +677,107 @@ function Format-PackageProcessArgument {
     return '"' + ($text -replace '"', '\"') + '"'
 }
 
+function Invoke-PackageInstallerCommand {
+<#
+.SYNOPSIS
+Runs a prepared installer process command.
+
+.DESCRIPTION
+Owns the common process-launch, elevation, timeout, and exit-code mechanics for
+installer adapters. Adapter-specific command path and arguments are resolved by
+the caller.
+#>
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [psobject]$PackageResult,
+
+        [Parameter(Mandatory = $true)]
+        [string]$CommandPath,
+
+        [AllowEmptyCollection()]
+        [object[]]$CommandArguments,
+
+        [Parameter(Mandatory = $true)]
+        [string]$WorkingDirectory,
+
+        [Parameter(Mandatory = $true)]
+        [int]$TimeoutSec,
+
+        [Parameter(Mandatory = $true)]
+        [int[]]$SuccessExitCodes,
+
+        [AllowEmptyCollection()]
+        [int[]]$RestartExitCodes,
+
+        [Parameter(Mandatory = $true)]
+        [string]$TargetKind,
+
+        [Parameter(Mandatory = $true)]
+        [string]$InstallerKind,
+
+        [Parameter(Mandatory = $true)]
+        [string]$UiMode,
+
+        [AllowNull()]
+        [string]$LogPath
+    )
+
+    if ([string]::IsNullOrWhiteSpace($CommandPath)) {
+        throw 'Package installer command path is empty.'
+    }
+    if (-not (Test-Path -LiteralPath $CommandPath -PathType Leaf)) {
+        throw "Package installer command '$CommandPath' does not exist."
+    }
+    if ([string]::IsNullOrWhiteSpace($WorkingDirectory)) {
+        throw 'Package installer working directory is empty.'
+    }
+    $null = New-Item -ItemType Directory -Path $WorkingDirectory -Force
+
+    $elevationPlan = Get-PackageInstallerElevationPlan -PackageResult $PackageResult
+    Write-PackageExecutionMessage -Message ("[STATE] Installer execution: targetKind='{0}', installerKind='{1}', uiMode='{2}', elevation='{3}', processIsElevated='{4}', willElevate='{5}'." -f $TargetKind, $InstallerKind, $UiMode, $elevationPlan.Mode, $elevationPlan.ProcessIsElevated, $elevationPlan.ShouldElevate)
+
+    $startProcessParameters = @{
+        FilePath         = $CommandPath
+        ArgumentList     = @($CommandArguments)
+        WorkingDirectory = $WorkingDirectory
+        PassThru         = $true
+    }
+    if ($elevationPlan.ShouldElevate) {
+        $startProcessParameters['Verb'] = 'RunAs'
+    }
+
+    $process = Start-Process @startProcessParameters
+    if (-not $process.WaitForExit($TimeoutSec * 1000)) {
+        try {
+            Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue
+        }
+        catch {
+        }
+
+        throw "Package installer command exceeded the timeout of $TimeoutSec seconds."
+    }
+
+    $process.Refresh()
+    $exitCode = [int]$process.ExitCode
+    $acceptedExitCodes = @($SuccessExitCodes) + @($RestartExitCodes)
+    if ($exitCode -notin $acceptedExitCodes) {
+        throw "Package installer command failed with exit code $exitCode."
+    }
+
+    return [pscustomobject]@{
+        ExitCode         = $exitCode
+        RestartRequired  = ($exitCode -in $RestartExitCodes)
+        LogPath          = $LogPath
+        CommandPath      = $CommandPath
+        CommandArguments = @($CommandArguments)
+        TargetKind       = $TargetKind
+        InstallerKind    = $InstallerKind
+        UiMode           = $UiMode
+        Elevation        = $elevationPlan
+    }
+}
+
 function Invoke-PackageInstallerProcess {
 <#
 .SYNOPSIS
@@ -666,50 +846,84 @@ Invoke-PackageInstallerProcess -PackageResult $result
         $null = New-Item -ItemType Directory -Path $workingDirectory -Force
     }
 
-    $elevationPlan = Get-PackageInstallerElevationPlan -PackageResult $PackageResult
     $installerKind = if ($install.PSObject.Properties['installerKind'] -and -not [string]::IsNullOrWhiteSpace([string]$install.installerKind)) { [string]$install.installerKind } else { '<unspecified>' }
     $uiMode = if ($install.PSObject.Properties['uiMode'] -and -not [string]::IsNullOrWhiteSpace([string]$install.uiMode)) { [string]$install.uiMode } else { '<unspecified>' }
-    Write-PackageExecutionMessage -Message ("[STATE] Installer execution: targetKind='{0}', installerKind='{1}', uiMode='{2}', elevation='{3}', processIsElevated='{4}', willElevate='{5}'." -f $targetKind, $installerKind, $uiMode, $elevationPlan.Mode, $elevationPlan.ProcessIsElevated, $elevationPlan.ShouldElevate)
 
-    $startProcessParameters = @{
-        FilePath         = $commandPath
-        ArgumentList     = $commandArguments
-        WorkingDirectory = $workingDirectory
-        PassThru         = $true
+    return (Invoke-PackageInstallerCommand -PackageResult $PackageResult -CommandPath $commandPath -CommandArguments @($commandArguments) -WorkingDirectory $workingDirectory -TimeoutSec $timeoutSec -SuccessExitCodes @($successExitCodes) -RestartExitCodes @($restartExitCodes) -TargetKind $targetKind -InstallerKind $installerKind -UiMode $uiMode -LogPath $logPath)
+}
+
+function Copy-PackageInstallerToInstallStage {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [psobject]$PackageResult
+    )
+
+    if ([string]::IsNullOrWhiteSpace($PackageResult.PackageFilePath) -or -not (Test-Path -LiteralPath $PackageResult.PackageFilePath -PathType Leaf)) {
+        throw "Package installer for '$($PackageResult.PackageId)' requires a saved package file."
     }
-    if ($elevationPlan.ShouldElevate) {
-        $startProcessParameters['Verb'] = 'RunAs'
+    if ([string]::IsNullOrWhiteSpace($PackageResult.PackageInstallStageDirectory)) {
+        throw "Package installer for '$($PackageResult.PackageId)' requires a package install stage directory."
     }
 
-    $process = Start-Process @startProcessParameters
-    if (-not $process.WaitForExit($timeoutSec * 1000)) {
-        try {
-            Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue
+    $stageDirectory = [System.IO.Path]::GetFullPath([string]$PackageResult.PackageInstallStageDirectory)
+    $null = New-Item -ItemType Directory -Path $stageDirectory -Force
+    $installerFileName = Split-Path -Leaf $PackageResult.PackageFilePath
+    $stagedInstallerPath = Join-Path $stageDirectory $installerFileName
+    return (Copy-FileToPath -SourcePath $PackageResult.PackageFilePath -TargetPath $stagedInstallerPath -Overwrite)
+}
+
+function Invoke-PackageNsisInstallerProcess {
+<#
+.SYNOPSIS
+Runs an NSIS installer package through the isolated package install stage.
+#>
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [psobject]$PackageResult
+    )
+
+    $install = $PackageResult.Package.install
+    if ([string]::IsNullOrWhiteSpace([string]$PackageResult.InstallDirectory)) {
+        throw "Package nsisInstaller for '$($PackageResult.PackageId)' requires an install directory."
+    }
+
+    $commandPath = Copy-PackageInstallerToInstallStage -PackageResult $PackageResult
+    $commandArguments = @()
+    foreach ($argument in @($install.commandArguments)) {
+        $resolvedArgument = Resolve-PackageTemplateText -Text ([string]$argument) -PackageConfig $PackageResult.PackageConfig -Package $PackageResult.Package -ExtraTokens @{
+                packageFilePath = $PackageResult.PackageFilePath
+                installDirectory = $PackageResult.InstallDirectory
+                packageFileStagingDirectory = $PackageResult.PackageFileStagingDirectory
+                packageInstallStageDirectory = $PackageResult.PackageInstallStageDirectory
+                downloadDirectory = $PackageResult.PackageFileStagingDirectory
+            }
+        $commandArguments += (Format-PackageProcessArgument -Value $resolvedArgument)
+    }
+
+    if ($install.PSObject.Properties['targetDirectoryArgument'] -and $null -ne $install.targetDirectoryArgument) {
+        $targetDirectoryArgument = $install.targetDirectoryArgument
+        $targetDirectoryArgumentEnabled = (-not $targetDirectoryArgument.PSObject.Properties['enabled']) -or [bool]$targetDirectoryArgument.enabled
+        if ($targetDirectoryArgumentEnabled) {
+            $prefix = if ($targetDirectoryArgument.PSObject.Properties['prefix'] -and -not [string]::IsNullOrWhiteSpace([string]$targetDirectoryArgument.prefix)) {
+                [string]$targetDirectoryArgument.prefix
+            }
+            else {
+                '/D='
+            }
+            $commandArguments += ($prefix + [string]$PackageResult.InstallDirectory)
         }
-        catch {
-        }
-
-        throw "Package installer command exceeded the timeout of $timeoutSec seconds."
     }
 
-    $process.Refresh()
-    $exitCode = [int]$process.ExitCode
-    $acceptedExitCodes = @($successExitCodes) + @($restartExitCodes)
-    if ($exitCode -notin $acceptedExitCodes) {
-        throw "Package installer command failed with exit code $exitCode."
-    }
+    $timeoutSec = if ($install.PSObject.Properties['timeoutSec']) { [int]$install.timeoutSec } else { 300 }
+    $successExitCodes = if ($install.PSObject.Properties['successExitCodes']) { @($install.successExitCodes | ForEach-Object { [int]$_ }) } else { @(0) }
+    $restartExitCodes = if ($install.PSObject.Properties['restartExitCodes']) { @($install.restartExitCodes | ForEach-Object { [int]$_ }) } else { @() }
+    $targetKind = Get-PackageInstallTargetKind -Package $PackageResult.Package
+    $installerKind = if ($install.PSObject.Properties['installerKind'] -and -not [string]::IsNullOrWhiteSpace([string]$install.installerKind)) { [string]$install.installerKind } else { 'nsis' }
+    $uiMode = if ($install.PSObject.Properties['uiMode'] -and -not [string]::IsNullOrWhiteSpace([string]$install.uiMode)) { [string]$install.uiMode } else { 'silent' }
 
-    return [pscustomobject]@{
-        ExitCode         = $exitCode
-        RestartRequired  = ($exitCode -in $restartExitCodes)
-        LogPath          = $logPath
-        CommandPath      = $commandPath
-        CommandArguments = @($commandArguments)
-        TargetKind       = $targetKind
-        InstallerKind    = $installerKind
-        UiMode           = $uiMode
-        Elevation        = $elevationPlan
-    }
+    return (Invoke-PackageInstallerCommand -PackageResult $PackageResult -CommandPath $commandPath -CommandArguments @($commandArguments) -WorkingDirectory $PackageResult.PackageInstallStageDirectory -TimeoutSec $timeoutSec -SuccessExitCodes @($successExitCodes) -RestartExitCodes @($restartExitCodes) -TargetKind $targetKind -InstallerKind $installerKind -UiMode $uiMode -LogPath $null)
 }
 
 function Install-PackagePackage {
@@ -801,6 +1015,18 @@ Install-PackagePackage -PackageResult $result
                 Status           = Get-PackageOwnedInstallStatus -PackageResult $PackageResult
                 InstallKind      = 'runInstaller'
                 TargetKind       = $targetKind
+                InstallDirectory = $PackageResult.InstallDirectory
+                ReusedExisting   = $false
+                Installer        = $installerResult
+            }
+        }
+        'nsisInstaller' {
+            Write-PackageExecutionMessage -Message ("[ACTION] Running NSIS installer for target '{0}'." -f $PackageResult.InstallDirectory)
+            $installerResult = Invoke-PackageNsisInstallerProcess -PackageResult $PackageResult
+            $PackageResult.Install = [pscustomobject]@{
+                Status           = Get-PackageOwnedInstallStatus -PackageResult $PackageResult
+                InstallKind      = 'nsisInstaller'
+                TargetKind       = Get-PackageInstallTargetKind -Package $package
                 InstallDirectory = $PackageResult.InstallDirectory
                 ReusedExisting   = $false
                 Installer        = $installerResult

@@ -1,0 +1,201 @@
+{
+  "schemaVersion": "1.0",
+  "id": "NotepadPlusPlus",
+  "display": {
+    "default": {
+      "name": "Notepad++",
+      "publisher": "Notepad++ Team",
+      "corporation": "NOTEPAD++",
+      "summary": "Windows text and source-code editor"
+    },
+    "localizations": {}
+  },
+  "upstreamSources": {
+    "notepadPlusPlusGitHubRelease": {
+      "kind": "download",
+      "baseUri": "https://github.com/notepad-plus-plus/notepad-plus-plus/releases/download/v8.9.4/"
+    }
+  },
+  "providedTools": {
+    "commands": [],
+    "apps": [
+      {
+        "name": "notepad++",
+        "relativePath": "notepad++.exe"
+      }
+    ]
+  },
+  "releaseDefaults": {
+    "compatibility": {
+      "checks": [
+        {
+          "kind": "osVersion",
+          "operator": ">=",
+          "value": "10.0"
+        }
+      ]
+    },
+    "install": {
+      "kind": "nsisInstaller",
+      "installDirectory": "notepad-plus-plus/{releaseTrack}/{version}/{flavor}",
+      "installerKind": "nsis",
+      "uiMode": "silent",
+      "elevation": "none",
+      "timeoutSec": 300,
+      "commandArguments": [
+        "/S",
+        "/noUpdater",
+        "/closeRunningNpp"
+      ],
+      "targetDirectoryArgument": {
+        "enabled": true,
+        "prefix": "/D="
+      },
+      "successExitCodes": [
+        0
+      ],
+      "restartExitCodes": [],
+      "pathRegistration": {
+        "mode": "none"
+      }
+    },
+    "validation": {
+      "files": [
+        "notepad++.exe"
+      ],
+      "directories": [],
+      "commandChecks": [],
+      "metadataFiles": [],
+      "signatures": [
+        {
+          "relativePath": "notepad++.exe",
+          "requireValid": true,
+          "subjectContains": "NOTEPAD++"
+        }
+      ],
+      "fileDetails": [
+        {
+          "relativePath": "notepad++.exe",
+          "productName": "Notepad++",
+          "fileDescription": "Notepad++",
+          "fileVersion": "{version}",
+          "productVersion": "{version}"
+        }
+      ],
+      "registryChecks": []
+    },
+    "existingInstallDiscovery": {
+      "enableDetection": true,
+      "searchLocations": [
+        {
+          "kind": "windowsUninstallRegistryKey",
+          "searchOrder": 100,
+          "paths": [
+            "HKLM:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\Notepad++"
+          ],
+          "installDirectorySource": "displayIconDirectory"
+        }
+      ],
+      "installRootRules": []
+    },
+    "existingInstallPolicy": {
+      "allowAdoptExternal": true,
+      "upgradeAdoptedInstall": false,
+      "requirePackageOwnership": false
+    }
+  },
+  "releases": [
+    {
+      "id": "notepad-plus-plus-8.9.4-win-x64",
+      "version": "8.9.4",
+      "releaseTrack": "stable",
+      "flavor": "win-x64",
+      "constraints": {
+        "os": [
+          "windows"
+        ],
+        "cpu": [
+          "x64"
+        ]
+      },
+      "packageFile": {
+        "fileName": "npp.8.9.4.Installer.x64.exe",
+        "format": "exe",
+        "portable": false,
+        "autoUpdateSupported": false,
+        "integrity": {
+          "algorithm": "sha256",
+          "sha256": "f3629f500d0754d8e870255fff0e00384a37f5402d6f3ad8dd1f4f67d707b593"
+        },
+        "authenticode": {
+          "requireValid": true,
+          "subjectContains": "NOTEPAD++"
+        }
+      },
+      "acquisitionCandidates": [
+        {
+          "kind": "packageDepot",
+          "searchOrder": 100,
+          "verification": {
+            "mode": "required"
+          }
+        },
+        {
+          "kind": "download",
+          "sourceId": "notepadPlusPlusGitHubRelease",
+          "sourcePath": "npp.8.9.4.Installer.x64.exe",
+          "searchOrder": 900,
+          "verification": {
+            "mode": "required"
+          }
+        }
+      ]
+    },
+    {
+      "id": "notepad-plus-plus-8.9.4-win-arm64",
+      "version": "8.9.4",
+      "releaseTrack": "stable",
+      "flavor": "win-arm64",
+      "constraints": {
+        "os": [
+          "windows"
+        ],
+        "cpu": [
+          "arm64"
+        ]
+      },
+      "packageFile": {
+        "fileName": "npp.8.9.4.Installer.arm64.exe",
+        "format": "exe",
+        "portable": false,
+        "autoUpdateSupported": false,
+        "integrity": {
+          "algorithm": "sha256",
+          "sha256": "7d59f0c62caa4d2366f900ca8169fb37cf1dcfce5c79cb3ccb08089b1adbc91"
+        },
+        "authenticode": {
+          "requireValid": true,
+          "subjectContains": "NOTEPAD++"
+        }
+      },
+      "acquisitionCandidates": [
+        {
+          "kind": "packageDepot",
+          "searchOrder": 100,
+          "verification": {
+            "mode": "required"
+          }
+        },
+        {
+          "kind": "download",
+          "sourceId": "notepadPlusPlusGitHubRelease",
+          "sourcePath": "npp.8.9.4.Installer.arm64.exe",
+          "searchOrder": 900,
+          "verification": {
+            "mode": "required"
+          }
+        }
+      ]
+    }
+  ]
+}

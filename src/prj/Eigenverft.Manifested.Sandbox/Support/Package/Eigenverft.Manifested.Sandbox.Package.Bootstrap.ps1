@@ -121,7 +121,7 @@ Get-PackageLocalRoot
         throw 'Could not resolve the LocalApplicationData directory for Package.'
     }
 
-    return [System.IO.Path]::GetFullPath((Join-Path $localApplicationData 'Eigenverft.Manifested.Sandbox'))
+    return [System.IO.Path]::GetFullPath((Join-Path (Join-Path $localApplicationData 'Programs') 'EVF.Sandbox'))
 }
 
 function Get-PackageLocalGlobalConfigPath {

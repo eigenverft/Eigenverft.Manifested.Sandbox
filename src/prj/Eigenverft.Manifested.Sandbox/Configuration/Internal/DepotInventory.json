@@ -6,7 +6,7 @@
         "kind": "filesystem",
         "enabled": true,
         "searchOrder": 100,
-        "basePath": "%LOCALAPPDATA%/Eigenverft.Manifested.Sandbox/DefaultPackageDepot",
+        "basePath": "{applicationRootDirectory}/DefaultPackageDepot",
         "readable": true,
         "writable": true,
         "mirrorTarget": true,

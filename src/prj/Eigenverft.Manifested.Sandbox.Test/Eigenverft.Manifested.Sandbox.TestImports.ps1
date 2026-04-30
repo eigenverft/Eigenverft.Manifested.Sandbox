@@ -56,5 +56,6 @@ $moduleProjectRoot = Join-Path (Split-Path -Parent $PSScriptRoot) 'Eigenverft.Ma
 . "$moduleProjectRoot\Commands\Eigenverft.Manifested.Sandbox.Cmd.QwenCli.ps1"
 . "$moduleProjectRoot\Commands\Eigenverft.Manifested.Sandbox.Cmd.GitHubCli.ps1"
 . "$moduleProjectRoot\Commands\Eigenverft.Manifested.Sandbox.Cmd.GitRuntime.ps1"
+. "$moduleProjectRoot\Commands\Eigenverft.Manifested.Sandbox.Cmd.NotepadPlusPlus.ps1"
 . "$moduleProjectRoot\Commands\Eigenverft.Manifested.Sandbox.Cmd.VSCodeRuntime.ps1"
 

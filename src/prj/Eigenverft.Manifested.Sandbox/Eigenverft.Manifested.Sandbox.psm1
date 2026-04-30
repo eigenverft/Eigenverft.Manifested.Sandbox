@@ -53,4 +53,5 @@
 . "$PSScriptRoot\Commands\Eigenverft.Manifested.Sandbox.Cmd.QwenCli.ps1"
 . "$PSScriptRoot\Commands\Eigenverft.Manifested.Sandbox.Cmd.GitHubCli.ps1"
 . "$PSScriptRoot\Commands\Eigenverft.Manifested.Sandbox.Cmd.GitRuntime.ps1"
+. "$PSScriptRoot\Commands\Eigenverft.Manifested.Sandbox.Cmd.NotepadPlusPlus.ps1"
 . "$PSScriptRoot\Commands\Eigenverft.Manifested.Sandbox.Cmd.VSCodeRuntime.ps1"
