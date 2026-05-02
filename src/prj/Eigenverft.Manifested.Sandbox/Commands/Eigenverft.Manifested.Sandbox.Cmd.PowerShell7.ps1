@@ -19,6 +19,6 @@ Invoke-PowerShell7
     [CmdletBinding()]
     param()
 
-    return (Invoke-PackageDefinitionCommand -DefinitionId 'PowerShell7' -CommandName 'Invoke-PowerShell7')
+    return (Invoke-PackageDefinitionCommand -RepositoryId 'EigenverftModule' -DefinitionId 'PowerShell7' -DesiredState Assigned)
 }
 

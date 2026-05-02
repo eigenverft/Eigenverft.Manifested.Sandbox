@@ -13,9 +13,11 @@
   "upstreamSources": {},
   "dependencies": [
     {
+      "repositoryId": "EigenverftModule",
       "definitionId": "VisualCppRedistributable"
     },
     {
+      "repositoryId": "EigenverftModule",
       "definitionId": "NodeRuntime"
     }
   ],

@@ -681,7 +681,7 @@ exit /b 0
         Mock Get-PackageDefinitionPath { param($DefinitionId) $documents.DefinitionPath }
 
         $config = Get-PackageConfig -DefinitionId 'Qwen35_2B_Q8_0_Model'
-        $result = New-PackageResult -CommandName 'test' -PackageConfig $config
+        $result = New-PackageResult -PackageConfig $config
         $result = Resolve-PackagePackage -PackageResult $result
         $result = Resolve-PackagePaths -PackageResult $result
         $result = Build-PackageAcquisitionPlan -PackageResult $result
@@ -750,7 +750,7 @@ exit /b 0
         Mock Get-PackageDepotInventoryPath { $documents.DepotInventoryPath }
         Mock Get-PackageDefinitionPath { param($DefinitionId) $documents.DefinitionPath }
 
-        $result = Invoke-PackageDefinitionCommand -DefinitionId 'VSCodeRuntime' -CommandName 'Invoke-VSCodeRuntime'
+        $result = Invoke-PackageDefinitionCommandCore -DefinitionId 'VSCodeRuntime'
 
         $result.Status | Should -Be 'Failed'
         $result.FailureReason | Should -Be 'InstalledPackageValidationFailed'

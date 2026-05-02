@@ -20,6 +20,6 @@ Invoke-PythonRuntime
     [CmdletBinding()]
     param()
 
-    return (Invoke-PackageDefinitionCommand -DefinitionId 'PythonRuntime' -CommandName 'Invoke-PythonRuntime')
+    return (Invoke-PackageDefinitionCommand -RepositoryId 'EigenverftModule' -DefinitionId 'PythonRuntime' -DesiredState Assigned)
 }
 

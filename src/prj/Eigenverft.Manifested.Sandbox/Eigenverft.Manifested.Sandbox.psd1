@@ -73,6 +73,8 @@ PowerShellVersion = '5.1'
 FunctionsToExport = @(
     'Get-SandboxVersion',
     'Get-PackageState',
+    'Invoke-Package',
+    'Invoke-PackageDefinitionCommand',
     'Invoke-VisualCppRedistributable',
     'Invoke-PowerShell7',
     'Invoke-PythonRuntime',
@@ -125,6 +127,7 @@ FileList = @(
     'Support\Upstream\Eigenverft.Manifested.Sandbox.Upstream.GitHubRelease.ps1',
     'Support\Package\Eigenverft.Manifested.Sandbox.Package.ExecutionMessage.ps1',
     'Support\Package\Eigenverft.Manifested.Sandbox.Package.Bootstrap.ps1',
+    'Support\Package\Eigenverft.Manifested.Sandbox.Package.DefinitionReference.ps1',
     'Support\Package\Eigenverft.Manifested.Sandbox.Package.Config.ps1',
     'Support\Package\Eigenverft.Manifested.Sandbox.Package.LocalEnvironment.ps1',
     'Support\Package\Eigenverft.Manifested.Sandbox.Package.Selection.ps1',

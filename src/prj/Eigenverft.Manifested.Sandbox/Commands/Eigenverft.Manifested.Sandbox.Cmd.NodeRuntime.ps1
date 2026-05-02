@@ -48,6 +48,6 @@ Invoke-NodeRuntime
     [CmdletBinding()]
     param()
 
-    return (Invoke-PackageDefinitionCommand -DefinitionId 'NodeRuntime' -CommandName 'Invoke-NodeRuntime')
+    return (Invoke-PackageDefinitionCommand -RepositoryId 'EigenverftModule' -DefinitionId 'NodeRuntime' -DesiredState Assigned)
 }
 

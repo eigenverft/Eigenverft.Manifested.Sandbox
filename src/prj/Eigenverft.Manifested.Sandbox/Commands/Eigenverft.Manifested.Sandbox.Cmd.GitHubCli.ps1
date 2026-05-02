@@ -20,6 +20,6 @@ Invoke-GitHubCli
     [CmdletBinding()]
     param()
 
-    return (Invoke-PackageDefinitionCommand -DefinitionId 'GitHubCli' -CommandName 'Invoke-GitHubCli')
+    return (Invoke-PackageDefinitionCommand -RepositoryId 'EigenverftModule' -DefinitionId 'GitHubCli' -DesiredState Assigned)
 }
 

@@ -12,6 +12,7 @@
   },
   "dependencies": [
     {
+      "repositoryId": "EigenverftModule",
       "definitionId": "VisualCppRedistributable"
     }
   ],

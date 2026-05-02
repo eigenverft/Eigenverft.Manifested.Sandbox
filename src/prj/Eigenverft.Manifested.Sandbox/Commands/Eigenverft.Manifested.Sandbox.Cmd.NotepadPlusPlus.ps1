@@ -18,5 +18,5 @@ Invoke-NotepadPlusPlus
     [CmdletBinding()]
     param()
 
-    return (Invoke-PackageDefinitionCommand -DefinitionId 'NotepadPlusPlus' -CommandName 'Invoke-NotepadPlusPlus')
+    return (Invoke-PackageDefinitionCommand -RepositoryId 'EigenverftModule' -DefinitionId 'NotepadPlusPlus' -DesiredState Assigned)
 }

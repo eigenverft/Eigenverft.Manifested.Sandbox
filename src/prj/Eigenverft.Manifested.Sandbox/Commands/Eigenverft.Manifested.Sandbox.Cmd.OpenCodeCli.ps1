@@ -17,6 +17,6 @@ Invoke-OpenCodeCli
     [CmdletBinding()]
     param()
 
-    return (Invoke-PackageDefinitionCommand -DefinitionId 'OpenCodeCli' -CommandName 'Invoke-OpenCodeCli')
+    return (Invoke-PackageDefinitionCommand -RepositoryId 'EigenverftModule' -DefinitionId 'OpenCodeCli' -DesiredState Assigned)
 }
 

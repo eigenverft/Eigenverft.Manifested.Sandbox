@@ -20,6 +20,6 @@ Invoke-VSCodeRuntime
     [CmdletBinding()]
     param()
 
-    return (Invoke-PackageDefinitionCommand -DefinitionId 'VSCodeRuntime' -CommandName 'Invoke-VSCodeRuntime')
+    return (Invoke-PackageDefinitionCommand -RepositoryId 'EigenverftModule' -DefinitionId 'VSCodeRuntime' -DesiredState Assigned)
 }
 

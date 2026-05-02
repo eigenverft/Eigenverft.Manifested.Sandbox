@@ -17,6 +17,6 @@ Invoke-GeminiCli
     [CmdletBinding()]
     param()
 
-    return (Invoke-PackageDefinitionCommand -DefinitionId 'GeminiCli' -CommandName 'Invoke-GeminiCli')
+    return (Invoke-PackageDefinitionCommand -RepositoryId 'EigenverftModule' -DefinitionId 'GeminiCli' -DesiredState Assigned)
 }
 

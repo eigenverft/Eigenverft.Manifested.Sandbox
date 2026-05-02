@@ -311,7 +311,7 @@ Resolve-PackageExistingPackageDecision -PackageResult $result
             [string]::Equals([string]$ownershipRecord.currentVersion, [string]$PackageResult.PackageVersion, [System.StringComparison]::OrdinalIgnoreCase)
     }
 
-    if ([string]::Equals($classification, 'PackageOwned', [System.StringComparison]::OrdinalIgnoreCase) -and -not $ownershipRecord) {
+    if ([string]::Equals($classification, 'PackageTarget', [System.StringComparison]::OrdinalIgnoreCase) -and -not $ownershipRecord) {
         $PackageResult.ExistingPackage.Decision = 'ReusePackageOwned'
         $PackageResult.InstallOrigin = 'PackageReused'
         Write-PackageExecutionMessage -Message ("[DECISION] Reusing Package-owned target install '{0}'." -f $PackageResult.ExistingPackage.InstallDirectory)
@@ -319,7 +319,7 @@ Resolve-PackageExistingPackageDecision -PackageResult $result
         return $PackageResult
     }
 
-    if ([string]::Equals($classification, 'PackageOwned', [System.StringComparison]::OrdinalIgnoreCase) -and $ownershipRecord) {
+    if ([string]::Equals($classification, 'PackageTarget', [System.StringComparison]::OrdinalIgnoreCase) -and $ownershipRecord) {
         if ([string]::Equals([string]$ownershipRecord.ownershipKind, 'AdoptedExternal', [System.StringComparison]::OrdinalIgnoreCase)) {
             if ($sameRelease -or (-not $upgradeAdoptedInstall)) {
                 $PackageResult.ExistingPackage.Decision = 'AdoptExternal'

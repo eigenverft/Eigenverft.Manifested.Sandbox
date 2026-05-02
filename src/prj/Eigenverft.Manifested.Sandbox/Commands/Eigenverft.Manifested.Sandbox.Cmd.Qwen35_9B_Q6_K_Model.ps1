@@ -21,6 +21,6 @@ Invoke-Qwen35-9B-Q6-K-Model
     [CmdletBinding()]
     param()
 
-    return (Invoke-PackageDefinitionCommand -DefinitionId 'Qwen35_9B_Q6_K_Model' -CommandName 'Invoke-Qwen35-9B-Q6-K-Model')
+    return (Invoke-PackageDefinitionCommand -RepositoryId 'EigenverftModule' -DefinitionId 'Qwen35_9B_Q6_K_Model' -DesiredState Assigned)
 }
 

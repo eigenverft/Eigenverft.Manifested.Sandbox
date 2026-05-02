@@ -259,7 +259,7 @@ Classify-PackageExistingPackage -PackageResult $result
 
     $record = Get-PackageOwnershipRecord -PackageResult $PackageResult
     $classification = if ($record -or [string]::Equals([string]$PackageResult.ExistingPackage.SearchKind, 'packageTargetInstallPath', [System.StringComparison]::OrdinalIgnoreCase)) {
-        'PackageOwned'
+        'PackageTarget'
     }
     else {
         'ExternalInstall'
@@ -364,7 +364,7 @@ Update-PackageOwnershipRecord -PackageResult $result
     $PackageResult.Ownership = [pscustomobject]@{
         IndexPath       = $index.Path
         InstallSlotId   = $installSlotId
-        Classification  = if ($ownershipKind -eq 'AdoptedExternal') { 'AdoptedExternal' } else { 'PackageOwned' }
+        Classification  = if ($ownershipKind -eq 'AdoptedExternal') { 'AdoptedExternal' } else { 'PackageTarget' }
         OwnershipRecord = $newRecord
     }
 

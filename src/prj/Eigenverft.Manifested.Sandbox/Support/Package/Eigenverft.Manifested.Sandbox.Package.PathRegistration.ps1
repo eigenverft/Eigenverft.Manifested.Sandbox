@@ -94,7 +94,7 @@ function Get-PackagePathRegistrationCleanupDirectories {
     $candidateInstallDirectories = New-Object System.Collections.Generic.List[string]
 
     if ($PackageResult.ExistingPackage -and
-        [string]::Equals([string]$PackageResult.ExistingPackage.Classification, 'PackageOwned', [System.StringComparison]::OrdinalIgnoreCase) -and
+        [string]::Equals([string]$PackageResult.ExistingPackage.Classification, 'PackageTarget', [System.StringComparison]::OrdinalIgnoreCase) -and
         -not [string]::IsNullOrWhiteSpace([string]$PackageResult.ExistingPackage.InstallDirectory)) {
         $candidateInstallDirectories.Add([string]$PackageResult.ExistingPackage.InstallDirectory) | Out-Null
     }

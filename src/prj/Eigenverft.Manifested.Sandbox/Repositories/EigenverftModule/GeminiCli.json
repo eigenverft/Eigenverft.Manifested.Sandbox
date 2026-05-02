@@ -13,6 +13,7 @@
   "upstreamSources": {},
   "dependencies": [
     {
+      "repositoryId": "EigenverftModule",
       "definitionId": "NodeRuntime"
     }
   ],

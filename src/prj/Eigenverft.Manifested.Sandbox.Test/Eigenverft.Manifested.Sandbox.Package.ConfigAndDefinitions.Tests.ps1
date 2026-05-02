@@ -281,11 +281,126 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
         Mock Get-PackageDefinitionPath { param($DefinitionId) $documents.DefinitionPath }
         Mock Initialize-PackageLocalEnvironment { throw 'local environment boom' }
 
-        $result = Invoke-PackageDefinitionCommand -DefinitionId 'VSCodeRuntime' -CommandName 'Invoke-VSCodeRuntime'
+        $result = Invoke-PackageDefinitionCommandCore -DefinitionId 'VSCodeRuntime'
 
         $result.Status | Should -Be 'Failed'
         $result.FailureReason | Should -Be 'LocalEnvironmentInitializationFailed'
         $result.ErrorMessage | Should -Be 'local environment boom'
+    }
+
+    It 'runs the public package definition command with default repository and assigned state' {
+        Mock Invoke-PackageDefinitionCommandCore {
+            [pscustomobject]@{
+                RepositoryId = $RepositoryId
+                DefinitionId = $DefinitionId
+                DesiredState = $DesiredState
+                Status       = 'Ready'
+            }
+        }
+
+        $result = Invoke-PackageDefinitionCommand -DefinitionId 'GitHubCli'
+
+        Assert-MockCalled Invoke-PackageDefinitionCommandCore -Times 1 -ParameterFilter {
+            $RepositoryId -eq 'EigenverftModule' -and
+            $DefinitionId -eq 'GitHubCli' -and
+            $DesiredState -eq 'Assigned'
+        }
+        $result.Status | Should -Be 'Ready'
+    }
+
+    It 'runs the slim public package command with default repository and assigned state' {
+        Mock Invoke-PackageDefinitionCommandCore {
+            [pscustomobject]@{
+                RepositoryId = $RepositoryId
+                DefinitionId = $DefinitionId
+                DesiredState = $DesiredState
+                Status       = 'Ready'
+            }
+        }
+
+        $result = Invoke-Package -DefinitionId 'GitHubCli'
+
+        Assert-MockCalled Invoke-PackageDefinitionCommandCore -Times 1 -ParameterFilter {
+            $RepositoryId -eq 'EigenverftModule' -and
+            $DefinitionId -eq 'GitHubCli' -and
+            $DesiredState -eq 'Assigned'
+        }
+        $result.Status | Should -Be 'Ready'
+    }
+
+    It 'runs public package definition command arrays in listed order' {
+        Mock Invoke-PackageDefinitionCommandCore {
+            [pscustomobject]@{
+                RepositoryId = $RepositoryId
+                DefinitionId = $DefinitionId
+                DesiredState = $DesiredState
+                Status       = 'Ready'
+            }
+        }
+
+        $results = @(Invoke-PackageDefinitionCommand -DefinitionId GitHubCli, CodexCli)
+
+        Assert-MockCalled Invoke-PackageDefinitionCommandCore -Times 1 -ParameterFilter { $DefinitionId -eq 'GitHubCli' }
+        Assert-MockCalled Invoke-PackageDefinitionCommandCore -Times 1 -ParameterFilter { $DefinitionId -eq 'CodexCli' }
+        @($results.DefinitionId) | Should -Be @('GitHubCli', 'CodexCli')
+    }
+
+    It 'stops public package definition command arrays after the first failed result' {
+        Mock Invoke-PackageDefinitionCommandCore {
+            [pscustomobject]@{
+                RepositoryId = $RepositoryId
+                DefinitionId = $DefinitionId
+                DesiredState = $DesiredState
+                Status       = if ($DefinitionId -eq 'GitHubCli') { 'Failed' } else { 'Ready' }
+            }
+        }
+
+        $results = @(Invoke-PackageDefinitionCommand -DefinitionId GitHubCli, CodexCli)
+
+        Assert-MockCalled Invoke-PackageDefinitionCommandCore -Times 1 -ParameterFilter { $DefinitionId -eq 'GitHubCli' }
+        Assert-MockCalled Invoke-PackageDefinitionCommandCore -Times 0 -ParameterFilter { $DefinitionId -eq 'CodexCli' }
+        @($results.DefinitionId) | Should -Be @('GitHubCli')
+        $results[0].Status | Should -Be 'Failed'
+    }
+
+    It 'resolves shipped package definitions through the default repository seam' {
+        $reference = Resolve-PackageDefinitionReference -DefinitionId 'VSCodeRuntime'
+
+        $reference.RepositoryId | Should -Be 'EigenverftModule'
+        $reference.DefinitionId | Should -Be 'VSCodeRuntime'
+        $reference.SourceKind | Should -Be 'moduleLocal'
+        Split-Path -Leaf $reference.DefinitionPath | Should -Be 'VSCodeRuntime.json'
+    }
+
+    It 'fails clearly for unsupported package repositories' {
+        { Resolve-PackageDefinitionReference -RepositoryId 'OtherRepository' -DefinitionId 'VSCodeRuntime' } | Should -Throw "*Only 'EigenverftModule' is currently supported*"
+    }
+
+    It 'returns a clean not-implemented result for removed desired state' {
+        $rootPath = Join-Path $TestDrive 'removed-state-not-implemented'
+        $globalDocument = New-TestPackageGlobalDocument -ApplicationRootDirectory (Join-Path $rootPath 'AppRoot')
+        $definitionDocument = New-TestVSCodeDefinitionDocument -Releases @(
+            New-TestPackageRelease -Id 'vsCode-win-x64-stable' -Version '2.0.0' -Architecture 'x64' -Flavor 'win32-x64' -FileName 'VSCode-win32-x64-2.0.0.zip' -AcquisitionCandidates @(
+                @{
+                    kind        = 'packageDepot'
+                    searchOrder = 10
+                }
+            )
+        )
+        $documents = Write-TestPackageDocuments -RootPath $rootPath -GlobalDocument $globalDocument -DefinitionDocument $definitionDocument
+
+        [Environment]::SetEnvironmentVariable($script:SourceInventoryEnvVarName, (Join-Path $TestDrive 'missing-inventory.json'), 'Process')
+        Mock Get-PackageGlobalConfigPath { $documents.GlobalConfigPath }
+        Mock Get-PackageDepotInventoryPath { $documents.DepotInventoryPath }
+        Mock Get-PackageDefinitionPath { param($DefinitionId) $documents.DefinitionPath }
+
+        $result = Invoke-PackageDefinitionCommand -DefinitionId 'VSCodeRuntime' -DesiredState Removed
+
+        $result.RepositoryId | Should -Be 'EigenverftModule'
+        $result.DesiredState | Should -Be 'Removed'
+        $result.Status | Should -Be 'Failed'
+        $result.FailureReason | Should -Be 'PackageDesiredStateNotImplemented'
+        $result.ErrorMessage | Should -Match "DesiredState 'Removed' is not implemented"
     }
 
     It 'fails clearly when global config still uses retired ownershipTracking' {
@@ -375,12 +490,13 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
         [Environment]::SetEnvironmentVariable($script:SourceInventoryEnvVarName, (Join-Path $TestDrive 'missing-inventory.json'), 'Process')
 
         $config = Get-PackageConfig -DefinitionId 'LlamaCppRuntime'
-        $result = New-PackageResult -CommandName 'test' -PackageConfig $config
+        $result = New-PackageResult -PackageConfig $config
         $result = Resolve-PackagePackage -PackageResult $result
         $sourceDefinition = Get-PackageSourceDefinition -PackageConfig $config -SourceRef ([pscustomobject]@{ scope = 'definition'; id = 'llamaCppGitHub' })
 
         $config.DefinitionId | Should -Be 'LlamaCppRuntime'
         @($config.Definition.dependencies.definitionId) | Should -Be @('VisualCppRedistributable')
+        @($config.Definition.dependencies.repositoryId) | Should -Be @('EigenverftModule')
         $sourceDefinition.Kind | Should -Be 'githubRelease'
         $sourceDefinition.RepositoryOwner | Should -Be 'ggml-org'
         $sourceDefinition.RepositoryName | Should -Be 'llama.cpp'
@@ -394,7 +510,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
         [Environment]::SetEnvironmentVariable($script:SourceInventoryEnvVarName, (Join-Path $TestDrive 'missing-inventory.json'), 'Process')
 
         $config = Get-PackageConfig -DefinitionId 'GitRuntime'
-        $result = New-PackageResult -CommandName 'test' -PackageConfig $config
+        $result = New-PackageResult -PackageConfig $config
         $result = Resolve-PackagePackage -PackageResult $result
         $sourceDefinition = Get-PackageSourceDefinition -PackageConfig $config -SourceRef ([pscustomobject]@{ scope = 'definition'; id = 'gitForWindowsGitHub' })
 
@@ -426,7 +542,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
         [Environment]::SetEnvironmentVariable($script:SourceInventoryEnvVarName, (Join-Path $TestDrive 'missing-inventory.json'), 'Process')
 
         $config = Get-PackageConfig -DefinitionId 'GitHubCli'
-        $result = New-PackageResult -CommandName 'test' -PackageConfig $config
+        $result = New-PackageResult -PackageConfig $config
         $result = Resolve-PackagePackage -PackageResult $result
         $sourceDefinition = Get-PackageSourceDefinition -PackageConfig $config -SourceRef ([pscustomobject]@{ scope = 'definition'; id = 'ghCliGitHub' })
 
@@ -458,7 +574,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
         [Environment]::SetEnvironmentVariable($script:SourceInventoryEnvVarName, (Join-Path $TestDrive 'missing-inventory.json'), 'Process')
 
         $config = Get-PackageConfig -DefinitionId 'NotepadPlusPlus'
-        $result = New-PackageResult -CommandName 'test' -PackageConfig $config
+        $result = New-PackageResult -PackageConfig $config
         $result = Resolve-PackagePackage -PackageResult $result
         $sourceDefinition = Get-PackageSourceDefinition -PackageConfig $config -SourceRef ([pscustomobject]@{ scope = 'definition'; id = 'notepadPlusPlusGitHubRelease' })
 
@@ -491,7 +607,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
         [Environment]::SetEnvironmentVariable($script:SourceInventoryEnvVarName, (Join-Path $TestDrive 'missing-inventory.json'), 'Process')
 
         $config = Get-PackageConfig -DefinitionId 'NodeRuntime'
-        $result = New-PackageResult -CommandName 'test' -PackageConfig $config
+        $result = New-PackageResult -PackageConfig $config
         $result = Resolve-PackagePackage -PackageResult $result
         $sourceDefinition = Get-PackageSourceDefinition -PackageConfig $config -SourceRef ([pscustomobject]@{ scope = 'definition'; id = 'nodeJsRelease' })
 
@@ -530,7 +646,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
 
         foreach ($case in $cases) {
             $config = Get-PackageConfig -DefinitionId $case.DefinitionId
-            $result = New-PackageResult -CommandName 'test' -PackageConfig $config
+            $result = New-PackageResult -PackageConfig $config
             $result = Resolve-PackagePackage -PackageResult $result
             $result = Resolve-PackagePaths -PackageResult $result
             $result = Build-PackageAcquisitionPlan -PackageResult $result
@@ -544,9 +660,11 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
             $config.Definition.providedTools.commands[0].relativePath | Should -Be $case.RelativePath
             if ($case.DefinitionId -eq 'CodexCli') {
                 @($config.Definition.dependencies.definitionId) | Should -Be @('VisualCppRedistributable', 'NodeRuntime')
+                @($config.Definition.dependencies.repositoryId) | Should -Be @('EigenverftModule', 'EigenverftModule')
             }
             else {
                 @($config.Definition.dependencies.definitionId) | Should -Be @('NodeRuntime')
+                @($config.Definition.dependencies.repositoryId) | Should -Be @('EigenverftModule')
             }
             $result.Package.PSObject.Properties['packageFile'] | Should -BeNullOrEmpty
             $result.AcquisitionPlan.PackageFileRequired | Should -BeFalse
@@ -558,20 +676,22 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
         $definition = [pscustomobject]@{
             id           = 'CodexCli'
             dependencies = @(
-                [pscustomobject]@{ definitionId = 'VisualCppRedistributable' }
-                [pscustomobject]@{ definitionId = 'NodeRuntime' }
+                [pscustomobject]@{ repositoryId = 'EigenverftModule'; definitionId = 'VisualCppRedistributable' }
+                [pscustomobject]@{ repositoryId = 'EigenverftModule'; definitionId = 'NodeRuntime' }
             )
         }
         $result = [pscustomobject]@{
-            DefinitionId       = 'CodexCli'
+            DefinitionId  = 'CodexCli'
+            RepositoryId  = 'EigenverftModule'
             PackageConfig = [pscustomobject]@{
                 Definition = $definition
             }
-            Dependencies       = @()
+            Dependencies  = @()
         }
 
-        Mock Invoke-PackageDefinitionCommand {
+        Mock Invoke-PackageDefinitionCommandCore {
             [pscustomobject]@{
+                RepositoryId   = $RepositoryId
                 Status        = 'Ready'
                 InstallOrigin = 'PackageReused'
             Install       = [pscustomobject]@{ Status = 'ReusedPackageOwned' }
@@ -588,9 +708,11 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
 
         $resolved = Resolve-PackageDependencies -PackageResult $result
 
-        Assert-MockCalled Invoke-PackageDefinitionCommand -Times 1 -ParameterFilter { $DefinitionId -eq 'VisualCppRedistributable' }
-        Assert-MockCalled Invoke-PackageDefinitionCommand -Times 1 -ParameterFilter { $DefinitionId -eq 'NodeRuntime' }
+        Assert-MockCalled Invoke-PackageDefinitionCommandCore -Times 1 -ParameterFilter { $DefinitionId -eq 'VisualCppRedistributable' }
+        Assert-MockCalled Invoke-PackageDefinitionCommandCore -Times 1 -ParameterFilter { $DefinitionId -eq 'NodeRuntime' }
+        Assert-MockCalled Invoke-PackageDefinitionCommandCore -Times 2 -ParameterFilter { $RepositoryId -eq 'EigenverftModule' -and $DesiredState -eq 'Assigned' }
         @($resolved.Dependencies.DefinitionId) | Should -Be @('VisualCppRedistributable', 'NodeRuntime')
+        @($resolved.Dependencies.RepositoryId) | Should -Be @('EigenverftModule', 'EigenverftModule')
         @($resolved.Dependencies.Status) | Should -Be @('Ready', 'Ready')
         @($resolved.Dependencies[1].Commands.Name) | Should -Be @('npm')
     }
@@ -610,14 +732,14 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
             Dependencies       = @()
         }
 
-        { Resolve-PackageDependencies -PackageResult $result -DependencyStack @('CodexCli', 'NodeRuntime') } | Should -Throw '*dependency cycle*'
+        { Resolve-PackageDependencies -PackageResult $result -DependencyStack @('EigenverftModule:CodexCli', 'EigenverftModule:NodeRuntime') } | Should -Throw '*dependency cycle*'
     }
 
     It 'loads the shipped PythonRuntime definition and selects the fixed NuGet package release' {
         [Environment]::SetEnvironmentVariable($script:SourceInventoryEnvVarName, (Join-Path $TestDrive 'missing-inventory.json'), 'Process')
 
         $config = Get-PackageConfig -DefinitionId 'PythonRuntime'
-        $result = New-PackageResult -CommandName 'test' -PackageConfig $config
+        $result = New-PackageResult -PackageConfig $config
         $result = Resolve-PackagePackage -PackageResult $result
         $sourceDefinition = Get-PackageSourceDefinition -PackageConfig $config -SourceRef ([pscustomobject]@{ scope = 'definition'; id = 'pythonNuGetPackage' })
 
@@ -650,7 +772,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
         [Environment]::SetEnvironmentVariable($script:SourceInventoryEnvVarName, (Join-Path $TestDrive 'missing-inventory.json'), 'Process')
 
         $config = Get-PackageConfig -DefinitionId 'PowerShell7'
-        $result = New-PackageResult -CommandName 'test' -PackageConfig $config
+        $result = New-PackageResult -PackageConfig $config
         $result = Resolve-PackagePackage -PackageResult $result
         $sourceDefinition = Get-PackageSourceDefinition -PackageConfig $config -SourceRef ([pscustomobject]@{ scope = 'definition'; id = 'powerShellGitHub' })
 
@@ -682,7 +804,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
         [Environment]::SetEnvironmentVariable($script:SourceInventoryEnvVarName, (Join-Path $TestDrive 'missing-inventory.json'), 'Process')
 
         $config = Get-PackageConfig -DefinitionId 'VisualCppRedistributable'
-        $result = New-PackageResult -CommandName 'test' -PackageConfig $config
+        $result = New-PackageResult -PackageConfig $config
         $result = Resolve-PackagePackage -PackageResult $result
         $sourceDefinition = Get-PackageSourceDefinition -PackageConfig $config -SourceRef ([pscustomobject]@{ scope = 'definition'; id = 'visualCppRedistributableDownload' })
 
@@ -704,7 +826,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
         Mock Get-VideoMemoryGiB { 1.0 }
 
         $config = Get-PackageConfig -DefinitionId 'Qwen35_2B_Q8_0_Model'
-        $result = New-PackageResult -CommandName 'test' -PackageConfig $config
+        $result = New-PackageResult -PackageConfig $config
         $result = Resolve-PackagePackage -PackageResult $result
         $sourceDefinition = Get-PackageSourceDefinition -PackageConfig $config -SourceRef ([pscustomobject]@{ scope = 'definition'; id = 'huggingFaceDownload' })
 
@@ -729,7 +851,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
         Mock Get-VideoMemoryGiB { 2.0 }
 
         $config = Get-PackageConfig -DefinitionId 'Qwen35_9B_Q6_K_Model'
-        $result = New-PackageResult -CommandName 'test' -PackageConfig $config
+        $result = New-PackageResult -PackageConfig $config
         $result = Resolve-PackagePackage -PackageResult $result
         $sourceDefinition = Get-PackageSourceDefinition -PackageConfig $config -SourceRef ([pscustomobject]@{ scope = 'definition'; id = 'huggingFaceDownload' })
 
@@ -1047,7 +1169,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
         Mock Get-PackageDefinitionPath { param($DefinitionId) $documents.DefinitionPath }
 
         $config = Get-PackageConfig -DefinitionId 'VSCodeRuntime'
-        $result = New-PackageResult -CommandName 'test' -PackageConfig $config
+        $result = New-PackageResult -PackageConfig $config
 
         { Resolve-PackagePackage -PackageResult $result } | Should -Throw '*compatibility.checks*'
     }
@@ -1101,7 +1223,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
         Mock Get-PackageDefinitionPath { param($DefinitionId) $documents.DefinitionPath }
 
         $config = Get-PackageConfig -DefinitionId 'VSCodeRuntime'
-        $result = New-PackageResult -CommandName 'test' -PackageConfig $config
+        $result = New-PackageResult -PackageConfig $config
         $result = Resolve-PackagePackage -PackageResult $result
         $definitionSource = Get-PackageSourceDefinition -PackageConfig $config -SourceRef ([pscustomobject]@{ scope = 'definition'; id = 'llamaCppGitHub' })
 
@@ -1173,7 +1295,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
         }
 
         $config = Get-PackageConfig -DefinitionId 'VSCodeRuntime'
-        $result = New-PackageResult -CommandName 'test' -PackageConfig $config
+        $result = New-PackageResult -PackageConfig $config
         $result = Resolve-PackagePackage -PackageResult $result
         $sourceDefinition = Get-PackageSourceDefinition -PackageConfig $config -SourceRef ([pscustomobject]@{ scope = 'definition'; id = 'llamaCppGitHub' })
         $resolvedSource = Resolve-PackageSource -SourceDefinition $sourceDefinition -AcquisitionCandidate $result.Package.acquisitionCandidates[0] -Package $result.Package
@@ -1285,7 +1407,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
         Mock Get-PackageDefinitionPath { param($DefinitionId) $documents.DefinitionPath }
 
         $config = Get-PackageConfig -DefinitionId 'VSCodeRuntime'
-        $result = New-PackageResult -CommandName 'test' -PackageConfig $config
+        $result = New-PackageResult -PackageConfig $config
         $result = Resolve-PackagePackage -PackageResult $result
         $result = Resolve-PackagePaths -PackageResult $result
 
@@ -1322,7 +1444,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
         }
 
         $config = Get-PackageConfig -DefinitionId 'VSCodeRuntime'
-        $result = New-PackageResult -CommandName 'test' -PackageConfig $config
+        $result = New-PackageResult -PackageConfig $config
         $result = Resolve-PackagePackage -PackageResult $result
         $null = Resolve-PackagePaths -PackageResult $result
 

@@ -59,7 +59,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - acquis
         Mock Get-PackageDefinitionPath { param($DefinitionId) $documents.DefinitionPath }
 
         $config = Get-PackageConfig -DefinitionId 'VSCodeRuntime'
-        $result = New-PackageResult -CommandName 'test' -PackageConfig $config
+        $result = New-PackageResult -PackageConfig $config
         $result = Resolve-PackagePackage -PackageResult $result
         $result = Resolve-PackagePaths -PackageResult $result
 
@@ -94,7 +94,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - acquis
         Mock Save-PackageDownloadFile { throw 'download should not run when the default package depot already has a verified artifact' }
 
         $config = Get-PackageConfig -DefinitionId 'VSCodeRuntime'
-        $result = New-PackageResult -CommandName 'test' -PackageConfig $config
+        $result = New-PackageResult -PackageConfig $config
         $result = Resolve-PackagePackage -PackageResult $result
         $result = Resolve-PackagePaths -PackageResult $result
         $result = Build-PackageAcquisitionPlan -PackageResult $result
@@ -143,7 +143,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - acquis
         Mock Save-PackageDownloadFile { throw 'download should not run when a readable package depot already has a verified artifact' }
 
         $config = Get-PackageConfig -DefinitionId 'VSCodeRuntime'
-        $result = New-PackageResult -CommandName 'test' -PackageConfig $config
+        $result = New-PackageResult -PackageConfig $config
         $result = Resolve-PackagePackage -PackageResult $result
         $result = Resolve-PackagePaths -PackageResult $result
         $result = Build-PackageAcquisitionPlan -PackageResult $result
@@ -177,7 +177,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - acquis
         Mock Get-PackageDefinitionPath { param($DefinitionId) $documents.DefinitionPath }
 
         $config = Get-PackageConfig -DefinitionId 'VSCodeRuntime'
-        $result = New-PackageResult -CommandName 'test' -PackageConfig $config
+        $result = New-PackageResult -PackageConfig $config
         $result = Resolve-PackagePackage -PackageResult $result
         $result = Resolve-PackagePaths -PackageResult $result
         $result = Build-PackageAcquisitionPlan -PackageResult $result
@@ -213,7 +213,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - acquis
         Mock Get-PackageDefinitionPath { param($DefinitionId) $documents.DefinitionPath }
 
         $config = Get-PackageConfig -DefinitionId 'VSCodeRuntime'
-        $result = New-PackageResult -CommandName 'test' -PackageConfig $config
+        $result = New-PackageResult -PackageConfig $config
         $result = Resolve-PackagePackage -PackageResult $result
         $result = Resolve-PackagePaths -PackageResult $result
         $result = Find-PackageExistingPackage -PackageResult $result
@@ -245,7 +245,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - acquis
         Mock Get-PackageDefinitionPath { param($DefinitionId) $documents.DefinitionPath }
 
         $config = Get-PackageConfig -DefinitionId 'VSCodeRuntime'
-        $result = New-PackageResult -CommandName 'test' -PackageConfig $config
+        $result = New-PackageResult -PackageConfig $config
         $result = Resolve-PackagePackage -PackageResult $result
         $result = Resolve-PackagePaths -PackageResult $result
         $result = Find-PackageExistingPackage -PackageResult $result
@@ -293,7 +293,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - acquis
         Mock Get-PackageDefinitionPath { param($DefinitionId) $documents.DefinitionPath }
 
         $config = Get-PackageConfig -DefinitionId 'VSCodeRuntime'
-        $result = New-PackageResult -CommandName 'test' -PackageConfig $config
+        $result = New-PackageResult -PackageConfig $config
         $result = Resolve-PackagePackage -PackageResult $result
         $result = Resolve-PackagePaths -PackageResult $result
         $result = Find-PackageExistingPackage -PackageResult $result
@@ -324,7 +324,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - acquis
         Mock Get-PackageDefinitionPath { param($DefinitionId) $documents.DefinitionPath }
 
         $config = Get-PackageConfig -DefinitionId 'VSCodeRuntime'
-        $result = New-PackageResult -CommandName 'test' -PackageConfig $config
+        $result = New-PackageResult -PackageConfig $config
         $result = Resolve-PackagePackage -PackageResult $result
         $result = Resolve-PackagePaths -PackageResult $result
         $result = Find-PackageExistingPackage -PackageResult $result
@@ -361,7 +361,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - acquis
         Mock Get-PackageDefinitionPath { param($DefinitionId) $documents.DefinitionPath }
 
         $config = Get-PackageConfig -DefinitionId 'VSCodeRuntime'
-        $result = New-PackageResult -CommandName 'test' -PackageConfig $config
+        $result = New-PackageResult -PackageConfig $config
         $result = Resolve-PackagePackage -PackageResult $result
         $result = Resolve-PackagePaths -PackageResult $result
         $result = Build-PackageAcquisitionPlan -PackageResult $result
@@ -373,7 +373,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - acquis
 
         Remove-Item -LiteralPath (Join-Path $result.InstallDirectory 'data') -Recurse -Force
 
-        $rerun = New-PackageResult -CommandName 'test' -PackageConfig $config
+        $rerun = New-PackageResult -PackageConfig $config
         $rerun = Resolve-PackagePackage -PackageResult $rerun
         $rerun = Resolve-PackagePaths -PackageResult $rerun
         $rerun = Build-PackageAcquisitionPlan -PackageResult $rerun

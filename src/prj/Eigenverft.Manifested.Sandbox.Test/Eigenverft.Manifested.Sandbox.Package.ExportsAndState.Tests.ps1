@@ -5,6 +5,29 @@
 . "$PSScriptRoot\Eigenverft.Manifested.Sandbox.Module.TestHelpers.ps1"
 
 Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - exports and state' -Body {
+    It 'exports Invoke-PackageDefinitionCommand with generic package parameters' {
+        $module = Import-Module -Name $script:ModuleManifestPath -Force -PassThru
+        $command = Get-Command -Name 'Invoke-PackageDefinitionCommand'
+
+        $command | Should -Not -BeNullOrEmpty
+        $command.Parameters.Keys | Should -Contain 'DefinitionId'
+        $command.Parameters.Keys | Should -Contain 'RepositoryId'
+        $command.Parameters.Keys | Should -Contain 'DesiredState'
+        $command.Parameters.Keys | Should -Not -Contain 'CommandName'
+        $command.Parameters.Keys | Should -Not -Contain 'DependencyStack'
+    }
+
+    It 'exports Invoke-Package as the slim public package command' {
+        $module = Import-Module -Name $script:ModuleManifestPath -Force -PassThru
+        $command = Get-Command -Name 'Invoke-Package'
+
+        $command | Should -Not -BeNullOrEmpty
+        $command.Parameters.Keys | Should -Contain 'DefinitionId'
+        $command.Parameters.Keys | Should -Contain 'DesiredState'
+        $command.Parameters.Keys | Should -Not -Contain 'RepositoryId'
+        $command.Parameters.Keys | Should -Not -Contain 'DependencyStack'
+    }
+
     It 'exports Invoke-VSCodeRuntime and keeps it parameterless' {
         $module = Import-Module -Name $script:ModuleManifestPath -Force -PassThru
         $command = Get-Command -Name 'Invoke-VSCodeRuntime'

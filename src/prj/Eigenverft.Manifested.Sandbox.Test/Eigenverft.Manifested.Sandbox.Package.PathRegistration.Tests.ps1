@@ -110,7 +110,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - path r
         Write-TestTextFile -Path (Join-Path $cmdDirectory 'git.exe') -Content 'fake git'
 
         $config = Get-PackageConfig -DefinitionId 'GitRuntime'
-        $packageResult = New-PackageResult -CommandName 'test' -PackageConfig $config
+        $packageResult = New-PackageResult -PackageConfig $config
         $packageResult = Resolve-PackagePackage -PackageResult $packageResult
         $packageResult.InstallDirectory = $installRoot
         $packageResult.InstallOrigin = 'PackageInstalled'
@@ -133,7 +133,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - path r
         Write-TestTextFile -Path (Join-Path $binDirectory 'gh.exe') -Content 'fake gh'
 
         $config = Get-PackageConfig -DefinitionId 'GitHubCli'
-        $packageResult = New-PackageResult -CommandName 'test' -PackageConfig $config
+        $packageResult = New-PackageResult -PackageConfig $config
         $packageResult = Resolve-PackagePackage -PackageResult $packageResult
         $packageResult.InstallDirectory = $installRoot
         $packageResult.InstallOrigin = 'PackageInstalled'
@@ -155,7 +155,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - path r
         Write-TestTextFile -Path (Join-Path $installRoot 'node.exe') -Content 'fake node'
 
         $config = Get-PackageConfig -DefinitionId 'NodeRuntime'
-        $packageResult = New-PackageResult -CommandName 'test' -PackageConfig $config
+        $packageResult = New-PackageResult -PackageConfig $config
         $packageResult = Resolve-PackagePackage -PackageResult $packageResult
         $packageResult.InstallDirectory = $installRoot
         $packageResult.InstallOrigin = 'PackageInstalled'
@@ -185,7 +185,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - path r
             Write-TestTextFile -Path (Join-Path $installRoot $case.CommandFile) -Content '@echo off'
 
             $config = Get-PackageConfig -DefinitionId $case.DefinitionId
-            $packageResult = New-PackageResult -CommandName 'test' -PackageConfig $config
+            $packageResult = New-PackageResult -PackageConfig $config
             $packageResult = Resolve-PackagePackage -PackageResult $packageResult
             $packageResult.InstallDirectory = $installRoot
             $packageResult.InstallOrigin = 'PackageInstalled'
@@ -208,7 +208,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - path r
         Write-TestTextFile -Path (Join-Path $installRoot 'python.exe') -Content 'fake python'
 
         $config = Get-PackageConfig -DefinitionId 'PythonRuntime'
-        $packageResult = New-PackageResult -CommandName 'test' -PackageConfig $config
+        $packageResult = New-PackageResult -PackageConfig $config
         $packageResult = Resolve-PackagePackage -PackageResult $packageResult
         $packageResult.InstallDirectory = $installRoot
         $packageResult.InstallOrigin = 'PackageInstalled'
@@ -230,7 +230,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - path r
         Write-TestTextFile -Path (Join-Path $installRoot 'pwsh.exe') -Content 'fake pwsh'
 
         $config = Get-PackageConfig -DefinitionId 'PowerShell7'
-        $packageResult = New-PackageResult -CommandName 'test' -PackageConfig $config
+        $packageResult = New-PackageResult -PackageConfig $config
         $packageResult = Resolve-PackagePackage -PackageResult $packageResult
         $packageResult.InstallDirectory = $installRoot
         $packageResult.InstallOrigin = 'PackageInstalled'
@@ -324,12 +324,12 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - path r
             }
             ExistingPackage = [pscustomobject]@{
                 InstallDirectory = $oldInstallRoot
-                Classification   = 'PackageOwned'
+                Classification   = 'PackageTarget'
                 Decision         = 'ReplacePackageOwnedInstall'
             }
             Ownership = [pscustomobject]@{
                 InstallSlotId   = 'VSCodeRuntime:stable:win32-x64'
-                Classification  = 'PackageOwned'
+                Classification  = 'PackageTarget'
                 OwnershipRecord = [pscustomobject]@{
                     installDirectory = $oldInstallRoot
                     ownershipKind    = 'PackageInstalled'

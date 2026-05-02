@@ -21,6 +21,6 @@ Invoke-LlamaCppRuntime
     [CmdletBinding()]
     param()
 
-    return (Invoke-PackageDefinitionCommand -DefinitionId 'LlamaCppRuntime' -CommandName 'Invoke-LlamaCppRuntime')
+    return (Invoke-PackageDefinitionCommand -RepositoryId 'EigenverftModule' -DefinitionId 'LlamaCppRuntime' -DesiredState Assigned)
 }
 

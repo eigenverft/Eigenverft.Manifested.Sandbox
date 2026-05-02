@@ -23,6 +23,7 @@
 . "$PSScriptRoot\Support\Upstream\Eigenverft.Manifested.Sandbox.Upstream.GitHubRelease.ps1"
 . "$PSScriptRoot\Support\Package\Eigenverft.Manifested.Sandbox.Package.ExecutionMessage.ps1"
 . "$PSScriptRoot\Support\Package\Eigenverft.Manifested.Sandbox.Package.Bootstrap.ps1"
+. "$PSScriptRoot\Support\Package\Eigenverft.Manifested.Sandbox.Package.DefinitionReference.ps1"
 . "$PSScriptRoot\Support\Package\Eigenverft.Manifested.Sandbox.Package.Config.ps1"
 . "$PSScriptRoot\Support\Package\Eigenverft.Manifested.Sandbox.Package.LocalEnvironment.ps1"
 . "$PSScriptRoot\Support\Package\Eigenverft.Manifested.Sandbox.Package.Selection.ps1"

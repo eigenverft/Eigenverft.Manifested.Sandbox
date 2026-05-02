@@ -17,6 +17,6 @@ Invoke-QwenCli
     [CmdletBinding()]
     param()
 
-    return (Invoke-PackageDefinitionCommand -DefinitionId 'QwenCli' -CommandName 'Invoke-QwenCli')
+    return (Invoke-PackageDefinitionCommand -RepositoryId 'EigenverftModule' -DefinitionId 'QwenCli' -DesiredState Assigned)
 }
 

@@ -18,6 +18,6 @@ Invoke-VisualCppRedistributable
     [CmdletBinding()]
     param()
 
-    return (Invoke-PackageDefinitionCommand -DefinitionId 'VisualCppRedistributable' -CommandName 'Invoke-VisualCppRedistributable')
+    return (Invoke-PackageDefinitionCommand -RepositoryId 'EigenverftModule' -DefinitionId 'VisualCppRedistributable' -DesiredState Assigned)
 }
 

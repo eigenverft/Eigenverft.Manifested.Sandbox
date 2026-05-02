@@ -1350,7 +1350,9 @@ Assert-PackageDefinitionSchema -DefinitionDocumentInfo $definitionInfo -Definiti
         [psobject]$DefinitionDocumentInfo,
 
         [Parameter(Mandatory = $true)]
-        [string]$DefinitionId
+        [string]$DefinitionId,
+
+        [string]$DefinitionRepositoryId = (Get-PackageDefaultRepositoryId)
     )
 
     $definition = $DefinitionDocumentInfo.Document
@@ -1381,7 +1383,15 @@ Assert-PackageDefinitionSchema -DefinitionDocumentInfo $definitionInfo -Definiti
             if (-not $dependency.PSObject.Properties['definitionId'] -or [string]::IsNullOrWhiteSpace([string]$dependency.definitionId)) {
                 throw "Package definition '$($definition.id)' has dependency without definitionId."
             }
-            if ([string]::Equals([string]$dependency.definitionId, [string]$definition.id, [System.StringComparison]::OrdinalIgnoreCase)) {
+            $dependencyRepositoryId = $DefinitionRepositoryId
+            if ($dependency.PSObject.Properties['repositoryId']) {
+                if ([string]::IsNullOrWhiteSpace([string]$dependency.repositoryId)) {
+                    throw "Package definition '$($definition.id)' has dependency '$($dependency.definitionId)' with empty repositoryId."
+                }
+                $dependencyRepositoryId = [string]$dependency.repositoryId
+            }
+            if ([string]::Equals([string]$dependency.definitionId, [string]$definition.id, [System.StringComparison]::OrdinalIgnoreCase) -and
+                [string]::Equals($dependencyRepositoryId, $DefinitionRepositoryId, [System.StringComparison]::OrdinalIgnoreCase)) {
                 throw "Package definition '$($definition.id)' cannot depend on itself."
             }
         }
@@ -1929,6 +1939,9 @@ Get-PackageConfig -DefinitionId VSCodeRuntime
 #>
     [CmdletBinding()]
     param(
+        [AllowNull()]
+        [string]$RepositoryId = (Get-PackageDefaultRepositoryId),
+
         [Parameter(Mandatory = $true)]
         [string]$DefinitionId
     )
@@ -1936,8 +1949,9 @@ Get-PackageConfig -DefinitionId VSCodeRuntime
     $globalDocumentInfo = Read-PackageJsonDocument -Path (Get-PackageGlobalConfigPath)
     Assert-PackageGlobalConfigSchema -GlobalDocumentInfo $globalDocumentInfo
 
-    $definitionDocumentInfo = Read-PackageJsonDocument -Path (Get-PackageDefinitionPath -DefinitionId $DefinitionId)
-    Assert-PackageDefinitionSchema -DefinitionDocumentInfo $definitionDocumentInfo -DefinitionId $DefinitionId
+    $definitionReference = Resolve-PackageDefinitionReference -RepositoryId $RepositoryId -DefinitionId $DefinitionId
+    $definitionDocumentInfo = Read-PackageJsonDocument -Path $definitionReference.DefinitionPath
+    Assert-PackageDefinitionSchema -DefinitionDocumentInfo $definitionDocumentInfo -DefinitionId $DefinitionId -DefinitionRepositoryId $definitionReference.RepositoryId
 
     $packageGlobalConfig = $globalDocumentInfo.Document.package
     $applicationRootDirectory = Resolve-PackageApplicationRootDirectory -GlobalConfiguration $packageGlobalConfig
@@ -1997,7 +2011,7 @@ Get-PackageConfig -DefinitionId VSCodeRuntime
         }
     }
 
-    $definitionRepositoryId = Get-PackageDefaultRepositoryId
+    $definitionRepositoryId = [string]$definitionReference.RepositoryId
     $definitionFileName = Split-Path -Leaf $definitionDocumentInfo.Path
 
     $display = if ($definition.display -and $definition.display.PSObject.Properties['default'] -and $null -ne $definition.display.default) {
@@ -2016,6 +2030,7 @@ Get-PackageConfig -DefinitionId VSCodeRuntime
         DepotInventoryPath                 = $effectiveAcquisitionEnvironment.DepotInventoryPath
         DepotInventory                     = $depotInventoryInfo.Document
         EffectiveAcquisitionEnvironment    = $effectiveAcquisitionEnvironment
+        DefinitionReference                = $definitionReference
         DefinitionPath                     = $definitionDocumentInfo.Path
         Definition                         = $definition
         DefinitionId                       = [string]$definition.id
@@ -2165,26 +2180,24 @@ Creates the initial Package result object.
 Creates the result object that later Package stage helpers enrich with
 release selection, package file, install, ownership, validation, and entry-point data.
 
-.PARAMETER CommandName
-The command that owns the result.
-
 .PARAMETER PackageConfig
 The resolved Package config object for the command.
 
 .EXAMPLE
-New-PackageResult -CommandName Invoke-VSCodeRuntime -PackageConfig $config
+New-PackageResult -PackageConfig $config
 #>
     [CmdletBinding()]
     param(
-        [Parameter(Mandatory = $true)]
-        [string]$CommandName,
+        [ValidateSet('Assigned', 'Removed')]
+        [string]$DesiredState = 'Assigned',
 
         [Parameter(Mandatory = $true)]
         [psobject]$PackageConfig
     )
 
     return [pscustomobject]@{
-        CommandName                      = $CommandName
+        DesiredState                     = $DesiredState
+        RepositoryId                     = $PackageConfig.DefinitionRepositoryId
         Status                           = 'Pending'
         FailureReason                    = $null
         ErrorMessage                     = $null

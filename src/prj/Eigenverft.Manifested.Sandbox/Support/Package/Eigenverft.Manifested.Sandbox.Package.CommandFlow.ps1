@@ -57,6 +57,7 @@ function Get-PackageCommandFailureReason {
 
     switch -Exact ($CurrentStep) {
         'InitializeLocalEnvironment' { return 'LocalEnvironmentInitializationFailed' }
+        'ResolveDesiredState' { return 'PackageDesiredStateNotImplemented' }
         'ResolvePackage' { return 'PackageSelectionFailed' }
         'ResolveDependencies' { return 'PackageDependencyFailed' }
         'ResolvePaths' { return 'PackagePathResolutionFailed' }
@@ -109,22 +110,15 @@ function Clear-PackageWorkDirectories {
     return $PackageResult
 }
 
-function Invoke-PackageDefinitionCommand {
+function Invoke-PackageAssignedFlow {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true)]
-        [ValidateNotNullOrEmpty()]
-        [string]$DefinitionId,
-
-        [Parameter(Mandatory = $true)]
-        [ValidateNotNullOrEmpty()]
-        [string]$CommandName,
+        [psobject]$PackageResult,
 
         [object[]]$DependencyStack = @()
     )
 
-    $packageConfig = Get-PackageConfig -DefinitionId $DefinitionId
-    $result = New-PackageResult -CommandName $CommandName -PackageConfig $packageConfig
     $steps = @(
         [pscustomobject]@{ Name = 'ResolvePackage'; Message = '[STEP] Resolving package selection.'; Action = { param($r) Resolve-PackagePackage -PackageResult $r } },
         [pscustomobject]@{ Name = 'ResolveDependencies'; Message = '[STEP] Ensuring package dependencies.'; Action = { param($r) Resolve-PackageDependencies -PackageResult $r -DependencyStack $DependencyStack } },
@@ -144,37 +138,106 @@ function Invoke-PackageDefinitionCommand {
     )
 
     try {
-        Write-PackageExecutionMessage -Message ("[START] {0}" -f $CommandName)
-        $result.CurrentStep = 'InitializeLocalEnvironment'
+        Write-PackageExecutionMessage -Message ("[START] Invoke-PackageDefinitionCommand repository='{0}' definition='{1}' desiredState='{2}'." -f $PackageResult.RepositoryId, $PackageResult.DefinitionId, $PackageResult.DesiredState)
+        $PackageResult.CurrentStep = 'InitializeLocalEnvironment'
         Write-PackageExecutionMessage -Message '[STEP] Initializing local package environment.'
-        $result.LocalEnvironment = Initialize-PackageLocalEnvironment -PackageConfig $packageConfig
-        if ($result.LocalEnvironment.InitializedNow) {
-            Write-PackageExecutionMessage -Message ("[STATE] Local package environment initialized: created={0}, existing={1}, skippedSources={2}." -f @($result.LocalEnvironment.CreatedDirectories).Count, @($result.LocalEnvironment.ExistingDirectories).Count, @($result.LocalEnvironment.SkippedSources).Count)
+        $PackageResult.LocalEnvironment = Initialize-PackageLocalEnvironment -PackageConfig $PackageResult.PackageConfig
+        if ($PackageResult.LocalEnvironment.InitializedNow) {
+            Write-PackageExecutionMessage -Message ("[STATE] Local package environment initialized: created={0}, existing={1}, skippedSources={2}." -f @($PackageResult.LocalEnvironment.CreatedDirectories).Count, @($PackageResult.LocalEnvironment.ExistingDirectories).Count, @($PackageResult.LocalEnvironment.SkippedSources).Count)
         }
         else {
             Write-PackageExecutionMessage -Message '[STATE] Local package environment already initialized.'
         }
 
         foreach ($step in $steps) {
-            $result.CurrentStep = $step.Name
+            $PackageResult.CurrentStep = $step.Name
             Write-PackageExecutionMessage -Message $step.Message
-            $result = & $step.Action $result
-            if ($step.Name -eq 'ValidateInstalledPackage' -and (-not $result.Validation -or -not $result.Validation.Accepted)) {
-                $failedCount = if ($result.Validation -and $result.Validation.PSObject.Properties['FailedChecks']) { @($result.Validation.FailedChecks).Count } else { 0 }
-                throw ("Package validation failed for '{0}' with {1} failed check(s)." -f $result.PackageId, $failedCount)
+            $PackageResult = & $step.Action $PackageResult
+            if ($step.Name -eq 'ValidateInstalledPackage' -and (-not $PackageResult.Validation -or -not $PackageResult.Validation.Accepted)) {
+                $failedCount = if ($PackageResult.Validation -and $PackageResult.Validation.PSObject.Properties['FailedChecks']) { @($PackageResult.Validation.FailedChecks).Count } else { 0 }
+                throw ("Package validation failed for '{0}' with {1} failed check(s)." -f $PackageResult.PackageId, $failedCount)
             }
         }
-        Write-PackageExecutionMessage -Message (Get-PackageOutcomeSummary -PackageResult $result)
-        Write-PackageExecutionMessage -Message ("[OK] Package completed with InstallOrigin='{0}' and InstallStatus='{1}'." -f $result.InstallOrigin, $result.Install.Status)
+        Write-PackageExecutionMessage -Message (Get-PackageOutcomeSummary -PackageResult $PackageResult)
+        Write-PackageExecutionMessage -Message ("[OK] Package completed with InstallOrigin='{0}' and InstallStatus='{1}'." -f $PackageResult.InstallOrigin, $PackageResult.Install.Status)
     }
     catch {
-        $result.Status = 'Failed'
-        $result.ErrorMessage = $_.Exception.Message
-        Write-PackageExecutionMessage -Level 'ERR' -Message ("[FAIL] Step '{0}' failed: {1}" -f $result.CurrentStep, $_.Exception.Message)
-        $result.FailureReason = Get-PackageCommandFailureReason -CurrentStep ([string]$result.CurrentStep)
+        $PackageResult.Status = 'Failed'
+        $PackageResult.ErrorMessage = $_.Exception.Message
+        Write-PackageExecutionMessage -Level 'ERR' -Message ("[FAIL] Step '{0}' failed: {1}" -f $PackageResult.CurrentStep, $_.Exception.Message)
+        $PackageResult.FailureReason = Get-PackageCommandFailureReason -CurrentStep ([string]$PackageResult.CurrentStep)
     }
 
+    return $PackageResult
+}
+
+function Invoke-PackageDefinitionCommandCore {
+    [CmdletBinding()]
+    param(
+        [AllowNull()]
+        [string]$RepositoryId = (Get-PackageDefaultRepositoryId),
+
+        [Parameter(Mandatory = $true)]
+        [ValidateNotNullOrEmpty()]
+        [string]$DefinitionId,
+
+        [ValidateSet('Assigned', 'Removed')]
+        [string]$DesiredState = 'Assigned',
+
+        [object[]]$DependencyStack = @()
+    )
+
+    $packageConfig = Get-PackageConfig -RepositoryId $RepositoryId -DefinitionId $DefinitionId
+    $result = New-PackageResult -DesiredState $DesiredState -PackageConfig $packageConfig
+
+    if ([string]::Equals($DesiredState, 'Removed', [System.StringComparison]::OrdinalIgnoreCase)) {
+        Write-PackageExecutionMessage -Message ("[START] Invoke-PackageDefinitionCommand repository='{0}' definition='{1}' desiredState='{2}'." -f $result.RepositoryId, $result.DefinitionId, $result.DesiredState)
+        $result.CurrentStep = 'ResolveDesiredState'
+        $result.Status = 'Failed'
+        $result.FailureReason = 'PackageDesiredStateNotImplemented'
+        $result.ErrorMessage = "DesiredState 'Removed' is not implemented yet for package definition '$DefinitionId'."
+        Write-PackageExecutionMessage -Level 'ERR' -Message ("[FAIL] DesiredState 'Removed' is not implemented yet for package definition '{0}'." -f $DefinitionId)
+        return (Complete-PackageResult -PackageResult $result)
+    }
+
+    $result = Invoke-PackageAssignedFlow -PackageResult $result -DependencyStack $DependencyStack
     return (Complete-PackageResult -PackageResult $result)
 }
 
+function Invoke-PackageDefinitionCommand {
+    [CmdletBinding()]
+    param(
+        [AllowNull()]
+        [string]$RepositoryId = (Get-PackageDefaultRepositoryId),
+
+        [Parameter(Mandatory = $true)]
+        [ValidateNotNullOrEmpty()]
+        [string[]]$DefinitionId,
+
+        [ValidateSet('Assigned', 'Removed')]
+        [string]$DesiredState = 'Assigned'
+    )
+
+    foreach ($definition in $DefinitionId) {
+        $result = Invoke-PackageDefinitionCommandCore -RepositoryId $RepositoryId -DefinitionId $definition -DesiredState $DesiredState
+        $result
+        if ($result -and -not [string]::Equals([string]$result.Status, 'Ready', [System.StringComparison]::OrdinalIgnoreCase)) {
+            break
+        }
+    }
+}
+
+function Invoke-Package {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [ValidateNotNullOrEmpty()]
+        [string[]]$DefinitionId,
+
+        [ValidateSet('Assigned', 'Removed')]
+        [string]$DesiredState = 'Assigned'
+    )
+
+    Invoke-PackageDefinitionCommand -DefinitionId $DefinitionId -DesiredState $DesiredState
+}
 

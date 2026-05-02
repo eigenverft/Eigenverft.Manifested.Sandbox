@@ -20,6 +20,6 @@ Invoke-GitRuntime
     [CmdletBinding()]
     param()
 
-    return (Invoke-PackageDefinitionCommand -DefinitionId 'GitRuntime' -CommandName 'Invoke-GitRuntime')
+    return (Invoke-PackageDefinitionCommand -RepositoryId 'EigenverftModule' -DefinitionId 'GitRuntime' -DesiredState Assigned)
 }
 

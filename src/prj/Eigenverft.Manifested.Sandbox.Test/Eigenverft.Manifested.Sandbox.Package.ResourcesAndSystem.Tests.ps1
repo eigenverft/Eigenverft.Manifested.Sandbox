@@ -123,7 +123,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - resour
         Mock Get-PackageDefinitionPath { param($DefinitionId) $documents.DefinitionPath }
 
         $config = Get-PackageConfig -DefinitionId 'VSCodeRuntime'
-        $result = New-PackageResult -CommandName 'test' -PackageConfig $config
+        $result = New-PackageResult -PackageConfig $config
         $result = Resolve-PackagePackage -PackageResult $result
         $result.InstallDirectory = $installRoot
         $result.Validation = [pscustomobject]@{

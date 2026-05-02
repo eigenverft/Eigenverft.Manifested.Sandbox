@@ -17,6 +17,6 @@ Invoke-CodexCli
     [CmdletBinding()]
     param()
 
-    return (Invoke-PackageDefinitionCommand -DefinitionId 'CodexCli' -CommandName 'Invoke-CodexCli')
+    return (Invoke-PackageDefinitionCommand -RepositoryId 'EigenverftModule' -DefinitionId 'CodexCli' -DesiredState Assigned)
 }
 
