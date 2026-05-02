@@ -39,11 +39,26 @@ archive backend can be replaced later without touching Package flows.
     $resolvedDestinationDirectory = [System.IO.Path]::GetFullPath($DestinationDirectory)
     $null = New-Item -ItemType Directory -Path $resolvedDestinationDirectory -Force
 
-    if ($Overwrite) {
-        Expand-Archive -LiteralPath $resolvedArchivePath -DestinationPath $resolvedDestinationDirectory -Force
+    $archivePathForExpansion = $resolvedArchivePath
+    $archiveAliasPath = $null
+    if ([string]::Equals([System.IO.Path]::GetExtension($resolvedArchivePath), '.nupkg', [System.StringComparison]::OrdinalIgnoreCase)) {
+        $archiveAliasPath = Join-Path $resolvedDestinationDirectory ('{0}.zip' -f [System.IO.Path]::GetFileNameWithoutExtension($resolvedArchivePath))
+        Copy-Item -LiteralPath $resolvedArchivePath -Destination $archiveAliasPath -Force
+        $archivePathForExpansion = $archiveAliasPath
     }
-    else {
-        Expand-Archive -LiteralPath $resolvedArchivePath -DestinationPath $resolvedDestinationDirectory
+
+    try {
+        if ($Overwrite) {
+            Expand-Archive -LiteralPath $archivePathForExpansion -DestinationPath $resolvedDestinationDirectory -Force
+        }
+        else {
+            Expand-Archive -LiteralPath $archivePathForExpansion -DestinationPath $resolvedDestinationDirectory
+        }
+    }
+    finally {
+        if ($archiveAliasPath -and (Test-Path -LiteralPath $archiveAliasPath)) {
+            Remove-Item -LiteralPath $archiveAliasPath -Force -ErrorAction SilentlyContinue
+        }
     }
 
     return $resolvedDestinationDirectory

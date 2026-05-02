@@ -193,6 +193,25 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - execut
         Test-Path -LiteralPath (Join-Path $destinationDirectory 'bin\code.cmd') | Should -BeTrue
     }
 
+    It 'extracts a nupkg archive through a zip alias and removes the alias' {
+        $rootPath = Join-Path $TestDrive 'archive-extract-nupkg'
+        $sourceDirectory = Join-Path $rootPath 'source'
+        $destinationDirectory = Join-Path $rootPath 'destination'
+        $zipPath = Join-Path $rootPath 'package.zip'
+        $nupkgPath = Join-Path $rootPath 'python.1.0.0.nupkg'
+
+        $null = New-Item -ItemType Directory -Path (Join-Path $sourceDirectory 'tools') -Force
+        Write-TestTextFile -Path (Join-Path $sourceDirectory 'tools\python.exe') -Content 'python'
+        Write-TestZipFromDirectory -SourceDirectory $sourceDirectory -ZipPath $zipPath
+        Move-Item -LiteralPath $zipPath -Destination $nupkgPath
+
+        $resolvedDestination = Expand-ArchiveToDirectory -ArchivePath $nupkgPath -DestinationDirectory $destinationDirectory
+
+        $resolvedDestination | Should -Be ([System.IO.Path]::GetFullPath($destinationDirectory))
+        Test-Path -LiteralPath (Join-Path $destinationDirectory 'tools\python.exe') | Should -BeTrue
+        Test-Path -LiteralPath (Join-Path $destinationDirectory 'python.1.0.0.zip') | Should -BeFalse
+    }
+
     It 'overwrites existing extracted files when requested' {
         $rootPath = Join-Path $TestDrive 'archive-extract-overwrite'
         $firstSourceDirectory = Join-Path $rootPath 'source-a'
