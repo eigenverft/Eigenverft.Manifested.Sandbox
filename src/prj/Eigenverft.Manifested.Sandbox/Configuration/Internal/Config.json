@@ -20,7 +20,7 @@
       },
       "defaults": {
         "allowFallback": true
-      },
+      }
     },
     "packageState": {
       "inventoryFilePath": "{applicationRootDirectory}/State/package-inventory.json",
