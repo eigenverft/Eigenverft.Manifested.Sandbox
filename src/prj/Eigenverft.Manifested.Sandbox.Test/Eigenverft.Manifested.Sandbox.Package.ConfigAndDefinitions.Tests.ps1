@@ -23,6 +23,8 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
         $globalInfo.Document.package.acquisitionEnvironment.stores.PSObject.Properties.Name | Should -Not -Contain 'defaultPackageDepotDirectory'
         $globalInfo.Document.package.acquisitionEnvironment.defaults.PSObject.Properties.Name | Should -Contain 'allowFallback'
         $globalInfo.Document.package.acquisitionEnvironment.defaults.PSObject.Properties.Name | Should -Not -Contain 'mirrorDownloadedArtifactsToDefaultPackageDepot'
+        $globalInfo.Document.package.packageState.PSObject.Properties.Name | Should -Contain 'inventoryFilePath'
+        $globalInfo.Document.package.packageState.PSObject.Properties.Name | Should -Contain 'operationHistoryFilePath'
         $depotInfo = Read-PackageJsonDocument -Path (Get-PackageShippedDepotInventoryPath)
         $depotInfo.Document.acquisitionEnvironment.environmentSources.PSObject.Properties.Name | Should -Contain 'defaultPackageDepot'
         $depotInfo.Document.acquisitionEnvironment.environmentSources.defaultPackageDepot.readable | Should -BeTrue
@@ -30,7 +32,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
         $depotInfo.Document.acquisitionEnvironment.environmentSources.defaultPackageDepot.mirrorTarget | Should -BeTrue
         $depotInfo.Document.acquisitionEnvironment.environmentSources.defaultPackageDepot.ensureExists | Should -BeTrue
         $depotInfo.Document.acquisitionEnvironment.environmentSources.defaultPackageDepot.basePath | Should -Be '{applicationRootDirectory}/DefaultPackageDepot'
-        $globalInfo.Document.package.acquisitionEnvironment.tracking.PSObject.Properties.Name | Should -Contain 'packageFileIndexFilePath'
+        $globalInfo.Document.package.acquisitionEnvironment.PSObject.Properties.Name | Should -Not -Contain 'tracking'
         $globalInfo.Document.package.acquisitionEnvironment.PSObject.Properties['environmentSources'] | Should -BeNullOrEmpty
     }
 
@@ -418,12 +420,24 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
     It 'fails clearly when global config still uses retired artifactIndexFilePath' {
         $globalConfigPath = Join-Path $TestDrive 'Global-old-artifact.json'
         $badGlobal = New-TestPackageGlobalDocument
-        $badGlobal.package.acquisitionEnvironment.tracking.Remove('packageFileIndexFilePath')
+        $badGlobal.package.acquisitionEnvironment.tracking = @{}
         $badGlobal.package.acquisitionEnvironment.tracking.artifactIndexFilePath = Join-Path $TestDrive 'artifact-index.json'
         Write-TestJsonDocument -Path $globalConfigPath -Document $badGlobal
 
         $globalInfo = Read-PackageJsonDocument -Path $globalConfigPath
         { Assert-PackageGlobalConfigSchema -GlobalDocumentInfo $globalInfo } | Should -Throw '*artifactIndexFilePath*'
+    }
+
+    It 'fails clearly when global config still uses retired packageFileIndexFilePath' {
+        $globalConfigPath = Join-Path $TestDrive 'Global-old-package-file-index.json'
+        $badGlobal = New-TestPackageGlobalDocument
+        $badGlobal.package.acquisitionEnvironment.tracking = @{
+            packageFileIndexFilePath = Join-Path $TestDrive 'package-file-index.json'
+        }
+        Write-TestJsonDocument -Path $globalConfigPath -Document $badGlobal
+
+        $globalInfo = Read-PackageJsonDocument -Path $globalConfigPath
+        { Assert-PackageGlobalConfigSchema -GlobalDocumentInfo $globalInfo } | Should -Throw '*packageFileIndexFilePath*'
     }
 
     It 'fails clearly when global config still uses retired installWorkspaceDirectory' {

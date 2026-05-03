@@ -71,7 +71,7 @@ function Get-PackageCommandFailureReason {
         'ValidateInstalledPackage' { return 'InstalledPackageValidationFailed' }
         'RegisterPath' { return 'PathRegistrationFailed' }
         'ResolveEntryPoints' { return 'EntryPointResolutionFailed' }
-        'UpdateOwnership' { return 'OwnershipUpdateFailed' }
+        'UpdateInventory' { return 'PackageInventoryUpdateFailed' }
         'ClearPackageWorkDirectories' { return 'PackageWorkDirectoryCleanupFailed' }
         default { return 'PackageCommandFailed' }
     }
@@ -133,7 +133,7 @@ function Invoke-PackageAssignedFlow {
         [pscustomobject]@{ Name = 'ValidateInstalledPackage'; Message = '[STEP] Validating the installed package.'; Action = { param($r) Test-PackageInstalledPackage -PackageResult $r } },
         [pscustomobject]@{ Name = 'RegisterPath'; Message = '[STEP] Applying PATH registration.'; Action = { param($r) Register-PackagePath -PackageResult $r } },
         [pscustomobject]@{ Name = 'ResolveEntryPoints'; Message = '[STEP] Resolving entry points.'; Action = { param($r) Resolve-PackageEntryPoints -PackageResult $r } },
-        [pscustomobject]@{ Name = 'UpdateOwnership'; Message = '[STEP] Updating ownership tracking.'; Action = { param($r) Update-PackageOwnershipRecord -PackageResult $r } },
+        [pscustomobject]@{ Name = 'UpdateInventory'; Message = '[STEP] Updating package inventory.'; Action = { param($r) Update-PackageInventoryRecord -PackageResult $r } },
         [pscustomobject]@{ Name = 'ClearPackageWorkDirectories'; Message = '[STEP] Cleaning package staging directories.'; Action = { param($r) Clear-PackageWorkDirectories -PackageResult $r } }
     )
 
@@ -197,11 +197,19 @@ function Invoke-PackageDefinitionCommandCore {
         $result.FailureReason = 'PackageDesiredStateNotImplemented'
         $result.ErrorMessage = "DesiredState 'Removed' is not implemented yet for package definition '$DefinitionId'."
         Write-PackageExecutionMessage -Level 'ERR' -Message ("[FAIL] DesiredState 'Removed' is not implemented yet for package definition '{0}'." -f $DefinitionId)
-        return (Complete-PackageResult -PackageResult $result)
+        $completedResult = Complete-PackageResult -PackageResult $result
+        Add-PackageOperationHistoryRecord -PackageConfig $packageConfig -PackageResult $completedResult -FailedStep 'ResolveDesiredState'
+        return $completedResult
     }
 
     $result = Invoke-PackageAssignedFlow -PackageResult $result -DependencyStack $DependencyStack
-    return (Complete-PackageResult -PackageResult $result)
+    $failedStep = if ([string]::Equals([string]$result.Status, 'Failed', [System.StringComparison]::OrdinalIgnoreCase)) { [string]$result.CurrentStep } else { $null }
+    $completedResult = Complete-PackageResult -PackageResult $result
+    if ([string]::Equals([string]$completedResult.Status, 'Failed', [System.StringComparison]::OrdinalIgnoreCase) -and [string]::IsNullOrWhiteSpace($failedStep)) {
+        $failedStep = [string]$result.CurrentStep
+    }
+    Add-PackageOperationHistoryRecord -PackageConfig $packageConfig -PackageResult $completedResult -FailedStep $failedStep
+    return $completedResult
 }
 
 function Invoke-PackageDefinitionCommand {
@@ -240,4 +248,3 @@ function Invoke-Package {
 
     Invoke-PackageDefinitionCommand -DefinitionId $DefinitionId -DesiredState $DesiredState
 }
-

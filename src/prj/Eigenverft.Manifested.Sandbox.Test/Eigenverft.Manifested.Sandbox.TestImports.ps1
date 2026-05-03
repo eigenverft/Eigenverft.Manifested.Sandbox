@@ -33,6 +33,7 @@ $moduleProjectRoot = Join-Path (Split-Path -Parent $PSScriptRoot) 'Eigenverft.Ma
 . "$moduleProjectRoot\Support\Package\Eigenverft.Manifested.Sandbox.Package.Dependencies.ps1"
 . "$moduleProjectRoot\Support\Package\Eigenverft.Manifested.Sandbox.Package.Source.ps1"
 . "$moduleProjectRoot\Support\Package\Eigenverft.Manifested.Sandbox.Package.Ownership.ps1"
+. "$moduleProjectRoot\Support\Package\Eigenverft.Manifested.Sandbox.Package.OperationHistory.ps1"
 . "$moduleProjectRoot\Support\Package\Eigenverft.Manifested.Sandbox.Package.State.ps1"
 . "$moduleProjectRoot\Support\Package\Eigenverft.Manifested.Sandbox.Package.Validation.ps1"
 . "$moduleProjectRoot\Support\Package\Eigenverft.Manifested.Sandbox.Package.Npm.ps1"

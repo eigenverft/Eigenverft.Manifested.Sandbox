@@ -191,7 +191,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - export
         $publicParameterNames | Should -Be @('Raw')
     }
 
-    It 'returns an empty package state when durable indexes and local directories are absent' {
+    It 'returns an empty package state when durable inventory/history files and local directories are absent' {
         $root = Join-Path $TestDrive 'empty-package-state'
         $config = [pscustomobject]@{
             LocalConfigurationPath              = Join-Path $root 'Configuration\Internal\Config.json'
@@ -200,28 +200,28 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - export
             PackageInstallStageRootDirectory    = Join-Path $root 'PackageInstallStage'
             DefaultPackageDepotDirectory        = Join-Path $root 'DefaultPackageDepot'
             LocalRepositoryRoot                 = Join-Path $root 'PackageRepositories'
-            PackageStateIndexFilePath           = Join-Path (Join-Path $root 'State') 'package-state-index.json'
-            PackageFileIndexFilePath            = Join-Path (Join-Path $root 'State') 'package-file-index.json'
+            PackageInventoryFilePath            = Join-Path (Join-Path $root 'State') 'package-inventory.json'
+            PackageOperationHistoryFilePath     = Join-Path (Join-Path $root 'State') 'package-operation-history.json'
         }
         $sourceInventoryPath = Join-Path (Join-Path $root 'Configuration\External') 'SourceInventory.json'
 
         Mock Get-PackageConfig { throw 'Get-PackageState must not load a package definition.' }
         Mock Get-PackageStateConfig { return $config }
-        Mock Get-PackagePackageStateIndex { return [pscustomobject]@{ Path = $config.PackageStateIndexFilePath; Records = @() } }
-        Mock Get-PackagePackageFileIndex { return [pscustomobject]@{ Path = $config.PackageFileIndexFilePath; Records = @() } }
+        Mock Get-PackageInventory { return [pscustomobject]@{ Path = $config.PackageInventoryFilePath; Records = @() } }
+        Mock Get-PackageOperationHistory { return [pscustomobject]@{ Path = $config.PackageOperationHistoryFilePath; Records = @() } }
         $config | Add-Member -MemberType NoteProperty -Name SourceInventoryInfo -Value ([pscustomobject]@{ Path = $sourceInventoryPath; Exists = $false; Document = $null })
 
         $state = Get-PackageState
 
         $state.LocalRoot | Should -Be $root
         $state.LocalConfigurationExists | Should -BeFalse
-        $state.PackageStateIndexExists | Should -BeFalse
-        $state.PackageFileIndexExists | Should -BeFalse
+        $state.PackageInventoryExists | Should -BeFalse
+        $state.OperationHistoryExists | Should -BeFalse
         $state.SourceInventoryExists | Should -BeFalse
         $state.PackageRecordCount | Should -Be 0
-        $state.PackageFileRecordCount | Should -Be 0
+        $state.OperationRecordCount | Should -Be 0
         $state.PackageRecords.Count | Should -Be 0
-        $state.PackageFiles.Count | Should -Be 0
+        $state.OperationRecords.Count | Should -Be 0
         $state.Directories.Installed.Exists | Should -BeFalse
         $state.Directories.PackageFileStaging.Exists | Should -BeFalse
         $state.Directories.PackageInstallStage.Exists | Should -BeFalse
@@ -238,22 +238,22 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - export
             PackageInstallStageRootDirectory    = Join-Path $root 'PackageInstallStage'
             DefaultPackageDepotDirectory        = Join-Path $root 'DefaultPackageDepot'
             LocalRepositoryRoot                 = Join-Path $root 'PackageRepositories'
-            PackageStateIndexFilePath           = Join-Path (Join-Path $root 'State') 'package-state-index.json'
-            PackageFileIndexFilePath            = Join-Path (Join-Path $root 'State') 'package-file-index.json'
+            PackageInventoryFilePath            = Join-Path (Join-Path $root 'State') 'package-inventory.json'
+            PackageOperationHistoryFilePath     = Join-Path (Join-Path $root 'State') 'package-operation-history.json'
             SourceInventoryInfo                 = [pscustomobject]@{ Path = (Join-Path (Join-Path $root 'Configuration\External') 'SourceInventory.json'); Exists = $false; Document = $null }
         }
 
         Mock Get-PackageConfig { throw 'VSCodeRuntime definition should not be required for state.' }
         Mock Get-PackageStateConfig { return $config }
-        Mock Get-PackagePackageStateIndex { return [pscustomobject]@{ Path = $config.PackageStateIndexFilePath; Records = @() } }
-        Mock Get-PackagePackageFileIndex { return [pscustomobject]@{ Path = $config.PackageFileIndexFilePath; Records = @() } }
+        Mock Get-PackageInventory { return [pscustomobject]@{ Path = $config.PackageInventoryFilePath; Records = @() } }
+        Mock Get-PackageOperationHistory { return [pscustomobject]@{ Path = $config.PackageOperationHistoryFilePath; Records = @() } }
 
         { Get-PackageState } | Should -Not -Throw
         Should -Invoke Get-PackageStateConfig -Times 1 -Exactly
         Should -Invoke Get-PackageConfig -Times 0 -Exactly
     }
 
-    It 'summarizes package ownership records, artifact records, and local directory state' {
+    It 'summarizes package inventory records, operation records, and local directory state' {
         $root = Join-Path $TestDrive 'populated-package-state'
         $installRoot = Join-Path $root 'Installed'
         $workspaceRoot = Join-Path $root 'PackageFileStaging'
@@ -261,14 +261,13 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - export
         $depotRoot = Join-Path $root 'DefaultPackageDepot'
         $localRepositoryRoot = Join-Path $root 'PackageRepositories'
         $installDirectory = Join-Path $installRoot 'vscode-runtime\stable\1.0.0\win32-x64'
-        $artifactPath = Join-Path $depotRoot 'packages\VSCodeRuntime\stable\1.0.0\win32-x64\package.zip'
         $definitionLocalPath = Join-Path $localRepositoryRoot 'EigenverftModule\VSCodeRuntime.json'
         $sourceInventoryPath = Join-Path (Join-Path $root 'Configuration\External') 'SourceInventory.json'
 
         $null = New-Item -ItemType Directory -Path $installDirectory -Force
         $null = New-Item -ItemType Directory -Path $workspaceRoot -Force
         $null = New-Item -ItemType Directory -Path $installStageRoot -Force
-        Write-TestTextFile -Path $artifactPath -Content 'fake-zip'
+        $null = New-Item -ItemType Directory -Path $depotRoot -Force
         Write-TestJsonDocument -Path $definitionLocalPath -Document (New-TestVSCodeDefinitionDocument -Releases @(
                 New-TestPackageRelease -Id 'vsCode-win-x64-stable' -Version '1.0.0' -Architecture 'x64' -Flavor 'win32-x64'
             ))
@@ -281,11 +280,11 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - export
             PackageInstallStageRootDirectory    = $installStageRoot
             DefaultPackageDepotDirectory        = $depotRoot
             LocalRepositoryRoot                 = $localRepositoryRoot
-            PackageStateIndexFilePath           = Join-Path (Join-Path $root 'State') 'package-state-index.json'
-            PackageFileIndexFilePath            = Join-Path (Join-Path $root 'State') 'package-file-index.json'
+            PackageInventoryFilePath            = Join-Path (Join-Path $root 'State') 'package-inventory.json'
+            PackageOperationHistoryFilePath     = Join-Path (Join-Path $root 'State') 'package-operation-history.json'
         }
-        Write-TestJsonDocument -Path $config.PackageStateIndexFilePath -Document @{ records = @() }
-        Write-TestJsonDocument -Path $config.PackageFileIndexFilePath -Document @{ records = @() }
+        Write-TestJsonDocument -Path $config.PackageInventoryFilePath -Document @{ records = @() }
+        Write-TestJsonDocument -Path $config.PackageOperationHistoryFilePath -Document @{ records = @() }
 
         $ownershipRecord = [pscustomobject]@{
             installSlotId    = 'VSCodeRuntime:stable:win32-x64'
@@ -301,38 +300,36 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - export
             ownershipKind    = 'PackageInstalled'
             updatedAtUtc     = '2026-04-25T12:00:00Z'
         }
-        $artifactRecord = [pscustomobject]@{
-            path         = $artifactPath
-            definitionId = 'VSCodeRuntime'
-            releaseId    = 'vscode-test'
-            releaseTrack = 'stable'
-            flavor       = 'win32-x64'
-            version      = '1.0.0'
-            sourceScope  = 'definition'
-            sourceId     = 'testSource'
-            updatedAtUtc = '2026-04-25T12:01:00Z'
+        $operationRecord = [pscustomobject]@{
+            operationId    = 'test-operation'
+            repositoryId   = 'EigenverftModule'
+            definitionId   = 'VSCodeRuntime'
+            desiredState   = 'Assigned'
+            status         = 'Ready'
+            packageId      = 'vscode-test'
+            packageVersion = '1.0.0'
+            completedAtUtc = '2026-04-25T12:01:00Z'
         }
 
         $config | Add-Member -MemberType NoteProperty -Name SourceInventoryInfo -Value ([pscustomobject]@{ Path = $sourceInventoryPath; Exists = $true; Document = @{ inventoryVersion = 1 } })
 
         Mock Get-PackageConfig { throw 'Get-PackageState must not load a package definition.' }
         Mock Get-PackageStateConfig { return $config }
-        Mock Get-PackagePackageStateIndex { return [pscustomobject]@{ Path = $config.PackageStateIndexFilePath; Records = @($ownershipRecord) } }
-        Mock Get-PackagePackageFileIndex { return [pscustomobject]@{ Path = $config.PackageFileIndexFilePath; Records = @($artifactRecord) } }
+        Mock Get-PackageInventory { return [pscustomobject]@{ Path = $config.PackageInventoryFilePath; Records = @($ownershipRecord) } }
+        Mock Get-PackageOperationHistory { return [pscustomobject]@{ Path = $config.PackageOperationHistoryFilePath; Records = @($operationRecord) } }
 
         $state = Get-PackageState
 
-        $state.PackageStateIndexExists | Should -BeTrue
-        $state.PackageFileIndexExists | Should -BeTrue
+        $state.PackageInventoryExists | Should -BeTrue
+        $state.OperationHistoryExists | Should -BeTrue
         $state.SourceInventoryExists | Should -BeTrue
         $state.PackageRecordCount | Should -Be 1
-        $state.PackageFileRecordCount | Should -Be 1
+        $state.OperationRecordCount | Should -Be 1
         $state.PackageRecords[0].InstallSlotId | Should -Be 'VSCodeRuntime:stable:win32-x64'
         $state.PackageRecords[0].DefinitionRepositoryId | Should -Be 'EigenverftModule'
         $state.PackageRecords[0].DefinitionLocalExists | Should -BeTrue
         $state.PackageRecords[0].InstallDirectoryExists | Should -BeTrue
-        $state.PackageFiles[0].Path | Should -Be $artifactPath
-        $state.PackageFiles[0].Exists | Should -BeTrue
+        $state.OperationRecords[0].operationId | Should -Be 'test-operation'
         $state.Directories.Installed.Exists | Should -BeTrue
         $state.Directories.PackageFileStaging.Exists | Should -BeTrue
         $state.Directories.PackageInstallStage.Exists | Should -BeTrue
@@ -349,25 +346,25 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - export
             PackageInstallStageRootDirectory    = Join-Path $root 'PackageInstallStage'
             DefaultPackageDepotDirectory        = Join-Path $root 'DefaultPackageDepot'
             LocalRepositoryRoot                 = Join-Path $root 'PackageRepositories'
-            PackageStateIndexFilePath           = Join-Path (Join-Path $root 'State') 'package-state-index.json'
-            PackageFileIndexFilePath            = Join-Path (Join-Path $root 'State') 'package-file-index.json'
+            PackageInventoryFilePath            = Join-Path (Join-Path $root 'State') 'package-inventory.json'
+            PackageOperationHistoryFilePath     = Join-Path (Join-Path $root 'State') 'package-operation-history.json'
         }
-        $packageStateIndex = [pscustomobject]@{ Path = $config.PackageStateIndexFilePath; Records = @([pscustomobject]@{ definitionId = 'VSCodeRuntime' }) }
-        $packageFileIndex = [pscustomobject]@{ Path = $config.PackageFileIndexFilePath; Records = @([pscustomobject]@{ definitionId = 'VSCodeRuntime' }) }
+        $packageInventory = [pscustomobject]@{ Path = $config.PackageInventoryFilePath; Records = @([pscustomobject]@{ definitionId = 'VSCodeRuntime' }) }
+        $operationHistory = [pscustomobject]@{ Path = $config.PackageOperationHistoryFilePath; Records = @([pscustomobject]@{ definitionId = 'VSCodeRuntime' }) }
         $sourceInventory = [pscustomobject]@{ Path = (Join-Path (Join-Path $root 'Configuration\External') 'SourceInventory.json'); Exists = $false; Document = $null }
 
         $config | Add-Member -MemberType NoteProperty -Name SourceInventoryInfo -Value $sourceInventory
 
         Mock Get-PackageConfig { throw 'Get-PackageState must not load a package definition.' }
         Mock Get-PackageStateConfig { return $config }
-        Mock Get-PackagePackageStateIndex { return $packageStateIndex }
-        Mock Get-PackagePackageFileIndex { return $packageFileIndex }
+        Mock Get-PackageInventory { return $packageInventory }
+        Mock Get-PackageOperationHistory { return $operationHistory }
 
         $state = Get-PackageState -Raw
 
         $state.Config | Should -Be $config
-        $state.PackageStateIndex | Should -Be $packageStateIndex
-        $state.PackageFileIndex | Should -Be $packageFileIndex
+        $state.PackageInventory | Should -Be $packageInventory
+        $state.OperationHistory | Should -Be $operationHistory
         $state.SourceInventory | Should -Be $sourceInventory
         $state.Directories.Installed.Path | Should -Be $config.PreferredTargetInstallRootDirectory
     }

@@ -9,7 +9,7 @@ function Get-PackageNpmGlobalConfigPath {
         [psobject]$PackageResult
     )
 
-    $packageRoot = Get-PackageRootFromStateIndexPath -PackageStateIndexFilePath ([string]$PackageResult.PackageConfig.PackageStateIndexFilePath)
+    $packageRoot = Get-PackageRootFromInventoryPath -PackageInventoryFilePath ([string]$PackageResult.PackageConfig.PackageInventoryFilePath)
     return ([System.IO.Path]::GetFullPath((Join-Path $packageRoot 'Configuration\External\npm\npmrc')))
 }
 
@@ -20,7 +20,7 @@ function New-PackageNpmCacheDirectory {
         [psobject]$PackageResult
     )
 
-    $packageRoot = Get-PackageRootFromStateIndexPath -PackageStateIndexFilePath ([string]$PackageResult.PackageConfig.PackageStateIndexFilePath)
+    $packageRoot = Get-PackageRootFromInventoryPath -PackageInventoryFilePath ([string]$PackageResult.PackageConfig.PackageInventoryFilePath)
     $segments = @(
         'Caches'
         'npm'

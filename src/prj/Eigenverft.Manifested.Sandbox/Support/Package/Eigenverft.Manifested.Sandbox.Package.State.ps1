@@ -73,33 +73,6 @@ function Select-PackageStateOwnershipRecord {
     }
 }
 
-function Select-PackageStatePackageFileRecord {
-    [CmdletBinding()]
-    param(
-        [Parameter(Mandatory = $true)]
-        [object]$Record
-    )
-
-    $path = [string]$Record.path
-    $exists = $false
-    if (-not [string]::IsNullOrWhiteSpace($path)) {
-        $exists = Test-Path -LiteralPath $path -PathType Leaf
-    }
-
-    return [pscustomobject]@{
-        Path         = $path
-        Exists       = $exists
-        DefinitionId = $Record.definitionId
-        ReleaseId    = $Record.releaseId
-        ReleaseTrack = $Record.releaseTrack
-        Flavor       = $Record.flavor
-        Version      = $Record.version
-        SourceScope  = $Record.sourceScope
-        SourceId     = $Record.sourceId
-        UpdatedAtUtc = $Record.updatedAtUtc
-    }
-}
-
 function Get-PackageStateConfig {
     [CmdletBinding()]
     param()
@@ -121,12 +94,20 @@ function Get-PackageStateConfig {
         Resolve-PackageConfiguredPath -PathValue 'Installed' -ApplicationRootDirectory $applicationRootDirectory
     }
 
-    $packageStateIndexFilePath = if ($packageGlobalConfig.packageState.PSObject.Properties['indexFilePath'] -and
-        -not [string]::IsNullOrWhiteSpace([string]$packageGlobalConfig.packageState.indexFilePath)) {
-        Resolve-PackageConfiguredPath -PathValue ([string]$packageGlobalConfig.packageState.indexFilePath) -ApplicationRootDirectory $applicationRootDirectory
+    $packageInventoryFilePath = if ($packageGlobalConfig.packageState.PSObject.Properties['inventoryFilePath'] -and
+        -not [string]::IsNullOrWhiteSpace([string]$packageGlobalConfig.packageState.inventoryFilePath)) {
+        Resolve-PackageConfiguredPath -PathValue ([string]$packageGlobalConfig.packageState.inventoryFilePath) -ApplicationRootDirectory $applicationRootDirectory
     }
     else {
-        Resolve-PackageConfiguredPath -PathValue 'State\package-state-index.json' -ApplicationRootDirectory $applicationRootDirectory
+        Resolve-PackageConfiguredPath -PathValue 'State\package-inventory.json' -ApplicationRootDirectory $applicationRootDirectory
+    }
+
+    $packageOperationHistoryFilePath = if ($packageGlobalConfig.packageState.PSObject.Properties['operationHistoryFilePath'] -and
+        -not [string]::IsNullOrWhiteSpace([string]$packageGlobalConfig.packageState.operationHistoryFilePath)) {
+        Resolve-PackageConfiguredPath -PathValue ([string]$packageGlobalConfig.packageState.operationHistoryFilePath) -ApplicationRootDirectory $applicationRootDirectory
+    }
+    else {
+        Resolve-PackageConfiguredPath -PathValue 'State\package-operation-history.json' -ApplicationRootDirectory $applicationRootDirectory
     }
 
     $localRepositoryRoot = if ($packageGlobalConfig.PSObject.Properties['localRepositoryRoot'] -and
@@ -155,8 +136,8 @@ function Get-PackageStateConfig {
         DefaultPackageDepotDirectory        = $effectiveAcquisitionEnvironment.Stores.DefaultPackageDepotDirectory
         PreferredTargetInstallRootDirectory = $preferredTargetInstallDirectory
         LocalRepositoryRoot                 = $localRepositoryRoot
-        PackageFileIndexFilePath            = $effectiveAcquisitionEnvironment.Tracking.PackageFileIndexFilePath
-        PackageStateIndexFilePath           = $packageStateIndexFilePath
+        PackageInventoryFilePath            = $packageInventoryFilePath
+        PackageOperationHistoryFilePath     = $packageOperationHistoryFilePath
         EnvironmentSources                  = $effectiveAcquisitionEnvironment.EnvironmentSources
     }
 }
@@ -168,8 +149,8 @@ function Get-PackageState {
     )
 
     $config = Get-PackageStateConfig
-    $packageStateIndex = Get-PackagePackageStateIndex -PackageConfig $config
-    $packageFileIndex = Get-PackagePackageFileIndex -PackageConfig $config
+    $packageInventory = Get-PackageInventory -PackageConfig $config
+    $operationHistory = Get-PackageOperationHistory -PackageConfig $config
     $sourceInventoryInfo = $config.SourceInventoryInfo
     $depotInventoryInfo = $config.DepotInventoryInfo
 
@@ -184,8 +165,8 @@ function Get-PackageState {
     if ($Raw.IsPresent) {
         return [pscustomobject]@{
             Config            = $config
-            PackageStateIndex = $packageStateIndex
-            PackageFileIndex  = $packageFileIndex
+            PackageInventory  = $packageInventory
+            OperationHistory  = $operationHistory
             DepotInventory    = $depotInventoryInfo
             SourceInventory   = $sourceInventoryInfo
             Directories       = $directories
@@ -193,12 +174,12 @@ function Get-PackageState {
     }
 
     $localRoot = $null
-    if (-not [string]::IsNullOrWhiteSpace([string]$config.PackageStateIndexFilePath)) {
-        $localRoot = Get-PackageRootFromStateIndexPath -PackageStateIndexFilePath $config.PackageStateIndexFilePath
+    if (-not [string]::IsNullOrWhiteSpace([string]$config.PackageInventoryFilePath)) {
+        $localRoot = Get-PackageRootFromInventoryPath -PackageInventoryFilePath $config.PackageInventoryFilePath
     }
 
-    $packageRecords = @($packageStateIndex.Records)
-    $packageFileRecords = @($packageFileIndex.Records)
+    $packageRecords = @($packageInventory.Records)
+    $operationRecords = @($operationHistory.Records)
 
     return [pscustomobject]@{
         LocalRoot                 = $localRoot
@@ -210,16 +191,16 @@ function Get-PackageState {
         DepotInventoryPath        = $depotInventoryInfo.Path
         DepotInventoryExists      = [bool]$depotInventoryInfo.Exists
         LocalRepositoryRoot       = $config.LocalRepositoryRoot
-        PackageStateIndexPath     = $packageStateIndex.Path
-        PackageStateIndexExists   = Test-PackageStateLeafPath -Path $packageStateIndex.Path
-        PackageFileIndexPath      = $packageFileIndex.Path
-        PackageFileIndexExists    = Test-PackageStateLeafPath -Path $packageFileIndex.Path
+        PackageInventoryPath      = $packageInventory.Path
+        PackageInventoryExists    = Test-PackageStateLeafPath -Path $packageInventory.Path
+        OperationHistoryPath      = $operationHistory.Path
+        OperationHistoryExists    = Test-PackageStateLeafPath -Path $operationHistory.Path
         SourceInventoryPath       = $sourceInventoryInfo.Path
         SourceInventoryExists     = [bool]$sourceInventoryInfo.Exists
         PackageRecordCount        = $packageRecords.Count
-        PackageFileRecordCount    = $packageFileRecords.Count
+        OperationRecordCount      = $operationRecords.Count
         PackageRecords            = @($packageRecords | ForEach-Object { Select-PackageStateOwnershipRecord -Record $_ })
-        PackageFiles              = @($packageFileRecords | ForEach-Object { Select-PackageStatePackageFileRecord -Record $_ })
+        OperationRecords          = @($operationRecords)
         Directories               = $directories
     }
 }

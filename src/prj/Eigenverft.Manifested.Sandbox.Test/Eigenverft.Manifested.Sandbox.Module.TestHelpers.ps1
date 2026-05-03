@@ -153,8 +153,8 @@ function global:New-TestPackageGlobalDocument {
         [string]$DefaultPackageDepotDirectory,
         [string]$PreferredTargetInstallDirectory,
         [string]$LocalRepositoryRoot,
-        [string]$PackageFileIndexFilePath,
-        [string]$PackageStateIndexFilePath,
+        [string]$PackageInventoryFilePath,
+        [string]$PackageOperationHistoryFilePath,
         [string]$PackageDepotRelativePath = '{definitionId}/{releaseTrack}/{version}/{flavor}',
         [string]$PackageWorkSlotDirectory = '{definitionId}-{slotHash}',
         [bool]$AllowFallback = $true,
@@ -170,9 +170,6 @@ function global:New-TestPackageGlobalDocument {
         }
         defaults = @{
             allowFallback = $AllowFallback
-        }
-        tracking = @{
-            packageFileIndexFilePath = if ($PSBoundParameters.ContainsKey('PackageFileIndexFilePath')) { $PackageFileIndexFilePath } else { '{applicationRootDirectory}/State/package-file-index.json' }
         }
     }
     if ($PSBoundParameters.ContainsKey('EnvironmentSources') -and $null -ne $EnvironmentSources) {
@@ -196,7 +193,8 @@ function global:New-TestPackageGlobalDocument {
             }
             acquisitionEnvironment = $acquisitionEnvironment
             packageState = @{
-                indexFilePath = if ($PSBoundParameters.ContainsKey('PackageStateIndexFilePath')) { $PackageStateIndexFilePath } else { '{applicationRootDirectory}/State/package-state-index.json' }
+                inventoryFilePath = if ($PSBoundParameters.ContainsKey('PackageInventoryFilePath')) { $PackageInventoryFilePath } else { '{applicationRootDirectory}/State/package-inventory.json' }
+                operationHistoryFilePath = if ($PSBoundParameters.ContainsKey('PackageOperationHistoryFilePath')) { $PackageOperationHistoryFilePath } else { '{applicationRootDirectory}/State/package-operation-history.json' }
             }
             selectionDefaults = @{
                 releaseTrack = $ReleaseTrack

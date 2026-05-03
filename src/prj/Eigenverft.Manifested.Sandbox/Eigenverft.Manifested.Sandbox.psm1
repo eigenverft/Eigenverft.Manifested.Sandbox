@@ -30,6 +30,7 @@
 . "$PSScriptRoot\Support\Package\Eigenverft.Manifested.Sandbox.Package.Dependencies.ps1"
 . "$PSScriptRoot\Support\Package\Eigenverft.Manifested.Sandbox.Package.Source.ps1"
 . "$PSScriptRoot\Support\Package\Eigenverft.Manifested.Sandbox.Package.Ownership.ps1"
+. "$PSScriptRoot\Support\Package\Eigenverft.Manifested.Sandbox.Package.OperationHistory.ps1"
 . "$PSScriptRoot\Support\Package\Eigenverft.Manifested.Sandbox.Package.State.ps1"
 . "$PSScriptRoot\Support\Package\Eigenverft.Manifested.Sandbox.Package.Validation.ps1"
 . "$PSScriptRoot\Support\Package\Eigenverft.Manifested.Sandbox.Package.Npm.ps1"

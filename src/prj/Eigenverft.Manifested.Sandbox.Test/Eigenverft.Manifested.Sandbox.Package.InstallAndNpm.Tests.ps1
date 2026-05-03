@@ -44,7 +44,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - instal
         $installDirectory = Join-Path $rootPath 'install'
         $workspaceDirectory = Join-Path $rootPath 'workspace'
         $stageDirectory = Join-Path $rootPath 'PackageInstallStage\packages\CodexCli\stable\0.125.0\win32-x64'
-        $packageStateIndexPath = Join-Path (Join-Path $rootPath 'State') 'package-state-index.json'
+        $packageStateIndexPath = Join-Path (Join-Path $rootPath 'State') 'package-inventory.json'
         Write-TestTextFile -Path $fakeNpmPath -Content @"
 @echo off
 set PREFIX=
@@ -72,7 +72,7 @@ exit /b 0
             PackageConfig     = [pscustomobject]@{
                 DefinitionId                  = 'CodexCli'
                 PackageFileStagingRootDirectory = $workspaceDirectory
-                PackageStateIndexFilePath     = $packageStateIndexPath
+                PackageInventoryFilePath     = $packageStateIndexPath
             }
             Dependencies           = @(
                 [pscustomobject]@{
@@ -125,7 +125,7 @@ exit /b 0
         $installDirectory = Join-Path $rootPath 'install'
         $workspaceDirectory = Join-Path $rootPath 'workspace'
         $stageDirectory = Join-Path $rootPath 'PackageInstallStage\packages\CodexCli\stable\0.125.0\win32-x64'
-        $packageStateIndexPath = Join-Path (Join-Path $rootPath 'State') 'package-state-index.json'
+        $packageStateIndexPath = Join-Path (Join-Path $rootPath 'State') 'package-inventory.json'
         Write-TestTextFile -Path $fakeNpmPath -Content "@echo off`r`nexit /b 7`r`n"
         Write-TestTextFile -Path (Join-Path $installDirectory 'sentinel.txt') -Content 'keep-me'
 
@@ -138,7 +138,7 @@ exit /b 0
             PackageConfig     = [pscustomobject]@{
                 DefinitionId                  = 'CodexCli'
                 PackageFileStagingRootDirectory = $workspaceDirectory
-                PackageStateIndexFilePath     = $packageStateIndexPath
+                PackageInventoryFilePath     = $packageStateIndexPath
             }
             Dependencies           = @(
                 [pscustomobject]@{
@@ -179,7 +179,7 @@ exit /b 0
             PackageConfig     = [pscustomobject]@{
                 DefinitionId                  = 'CodexCli'
                 PackageFileStagingRootDirectory = Join-Path $rootPath 'workspace'
-                PackageStateIndexFilePath     = Join-Path (Join-Path $rootPath 'State') 'package-state-index.json'
+                PackageInventoryFilePath     = Join-Path (Join-Path $rootPath 'State') 'package-inventory.json'
             }
             Dependencies           = @(
                 [pscustomobject]@{
@@ -453,7 +453,7 @@ exit /b 0
             InstallDirectory          = $null
             PackageConfig        = [pscustomobject]@{
                 PreferredTargetInstallRootDirectory = $rootPath
-                PackageStateIndexFilePath           = Join-Path (Join-Path $rootPath 'State') 'package-state-index.json'
+                PackageInventoryFilePath           = Join-Path (Join-Path $rootPath 'State') 'package-inventory.json'
             }
             Package = [pscustomobject]@{
                 install = [pscustomobject]@{
@@ -585,7 +585,7 @@ exit /b 0
         $packageFileStagingDirectory = Join-Path $rootPath 'workspace'
         $defaultPackageDepotDirectory = Join-Path $rootPath 'default-depot'
         $preferredTargetInstallDirectory = Join-Path $rootPath 'installs'
-        $packageStateIndexFilePath = Join-Path $rootPath 'package-state.json'
+        $packageStateIndexFilePath = Join-Path $rootPath 'package-inventory.json'
         $definitionDocument = @{
             schemaVersion = '1.0'
             id = 'Qwen35_2B_Q8_0_Model'
@@ -674,7 +674,7 @@ exit /b 0
                 }
             )
         }
-        $documents = Write-TestPackageDocuments -RootPath $rootPath -GlobalDocument (New-TestPackageGlobalDocument -PackageFileStagingDirectory $packageFileStagingDirectory -DefaultPackageDepotDirectory $defaultPackageDepotDirectory -PreferredTargetInstallDirectory $preferredTargetInstallDirectory -PackageStateIndexFilePath $packageStateIndexFilePath) -DefinitionDocument $definitionDocument
+        $documents = Write-TestPackageDocuments -RootPath $rootPath -GlobalDocument (New-TestPackageGlobalDocument -PackageFileStagingDirectory $packageFileStagingDirectory -DefaultPackageDepotDirectory $defaultPackageDepotDirectory -PreferredTargetInstallDirectory $preferredTargetInstallDirectory -PackageInventoryFilePath $packageStateIndexFilePath) -DefinitionDocument $definitionDocument
 
         [Environment]::SetEnvironmentVariable($script:SourceInventoryEnvVarName, (Join-Path $TestDrive 'missing-inventory.json'), 'Process')
         Mock Get-PackageGlobalConfigPath { $documents.GlobalConfigPath }
@@ -726,7 +726,8 @@ exit /b 0
         $packageFileStagingDirectory = Join-Path $rootPath 'FileStage'
         $packageInstallStageDirectory = Join-Path $rootPath 'InstStage'
         $defaultPackageDepotDirectory = Join-Path $rootPath 'DefaultPackageDepot'
-        $packageStateIndexFilePath = Join-Path $rootPath 'State\package-state-index.json'
+        $packageStateIndexFilePath = Join-Path $rootPath 'State\package-inventory.json'
+        $operationHistoryFilePath = Join-Path $rootPath 'State\package-operation-history.json'
         $badValidation = New-TestValidation -Version '2.0.0'
         $badValidation.files = @('missing-after-install.exe')
         $definitionDocument = New-TestVSCodeDefinitionDocument -ReleaseDefaultsValidation $badValidation -Releases @(
@@ -740,7 +741,7 @@ exit /b 0
                 }
             )
         )
-        $documents = Write-TestPackageDocuments -RootPath $rootPath -GlobalDocument (New-TestPackageGlobalDocument -PackageFileStagingDirectory $packageFileStagingDirectory -PackageInstallStageDirectory $packageInstallStageDirectory -DefaultPackageDepotDirectory $defaultPackageDepotDirectory -PackageStateIndexFilePath $packageStateIndexFilePath) -DefinitionDocument $definitionDocument
+        $documents = Write-TestPackageDocuments -RootPath $rootPath -GlobalDocument (New-TestPackageGlobalDocument -PackageFileStagingDirectory $packageFileStagingDirectory -PackageInstallStageDirectory $packageInstallStageDirectory -DefaultPackageDepotDirectory $defaultPackageDepotDirectory -PackageInventoryFilePath $packageStateIndexFilePath -PackageOperationHistoryFilePath $operationHistoryFilePath) -DefinitionDocument $definitionDocument
         $depotFilePath = Join-Path $defaultPackageDepotDirectory 'VSCodeRuntime\stable\2.0.0\win32-x64\VSCode-win32-x64-2.0.0.zip'
         $null = New-Item -ItemType Directory -Path (Split-Path -Parent $depotFilePath) -Force
         Copy-FileToPath -SourcePath $archiveInfo.ZipPath -TargetPath $depotFilePath -Overwrite | Out-Null
@@ -761,6 +762,14 @@ exit /b 0
         Test-Path -LiteralPath $result.PackageFilePath -PathType Leaf | Should -BeTrue
         Test-Path -LiteralPath $result.PackageInstallStageDirectory -PathType Container | Should -BeTrue
         Test-Path -LiteralPath $packageStateIndexFilePath -PathType Leaf | Should -BeFalse
+        Test-Path -LiteralPath $operationHistoryFilePath -PathType Leaf | Should -BeTrue
+        $historyDocument = Read-PackageJsonDocument -Path $operationHistoryFilePath
+        @($historyDocument.Document.records).Count | Should -Be 1
+        $historyDocument.Document.records[0].status | Should -Be 'Failed'
+        $historyDocument.Document.records[0].failureReason | Should -Be 'InstalledPackageValidationFailed'
+        $historyDocument.Document.records[0].failedStep | Should -Be 'ValidateInstalledPackage'
+        $historyDocument.Document.records[0].packageFilePreparation.status | Should -Be 'HydratedFromDefaultPackageDepot'
+        $historyDocument.Document.records[0].packageFilePreparation.packageFilePath | Should -Be $result.PackageFilePath
     }
 
     It 'discovers command-based existing installs through Get-ResolvedApplicationPath' {

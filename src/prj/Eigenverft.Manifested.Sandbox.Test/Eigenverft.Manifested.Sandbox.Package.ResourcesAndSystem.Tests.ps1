@@ -108,13 +108,13 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - resour
         @($writes | ForEach-Object { $_.Target }) | Should -Be @('Process', 'User')
     }
 
-    It 'writes ownership records keyed by install slot and updates current release metadata' {
+    It 'writes inventory records keyed by install slot and updates current release metadata' {
         $rootPath = Join-Path $TestDrive 'ownership-record'
         $installRoot = Join-Path $rootPath 'managed-install'
-        $packageStateIndexPath = Join-Path $rootPath 'package-state.json'
+        $packageStateIndexPath = Join-Path $rootPath 'package-inventory.json'
         $null = New-Item -ItemType Directory -Path $installRoot -Force
 
-        $globalDocument = New-TestPackageGlobalDocument -PackageStateIndexFilePath $packageStateIndexPath
+        $globalDocument = New-TestPackageGlobalDocument -PackageInventoryFilePath $packageStateIndexPath
         $release = New-TestPackageRelease -Id 'vsCode-win-x64-stable' -Version '3.0.0' -Architecture 'x64' -Flavor 'win32-x64' -Install @{ kind = 'reuseExisting' } -Validation (New-TestValidation -Version '3.0.0')
         $documents = Write-TestPackageDocuments -RootPath $rootPath -GlobalDocument $globalDocument -DefinitionDocument (New-TestVSCodeDefinitionDocument -Releases @($release) -ReleaseDefaultsValidation (New-TestValidation -Version '3.0.0'))
 
@@ -131,7 +131,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - resour
         }
         $result.InstallOrigin = 'PackageInstalled'
 
-        $result = Update-PackageOwnershipRecord -PackageResult $result
+        $result = Update-PackageInventoryRecord -PackageResult $result
         $savedDocument = Read-PackageJsonDocument -Path $packageStateIndexPath
         $record = $savedDocument.Document.records[0]
 

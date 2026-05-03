@@ -811,7 +811,7 @@ Invoke-PackageInstallerProcess -PackageResult $result
     $logPath = $null
     if ($install.PSObject.Properties['logRelativePath'] -and -not [string]::IsNullOrWhiteSpace([string]$install.logRelativePath)) {
         $logRelativePath = Resolve-PackageTemplateText -Text ([string]$install.logRelativePath) -PackageConfig $PackageResult.PackageConfig -Package $PackageResult.Package -ExtraTokens @{ timestamp = $timestamp }
-        $packageRoot = Get-PackageRootFromStateIndexPath -PackageStateIndexFilePath ([string]$PackageResult.PackageConfig.PackageStateIndexFilePath)
+        $packageRoot = Get-PackageRootFromInventoryPath -PackageInventoryFilePath ([string]$PackageResult.PackageConfig.PackageInventoryFilePath)
         $logRoot = [System.IO.Path]::GetFullPath((Join-Path $packageRoot 'Logs'))
         $logPath = [System.IO.Path]::GetFullPath((Join-Path $logRoot ($logRelativePath -replace '/', '\')))
         $null = New-Item -ItemType Directory -Path (Split-Path -Parent $logPath) -Force

@@ -9,7 +9,7 @@ Builds the logical Package install-slot id for a result.
 
 .DESCRIPTION
 Combines the definition id, release track, and flavor into the stable install
-slot identity used by the package-state index.
+slot identity used by the package inventory.
 
 .PARAMETER PackageResult
 The current Package result object.
@@ -29,20 +29,20 @@ Get-PackageInstallSlotId -PackageResult $result
     return ('{0}:{1}:{2}' -f $definitionId, $releaseTrack, $flavor)
 }
 
-function Get-PackagePackageStateIndex {
+function Get-PackageInventory {
 <#
 .SYNOPSIS
-Loads the Package package-state index.
+Loads the Package inventory.
 
 .DESCRIPTION
-Returns the configured package-state index document, or an empty record set
+Returns the configured package inventory document, or an empty record set
 when the index file does not exist yet.
 
 .PARAMETER PackageConfig
 The resolved Package config object.
 
 .EXAMPLE
-Get-PackagePackageStateIndex -PackageConfig $config
+Get-PackageInventory -PackageConfig $config
 #>
     [CmdletBinding()]
     param(
@@ -50,9 +50,9 @@ Get-PackagePackageStateIndex -PackageConfig $config
         [psobject]$PackageConfig
     )
 
-    $indexPath = $PackageConfig.PackageStateIndexFilePath
+    $indexPath = $PackageConfig.PackageInventoryFilePath
     if ([string]::IsNullOrWhiteSpace($indexPath)) {
-        throw 'Package package-state index path is not configured.'
+        throw 'Package inventory path is not configured.'
     }
 
     if (-not (Test-Path -LiteralPath $indexPath -PathType Leaf)) {
@@ -70,33 +70,33 @@ Get-PackagePackageStateIndex -PackageConfig $config
     }
 }
 
-function Save-PackagePackageStateIndex {
+function Save-PackageInventory {
 <#
 .SYNOPSIS
-Writes the Package package-state index to disk.
+Writes the Package inventory to disk.
 
 .DESCRIPTION
-Persists the normalized package-state index document to the configured index path.
+Persists the normalized package inventory document to the configured inventory path.
 
-.PARAMETER IndexPath
-The target index file path.
+.PARAMETER InventoryPath
+The target inventory file path.
 
 .PARAMETER Records
-The package-state records to persist.
+The package inventory records to persist.
 
 .EXAMPLE
-Save-PackagePackageStateIndex -IndexPath $path -Records $records
+Save-PackageInventory -InventoryPath $path -Records $records
 #>
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true)]
-        [string]$IndexPath,
+        [string]$InventoryPath,
 
         [Parameter(Mandatory = $true)]
         [object[]]$Records
     )
 
-    $directoryPath = Split-Path -Parent $IndexPath
+    $directoryPath = Split-Path -Parent $InventoryPath
     if (-not [string]::IsNullOrWhiteSpace($directoryPath)) {
         $null = New-Item -ItemType Directory -Path $directoryPath -Force
     }
@@ -104,7 +104,7 @@ Save-PackagePackageStateIndex -IndexPath $path -Records $records
     [ordered]@{
         schemaVersion = 1
         records = @($Records)
-    } | ConvertTo-Json -Depth 20 | Set-Content -LiteralPath $IndexPath -Encoding UTF8
+    } | ConvertTo-Json -Depth 20 | Set-Content -LiteralPath $InventoryPath -Encoding UTF8
 }
 
 function Copy-PackageDefinitionToLocalRepository {
@@ -198,7 +198,7 @@ Get-PackageOwnershipRecord -PackageResult $result
         return $null
     }
 
-    $index = Get-PackagePackageStateIndex -PackageConfig $PackageResult.PackageConfig
+    $index = Get-PackageInventory -PackageConfig $PackageResult.PackageConfig
     $installSlotId = Get-PackageInstallSlotId -PackageResult $PackageResult
     $normalizedInstallDirectory = [System.IO.Path]::GetFullPath($existingPackage.InstallDirectory)
     foreach ($record in @($index.Records)) {
@@ -228,10 +228,10 @@ function Resolve-PackageOwnershipKindText {
 function Classify-PackageExistingPackage {
 <#
 .SYNOPSIS
-Classifies a discovered existing install against the package-state index.
+Classifies a discovered existing install against the package inventory.
 
 .DESCRIPTION
-Attaches ownership classification data from the package-state index to the
+Attaches ownership classification data from the package inventory to the
 current existing install so later helpers can decide whether the install is
 Package-owned, adopted, or external.
 
@@ -249,7 +249,7 @@ Classify-PackageExistingPackage -PackageResult $result
 
     if (-not $PackageResult.ExistingPackage) {
         $PackageResult.Ownership = [pscustomobject]@{
-            IndexPath       = $PackageResult.PackageConfig.PackageStateIndexFilePath
+            InventoryPath   = $PackageResult.PackageConfig.PackageInventoryFilePath
             InstallSlotId   = Get-PackageInstallSlotId -PackageResult $PackageResult
             Classification  = 'NotFound'
             OwnershipRecord = $null
@@ -266,7 +266,7 @@ Classify-PackageExistingPackage -PackageResult $result
     }
     $installSlotId = Get-PackageInstallSlotId -PackageResult $PackageResult
     $PackageResult.Ownership = [pscustomobject]@{
-        IndexPath       = $PackageResult.PackageConfig.PackageStateIndexFilePath
+        InventoryPath   = $PackageResult.PackageConfig.PackageInventoryFilePath
         InstallSlotId   = $installSlotId
         Classification  = $classification
         OwnershipRecord = $record
@@ -284,21 +284,21 @@ Classify-PackageExistingPackage -PackageResult $result
     return $PackageResult
 }
 
-function Update-PackageOwnershipRecord {
+function Update-PackageInventoryRecord {
 <#
 .SYNOPSIS
-Updates the package-state record after a Package run.
+Updates the package inventory record after a Package run.
 
 .DESCRIPTION
-Writes or refreshes the package-state record for Package-owned installs,
+Writes or refreshes the package inventory record for Package-owned installs,
 Package-owned reuse, and adopted external installs. External installs that were ignored are not
-written to the package-state index.
+written to the package inventory.
 
 .PARAMETER PackageResult
 The finalized Package result object.
 
 .EXAMPLE
-Update-PackageOwnershipRecord -PackageResult $result
+Update-PackageInventoryRecord -PackageResult $result
 #>
     [CmdletBinding()]
     param(
@@ -322,7 +322,7 @@ Update-PackageOwnershipRecord -PackageResult $result
         return $PackageResult
     }
 
-    $index = Get-PackagePackageStateIndex -PackageConfig $PackageResult.PackageConfig
+    $index = Get-PackageInventory -PackageConfig $PackageResult.PackageConfig
     $normalizedInstallDirectory = if ([string]::IsNullOrWhiteSpace([string]$PackageResult.InstallDirectory)) {
         $null
     }
@@ -359,16 +359,16 @@ Update-PackageOwnershipRecord -PackageResult $result
     }
     $records += $newRecord
 
-    Save-PackagePackageStateIndex -IndexPath $index.Path -Records $records
+    Save-PackageInventory -InventoryPath $index.Path -Records $records
 
     $PackageResult.Ownership = [pscustomobject]@{
-        IndexPath       = $index.Path
+        InventoryPath   = $index.Path
         InstallSlotId   = $installSlotId
         Classification  = if ($ownershipKind -eq 'AdoptedExternal') { 'AdoptedExternal' } else { 'PackageTarget' }
         OwnershipRecord = $newRecord
     }
 
-    Write-PackageExecutionMessage -Message ("[STATE] Updated package-state record for installSlotId '{0}' with ownershipKind='{1}' at '{2}'." -f $installSlotId, $ownershipKind, $index.Path)
+    Write-PackageExecutionMessage -Message ("[STATE] Updated package inventory record for installSlotId '{0}' with ownershipKind='{1}' at '{2}'." -f $installSlotId, $ownershipKind, $index.Path)
 
     return $PackageResult
 }

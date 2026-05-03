@@ -2,152 +2,6 @@
     Eigenverft.Manifested.Sandbox.Package.Source
 #>
 
-function Get-PackagePackageFileIndex {
-<#
-.SYNOPSIS
-Loads the Package package-file index.
-
-.DESCRIPTION
-Returns the configured package-file index document, or an empty record set when
-the index file does not exist yet.
-
-.PARAMETER PackageConfig
-The resolved Package config object.
-
-.EXAMPLE
-Get-PackagePackageFileIndex -PackageConfig $config
-#>
-    [CmdletBinding()]
-    param(
-        [Parameter(Mandatory = $true)]
-        [psobject]$PackageConfig
-    )
-
-    $indexPath = $PackageConfig.PackageFileIndexFilePath
-    if ([string]::IsNullOrWhiteSpace($indexPath)) {
-        throw 'Package package-file index path is not configured.'
-    }
-
-    if (-not (Test-Path -LiteralPath $indexPath -PathType Leaf)) {
-        return [pscustomobject]@{
-            Path    = $indexPath
-            Records = @()
-        }
-    }
-
-    $documentInfo = Read-PackageJsonDocument -Path $indexPath
-    $records = if ($documentInfo.Document.PSObject.Properties['records']) { @($documentInfo.Document.records) } else { @() }
-    return [pscustomobject]@{
-        Path    = $documentInfo.Path
-        Records = $records
-    }
-}
-
-function Prepare-PackageInstallFileIndex {
-<#
-.SYNOPSIS
-Writes the Package package-file index to disk.
-
-.DESCRIPTION
-Persists the normalized package-file index document to the configured index path.
-
-.PARAMETER IndexPath
-The target index file path.
-
-.PARAMETER Records
-The package-file records to persist.
-
-.EXAMPLE
-Prepare-PackageInstallFileIndex -IndexPath $path -Records $records
-#>
-    [CmdletBinding()]
-    param(
-        [Parameter(Mandatory = $true)]
-        [string]$IndexPath,
-
-        [Parameter(Mandatory = $true)]
-        [object[]]$Records
-    )
-
-    $directoryPath = Split-Path -Parent $IndexPath
-    if (-not [string]::IsNullOrWhiteSpace($directoryPath)) {
-        $null = New-Item -ItemType Directory -Path $directoryPath -Force
-    }
-
-    [ordered]@{
-        schemaVersion = 1
-        records = @($Records)
-    } | ConvertTo-Json -Depth 20 | Set-Content -LiteralPath $IndexPath -Encoding UTF8
-}
-
-function Update-PackagePackageFileIndexRecord {
-<#
-.SYNOPSIS
-Updates the Package package-file index for one resolved package file path.
-
-.DESCRIPTION
-Refreshes the tracked source and package metadata for a package-file path in
-the package-file index.
-
-.PARAMETER PackageResult
-The current Package result object.
-
-.PARAMETER PackageFilePath
-The package-file path to write into the index.
-
-.PARAMETER SourceScope
-The source scope that produced the artifact.
-
-.PARAMETER SourceId
-The source id that produced the artifact.
-
-.EXAMPLE
-Update-PackagePackageFileIndexRecord -PackageResult $result -PackageFilePath $path -SourceScope environment -SourceId defaultPackageDepot
-#>
-    [CmdletBinding()]
-    param(
-        [Parameter(Mandatory = $true)]
-        [psobject]$PackageResult,
-
-        [Parameter(Mandatory = $true)]
-        [string]$PackageFilePath,
-
-        [AllowNull()]
-        [string]$SourceScope,
-
-        [AllowNull()]
-        [string]$SourceId
-    )
-
-    if ([string]::IsNullOrWhiteSpace($PackageFilePath)) {
-        return
-    }
-
-    $normalizedPackageFilePath = [System.IO.Path]::GetFullPath($PackageFilePath)
-    $index = Get-PackagePackageFileIndex -PackageConfig $PackageResult.PackageConfig
-    $records = @(
-        foreach ($record in @($index.Records)) {
-            if (-not [string]::Equals([string]$record.path, $normalizedPackageFilePath, [System.StringComparison]::OrdinalIgnoreCase)) {
-                $record
-            }
-        }
-    )
-
-    $records += [pscustomobject]@{
-        path         = $normalizedPackageFilePath
-        definitionId = $PackageResult.DefinitionId
-        releaseId    = $PackageResult.PackageId
-        releaseTrack = $PackageResult.ReleaseTrack
-        flavor       = if ($PackageResult.Package -and $PackageResult.Package.PSObject.Properties['flavor']) { [string]$PackageResult.Package.flavor } else { $null }
-        version      = $PackageResult.PackageVersion
-        sourceScope  = $SourceScope
-        sourceId     = $SourceId
-        updatedAtUtc = [DateTime]::UtcNow.ToString('o')
-    }
-
-    Prepare-PackageInstallFileIndex -IndexPath $index.Path -Records $records
-}
-
 function Get-PackageSourceDefinition {
 <#
 .SYNOPSIS
@@ -841,7 +695,6 @@ function Copy-PackageFileToMirrorDepots {
                 $null = New-Item -ItemType Directory -Path $targetDirectory -Force
             }
             $null = Copy-FileToPath -SourcePath $PackageResult.PackageFilePath -TargetPath $targetPath -Overwrite
-            Update-PackagePackageFileIndexRecord -PackageResult $PackageResult -PackageFilePath $targetPath -SourceScope 'environment' -SourceId $mirrorSource.id
             Write-PackageExecutionMessage -Message ("[ACTION] Mirrored package file to depot '{0}' at '{1}'." -f $mirrorSource.id, $targetPath)
         }
         catch {
@@ -1069,7 +922,6 @@ Prepare-PackageInstallFile -PackageResult $result
         }) | Out-Null
 
         if ($verification.Accepted) {
-            Update-PackagePackageFileIndexRecord -PackageResult $PackageResult -PackageFilePath $PackageResult.PackageFilePath -SourceScope 'packageFileStaging' -SourceId 'packageFileStaging'
             $PackageResult.PackageFilePreparation = [pscustomobject]@{
                 Success         = $true
                 Status          = 'ReusedPackageFile'
@@ -1156,15 +1008,9 @@ Prepare-PackageInstallFile -PackageResult $result
                 Remove-Item -LiteralPath $PackageResult.PackageFilePath -Force
             }
             Move-Item -LiteralPath $stagingPath -Destination $PackageResult.PackageFilePath -Force
-            Update-PackagePackageFileIndexRecord -PackageResult $PackageResult -PackageFilePath $PackageResult.PackageFilePath -SourceScope $sourceDefinition.Scope -SourceId $sourceDefinition.Id
 
             if ([string]::Equals([string]$resolvedSource.Kind, 'download', [System.StringComparison]::OrdinalIgnoreCase)) {
                 Copy-PackageFileToMirrorDepots -PackageResult $PackageResult -SourceDefinition $sourceDefinition
-            }
-            elseif ([string]::Equals([string]$sourceDefinition.Scope, 'environment', [System.StringComparison]::OrdinalIgnoreCase) -and
-                [string]::Equals([string]$sourceDefinition.Id, 'defaultPackageDepot', [System.StringComparison]::OrdinalIgnoreCase) -and
-                -not [string]::IsNullOrWhiteSpace($PackageResult.DefaultPackageDepotFilePath)) {
-                Update-PackagePackageFileIndexRecord -PackageResult $PackageResult -PackageFilePath $PackageResult.DefaultPackageDepotFilePath -SourceScope 'environment' -SourceId 'defaultPackageDepot'
             }
 
             $saveStatus = if ([string]::Equals([string]$sourceDefinition.Scope, 'environment', [System.StringComparison]::OrdinalIgnoreCase) -and

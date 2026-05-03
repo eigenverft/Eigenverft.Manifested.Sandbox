@@ -233,40 +233,40 @@ Get-PackageDefaultPreferredTargetInstallDirectory
     return [System.IO.Path]::GetFullPath((Join-Path (Get-PackageDefaultApplicationRootDirectory) 'Installed'))
 }
 
-function Get-PackageDefaultPackageFileIndexFilePath {
+function Get-PackageDefaultPackageInventoryFilePath {
 <#
 .SYNOPSIS
-Returns the default Package package-file index path.
+Returns the default Package inventory path.
 
 .DESCRIPTION
-Builds the fallback local package-file index file path when the Package
-acquisition environment does not define one explicitly.
-
-.EXAMPLE
-Get-PackageDefaultPackageFileIndexFilePath
-#>
-    [CmdletBinding()]
-    param()
-
-    return [System.IO.Path]::GetFullPath((Join-Path (Join-Path (Get-PackageDefaultApplicationRootDirectory) 'State') 'package-file-index.json'))
-}
-
-function Get-PackageDefaultPackageStateIndexFilePath {
-<#
-.SYNOPSIS
-Returns the default Package package-state index path.
-
-.DESCRIPTION
-Builds the fallback local package-state index file path when the Package
+Builds the fallback local package inventory file path when the Package
 global document does not define one explicitly.
 
 .EXAMPLE
-Get-PackageDefaultPackageStateIndexFilePath
+Get-PackageDefaultPackageInventoryFilePath
 #>
     [CmdletBinding()]
     param()
 
-    return [System.IO.Path]::GetFullPath((Join-Path (Join-Path (Get-PackageDefaultApplicationRootDirectory) 'State') 'package-state-index.json'))
+    return [System.IO.Path]::GetFullPath((Join-Path (Join-Path (Get-PackageDefaultApplicationRootDirectory) 'State') 'package-inventory.json'))
+}
+
+function Get-PackageDefaultOperationHistoryFilePath {
+<#
+.SYNOPSIS
+Returns the default Package operation-history path.
+
+.DESCRIPTION
+Builds the fallback local package operation-history file path when the Package
+global document does not define one explicitly.
+
+.EXAMPLE
+Get-PackageDefaultOperationHistoryFilePath
+#>
+    [CmdletBinding()]
+    param()
+
+    return [System.IO.Path]::GetFullPath((Join-Path (Join-Path (Get-PackageDefaultApplicationRootDirectory) 'State') 'package-operation-history.json'))
 }
 
 function Get-PackageDefaultLocalRepositoryRoot {
@@ -322,27 +322,27 @@ Get-PackageDefaultLogRootDirectory
     return [System.IO.Path]::GetFullPath((Join-Path (Get-PackageDefaultApplicationRootDirectory) 'Logs'))
 }
 
-function Get-PackageRootFromStateIndexPath {
+function Get-PackageRootFromInventoryPath {
 <#
 .SYNOPSIS
-Returns the Package local root from a package-state index path.
+Returns the Package local root from a package inventory path.
 
 .DESCRIPTION
-The current layout stores indexes under State. Older or custom test layouts may
-place the state index directly under the package root, so this helper accepts
+The current layout stores inventory under State. Older or custom test layouts may
+place the inventory directly under the package root, so this helper accepts
 both shapes.
 
 .EXAMPLE
-Get-PackageRootFromStateIndexPath -PackageStateIndexFilePath $path
+Get-PackageRootFromInventoryPath -PackageInventoryFilePath $path
 #>
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true)]
         [ValidateNotNullOrEmpty()]
-        [string]$PackageStateIndexFilePath
+        [string]$PackageInventoryFilePath
     )
 
-    $indexDirectory = Split-Path -Parent ([System.IO.Path]::GetFullPath($PackageStateIndexFilePath))
+    $indexDirectory = Split-Path -Parent ([System.IO.Path]::GetFullPath($PackageInventoryFilePath))
     if ([string]::Equals((Split-Path -Leaf $indexDirectory), 'State', [System.StringComparison]::OrdinalIgnoreCase)) {
         return [System.IO.Path]::GetFullPath((Split-Path -Parent $indexDirectory))
     }
@@ -1020,7 +1020,7 @@ Assert-PackageGlobalConfigSchema -GlobalDocumentInfo $globalInfo
         }
     }
 
-    foreach ($requiredAcquisitionProperty in @('stores', 'defaults', 'tracking')) {
+    foreach ($requiredAcquisitionProperty in @('stores', 'defaults')) {
         if (-not $package.acquisitionEnvironment.PSObject.Properties[$requiredAcquisitionProperty]) {
             throw "Package global config '$($GlobalDocumentInfo.Path)' is missing acquisitionEnvironment.$requiredAcquisitionProperty."
         }
@@ -1051,14 +1051,22 @@ Assert-PackageGlobalConfigSchema -GlobalDocumentInfo $globalInfo
         }
     }
 
-    if ($package.acquisitionEnvironment.tracking.PSObject.Properties['artifactIndexFilePath']) {
-        throw "Package global config '$($GlobalDocumentInfo.Path)' still uses retired property 'acquisitionEnvironment.tracking.artifactIndexFilePath'. Use 'acquisitionEnvironment.tracking.packageFileIndexFilePath'."
+    if ($package.acquisitionEnvironment.PSObject.Properties['tracking'] -and $package.acquisitionEnvironment.tracking) {
+        if ($package.acquisitionEnvironment.tracking.PSObject.Properties['artifactIndexFilePath']) {
+            throw "Package global config '$($GlobalDocumentInfo.Path)' still uses retired property 'acquisitionEnvironment.tracking.artifactIndexFilePath'. Package-file inventory is no longer durable state."
+        }
+        if ($package.acquisitionEnvironment.tracking.PSObject.Properties['packageFileIndexFilePath']) {
+            throw "Package global config '$($GlobalDocumentInfo.Path)' still uses retired property 'acquisitionEnvironment.tracking.packageFileIndexFilePath'. Package-file inventory is resolved live from package definitions, config, and depot inventory."
+        }
     }
-    if (-not $package.acquisitionEnvironment.tracking.PSObject.Properties['packageFileIndexFilePath']) {
-        throw "Package global config '$($GlobalDocumentInfo.Path)' is missing acquisitionEnvironment.tracking.packageFileIndexFilePath."
+    if ($package.packageState.PSObject.Properties['indexFilePath']) {
+        throw "Package global config '$($GlobalDocumentInfo.Path)' still uses retired property 'packageState.indexFilePath'. Use 'packageState.inventoryFilePath'."
     }
-    if (-not $package.packageState.PSObject.Properties['indexFilePath']) {
-        throw "Package global config '$($GlobalDocumentInfo.Path)' is missing packageState.indexFilePath."
+    if (-not $package.packageState.PSObject.Properties['inventoryFilePath']) {
+        throw "Package global config '$($GlobalDocumentInfo.Path)' is missing packageState.inventoryFilePath."
+    }
+    if (-not $package.packageState.PSObject.Properties['operationHistoryFilePath']) {
+        throw "Package global config '$($GlobalDocumentInfo.Path)' is missing packageState.operationHistoryFilePath."
     }
     if (-not $package.selectionDefaults.PSObject.Properties['releaseTrack']) {
         throw "Package global config '$($GlobalDocumentInfo.Path)' is missing selectionDefaults.releaseTrack."
@@ -1258,14 +1266,6 @@ Resolve-PackageEffectiveAcquisitionEnvironment -GlobalConfiguration $global -Sou
         Resolve-PackageConfiguredPath -PathValue 'InstStage' -ApplicationRootDirectory $applicationRootDirectory
     }
 
-    $packageFileIndexFilePath = if ($acquisitionEnvironment.tracking.PSObject.Properties['packageFileIndexFilePath'] -and
-        -not [string]::IsNullOrWhiteSpace([string]$acquisitionEnvironment.tracking.packageFileIndexFilePath)) {
-        Resolve-PackageConfiguredPath -PathValue ([string]$acquisitionEnvironment.tracking.packageFileIndexFilePath) -ApplicationRootDirectory $applicationRootDirectory
-    }
-    else {
-        Resolve-PackageConfiguredPath -PathValue 'State\package-file-index.json' -ApplicationRootDirectory $applicationRootDirectory
-    }
-
     $allowFallback = $true
     if ($acquisitionEnvironment.defaults.PSObject.Properties['allowFallback']) {
         $allowFallback = [bool]$acquisitionEnvironment.defaults.allowFallback
@@ -1302,9 +1302,6 @@ Resolve-PackageEffectiveAcquisitionEnvironment -GlobalConfiguration $global -Sou
             AllowFallback = $allowFallback
         }
         EnvironmentSources  = $environmentSources
-        Tracking            = [pscustomobject]@{
-            PackageFileIndexFilePath = $packageFileIndexFilePath
-        }
     }
 }
 
@@ -1982,12 +1979,20 @@ Get-PackageConfig -DefinitionId VSCodeRuntime
         Resolve-PackageConfiguredPath -PathValue 'Installed' -ApplicationRootDirectory $applicationRootDirectory
     }
 
-    $packageStateIndexFilePath = if ($packageGlobalConfig.packageState.PSObject.Properties['indexFilePath'] -and
-        -not [string]::IsNullOrWhiteSpace([string]$packageGlobalConfig.packageState.indexFilePath)) {
-        Resolve-PackageConfiguredPath -PathValue ([string]$packageGlobalConfig.packageState.indexFilePath) -ApplicationRootDirectory $applicationRootDirectory
+    $packageInventoryFilePath = if ($packageGlobalConfig.packageState.PSObject.Properties['inventoryFilePath'] -and
+        -not [string]::IsNullOrWhiteSpace([string]$packageGlobalConfig.packageState.inventoryFilePath)) {
+        Resolve-PackageConfiguredPath -PathValue ([string]$packageGlobalConfig.packageState.inventoryFilePath) -ApplicationRootDirectory $applicationRootDirectory
     }
     else {
-        Resolve-PackageConfiguredPath -PathValue 'State\package-state-index.json' -ApplicationRootDirectory $applicationRootDirectory
+        Resolve-PackageConfiguredPath -PathValue 'State\package-inventory.json' -ApplicationRootDirectory $applicationRootDirectory
+    }
+
+    $packageOperationHistoryFilePath = if ($packageGlobalConfig.packageState.PSObject.Properties['operationHistoryFilePath'] -and
+        -not [string]::IsNullOrWhiteSpace([string]$packageGlobalConfig.packageState.operationHistoryFilePath)) {
+        Resolve-PackageConfiguredPath -PathValue ([string]$packageGlobalConfig.packageState.operationHistoryFilePath) -ApplicationRootDirectory $applicationRootDirectory
+    }
+    else {
+        Resolve-PackageConfiguredPath -PathValue 'State\package-operation-history.json' -ApplicationRootDirectory $applicationRootDirectory
     }
 
     $localRepositoryRoot = if ($packageGlobalConfig.PSObject.Properties['localRepositoryRoot'] -and
@@ -2051,8 +2056,8 @@ Get-PackageConfig -DefinitionId VSCodeRuntime
         LocalRepositoryRoot                = $localRepositoryRoot
         PackageDepotRelativePathTemplate   = $packageDepotRelativePathTemplate
         PackageWorkSlotDirectoryTemplate   = $packageWorkSlotDirectoryTemplate
-        PackageFileIndexFilePath           = $effectiveAcquisitionEnvironment.Tracking.PackageFileIndexFilePath
-        PackageStateIndexFilePath          = $packageStateIndexFilePath
+        PackageInventoryFilePath           = $packageInventoryFilePath
+        PackageOperationHistoryFilePath    = $packageOperationHistoryFilePath
         AllowAcquisitionFallback           = $effectiveAcquisitionEnvironment.Defaults.AllowFallback
         EnvironmentSources                 = $effectiveAcquisitionEnvironment.EnvironmentSources
     }
@@ -2196,6 +2201,8 @@ New-PackageResult -PackageConfig $config
     )
 
     return [pscustomobject]@{
+        OperationId                      = [guid]::NewGuid().ToString('n')
+        OperationStartedAtUtc            = [DateTime]::UtcNow.ToString('o')
         DesiredState                     = $DesiredState
         RepositoryId                     = $PackageConfig.DefinitionRepositoryId
         Status                           = 'Pending'
@@ -2217,8 +2224,8 @@ New-PackageResult -PackageConfig $config
         DefaultPackageDepotDirectory     = $PackageConfig.DefaultPackageDepotDirectory
         PreferredTargetInstallRootDirectory = $PackageConfig.PreferredTargetInstallRootDirectory
         LocalRepositoryRoot              = $PackageConfig.LocalRepositoryRoot
-        PackageFileIndexFilePath         = $PackageConfig.PackageFileIndexFilePath
-        PackageStateIndexFilePath        = $PackageConfig.PackageStateIndexFilePath
+        PackageInventoryFilePath         = $PackageConfig.PackageInventoryFilePath
+        PackageOperationHistoryFilePath  = $PackageConfig.PackageOperationHistoryFilePath
         LocalEnvironment                 = $null
         Package                          = $null
         EffectiveRelease                 = $null

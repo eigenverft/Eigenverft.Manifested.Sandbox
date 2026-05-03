@@ -21,12 +21,10 @@
       "defaults": {
         "allowFallback": true
       },
-      "tracking": {
-        "packageFileIndexFilePath": "{applicationRootDirectory}/State/package-file-index.json"
-      }
     },
     "packageState": {
-      "indexFilePath": "{applicationRootDirectory}/State/package-state-index.json"
+      "inventoryFilePath": "{applicationRootDirectory}/State/package-inventory.json",
+      "operationHistoryFilePath": "{applicationRootDirectory}/State/package-operation-history.json"
     },
     "selectionDefaults": {
       "releaseTrack": "stable",
