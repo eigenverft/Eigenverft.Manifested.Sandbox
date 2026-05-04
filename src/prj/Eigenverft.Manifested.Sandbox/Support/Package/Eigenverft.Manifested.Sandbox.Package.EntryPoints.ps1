@@ -2,6 +2,90 @@
     Eigenverft.Manifested.Sandbox.Package.EntryPoints
 #>
 
+function Get-PackageProvidedToolEntryPoint {
+<#
+.SYNOPSIS
+Finds one provided command or app entry point by name.
+
+.DESCRIPTION
+Looks up an entry in definition.providedTools.commands or
+definition.providedTools.apps using the same case-insensitive matching used by
+Package path registration. Returns $null when the collection or entry is not
+present.
+#>
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [psobject]$Definition,
+
+        [Parameter(Mandatory = $true)]
+        [ValidateSet('commands', 'apps')]
+        [string]$ToolKind,
+
+        [Parameter(Mandatory = $true)]
+        [string]$Name
+    )
+
+    if (-not $Definition.PSObject.Properties['providedTools'] -or
+        -not $Definition.providedTools.PSObject.Properties[$ToolKind]) {
+        return $null
+    }
+
+    foreach ($entryPoint in @($Definition.providedTools.$ToolKind)) {
+        if ([string]::Equals([string]$entryPoint.name, $Name, [System.StringComparison]::OrdinalIgnoreCase)) {
+            return $entryPoint
+        }
+    }
+
+    return $null
+}
+
+function Resolve-PackageProvidedToolEntryPointPath {
+<#
+.SYNOPSIS
+Resolves one provided-tool entry point under an install directory.
+#>
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [psobject]$EntryPoint,
+
+        [Parameter(Mandatory = $true)]
+        [string]$InstallDirectory
+    )
+
+    return (Join-Path $InstallDirectory (([string]$EntryPoint.relativePath) -replace '/', '\'))
+}
+
+function Resolve-PackageProvidedToolPath {
+<#
+.SYNOPSIS
+Resolves one named provided command or app path under an install directory.
+#>
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [psobject]$Definition,
+
+        [Parameter(Mandatory = $true)]
+        [ValidateSet('commands', 'apps')]
+        [string]$ToolKind,
+
+        [Parameter(Mandatory = $true)]
+        [string]$Name,
+
+        [Parameter(Mandatory = $true)]
+        [string]$InstallDirectory
+    )
+
+    $entryPoint = Get-PackageProvidedToolEntryPoint -Definition $Definition -ToolKind $ToolKind -Name $Name
+    if (-not $entryPoint) {
+        return $null
+    }
+
+    return (Resolve-PackageProvidedToolEntryPointPath -EntryPoint $entryPoint -InstallDirectory $InstallDirectory)
+}
+
 function Resolve-PackageEntryPoints {
 <#
 .SYNOPSIS
@@ -26,7 +110,7 @@ Resolve-PackageEntryPoints -PackageResult $result
     $definition = $PackageResult.PackageConfig.Definition
     $commands = @(
         foreach ($entryPoint in @($definition.providedTools.commands)) {
-            $path = Join-Path $PackageResult.InstallDirectory (([string]$entryPoint.relativePath) -replace '/', '\')
+            $path = Resolve-PackageProvidedToolEntryPointPath -EntryPoint $entryPoint -InstallDirectory $PackageResult.InstallDirectory
             [pscustomobject]@{
                 Name   = $entryPoint.name
                 Path   = $path
@@ -37,7 +121,7 @@ Resolve-PackageEntryPoints -PackageResult $result
 
     $apps = @(
         foreach ($entryPoint in @($definition.providedTools.apps)) {
-            $path = Join-Path $PackageResult.InstallDirectory (([string]$entryPoint.relativePath) -replace '/', '\')
+            $path = Resolve-PackageProvidedToolEntryPointPath -EntryPoint $entryPoint -InstallDirectory $PackageResult.InstallDirectory
             [pscustomobject]@{
                 Name   = $entryPoint.name
                 Path   = $path

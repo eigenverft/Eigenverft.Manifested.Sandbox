@@ -42,7 +42,7 @@
       "pathRegistration": {
         "mode": "user",
         "source": {
-          "kind": "commandEntryPoint",
+          "kind": "shim",
           "value": "pwsh"
         }
       },

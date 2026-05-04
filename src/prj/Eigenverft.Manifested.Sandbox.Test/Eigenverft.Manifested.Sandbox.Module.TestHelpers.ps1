@@ -153,6 +153,7 @@ function global:New-TestPackageGlobalDocument {
         [string]$DefaultPackageDepotDirectory,
         [string]$PreferredTargetInstallDirectory,
         [string]$LocalRepositoryRoot,
+        [string]$ShimDirectory,
         [string]$PackageInventoryFilePath,
         [string]$PackageOperationHistoryFilePath,
         [string]$PackageDepotRelativePath = '{definitionId}/{releaseTrack}/{version}/{flavor}',
@@ -187,6 +188,7 @@ function global:New-TestPackageGlobalDocument {
                 }
             }
             localRepositoryRoot = if ($PSBoundParameters.ContainsKey('LocalRepositoryRoot')) { $LocalRepositoryRoot } else { '{applicationRootDirectory}/PackageRepositories' }
+            shimDirectory = if ($PSBoundParameters.ContainsKey('ShimDirectory')) { $ShimDirectory } else { '{applicationRootDirectory}/Shims' }
             layout = @{
                 packageDepotRelativePath = $PackageDepotRelativePath
                 packageWorkSlotDirectory = $PackageWorkSlotDirectory

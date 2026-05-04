@@ -49,8 +49,12 @@
       "pathRegistration": {
         "mode": "user",
         "source": {
-          "kind": "commandEntryPoint",
-          "value": "node"
+          "kind": "shim",
+          "values": [
+            "node",
+            "npm",
+            "npx"
+          ]
         }
       },
       "expandedRoot": "auto",

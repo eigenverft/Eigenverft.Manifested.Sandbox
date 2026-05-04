@@ -64,8 +64,14 @@
       "pathRegistration": {
         "mode": "user",
         "source": {
-          "kind": "installRelativeDirectory",
-          "value": "."
+          "kind": "shim",
+          "values": [
+            "llama-cli",
+            "llama-server",
+            "llama-quantize",
+            "llama-bench",
+            "llama-tokenize"
+          ]
         }
       },
       "expandedRoot": "auto",

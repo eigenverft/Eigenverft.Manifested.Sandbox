@@ -331,6 +331,18 @@ Update-PackageInventoryRecord -PackageResult $result
     }
     $installSlotId = Get-PackageInstallSlotId -PackageResult $PackageResult
     $definitionCopy = Copy-PackageDefinitionToLocalRepository -PackageResult $PackageResult
+    $pathRegistrationRecord = $null
+    if ($PackageResult.PSObject.Properties['PathRegistration'] -and $null -ne $PackageResult.PathRegistration) {
+        $pathRegistrationRecord = [pscustomobject]@{
+            mode           = [string]$PackageResult.PathRegistration.Mode
+            sourceKind     = [string]$PackageResult.PathRegistration.SourceKind
+            sourceValue    = [string]$PackageResult.PathRegistration.SourceValue
+            sourceValues   = @($PackageResult.PathRegistration.SourceValues)
+            sourcePath     = [string]$PackageResult.PathRegistration.SourcePath
+            registeredPath = [string]$PackageResult.PathRegistration.RegisteredPath
+            status         = [string]$PackageResult.PathRegistration.Status
+        }
+    }
     $records = @(
         foreach ($record in @($index.Records)) {
             $sameInstallSlot = [string]::Equals([string]$record.installSlotId, $installSlotId, [System.StringComparison]::OrdinalIgnoreCase)
@@ -355,6 +367,7 @@ Update-PackageInventoryRecord -PackageResult $result
         currentVersion  = $PackageResult.PackageVersion
         installDirectory = $normalizedInstallDirectory
         ownershipKind   = $ownershipKind
+        pathRegistration = $pathRegistrationRecord
         updatedAtUtc    = [DateTime]::UtcNow.ToString('o')
     }
     $records += $newRecord

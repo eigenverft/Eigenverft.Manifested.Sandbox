@@ -200,6 +200,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - export
             PackageInstallStageRootDirectory    = Join-Path $root 'PackageInstallStage'
             DefaultPackageDepotDirectory        = Join-Path $root 'DefaultPackageDepot'
             LocalRepositoryRoot                 = Join-Path $root 'PackageRepositories'
+            ShimDirectory                       = Join-Path $root 'Shims'
             PackageInventoryFilePath            = Join-Path (Join-Path $root 'State') 'package-inventory.json'
             PackageOperationHistoryFilePath     = Join-Path (Join-Path $root 'State') 'package-operation-history.json'
         }
@@ -227,6 +228,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - export
         $state.Directories.PackageInstallStage.Exists | Should -BeFalse
         $state.Directories.DefaultPackageDepot.Exists | Should -BeFalse
         $state.Directories.LocalRepositoryRoot.Exists | Should -BeFalse
+        $state.Directories.Shims.Exists | Should -BeFalse
     }
 
     It 'gets package state without loading a package definition config' {
@@ -238,6 +240,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - export
             PackageInstallStageRootDirectory    = Join-Path $root 'PackageInstallStage'
             DefaultPackageDepotDirectory        = Join-Path $root 'DefaultPackageDepot'
             LocalRepositoryRoot                 = Join-Path $root 'PackageRepositories'
+            ShimDirectory                       = Join-Path $root 'Shims'
             PackageInventoryFilePath            = Join-Path (Join-Path $root 'State') 'package-inventory.json'
             PackageOperationHistoryFilePath     = Join-Path (Join-Path $root 'State') 'package-operation-history.json'
             SourceInventoryInfo                 = [pscustomobject]@{ Path = (Join-Path (Join-Path $root 'Configuration\External') 'SourceInventory.json'); Exists = $false; Document = $null }
@@ -260,6 +263,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - export
         $installStageRoot = Join-Path $root 'PackageInstallStage'
         $depotRoot = Join-Path $root 'DefaultPackageDepot'
         $localRepositoryRoot = Join-Path $root 'PackageRepositories'
+        $shimDirectory = Join-Path $root 'Shims'
         $installDirectory = Join-Path $installRoot 'vscode-runtime\stable\1.0.0\win32-x64'
         $definitionLocalPath = Join-Path $localRepositoryRoot 'EigenverftModule\VSCodeRuntime.json'
         $sourceInventoryPath = Join-Path (Join-Path $root 'Configuration\External') 'SourceInventory.json'
@@ -268,6 +272,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - export
         $null = New-Item -ItemType Directory -Path $workspaceRoot -Force
         $null = New-Item -ItemType Directory -Path $installStageRoot -Force
         $null = New-Item -ItemType Directory -Path $depotRoot -Force
+        $null = New-Item -ItemType Directory -Path $shimDirectory -Force
         Write-TestJsonDocument -Path $definitionLocalPath -Document (New-TestVSCodeDefinitionDocument -Releases @(
                 New-TestPackageRelease -Id 'vsCode-win-x64-stable' -Version '1.0.0' -Architecture 'x64' -Flavor 'win32-x64'
             ))
@@ -280,6 +285,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - export
             PackageInstallStageRootDirectory    = $installStageRoot
             DefaultPackageDepotDirectory        = $depotRoot
             LocalRepositoryRoot                 = $localRepositoryRoot
+            ShimDirectory                       = $shimDirectory
             PackageInventoryFilePath            = Join-Path (Join-Path $root 'State') 'package-inventory.json'
             PackageOperationHistoryFilePath     = Join-Path (Join-Path $root 'State') 'package-operation-history.json'
         }
@@ -298,6 +304,14 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - export
             currentVersion   = '1.0.0'
             installDirectory = $installDirectory
             ownershipKind    = 'PackageInstalled'
+            pathRegistration = [pscustomobject]@{
+                mode           = 'user'
+                sourceKind     = 'shim'
+                sourceValue    = 'code'
+                sourcePath     = Join-Path $shimDirectory 'code.cmd'
+                registeredPath = $shimDirectory
+                status         = 'Registered'
+            }
             updatedAtUtc     = '2026-04-25T12:00:00Z'
         }
         $operationRecord = [pscustomobject]@{
@@ -329,12 +343,15 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - export
         $state.PackageRecords[0].DefinitionRepositoryId | Should -Be 'EigenverftModule'
         $state.PackageRecords[0].DefinitionLocalExists | Should -BeTrue
         $state.PackageRecords[0].InstallDirectoryExists | Should -BeTrue
+        $state.PackageRecords[0].PathRegistration.SourceKind | Should -Be 'shim'
+        $state.PackageRecords[0].PathRegistration.RegisteredPath | Should -Be $shimDirectory
         $state.OperationRecords[0].operationId | Should -Be 'test-operation'
         $state.Directories.Installed.Exists | Should -BeTrue
         $state.Directories.PackageFileStaging.Exists | Should -BeTrue
         $state.Directories.PackageInstallStage.Exists | Should -BeTrue
         $state.Directories.DefaultPackageDepot.Exists | Should -BeTrue
         $state.Directories.LocalRepositoryRoot.Exists | Should -BeTrue
+        $state.Directories.Shims.Exists | Should -BeTrue
     }
 
     It 'returns the resolved raw package state on request' {
@@ -346,6 +363,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - export
             PackageInstallStageRootDirectory    = Join-Path $root 'PackageInstallStage'
             DefaultPackageDepotDirectory        = Join-Path $root 'DefaultPackageDepot'
             LocalRepositoryRoot                 = Join-Path $root 'PackageRepositories'
+            ShimDirectory                       = Join-Path $root 'Shims'
             PackageInventoryFilePath            = Join-Path (Join-Path $root 'State') 'package-inventory.json'
             PackageOperationHistoryFilePath     = Join-Path (Join-Path $root 'State') 'package-operation-history.json'
         }

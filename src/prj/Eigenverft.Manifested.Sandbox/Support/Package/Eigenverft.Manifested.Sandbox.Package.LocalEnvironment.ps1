@@ -83,6 +83,7 @@ the existing lazy creation paths elsewhere in the Package flow.
     Add-PackageLocalEnvironmentDirectoryCandidate -Candidates $directoryCandidates -Path ([string]$PackageConfig.PackageFileStagingRootDirectory)
     Add-PackageLocalEnvironmentDirectoryCandidate -Candidates $directoryCandidates -Path ([string]$PackageConfig.PackageInstallStageRootDirectory)
     Add-PackageLocalEnvironmentDirectoryCandidate -Candidates $directoryCandidates -Path ([string]$PackageConfig.LocalRepositoryRoot)
+    Add-PackageLocalEnvironmentDirectoryCandidate -Candidates $directoryCandidates -Path ([string]$PackageConfig.ShimDirectory)
     Add-PackageLocalEnvironmentDirectoryCandidate -Candidates $directoryCandidates -Path (Join-Path $applicationRootDirectory 'Caches')
     Add-PackageLocalEnvironmentDirectoryCandidate -Candidates $directoryCandidates -Path (Join-Path (Join-Path $applicationRootDirectory 'Caches') 'npm')
 

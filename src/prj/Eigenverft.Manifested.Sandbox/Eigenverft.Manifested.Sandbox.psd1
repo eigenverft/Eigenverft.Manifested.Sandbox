@@ -140,6 +140,7 @@ FileList = @(
     'Support\Package\Eigenverft.Manifested.Sandbox.Package.Npm.ps1',
     'Support\Package\Eigenverft.Manifested.Sandbox.Package.Install.ps1',
     'Support\Package\Eigenverft.Manifested.Sandbox.Package.EntryPoints.ps1',
+    'Support\Package\Eigenverft.Manifested.Sandbox.Package.Shims.ps1',
     'Support\Package\Eigenverft.Manifested.Sandbox.Package.PathRegistration.ps1',
     'Support\Package\Eigenverft.Manifested.Sandbox.Package.CommandFlow.ps1',
     'Configuration\Internal\Config.json',

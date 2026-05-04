@@ -12,6 +12,8 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
         $globalInfo.Document.package.PSObject.Properties.Name | Should -Contain 'applicationRootDirectory'
         $globalInfo.Document.package.PSObject.Properties.Name | Should -Contain 'repositorySources'
         $globalInfo.Document.package.PSObject.Properties.Name | Should -Contain 'localRepositoryRoot'
+        $globalInfo.Document.package.PSObject.Properties.Name | Should -Contain 'shimDirectory'
+        $globalInfo.Document.package.shimDirectory | Should -Be '{applicationRootDirectory}/Shims'
         $globalInfo.Document.package.PSObject.Properties.Name | Should -Contain 'layout'
         $globalInfo.Document.package.layout.packageDepotRelativePath | Should -Be '{definitionId}/{releaseTrack}/{version}/{flavor}'
         $globalInfo.Document.package.layout.packageWorkSlotDirectory | Should -Be '{definitionId}-{slotHash}'
@@ -101,6 +103,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
         $config.PackageInstallStageRootDirectory | Should -Be ([System.IO.Path]::GetFullPath((Join-Path $applicationRootPath 'InstStage')))
         $config.DefaultPackageDepotDirectory | Should -Be ([System.IO.Path]::GetFullPath((Join-Path $applicationRootPath 'DefaultPackageDepot')))
         $config.LocalRepositoryRoot | Should -Be ([System.IO.Path]::GetFullPath((Join-Path $applicationRootPath 'PackageRepositories')))
+        $config.ShimDirectory | Should -Be ([System.IO.Path]::GetFullPath((Join-Path $applicationRootPath 'Shims')))
 
         $fallbackRootPath = Join-Path $TestDrive 'application-root-fallback'
         $fallbackGlobalDocument = New-TestPackageGlobalDocument
@@ -113,6 +116,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
 
         $fallbackConfig.ApplicationRootDirectory | Should -Be (Get-PackageDefaultApplicationRootDirectory)
         $fallbackConfig.PackageFileStagingRootDirectory | Should -Be ([System.IO.Path]::GetFullPath((Join-Path (Get-PackageDefaultApplicationRootDirectory) 'FileStage')))
+        $fallbackConfig.ShimDirectory | Should -Be ([System.IO.Path]::GetFullPath((Join-Path (Get-PackageDefaultApplicationRootDirectory) 'Shims')))
     }
 
     It 'resolves absolute configured paths without joining them under applicationRootDirectory' {
@@ -141,6 +145,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
         $config.PreferredTargetInstallRootDirectory | Should -Be ([System.IO.Path]::GetFullPath($absoluteInstallPath))
         $config.PackageFileStagingRootDirectory | Should -Be ([System.IO.Path]::GetFullPath($absoluteFileStagingPath))
         $config.PackageInstallStageRootDirectory | Should -Be ([System.IO.Path]::GetFullPath($absoluteInstallStagingPath))
+        $config.ShimDirectory | Should -Be ([System.IO.Path]::GetFullPath((Join-Path $applicationRootPath 'Shims')))
     }
 
     It 'creates the local DepotInventory.json copy from shipped configuration when missing' {
@@ -219,6 +224,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
         Test-Path -LiteralPath (Join-Path $applicationRootPath 'FileStage') -PathType Container | Should -BeTrue
         Test-Path -LiteralPath (Join-Path $applicationRootPath 'InstStage') -PathType Container | Should -BeTrue
         Test-Path -LiteralPath (Join-Path $applicationRootPath 'PackageRepositories') -PathType Container | Should -BeTrue
+        Test-Path -LiteralPath (Join-Path $applicationRootPath 'Shims') -PathType Container | Should -BeTrue
         Test-Path -LiteralPath (Join-Path (Join-Path $applicationRootPath 'Caches') 'npm') -PathType Container | Should -BeTrue
         Test-Path -LiteralPath $defaultDepotPath -PathType Container | Should -BeTrue
         Test-Path -LiteralPath $readOnlyDepotPath -PathType Container | Should -BeFalse
@@ -518,6 +524,8 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
         $result.Package.version | Should -Be '8863'
         $result.Package.releaseTag | Should -Be 'b8863'
         $result.Package.packageFile.fileName | Should -Be 'llama-b8863-bin-win-cpu-x64.zip'
+        $result.Package.install.pathRegistration.source.kind | Should -Be 'shim'
+        $result.Package.install.pathRegistration.source.values | Should -Be @('llama-cli', 'llama-server', 'llama-quantize', 'llama-bench', 'llama-tokenize')
     }
 
     It 'loads the shipped GitRuntime definition and selects the fixed GitHub-backed release' {
@@ -549,6 +557,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
         $result.Package.releaseTag | Should -Be 'v2.54.0.windows.1'
         $result.Package.packageFile.fileName | Should -Be $expectedFileName
         $result.Package.packageFile.contentHash.value | Should -Be $expectedSha256
+        $result.Package.install.pathRegistration.source.kind | Should -Be 'shim'
         $result.Package.install.pathRegistration.source.value | Should -Be 'git'
     }
 
@@ -581,6 +590,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
         $result.Package.releaseTag | Should -Be 'v2.91.0'
         $result.Package.packageFile.fileName | Should -Be $expectedFileName
         $result.Package.packageFile.contentHash.value | Should -Be $expectedSha256
+        $result.Package.install.pathRegistration.source.kind | Should -Be 'shim'
         $result.Package.install.pathRegistration.source.value | Should -Be 'gh'
     }
 
@@ -645,7 +655,8 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
         $result.Package.releaseTag | Should -Be 'v24.15.0'
         $result.Package.packageFile.fileName | Should -Be $expectedFileName
         $result.Package.packageFile.contentHash.value | Should -Be $expectedSha256
-        $result.Package.install.pathRegistration.source.value | Should -Be 'node'
+        $result.Package.install.pathRegistration.source.kind | Should -Be 'shim'
+        $result.Package.install.pathRegistration.source.values | Should -Be @('node', 'npm', 'npx')
     }
 
     It 'loads the shipped npm-backed CLI runtime definitions without package-file acquisition' {
@@ -670,6 +681,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
             $result.Package.install.kind | Should -Be 'npmGlobalPackage'
             $result.Package.install.installerCommand | Should -Be 'npm'
             $result.Package.install.packageSpec | Should -Be $case.PackageSpec
+            $result.Package.install.pathRegistration.source.kind | Should -Be 'shim'
             $result.Package.install.pathRegistration.source.value | Should -Be $case.Command
             $config.Definition.providedTools.commands[0].relativePath | Should -Be $case.RelativePath
             if ($case.DefinitionId -eq 'CodexCli') {
@@ -778,6 +790,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
         $result.Package.packageFile.fileName | Should -Be $expectedFileName
         $result.Package.packageFile.contentHash.value | Should -Be $expectedSha256
         $result.Package.install.expandedRoot | Should -Be 'tools'
+        $result.Package.install.pathRegistration.source.kind | Should -Be 'shim'
         $result.Package.install.pathRegistration.source.value | Should -Be 'python'
         $result.Package.validation.commandChecks[1].arguments | Should -Be @('-m', 'pip', '--version')
     }
@@ -811,6 +824,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
         $result.Package.releaseTag | Should -Be 'v7.6.1'
         $result.Package.packageFile.fileName | Should -Be $expectedFileName
         $result.Package.packageFile.contentHash.value | Should -Be $expectedSha256
+        $result.Package.install.pathRegistration.source.kind | Should -Be 'shim'
         $result.Package.install.pathRegistration.source.value | Should -Be 'pwsh'
     }
 

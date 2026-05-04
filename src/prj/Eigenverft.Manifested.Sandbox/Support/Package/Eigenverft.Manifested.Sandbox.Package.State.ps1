@@ -55,6 +55,28 @@ function Select-PackageStateOwnershipRecord {
         $installDirectoryExists = Test-Path -LiteralPath $installDirectory -PathType Container
     }
 
+    $pathRegistration = $null
+    if ($Record.PSObject.Properties['pathRegistration'] -and $null -ne $Record.pathRegistration) {
+        $sourcePath = [string]$Record.pathRegistration.sourcePath
+        $registeredPath = [string]$Record.pathRegistration.registeredPath
+        $registeredPathExists = $false
+        if (-not [string]::IsNullOrWhiteSpace($registeredPath)) {
+            $registeredPathExists = Test-Path -LiteralPath $registeredPath -PathType Container
+        }
+
+        $pathRegistration = [pscustomobject]@{
+            Mode                 = $Record.pathRegistration.mode
+            SourceKind           = $Record.pathRegistration.sourceKind
+            SourceValue          = $Record.pathRegistration.sourceValue
+            SourceValues         = @($Record.pathRegistration.sourceValues)
+            SourcePath           = $sourcePath
+            SourcePathExists     = Test-PackageStateLeafPath -Path $sourcePath
+            RegisteredPath       = $registeredPath
+            RegisteredPathExists = $registeredPathExists
+            Status               = $Record.pathRegistration.status
+        }
+    }
+
     return [pscustomobject]@{
         InstallSlotId          = $Record.installSlotId
         DefinitionId           = $Record.definitionId
@@ -69,6 +91,7 @@ function Select-PackageStateOwnershipRecord {
         InstallDirectory       = $installDirectory
         InstallDirectoryExists = $installDirectoryExists
         OwnershipKind          = $Record.ownershipKind
+        PathRegistration       = $pathRegistration
         UpdatedAtUtc           = $Record.updatedAtUtc
     }
 }
@@ -118,6 +141,14 @@ function Get-PackageStateConfig {
         Resolve-PackageConfiguredPath -PathValue 'PackageRepositories' -ApplicationRootDirectory $applicationRootDirectory
     }
 
+    $shimDirectory = if ($packageGlobalConfig.PSObject.Properties['shimDirectory'] -and
+        -not [string]::IsNullOrWhiteSpace([string]$packageGlobalConfig.shimDirectory)) {
+        Resolve-PackageConfiguredPath -PathValue ([string]$packageGlobalConfig.shimDirectory) -ApplicationRootDirectory $applicationRootDirectory
+    }
+    else {
+        Resolve-PackageConfiguredPath -PathValue 'Shims' -ApplicationRootDirectory $applicationRootDirectory
+    }
+
     return [pscustomobject]@{
         GlobalConfigurationPath             = $globalDocumentInfo.Path
         GlobalConfiguration                 = $packageGlobalConfig
@@ -136,6 +167,7 @@ function Get-PackageStateConfig {
         DefaultPackageDepotDirectory        = $effectiveAcquisitionEnvironment.Stores.DefaultPackageDepotDirectory
         PreferredTargetInstallRootDirectory = $preferredTargetInstallDirectory
         LocalRepositoryRoot                 = $localRepositoryRoot
+        ShimDirectory                       = $shimDirectory
         PackageInventoryFilePath            = $packageInventoryFilePath
         PackageOperationHistoryFilePath     = $packageOperationHistoryFilePath
         EnvironmentSources                  = $effectiveAcquisitionEnvironment.EnvironmentSources
@@ -160,6 +192,7 @@ function Get-PackageState {
         PackageInstallStage   = Get-PackageStateDirectorySummary -Path $config.PackageInstallStageRootDirectory
         DefaultPackageDepot = Get-PackageStateDirectorySummary -Path $config.DefaultPackageDepotDirectory
         LocalRepositoryRoot = Get-PackageStateDirectorySummary -Path $config.LocalRepositoryRoot
+        Shims               = Get-PackageStateDirectorySummary -Path $config.ShimDirectory
     }
 
     if ($Raw.IsPresent) {

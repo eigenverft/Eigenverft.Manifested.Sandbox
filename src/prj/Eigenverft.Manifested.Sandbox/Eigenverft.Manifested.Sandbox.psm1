@@ -36,6 +36,7 @@
 . "$PSScriptRoot\Support\Package\Eigenverft.Manifested.Sandbox.Package.Npm.ps1"
 . "$PSScriptRoot\Support\Package\Eigenverft.Manifested.Sandbox.Package.Install.ps1"
 . "$PSScriptRoot\Support\Package\Eigenverft.Manifested.Sandbox.Package.EntryPoints.ps1"
+. "$PSScriptRoot\Support\Package\Eigenverft.Manifested.Sandbox.Package.Shims.ps1"
 . "$PSScriptRoot\Support\Package\Eigenverft.Manifested.Sandbox.Package.PathRegistration.ps1"
 . "$PSScriptRoot\Support\Package\Eigenverft.Manifested.Sandbox.Package.CommandFlow.ps1"
 

@@ -9,6 +9,7 @@
       }
     },
     "localRepositoryRoot": "{applicationRootDirectory}/PackageRepositories",
+    "shimDirectory": "{applicationRootDirectory}/Shims",
     "layout": {
       "packageDepotRelativePath": "{definitionId}/{releaseTrack}/{version}/{flavor}",
       "packageWorkSlotDirectory": "{definitionId}-{slotHash}"

@@ -215,6 +215,21 @@ Get-PackageDefaultPackageInstallStageDirectory
     return [System.IO.Path]::GetFullPath((Join-Path (Get-PackageDefaultApplicationRootDirectory) 'InstStage'))
 }
 
+function Get-PackageDefaultShimDirectory {
+<#
+.SYNOPSIS
+Returns the default Package shim root.
+
+.DESCRIPTION
+Builds the fallback local shim root when Config.json does not define one
+explicitly.
+#>
+    [CmdletBinding()]
+    param()
+
+    return [System.IO.Path]::GetFullPath((Join-Path (Get-PackageDefaultApplicationRootDirectory) 'Shims'))
+}
+
 function Get-PackageDefaultPreferredTargetInstallDirectory {
 <#
 .SYNOPSIS
@@ -1011,6 +1026,10 @@ Assert-PackageGlobalConfigSchema -GlobalDocumentInfo $globalInfo
         [string]::IsNullOrWhiteSpace([string]$package.applicationRootDirectory)) {
         throw "Package global config '$($GlobalDocumentInfo.Path)' defines an empty applicationRootDirectory."
     }
+    if ($package.PSObject.Properties['shimDirectory'] -and
+        [string]::IsNullOrWhiteSpace([string]$package.shimDirectory)) {
+        throw "Package global config '$($GlobalDocumentInfo.Path)' defines an empty shimDirectory."
+    }
     if ($package.PSObject.Properties['layout'] -and $package.layout) {
         foreach ($layoutProperty in @('packageDepotRelativePath', 'packageWorkSlotDirectory')) {
             if ($package.layout.PSObject.Properties[$layoutProperty] -and
@@ -1620,15 +1639,42 @@ Assert-PackageDefinitionSchema -DefinitionDocumentInfo $definitionInfo -Definiti
                 if (-not $pathRegistration.source.PSObject.Properties['kind'] -or [string]::IsNullOrWhiteSpace([string]$pathRegistration.source.kind)) {
                     throw "Package release '$($release.id)' in '$($definition.id)' defines install.pathRegistration without source.kind."
                 }
-                if (-not $pathRegistration.source.PSObject.Properties['value'] -or [string]::IsNullOrWhiteSpace([string]$pathRegistration.source.value)) {
-                    throw "Package release '$($release.id)' in '$($definition.id)' defines install.pathRegistration without source.value."
-                }
 
                 switch -Exact ([string]$pathRegistration.source.kind) {
-                    'commandEntryPoint' { }
-                    'appEntryPoint' { }
-                    'installRelativeDirectory' { }
-                    'shim' { }
+                    'commandEntryPoint' {
+                        if (-not $pathRegistration.source.PSObject.Properties['value'] -or [string]::IsNullOrWhiteSpace([string]$pathRegistration.source.value)) {
+                            throw "Package release '$($release.id)' in '$($definition.id)' defines install.pathRegistration source kind 'commandEntryPoint' without source.value."
+                        }
+                        if ($pathRegistration.source.PSObject.Properties['values']) {
+                            throw "Package release '$($release.id)' in '$($definition.id)' defines install.pathRegistration source.values for source kind 'commandEntryPoint'."
+                        }
+                    }
+                    'appEntryPoint' {
+                        if (-not $pathRegistration.source.PSObject.Properties['value'] -or [string]::IsNullOrWhiteSpace([string]$pathRegistration.source.value)) {
+                            throw "Package release '$($release.id)' in '$($definition.id)' defines install.pathRegistration source kind 'appEntryPoint' without source.value."
+                        }
+                        if ($pathRegistration.source.PSObject.Properties['values']) {
+                            throw "Package release '$($release.id)' in '$($definition.id)' defines install.pathRegistration source.values for source kind 'appEntryPoint'."
+                        }
+                    }
+                    'installRelativeDirectory' {
+                        if (-not $pathRegistration.source.PSObject.Properties['value'] -or [string]::IsNullOrWhiteSpace([string]$pathRegistration.source.value)) {
+                            throw "Package release '$($release.id)' in '$($definition.id)' defines install.pathRegistration source kind 'installRelativeDirectory' without source.value."
+                        }
+                        if ($pathRegistration.source.PSObject.Properties['values']) {
+                            throw "Package release '$($release.id)' in '$($definition.id)' defines install.pathRegistration source.values for source kind 'installRelativeDirectory'."
+                        }
+                    }
+                    'shim' {
+                        $hasShimValue = $pathRegistration.source.PSObject.Properties['value'] -and -not [string]::IsNullOrWhiteSpace([string]$pathRegistration.source.value)
+                        $hasShimValues = $false
+                        if ($pathRegistration.source.PSObject.Properties['values'] -and $null -ne $pathRegistration.source.values) {
+                            $hasShimValues = @($pathRegistration.source.values | Where-Object { -not [string]::IsNullOrWhiteSpace([string]$_) }).Count -gt 0
+                        }
+                        if (-not $hasShimValue -and -not $hasShimValues) {
+                            throw "Package release '$($release.id)' in '$($definition.id)' defines install.pathRegistration source kind 'shim' without source.value or source.values."
+                        }
+                    }
                     default {
                         throw "Package release '$($release.id)' in '$($definition.id)' uses unsupported install.pathRegistration.source.kind '$($pathRegistration.source.kind)'."
                     }
@@ -2003,6 +2049,14 @@ Get-PackageConfig -DefinitionId VSCodeRuntime
         Resolve-PackageConfiguredPath -PathValue 'PackageRepositories' -ApplicationRootDirectory $applicationRootDirectory
     }
 
+    $shimDirectory = if ($packageGlobalConfig.PSObject.Properties['shimDirectory'] -and
+        -not [string]::IsNullOrWhiteSpace([string]$packageGlobalConfig.shimDirectory)) {
+        Resolve-PackageConfiguredPath -PathValue ([string]$packageGlobalConfig.shimDirectory) -ApplicationRootDirectory $applicationRootDirectory
+    }
+    else {
+        Resolve-PackageConfiguredPath -PathValue 'Shims' -ApplicationRootDirectory $applicationRootDirectory
+    }
+
     $packageDepotRelativePathTemplate = '{definitionId}/{releaseTrack}/{version}/{flavor}'
     $packageWorkSlotDirectoryTemplate = '{definitionId}-{slotHash}'
     if ($packageGlobalConfig.PSObject.Properties['layout'] -and $packageGlobalConfig.layout) {
@@ -2054,6 +2108,7 @@ Get-PackageConfig -DefinitionId VSCodeRuntime
         DefaultPackageDepotDirectory       = $effectiveAcquisitionEnvironment.Stores.DefaultPackageDepotDirectory
         PreferredTargetInstallRootDirectory = $preferredTargetInstallDirectory
         LocalRepositoryRoot                = $localRepositoryRoot
+        ShimDirectory                      = $shimDirectory
         PackageDepotRelativePathTemplate   = $packageDepotRelativePathTemplate
         PackageWorkSlotDirectoryTemplate   = $packageWorkSlotDirectoryTemplate
         PackageInventoryFilePath           = $packageInventoryFilePath
@@ -2224,6 +2279,7 @@ New-PackageResult -PackageConfig $config
         DefaultPackageDepotDirectory     = $PackageConfig.DefaultPackageDepotDirectory
         PreferredTargetInstallRootDirectory = $PackageConfig.PreferredTargetInstallRootDirectory
         LocalRepositoryRoot              = $PackageConfig.LocalRepositoryRoot
+        ShimDirectory                    = $PackageConfig.ShimDirectory
         PackageInventoryFilePath         = $PackageConfig.PackageInventoryFilePath
         PackageOperationHistoryFilePath  = $PackageConfig.PackageOperationHistoryFilePath
         LocalEnvironment                 = $null

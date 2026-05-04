@@ -2,6 +2,55 @@
     Eigenverft.Manifested.Sandbox.Package.PathRegistration
 #>
 
+function Add-PackagePathCleanupDirectory {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [AllowEmptyCollection()]
+        [System.Collections.Generic.List[string]]$CleanupDirectories,
+
+        [AllowNull()]
+        [string]$DirectoryPath
+    )
+
+    $normalizedDirectoryPath = Get-NormalizedPathEntry -PathEntry $DirectoryPath
+    if ([string]::IsNullOrWhiteSpace($normalizedDirectoryPath)) {
+        return
+    }
+
+    if ($normalizedDirectoryPath -notin @($CleanupDirectories.ToArray())) {
+        $CleanupDirectories.Add($normalizedDirectoryPath) | Out-Null
+    }
+}
+
+function Get-PackagePathRegistrationSourceValues {
+    [CmdletBinding()]
+    param(
+        [AllowNull()]
+        [psobject]$Source
+    )
+
+    $values = New-Object System.Collections.Generic.List[string]
+    if ($Source -and $Source.PSObject.Properties['value'] -and
+        -not [string]::IsNullOrWhiteSpace([string]$Source.value)) {
+        $values.Add([string]$Source.value) | Out-Null
+    }
+
+    if ($Source -and $Source.PSObject.Properties['values'] -and $null -ne $Source.values) {
+        foreach ($value in @($Source.values)) {
+            $textValue = ([string]$value).Trim()
+            if ([string]::IsNullOrWhiteSpace($textValue)) {
+                continue
+            }
+            if ($textValue -notin @($values.ToArray())) {
+                $values.Add($textValue) | Out-Null
+            }
+        }
+    }
+
+    return @($values.ToArray())
+}
+
 function Get-PackagePathRegistrationSourcePath {
 <#
 .SYNOPSIS
@@ -31,9 +80,10 @@ or directory path for the requested install directory.
 
     $source = $pathRegistration.source
     $sourceKind = if ($source.PSObject.Properties['kind']) { [string]$source.kind } else { $null }
-    $sourceValue = if ($source.PSObject.Properties['value']) { [string]$source.value } else { $null }
-    if ([string]::IsNullOrWhiteSpace($sourceKind) -or [string]::IsNullOrWhiteSpace($sourceValue)) {
-        throw "Package pathRegistration requires source.kind and source.value when pathRegistration.mode is not 'none'."
+    $sourceValues = @(Get-PackagePathRegistrationSourceValues -Source $source)
+    $sourceValue = if ($sourceValues.Count -gt 0) { [string]$sourceValues[0] } else { $null }
+    if ([string]::IsNullOrWhiteSpace($sourceKind) -or $sourceValues.Count -eq 0) {
+        throw "Package pathRegistration requires source.kind and source.value or source.values when pathRegistration.mode is not 'none'."
     }
 
     $baseInstallDirectory = if (-not [string]::IsNullOrWhiteSpace($InstallDirectoryOverride)) {
@@ -45,26 +95,42 @@ or directory path for the requested install directory.
 
     switch -Exact ($sourceKind) {
         'commandEntryPoint' {
-            foreach ($entryPoint in @($PackageResult.PackageConfig.Definition.providedTools.commands)) {
-                if ([string]::Equals([string]$entryPoint.name, $sourceValue, [System.StringComparison]::OrdinalIgnoreCase)) {
-                    return (Join-Path $baseInstallDirectory (([string]$entryPoint.relativePath) -replace '/', '\'))
-                }
+            if ($sourceValues.Count -gt 1) {
+                throw "Package pathRegistration source kind 'commandEntryPoint' supports only one source value."
+            }
+            $sourcePath = Resolve-PackageProvidedToolPath -Definition $PackageResult.PackageConfig.Definition -ToolKind 'commands' -Name $sourceValue -InstallDirectory $baseInstallDirectory
+            if (-not [string]::IsNullOrWhiteSpace($sourcePath)) {
+                return $sourcePath
             }
             throw "Package pathRegistration source commandEntryPoint '$sourceValue' was not found in providedTools.commands."
         }
         'appEntryPoint' {
-            foreach ($entryPoint in @($PackageResult.PackageConfig.Definition.providedTools.apps)) {
-                if ([string]::Equals([string]$entryPoint.name, $sourceValue, [System.StringComparison]::OrdinalIgnoreCase)) {
-                    return (Join-Path $baseInstallDirectory (([string]$entryPoint.relativePath) -replace '/', '\'))
-                }
+            if ($sourceValues.Count -gt 1) {
+                throw "Package pathRegistration source kind 'appEntryPoint' supports only one source value."
+            }
+            $sourcePath = Resolve-PackageProvidedToolPath -Definition $PackageResult.PackageConfig.Definition -ToolKind 'apps' -Name $sourceValue -InstallDirectory $baseInstallDirectory
+            if (-not [string]::IsNullOrWhiteSpace($sourcePath)) {
+                return $sourcePath
             }
             throw "Package pathRegistration source appEntryPoint '$sourceValue' was not found in providedTools.apps."
         }
         'installRelativeDirectory' {
+            if ($sourceValues.Count -gt 1) {
+                throw "Package pathRegistration source kind 'installRelativeDirectory' supports only one source value."
+            }
             return (Join-Path $baseInstallDirectory (($sourceValue) -replace '/', '\'))
         }
         'shim' {
-            throw "Package pathRegistration source kind 'shim' is reserved but not implemented yet."
+            if (-not [string]::IsNullOrWhiteSpace($InstallDirectoryOverride)) {
+                return (Get-PackageCommandShimPath -PackageResult $PackageResult -CommandName $sourceValues[0])
+            }
+
+            $shimResults = @(
+                foreach ($commandName in $sourceValues) {
+                    New-PackageCommandShim -PackageResult $PackageResult -CommandName $commandName
+                }
+            )
+            return $shimResults[0].ShimPath
         }
         default {
             throw "Unsupported Package pathRegistration source kind '$sourceKind'."
@@ -92,6 +158,14 @@ function Get-PackagePathRegistrationCleanupDirectories {
     $currentInstallDirectory = Get-NormalizedPathEntry -PathEntry ([string]$PackageResult.InstallDirectory)
     $cleanupDirectories = New-Object System.Collections.Generic.List[string]
     $candidateInstallDirectories = New-Object System.Collections.Generic.List[string]
+    $currentSource = $PackageResult.Package.install.pathRegistration.source
+    $currentSourceKind = if ($currentSource.PSObject.Properties['kind']) {
+        [string]$PackageResult.Package.install.pathRegistration.source.kind
+    }
+    else {
+        $null
+    }
+    $currentSourceValues = @(Get-PackagePathRegistrationSourceValues -Source $currentSource)
 
     if ($PackageResult.ExistingPackage -and
         [string]::Equals([string]$PackageResult.ExistingPackage.Classification, 'PackageTarget', [System.StringComparison]::OrdinalIgnoreCase) -and
@@ -113,21 +187,41 @@ function Get-PackagePathRegistrationCleanupDirectories {
             continue
         }
 
-        $candidateSourcePath = Get-PackagePathRegistrationSourcePath -PackageResult $PackageResult -InstallDirectoryOverride $candidateInstallDirectory
-        $candidateSourceKind = if ($PackageResult.Package.install.pathRegistration.source.PSObject.Properties['kind']) {
-            [string]$PackageResult.Package.install.pathRegistration.source.kind
-        }
-        else {
-            $null
-        }
-        $candidateRegisteredDirectory = Resolve-PathRegistrationDirectory -SourcePath $candidateSourcePath -SourceKind $candidateSourceKind
-        $normalizedCandidateRegisteredDirectory = Get-NormalizedPathEntry -PathEntry $candidateRegisteredDirectory
-        if ([string]::IsNullOrWhiteSpace($normalizedCandidateRegisteredDirectory)) {
+        if ([string]::Equals($currentSourceKind, 'shim', [System.StringComparison]::OrdinalIgnoreCase)) {
             continue
         }
 
-        if ($normalizedCandidateRegisteredDirectory -notin @($cleanupDirectories.ToArray())) {
-            $cleanupDirectories.Add($normalizedCandidateRegisteredDirectory) | Out-Null
+        $candidateSourcePath = Get-PackagePathRegistrationSourcePath -PackageResult $PackageResult -InstallDirectoryOverride $candidateInstallDirectory
+        $candidateSourceKind = $currentSourceKind
+        $candidateRegisteredDirectory = Resolve-PathRegistrationDirectory -SourcePath $candidateSourcePath -SourceKind $candidateSourceKind
+        Add-PackagePathCleanupDirectory -CleanupDirectories $cleanupDirectories -DirectoryPath $candidateRegisteredDirectory
+    }
+
+    if ([string]::Equals($currentSourceKind, 'shim', [System.StringComparison]::OrdinalIgnoreCase) -and
+        $currentSourceValues.Count -gt 0) {
+        $directCleanupInstallDirectories = New-Object System.Collections.Generic.List[string]
+        $directCandidateInstallDirectories = @($candidateInstallDirectories.ToArray()) + @([string]$PackageResult.InstallDirectory)
+        foreach ($candidateInstallDirectory in $directCandidateInstallDirectories) {
+            if ([string]::IsNullOrWhiteSpace($candidateInstallDirectory)) {
+                continue
+            }
+            $normalizedCandidateInstallDirectory = Get-NormalizedPathEntry -PathEntry $candidateInstallDirectory
+            if ([string]::IsNullOrWhiteSpace($normalizedCandidateInstallDirectory) -or
+                $normalizedCandidateInstallDirectory -in @($directCleanupInstallDirectories.ToArray())) {
+                continue
+            }
+            $directCleanupInstallDirectories.Add($normalizedCandidateInstallDirectory) | Out-Null
+        }
+
+        foreach ($candidateInstallDirectory in @($directCleanupInstallDirectories.ToArray())) {
+            foreach ($currentSourceValue in $currentSourceValues) {
+                $directCommandPath = Resolve-PackageProvidedToolPath -Definition $PackageResult.PackageConfig.Definition -ToolKind 'commands' -Name $currentSourceValue -InstallDirectory $candidateInstallDirectory
+                if ([string]::IsNullOrWhiteSpace($directCommandPath)) {
+                    continue
+                }
+                $directCommandDirectory = Resolve-PathRegistrationDirectory -SourcePath $directCommandPath -SourceKind 'commandEntryPoint'
+                Add-PackagePathCleanupDirectory -CleanupDirectories $cleanupDirectories -DirectoryPath $directCommandDirectory
+            }
         }
     }
 
@@ -163,7 +257,8 @@ for the same install slot.
 
     $source = if ($pathRegistration -and $pathRegistration.PSObject.Properties['source']) { $pathRegistration.source } else { $null }
     $sourceKind = if ($source -and $source.PSObject.Properties['kind']) { [string]$source.kind } else { $null }
-    $sourceValue = if ($source -and $source.PSObject.Properties['value']) { [string]$source.value } else { $null }
+    $sourceValues = @(Get-PackagePathRegistrationSourceValues -Source $source)
+    $sourceValue = if ($sourceValues.Count -gt 0) { $sourceValues -join ',' } else { $null }
 
     if ($mode -eq 'none') {
         $pathRegistrationResult = [pscustomobject]@{
@@ -171,6 +266,7 @@ for the same install slot.
             Mode               = 'none'
             SourceKind         = $sourceKind
             SourceValue        = $sourceValue
+            SourceValues       = @($sourceValues)
             SourcePath         = $null
             RegisteredPath     = $null
             CleanupDirectories = @()
@@ -197,6 +293,7 @@ for the same install slot.
             Mode               = $mode
             SourceKind         = $sourceKind
             SourceValue        = $sourceValue
+            SourceValues       = @($sourceValues)
             SourcePath         = $null
             RegisteredPath     = $null
             CleanupDirectories = @()
@@ -228,6 +325,7 @@ for the same install slot.
         Mode               = $registrationResult.Mode
         SourceKind         = $sourceKind
         SourceValue        = $sourceValue
+        SourceValues       = @($sourceValues)
         SourcePath         = $sourcePath
         RegisteredPath     = $registrationResult.RegisteredPath
         CleanupDirectories = @($registrationResult.CleanupDirectories)

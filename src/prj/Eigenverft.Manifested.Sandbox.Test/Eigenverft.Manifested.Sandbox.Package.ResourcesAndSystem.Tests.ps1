@@ -130,6 +130,14 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - resour
             Accepted = $true
         }
         $result.InstallOrigin = 'PackageInstalled'
+        $result.PathRegistration = [pscustomobject]@{
+            Mode           = 'user'
+            SourceKind     = 'commandEntryPoint'
+            SourceValue    = 'code'
+            SourcePath     = Join-Path $installRoot 'Code.exe'
+            RegisteredPath = $installRoot
+            Status         = 'Registered'
+        }
 
         $result = Update-PackageInventoryRecord -PackageResult $result
         $savedDocument = Read-PackageJsonDocument -Path $packageStateIndexPath
@@ -145,6 +153,8 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - resour
         $record.currentReleaseId | Should -Be 'vsCode-win-x64-stable'
         $record.currentVersion | Should -Be '3.0.0'
         $record.installDirectory | Should -Be $installRoot
+        $record.pathRegistration.sourceKind | Should -Be 'commandEntryPoint'
+        $record.pathRegistration.registeredPath | Should -Be $installRoot
     }
 
     It 'resolves source inventory absence as no additional environment sources' {
