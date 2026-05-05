@@ -13,6 +13,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - export
         $command.Parameters.Keys | Should -Contain 'DefinitionId'
         $command.Parameters.Keys | Should -Contain 'RepositoryId'
         $command.Parameters.Keys | Should -Contain 'DesiredState'
+        $command.Parameters.Keys | Should -Contain 'FailFast'
         $command.Parameters.Keys | Should -Not -Contain 'CommandName'
         $command.Parameters.Keys | Should -Not -Contain 'DependencyStack'
     }
@@ -24,6 +25,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - export
         $command | Should -Not -BeNullOrEmpty
         $command.Parameters.Keys | Should -Contain 'DefinitionId'
         $command.Parameters.Keys | Should -Contain 'DesiredState'
+        $command.Parameters.Keys | Should -Contain 'FailFast'
         $command.Parameters.Keys | Should -Not -Contain 'RepositoryId'
         $command.Parameters.Keys | Should -Not -Contain 'DependencyStack'
     }

@@ -213,6 +213,14 @@ function Invoke-PackageDefinitionCommandCore {
 }
 
 function Invoke-PackageDefinitionCommand {
+    <#
+    .SYNOPSIS
+        Runs package definition lifecycle for one or more definitions.
+
+    .PARAMETER FailFast
+        When set, stops after the first result whose Status is not 'Ready'.
+        By default every DefinitionId is attempted and each result is written to the pipeline.
+    #>
     [CmdletBinding()]
     param(
         [AllowNull()]
@@ -223,19 +231,28 @@ function Invoke-PackageDefinitionCommand {
         [string[]]$DefinitionId,
 
         [ValidateSet('Assigned', 'Removed')]
-        [string]$DesiredState = 'Assigned'
+        [string]$DesiredState = 'Assigned',
+
+        [switch]$FailFast
     )
 
     foreach ($definition in $DefinitionId) {
         $result = Invoke-PackageDefinitionCommandCore -RepositoryId $RepositoryId -DefinitionId $definition -DesiredState $DesiredState
         $result
-        if ($result -and -not [string]::Equals([string]$result.Status, 'Ready', [System.StringComparison]::OrdinalIgnoreCase)) {
+        if ($FailFast -and $result -and -not [string]::Equals([string]$result.Status, 'Ready', [System.StringComparison]::OrdinalIgnoreCase)) {
             break
         }
     }
 }
 
 function Invoke-Package {
+    <#
+    .SYNOPSIS
+        Slim entry point for Invoke-PackageDefinitionCommand (default repository).
+
+    .PARAMETER FailFast
+        Passed through; see Invoke-PackageDefinitionCommand.
+    #>
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true)]
@@ -243,8 +260,10 @@ function Invoke-Package {
         [string[]]$DefinitionId,
 
         [ValidateSet('Assigned', 'Removed')]
-        [string]$DesiredState = 'Assigned'
+        [string]$DesiredState = 'Assigned',
+
+        [switch]$FailFast
     )
 
-    Invoke-PackageDefinitionCommand -DefinitionId $DefinitionId -DesiredState $DesiredState
+    Invoke-PackageDefinitionCommand -DefinitionId $DefinitionId -DesiredState $DesiredState -FailFast:$FailFast
 }

@@ -353,7 +353,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
         @($results.DefinitionId) | Should -Be @('GitHubCli', 'CodexCli')
     }
 
-    It 'stops public package definition command arrays after the first failed result' {
+    It 'continues public package definition command arrays after a failed result by default' {
         Mock Invoke-PackageDefinitionCommandCore {
             [pscustomobject]@{
                 RepositoryId = $RepositoryId
@@ -364,6 +364,25 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
         }
 
         $results = @(Invoke-PackageDefinitionCommand -DefinitionId GitHubCli, CodexCli)
+
+        Assert-MockCalled Invoke-PackageDefinitionCommandCore -Times 1 -ParameterFilter { $DefinitionId -eq 'GitHubCli' }
+        Assert-MockCalled Invoke-PackageDefinitionCommandCore -Times 1 -ParameterFilter { $DefinitionId -eq 'CodexCli' }
+        @($results.DefinitionId) | Should -Be @('GitHubCli', 'CodexCli')
+        $results[0].Status | Should -Be 'Failed'
+        $results[1].Status | Should -Be 'Ready'
+    }
+
+    It 'stops public package definition command arrays after the first failed result when FailFast is set' {
+        Mock Invoke-PackageDefinitionCommandCore {
+            [pscustomobject]@{
+                RepositoryId = $RepositoryId
+                DefinitionId = $DefinitionId
+                DesiredState = $DesiredState
+                Status       = if ($DefinitionId -eq 'GitHubCli') { 'Failed' } else { 'Ready' }
+            }
+        }
+
+        $results = @(Invoke-PackageDefinitionCommand -DefinitionId GitHubCli, CodexCli -FailFast)
 
         Assert-MockCalled Invoke-PackageDefinitionCommandCore -Times 1 -ParameterFilter { $DefinitionId -eq 'GitHubCli' }
         Assert-MockCalled Invoke-PackageDefinitionCommandCore -Times 0 -ParameterFilter { $DefinitionId -eq 'CodexCli' }
