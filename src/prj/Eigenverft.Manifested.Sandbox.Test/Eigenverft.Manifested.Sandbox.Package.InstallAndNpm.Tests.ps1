@@ -587,7 +587,7 @@ exit /b 0
         $preferredTargetInstallDirectory = Join-Path $rootPath 'installs'
         $packageStateIndexFilePath = Join-Path $rootPath 'package-inventory.json'
         $definitionDocument = @{
-            schemaVersion = '1.0'
+            schemaVersion = '1.1'
             id = 'Qwen35_2B_Q8_0_Model'
             display = @{
                 default = @{
@@ -596,7 +596,6 @@ exit /b 0
                     corporation = 'Unsloth AI'
                     summary = 'Quantized GGUF model resource'
                 }
-                localizations = @{}
             }
             upstreamSources = @{
                 huggingFaceDownload = @{
@@ -608,7 +607,7 @@ exit /b 0
                 commands = [object[]]@()
                 apps = [object[]]@()
             }
-            releaseDefaults = @{
+            shared = @{
                 compatibility = @{
                     checks = @(
                         @{
@@ -636,15 +635,21 @@ exit /b 0
                     fileDetails = [object[]]@()
                     registryChecks = [object[]]@()
                 }
-                existingInstallDiscovery = @{
+                discovery = @{
                     enableDetection = $false
                     searchLocations = [object[]]@()
                     installRootRules = [object[]]@()
                 }
-                existingInstallPolicy = @{
+                ownershipPolicy = @{
                     allowAdoptExternal = $false
                     upgradeAdoptedInstall = $false
                     requirePackageOwnership = $false
+                }
+                remove = @{
+                    keepInstallDirectory = $false
+                    keepInventoryRecord = $false
+                    keepShims = $false
+                    requireProcessExit = [int[]]@()
                 }
             }
             releases = @(
@@ -659,8 +664,6 @@ exit /b 0
                     }
                     packageFile = @{
                         fileName = 'Qwen3.5-2B-Q8_0.gguf'
-                        format = 'gguf'
-                        portable = $true
                     }
                     acquisitionCandidates = @(
                         @{
@@ -730,7 +733,7 @@ exit /b 0
         $operationHistoryFilePath = Join-Path $rootPath 'State\package-operation-history.json'
         $badValidation = New-TestValidation -Version '2.0.0'
         $badValidation.files = @('missing-after-install.exe')
-        $definitionDocument = New-TestVSCodeDefinitionDocument -ReleaseDefaultsValidation $badValidation -Releases @(
+        $definitionDocument = New-TestVSCodeDefinitionDocument -SharedValidation $badValidation -Releases @(
             New-TestPackageRelease -Id 'vsCode-win-x64-stable' -Version '2.0.0' -Architecture 'x64' -Flavor 'win32-x64' -FileName 'VSCode-win32-x64-2.0.0.zip' -PackageFileSha256 $archiveInfo.Sha256 -AcquisitionCandidates @(
                 @{
                     kind        = 'packageDepot'

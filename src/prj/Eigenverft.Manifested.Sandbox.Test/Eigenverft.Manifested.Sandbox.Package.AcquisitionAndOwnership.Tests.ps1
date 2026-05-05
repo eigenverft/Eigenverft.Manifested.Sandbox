@@ -51,7 +51,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - acquis
         )
         $globalDocument = New-TestPackageGlobalDocument -PackageFileStagingDirectory (Join-Path $rootPath 'workspace')
         $depotInventoryDocument = New-TestDepotInventoryDocument -DefaultPackageDepotDirectory (Join-Path $rootPath 'default-depot')
-        $documents = Write-TestPackageDocuments -RootPath $rootPath -GlobalDocument $globalDocument -DepotInventoryDocument $depotInventoryDocument -DefinitionDocument (New-TestVSCodeDefinitionDocument -Releases @($release) -ReleaseDefaultsValidation (New-TestValidation -Version '2.0.0'))
+        $documents = Write-TestPackageDocuments -RootPath $rootPath -GlobalDocument $globalDocument -DepotInventoryDocument $depotInventoryDocument -DefinitionDocument (New-TestVSCodeDefinitionDocument -Releases @($release) -SharedValidation (New-TestValidation -Version '2.0.0'))
 
         [Environment]::SetEnvironmentVariable($script:SourceInventoryEnvVarName, (Join-Path $TestDrive 'missing-inventory.json'), 'Process')
         Mock Get-PackageGlobalConfigPath { $documents.GlobalConfigPath }
@@ -86,7 +86,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - acquis
                 verification = @{ mode = 'required'; algorithm = 'sha256'; sha256 = $packageArchive.Sha256 }
             }
         )
-        $documents = Write-TestPackageDocuments -RootPath $rootPath -GlobalDocument $globalDocument -DefinitionDocument (New-TestVSCodeDefinitionDocument -Releases @($release) -ReleaseDefaultsValidation (New-TestValidation -Version '2.0.0'))
+        $documents = Write-TestPackageDocuments -RootPath $rootPath -GlobalDocument $globalDocument -DefinitionDocument (New-TestVSCodeDefinitionDocument -Releases @($release) -SharedValidation (New-TestValidation -Version '2.0.0'))
 
         [Environment]::SetEnvironmentVariable($script:SourceInventoryEnvVarName, (Join-Path $TestDrive 'missing-inventory.json'), 'Process')
         Mock Get-PackageGlobalConfigPath { $documents.GlobalConfigPath }
@@ -134,7 +134,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - acquis
                 verification = @{ mode = 'required'; algorithm = 'sha256'; sha256 = $packageArchive.Sha256 }
             }
         )
-        $documents = Write-TestPackageDocuments -RootPath $rootPath -GlobalDocument $globalDocument -DepotInventoryDocument $depotInventoryDocument -DefinitionDocument (New-TestVSCodeDefinitionDocument -Releases @($release) -ReleaseDefaultsValidation (New-TestValidation -Version '2.0.0'))
+        $documents = Write-TestPackageDocuments -RootPath $rootPath -GlobalDocument $globalDocument -DepotInventoryDocument $depotInventoryDocument -DefinitionDocument (New-TestVSCodeDefinitionDocument -Releases @($release) -SharedValidation (New-TestValidation -Version '2.0.0'))
 
         [Environment]::SetEnvironmentVariable($script:SourceInventoryEnvVarName, (Join-Path $TestDrive 'missing-inventory.json'), 'Process')
         Mock Get-PackageGlobalConfigPath { $documents.GlobalConfigPath }
@@ -170,7 +170,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - acquis
                 verification = @{ mode = 'required' }
             }
         )
-        $documents = Write-TestPackageDocuments -RootPath $rootPath -GlobalDocument $globalDocument -DefinitionDocument (New-TestVSCodeDefinitionDocument -Releases @($release) -ReleaseDefaultsValidation (New-TestValidation -Version '2.0.0'))
+        $documents = Write-TestPackageDocuments -RootPath $rootPath -GlobalDocument $globalDocument -DefinitionDocument (New-TestVSCodeDefinitionDocument -Releases @($release) -SharedValidation (New-TestValidation -Version '2.0.0'))
 
         [Environment]::SetEnvironmentVariable($script:SourceInventoryEnvVarName, (Join-Path $TestDrive 'missing-inventory.json'), 'Process')
         Mock Get-PackageGlobalConfigPath { $documents.GlobalConfigPath }
@@ -206,7 +206,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - acquis
         $policy = New-TestExistingInstallPolicy -AllowAdoptExternal $true
         $validation = New-TestValidation -Version '2.0.0' -Directories @()
         $release = New-TestPackageRelease -Id 'vsCode-win-x64-stable' -Version '2.0.0' -Architecture 'x64' -Flavor 'win32-x64' -Install @{ kind = 'reuseExisting' } -ExistingInstallDiscovery $discovery -ExistingInstallPolicy $policy -Validation $validation
-        $documents = Write-TestPackageDocuments -RootPath $rootPath -GlobalDocument (New-TestPackageGlobalDocument -PackageInventoryFilePath (Join-Path $rootPath 'package-inventory.json')) -DefinitionDocument (New-TestVSCodeDefinitionDocument -Releases @($release) -ReleaseDefaultsValidation $validation)
+        $documents = Write-TestPackageDocuments -RootPath $rootPath -GlobalDocument (New-TestPackageGlobalDocument -PackageInventoryFilePath (Join-Path $rootPath 'package-inventory.json')) -DefinitionDocument (New-TestVSCodeDefinitionDocument -Releases @($release) -SharedValidation $validation)
 
         [Environment]::SetEnvironmentVariable($script:SourceInventoryEnvVarName, (Join-Path $TestDrive 'missing-inventory.json'), 'Process')
         Mock Get-PackageGlobalConfigPath { $documents.GlobalConfigPath }
@@ -238,7 +238,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - acquis
         $policy = New-TestExistingInstallPolicy -AllowAdoptExternal $true -RequirePackageOwnership $true
         $validation = New-TestValidation -Version '2.0.0' -Directories @()
         $release = New-TestPackageRelease -Id 'vsCode-win-x64-stable' -Version '2.0.0' -Architecture 'x64' -Flavor 'win32-x64' -Install @{ kind = 'reuseExisting' } -ExistingInstallDiscovery $discovery -ExistingInstallPolicy $policy -Validation $validation
-        $documents = Write-TestPackageDocuments -RootPath $rootPath -GlobalDocument (New-TestPackageGlobalDocument -PackageInventoryFilePath (Join-Path $rootPath 'package-inventory.json')) -DefinitionDocument (New-TestVSCodeDefinitionDocument -Releases @($release) -ReleaseDefaultsValidation $validation)
+        $documents = Write-TestPackageDocuments -RootPath $rootPath -GlobalDocument (New-TestPackageGlobalDocument -PackageInventoryFilePath (Join-Path $rootPath 'package-inventory.json')) -DefinitionDocument (New-TestVSCodeDefinitionDocument -Releases @($release) -SharedValidation $validation)
 
         [Environment]::SetEnvironmentVariable($script:SourceInventoryEnvVarName, (Join-Path $TestDrive 'missing-inventory.json'), 'Process')
         Mock Get-PackageGlobalConfigPath { $documents.GlobalConfigPath }
@@ -286,7 +286,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - acquis
         $policy = New-TestExistingInstallPolicy -AllowAdoptExternal $true
         $validation = New-TestValidation -Version '2.0.0' -Directories @()
         $release = New-TestPackageRelease -Id 'vsCode-win-x64-stable' -Version '2.0.0' -Architecture 'x64' -Flavor 'win32-x64' -Install @{ kind = 'reuseExisting' } -ExistingInstallDiscovery $discovery -ExistingInstallPolicy $policy -Validation $validation
-        $documents = Write-TestPackageDocuments -RootPath $rootPath -GlobalDocument (New-TestPackageGlobalDocument -PackageInventoryFilePath $packageStateIndexPath) -DefinitionDocument (New-TestVSCodeDefinitionDocument -Releases @($release) -ReleaseDefaultsValidation $validation)
+        $documents = Write-TestPackageDocuments -RootPath $rootPath -GlobalDocument (New-TestPackageGlobalDocument -PackageInventoryFilePath $packageStateIndexPath) -DefinitionDocument (New-TestVSCodeDefinitionDocument -Releases @($release) -SharedValidation $validation)
 
         [Environment]::SetEnvironmentVariable($script:SourceInventoryEnvVarName, (Join-Path $TestDrive 'missing-inventory.json'), 'Process')
         Mock Get-PackageGlobalConfigPath { $documents.GlobalConfigPath }
@@ -317,7 +317,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - acquis
             kind             = 'reuseExisting'
             installDirectory = $installRoot
         } -ExistingInstallDiscovery (New-TestExistingInstallDiscovery -EnableDetection $true -SearchLocations @()) -ExistingInstallPolicy (New-TestExistingInstallPolicy -AllowAdoptExternal $true) -Validation $validation
-        $documents = Write-TestPackageDocuments -RootPath $rootPath -GlobalDocument (New-TestPackageGlobalDocument -PreferredTargetInstallDirectory (Join-Path $rootPath 'managed-root') -PackageInventoryFilePath (Join-Path $rootPath 'package-inventory.json')) -DefinitionDocument (New-TestVSCodeDefinitionDocument -Releases @($release) -ReleaseDefaultsValidation $validation)
+        $documents = Write-TestPackageDocuments -RootPath $rootPath -GlobalDocument (New-TestPackageGlobalDocument -PreferredTargetInstallDirectory (Join-Path $rootPath 'managed-root') -PackageInventoryFilePath (Join-Path $rootPath 'package-inventory.json')) -DefinitionDocument (New-TestVSCodeDefinitionDocument -Releases @($release) -SharedValidation $validation)
 
         [Environment]::SetEnvironmentVariable($script:SourceInventoryEnvVarName, (Join-Path $TestDrive 'missing-inventory.json'), 'Process')
         Mock Get-PackageGlobalConfigPath { $documents.GlobalConfigPath }
@@ -354,7 +354,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - acquis
                 verification = @{ mode = 'required'; algorithm = 'sha256'; sha256 = $packageArchive.Sha256 }
             }
         ) -Validation (New-TestValidation -Version '2.0.0')
-        $documents = Write-TestPackageDocuments -RootPath $rootPath -GlobalDocument $globalDocument -DefinitionDocument (New-TestVSCodeDefinitionDocument -Releases @($release) -ReleaseDefaultsValidation (New-TestValidation -Version '2.0.0'))
+        $documents = Write-TestPackageDocuments -RootPath $rootPath -GlobalDocument $globalDocument -DefinitionDocument (New-TestVSCodeDefinitionDocument -Releases @($release) -SharedValidation (New-TestValidation -Version '2.0.0'))
 
         [Environment]::SetEnvironmentVariable($script:SourceInventoryEnvVarName, (Join-Path $TestDrive 'missing-inventory.json'), 'Process')
         Mock Get-PackageGlobalConfigPath { $documents.GlobalConfigPath }

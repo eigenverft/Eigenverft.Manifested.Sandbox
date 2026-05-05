@@ -1,6 +1,5 @@
 {
-  "$schema": "./eigenverft-module-package-definition.schema.json",
-  "schemaVersion": "1.0",
+  "schemaVersion": "1.1",
   "id": "PythonRuntime",
   "display": {
     "default": {
@@ -8,8 +7,7 @@
       "publisher": "Python Software Foundation",
       "corporation": "Python Software Foundation",
       "summary": "Portable Python runtime from the official NuGet package"
-    },
-    "localizations": {}
+    }
   },
   "upstreamSources": {
     "pythonNuGetPackage": {
@@ -26,7 +24,12 @@
     ],
     "apps": []
   },
-  "releaseDefaults": {
+  "shared": {
+    "ownershipPolicy": {
+      "allowAdoptExternal": false,
+      "upgradeAdoptedInstall": false,
+      "requirePackageOwnership": true
+    },
     "compatibility": {
       "checks": [
         {
@@ -35,6 +38,17 @@
           "value": "10.0"
         }
       ]
+    },
+    "remove": {
+      "keepInstallDirectory": false,
+      "keepInventoryRecord": false,
+      "requireProcessExit": [],
+      "keepShims": false
+    },
+    "discovery": {
+      "enableDetection": false,
+      "searchLocations": [],
+      "installRootRules": []
     },
     "install": {
       "kind": "expandArchive",
@@ -79,16 +93,6 @@
       "signatures": [],
       "fileDetails": [],
       "registryChecks": []
-    },
-    "existingInstallDiscovery": {
-      "enableDetection": false,
-      "searchLocations": [],
-      "installRootRules": []
-    },
-    "existingInstallPolicy": {
-      "allowAdoptExternal": false,
-      "upgradeAdoptedInstall": false,
-      "requirePackageOwnership": true
     }
   },
   "releases": [
@@ -108,8 +112,6 @@
       },
       "packageFile": {
         "fileName": "python.3.13.13.nupkg",
-        "format": "nupkg",
-        "portable": true,
         "contentHash": {
           "algorithm": "sha256",
           "value": "c2347c2975f661b2dafceacc94218dfe87781955a3cd309c633d343b8c8dac31"
@@ -150,8 +152,6 @@
       },
       "packageFile": {
         "fileName": "pythonarm64.3.13.13.nupkg",
-        "format": "nupkg",
-        "portable": true,
         "contentHash": {
           "algorithm": "sha256",
           "value": "2a0406b834d4ff33414f70597b67797466ba2344baa534ab8f62c4eae1c3e599"
@@ -176,5 +176,6 @@
         }
       ]
     }
-  ]
+  ],
+  "$schema": "./eigenverft-module-package-definition-1.1.schema.json"
 }

@@ -1,7 +1,9 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://eigenverft.local/schemas/eigenverft-module-package-definition4.schema.json",
-  "description": "Variant 4 (2+3 hybrid): package-scoped root data with one shared lifecycle block pairing install/remove/discovery/validation.",
+  "$id": "https://eigenverft.local/schemas/eigenverft-module-package-definition-1.1.schema.json",
+  "title": "Eigenverft module package definition (schemaVersion 1.1 wire)",
+  "$comment": "Mandatory baseline wire model. schemaVersion is fixed to \"1.1\" (see properties.schemaVersion.const); successor to the retired 1.0 definition line.",
+  "description": "Package definition (schemaVersion 1.1): package-scoped root with one shared lifecycle block (install/remove/discovery/validation). Supersedes earlier on-disk shapes including schemaVersion 1.0.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -19,9 +21,9 @@
       "description": "Optional JSON Schema association for editors and linters."
     },
     "schemaVersion": {
-      "description": "Format version for variant 4.",
+      "description": "Mandatory baseline wire version. Must be \"1.1\" (successor to the retired 1.0 definition line).",
       "type": "string",
-      "const": "2.1"
+      "const": "1.1"
     },
     "id": {
       "description": "Stable package definition id (normally filename stem).",
@@ -44,11 +46,18 @@
       }
     },
     "dependencies": {
-      "description": "Optional package dependencies to resolve before lifecycle operations.",
-      "type": "array",
-      "items": {
-        "$ref": "#/$defs/dependencyRef"
-      }
+      "description": "Optional package dependencies to resolve before lifecycle operations. May be a single dependencyRef object or an array of dependencyRef (both deserialize the same in PowerShell).",
+      "oneOf": [
+        {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/dependencyRef"
+          }
+        },
+        {
+          "$ref": "#/$defs/dependencyRef"
+        }
+      ]
     },
     "providedTools": {
       "description": "Package-owned commands/apps. Single source of truth (no duplicate shim list in shared).",

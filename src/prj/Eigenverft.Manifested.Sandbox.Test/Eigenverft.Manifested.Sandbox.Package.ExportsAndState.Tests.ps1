@@ -390,40 +390,42 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - export
     It 'does not export migrated legacy runtime commands' {
         $module = Import-Module -Name $script:ModuleManifestPath -Force -PassThru
 
-        Get-Command -Name 'Get-SandboxState' -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
-        Get-Command -Name 'Initialize-VSCodeRuntime' -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
-        Get-Command -Name 'Initialize-GitRuntime' -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
-        Get-Command -Name 'Initialize-GHCliRuntime' -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
-        Get-Command -Name 'Initialize-NodeRuntime' -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
-        Get-Command -Name 'Initialize-PythonRuntime' -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
-        Get-Command -Name 'Initialize-Ps7Runtime' -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
-        Get-Command -Name 'Initialize-VCRuntime' -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
-        Get-Command -Name 'Initialize-CodexRuntime' -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
-        Get-Command -Name 'Initialize-GeminiRuntime' -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
-        Get-Command -Name 'Initialize-OpenCodeRuntime' -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
-        Get-Command -Name 'Initialize-QwenRuntime' -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
-        Get-Command -Name 'Invoke-CodexRuntime' -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
-        Get-Command -Name 'Invoke-GeminiRuntime' -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
-        Get-Command -Name 'Invoke-OpenCodeRuntime' -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
-        Get-Command -Name 'Invoke-QwenCliRuntime' -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
-        Get-Command -Name 'Invoke-GHCliRuntime' -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
-        Get-Command -Name 'Invoke-Qwen35-2B-Q6K' -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
-        Get-Command -Name 'Invoke-Qwen35-2B-Q6K-Model' -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
-        Get-Command -Name 'Invoke-VCRuntime' -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
-        Get-Command -Name 'Invoke-Ps7Runtime' -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
-        Get-Command -Name 'Invoke-Package-VSCodeRuntime' -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
-        Get-Command -Name 'Invoke-Package-GitRuntime' -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
-        Get-Command -Name 'Invoke-Package-GHCliRuntime' -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
-        Get-Command -Name 'Invoke-Package-NodeRuntime' -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
-        Get-Command -Name 'Invoke-Package-PythonRuntime' -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
-        Get-Command -Name 'Invoke-Package-Ps7Runtime' -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
-        Get-Command -Name 'Invoke-Package-VCRuntime' -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
-        Get-Command -Name 'Invoke-Package-CodexRuntime' -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
-        Get-Command -Name 'Invoke-Package-GeminiRuntime' -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
-        Get-Command -Name 'Invoke-Package-OpenCodeRuntime' -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
-        Get-Command -Name 'Invoke-Package-QwenCliRuntime' -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
-        Get-Command -Name 'Invoke-Package-Qwen35-2B-Q6K' -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
-        Get-Command -Name 'Invoke-Package-LlamaCppRuntime' -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
+        # Resolve commands against this import only: another copy of the module on PSModulePath
+        # (e.g. Documents\WindowsPowerShell\Modules) can otherwise satisfy Get-Command by name alone.
+        Get-Command -Name 'Get-SandboxState' -Module $module -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
+        Get-Command -Name 'Initialize-VSCodeRuntime' -Module $module -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
+        Get-Command -Name 'Initialize-GitRuntime' -Module $module -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
+        Get-Command -Name 'Initialize-GHCliRuntime' -Module $module -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
+        Get-Command -Name 'Initialize-NodeRuntime' -Module $module -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
+        Get-Command -Name 'Initialize-PythonRuntime' -Module $module -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
+        Get-Command -Name 'Initialize-Ps7Runtime' -Module $module -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
+        Get-Command -Name 'Initialize-VCRuntime' -Module $module -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
+        Get-Command -Name 'Initialize-CodexRuntime' -Module $module -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
+        Get-Command -Name 'Initialize-GeminiRuntime' -Module $module -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
+        Get-Command -Name 'Initialize-OpenCodeRuntime' -Module $module -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
+        Get-Command -Name 'Initialize-QwenRuntime' -Module $module -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
+        Get-Command -Name 'Invoke-CodexRuntime' -Module $module -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
+        Get-Command -Name 'Invoke-GeminiRuntime' -Module $module -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
+        Get-Command -Name 'Invoke-OpenCodeRuntime' -Module $module -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
+        Get-Command -Name 'Invoke-QwenCliRuntime' -Module $module -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
+        Get-Command -Name 'Invoke-GHCliRuntime' -Module $module -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
+        Get-Command -Name 'Invoke-Qwen35-2B-Q6K' -Module $module -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
+        Get-Command -Name 'Invoke-Qwen35-2B-Q6K-Model' -Module $module -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
+        Get-Command -Name 'Invoke-VCRuntime' -Module $module -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
+        Get-Command -Name 'Invoke-Ps7Runtime' -Module $module -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
+        Get-Command -Name 'Invoke-Package-VSCodeRuntime' -Module $module -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
+        Get-Command -Name 'Invoke-Package-GitRuntime' -Module $module -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
+        Get-Command -Name 'Invoke-Package-GHCliRuntime' -Module $module -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
+        Get-Command -Name 'Invoke-Package-NodeRuntime' -Module $module -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
+        Get-Command -Name 'Invoke-Package-PythonRuntime' -Module $module -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
+        Get-Command -Name 'Invoke-Package-Ps7Runtime' -Module $module -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
+        Get-Command -Name 'Invoke-Package-VCRuntime' -Module $module -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
+        Get-Command -Name 'Invoke-Package-CodexRuntime' -Module $module -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
+        Get-Command -Name 'Invoke-Package-GeminiRuntime' -Module $module -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
+        Get-Command -Name 'Invoke-Package-OpenCodeRuntime' -Module $module -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
+        Get-Command -Name 'Invoke-Package-QwenCliRuntime' -Module $module -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
+        Get-Command -Name 'Invoke-Package-Qwen35-2B-Q6K' -Module $module -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
+        Get-Command -Name 'Invoke-Package-LlamaCppRuntime' -Module $module -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
     }
 
 }

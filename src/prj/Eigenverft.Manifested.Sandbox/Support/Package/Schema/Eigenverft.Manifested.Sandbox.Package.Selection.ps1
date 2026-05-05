@@ -318,8 +318,10 @@ Attaches the selected release to a Package result.
 .DESCRIPTION
 Filters the definition releases from the resolved Package config by
 platform, architecture, and release track, selects the newest matching release,
-applies definition-level release defaults, and attaches the package-facing
-data to the result object.
+applies definition-level shared lifecycle defaults (Resolve-PackageEffectiveRelease:
+wire discovery/ownershipPolicy become existingInstallDiscovery/existingInstallPolicy),
+and attaches the merged release to the result. PackageResult.Package and EffectiveRelease
+are that effective release row, not the raw definition document.
 
 .PARAMETER PackageResult
 The Package result object to enrich.
@@ -338,12 +340,12 @@ Resolve-PackagePackage -PackageResult $result
     $effectiveReleaseTrack = if ([string]::IsNullOrWhiteSpace($packageConfig.ReleaseTrack)) { 'none' } else { [string]$packageConfig.ReleaseTrack }
 
     $matchingPackages = @(
-        foreach ($package in @($definition.releases)) {
-            $constraints = if ($package.PSObject.Properties['constraints']) { $package.constraints } else { $null }
+        foreach ($release in @($definition.releases)) {
+            $constraints = if ($release.PSObject.Properties['constraints']) { $release.constraints } else { $null }
             $osConstraints = if ($constraints -and $constraints.PSObject.Properties['os']) { @($constraints.os) } else { @() }
             $cpuConstraints = if ($constraints -and $constraints.PSObject.Properties['cpu']) { @($constraints.cpu) } else { @() }
-            $packageReleaseTrack = if ($package.PSObject.Properties['releaseTrack'] -and -not [string]::IsNullOrWhiteSpace([string]$package.releaseTrack)) {
-                [string]$package.releaseTrack
+            $packageReleaseTrack = if ($release.PSObject.Properties['releaseTrack'] -and -not [string]::IsNullOrWhiteSpace([string]$release.releaseTrack)) {
+                [string]$release.releaseTrack
             }
             else {
                 'none'
@@ -352,7 +354,7 @@ Resolve-PackagePackage -PackageResult $result
             if ([string]::Equals($packageReleaseTrack, $effectiveReleaseTrack, [System.StringComparison]::OrdinalIgnoreCase) -and
                 (Test-PackageConstraintSetMatch -Values $osConstraints -ActualValue $packageConfig.Platform) -and
                 (Test-PackageConstraintSetMatch -Values $cpuConstraints -ActualValue $packageConfig.Architecture)) {
-                $package
+                $release
             }
         }
     )

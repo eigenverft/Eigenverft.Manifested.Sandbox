@@ -1,6 +1,5 @@
 {
-  "$schema": "./eigenverft-module-package-definition.schema.json",
-  "schemaVersion": "1.0",
+  "schemaVersion": "1.1",
   "id": "NotepadPlusPlus",
   "display": {
     "default": {
@@ -8,8 +7,7 @@
       "publisher": "Notepad++ Team",
       "corporation": "NOTEPAD++",
       "summary": "Windows text and source-code editor"
-    },
-    "localizations": {}
+    }
   },
   "upstreamSources": {
     "notepadPlusPlusGitHubRelease": {
@@ -26,7 +24,12 @@
       }
     ]
   },
-  "releaseDefaults": {
+  "shared": {
+    "ownershipPolicy": {
+      "allowAdoptExternal": true,
+      "upgradeAdoptedInstall": false,
+      "requirePackageOwnership": false
+    },
     "compatibility": {
       "checks": [
         {
@@ -35,6 +38,26 @@
           "value": "10.0"
         }
       ]
+    },
+    "remove": {
+      "keepInstallDirectory": false,
+      "keepInventoryRecord": false,
+      "requireProcessExit": [],
+      "keepShims": false
+    },
+    "discovery": {
+      "enableDetection": true,
+      "searchLocations": [
+        {
+          "kind": "windowsUninstallRegistryKey",
+          "searchOrder": 100,
+          "paths": [
+            "HKLM:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\Notepad++"
+          ],
+          "installDirectorySource": "displayIconDirectory"
+        }
+      ],
+      "installRootRules": []
     },
     "install": {
       "kind": "nsisInstaller",
@@ -84,25 +107,6 @@
         }
       ],
       "registryChecks": []
-    },
-    "existingInstallDiscovery": {
-      "enableDetection": true,
-      "searchLocations": [
-        {
-          "kind": "windowsUninstallRegistryKey",
-          "searchOrder": 100,
-          "paths": [
-            "HKLM:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\Notepad++"
-          ],
-          "installDirectorySource": "displayIconDirectory"
-        }
-      ],
-      "installRootRules": []
-    },
-    "existingInstallPolicy": {
-      "allowAdoptExternal": true,
-      "upgradeAdoptedInstall": false,
-      "requirePackageOwnership": false
     }
   },
   "releases": [
@@ -121,8 +125,6 @@
       },
       "packageFile": {
         "fileName": "npp.8.9.4.Installer.x64.exe",
-        "format": "exe",
-        "portable": false,
         "contentHash": {
           "algorithm": "sha256",
           "value": "f3629f500d0754d8e870255fff0e00384a37f5402d6f3ad8dd1f4f67d707b593"
@@ -167,8 +169,6 @@
       },
       "packageFile": {
         "fileName": "npp.8.9.4.Installer.arm64.exe",
-        "format": "exe",
-        "portable": false,
         "contentHash": {
           "algorithm": "sha256",
           "value": "7d59f0c62caa4d2366f900ca8169fb37cf1dcfce5c79cb3ccb08089b1adbc91"
@@ -198,5 +198,6 @@
         }
       ]
     }
-  ]
+  ],
+  "$schema": "./eigenverft-module-package-definition-1.1.schema.json"
 }

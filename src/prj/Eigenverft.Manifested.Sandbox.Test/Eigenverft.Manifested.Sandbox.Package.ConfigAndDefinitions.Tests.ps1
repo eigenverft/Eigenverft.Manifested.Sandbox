@@ -912,7 +912,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
     It 'fails clearly when a definition still uses requireManagedOwnership' {
         $rootPath = Join-Path $TestDrive 'retired-require-managed-ownership'
         $release = New-TestPackageRelease -Id 'vsCode-win-x64-stable' -Version '2.0.0' -Architecture 'x64' -Flavor 'win32-x64' -Install @{ kind = 'reuseExisting' } -Validation (New-TestValidation -Version '2.0.0')
-        $definitionDocument = New-TestVSCodeDefinitionDocument -Releases @($release) -ReleaseDefaultsValidation (New-TestValidation -Version '2.0.0') -ReleaseDefaultsExistingInstallPolicy @{
+        $definitionDocument = New-TestVSCodeDefinitionDocument -Releases @($release) -SharedValidation (New-TestValidation -Version '2.0.0') -SharedExistingInstallPolicy @{
             allowAdoptExternal    = $false
             upgradeAdoptedInstall = $false
             requireManagedOwnership = $false
@@ -933,7 +933,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
                 command      = 'npm'
             }
         } -Validation (New-TestValidation -Version '1.0.0')
-        $definitionDocument = New-TestVSCodeDefinitionDocument -Releases @($release) -ReleaseDefaultsValidation (New-TestValidation -Version '1.0.0')
+        $definitionDocument = New-TestVSCodeDefinitionDocument -Releases @($release) -SharedValidation (New-TestValidation -Version '1.0.0')
         $definitionInfo = [pscustomobject]@{
             Path     = Join-Path $TestDrive 'VSCodeRuntime.json'
             Document = ConvertTo-TestPsObject -InputObject $definitionDocument
@@ -953,17 +953,17 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
         { Assert-PackageDefinitionSchema -DefinitionDocumentInfo $definitionInfo -DefinitionId 'VSCodeRuntime' } | Should -Throw '*schemaVersion*'
     }
 
-    It 'fails clearly when a definition still uses releaseDefaults.requirements' {
+    It 'fails clearly when a definition still uses shared.requirements' {
         $rootPath = Join-Path $TestDrive 'retired-requirements-packages'
         $release = New-TestPackageRelease -Id 'vsCode-win-x64-stable' -Version '2.0.0' -Architecture 'x64' -Flavor 'win32-x64' -Install @{ kind = 'reuseExisting' } -Validation (New-TestValidation -Version '2.0.0')
         $definitionDocument = New-TestVSCodeDefinitionDocument -Releases @($release)
-        $definitionDocument.releaseDefaults.requirements = @{
+        $definitionDocument.shared.requirements = @{
             checks = [object[]]@()
         }
         $documents = Write-TestPackageDocuments -RootPath $rootPath -GlobalDocument (New-TestPackageGlobalDocument) -DefinitionDocument $definitionDocument
 
         $definitionInfo = Read-PackageJsonDocument -Path $documents.DefinitionPath
-        { Assert-PackageDefinitionSchema -DefinitionDocumentInfo $definitionInfo -DefinitionId 'VSCodeRuntime' } | Should -Throw '*releaseDefaults.requirements*'
+        { Assert-PackageDefinitionSchema -DefinitionDocumentInfo $definitionInfo -DefinitionId 'VSCodeRuntime' } | Should -Throw '*shared.requirements*'
     }
 
     It 'fails clearly when an acquisition candidate still uses retired priority' {
@@ -1238,7 +1238,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
                 verification = @{ mode = 'required' }
             }
         )
-        $documents = Write-TestPackageDocuments -RootPath $rootPath -GlobalDocument (New-TestPackageGlobalDocument) -DefinitionDocument (New-TestVSCodeDefinitionDocument -Releases @($release) -ReleaseDefaultsValidation (New-TestValidation -Version '0.0.1') -UpstreamSources @{
+        $documents = Write-TestPackageDocuments -RootPath $rootPath -GlobalDocument (New-TestPackageGlobalDocument) -DefinitionDocument (New-TestVSCodeDefinitionDocument -Releases @($release) -SharedValidation (New-TestValidation -Version '0.0.1') -UpstreamSources @{
             llamaCppGitHub = @{
                 kind            = 'githubRelease'
                 repositoryOwner = 'ggml-org'
@@ -1272,7 +1272,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
                 verification = @{ mode = 'required' }
             }
         )
-        $documents = Write-TestPackageDocuments -RootPath $rootPath -GlobalDocument (New-TestPackageGlobalDocument) -DefinitionDocument (New-TestVSCodeDefinitionDocument -Releases @($release) -ReleaseDefaultsValidation (New-TestValidation -Version '0.0.1') -UpstreamSources @{
+        $documents = Write-TestPackageDocuments -RootPath $rootPath -GlobalDocument (New-TestPackageGlobalDocument) -DefinitionDocument (New-TestVSCodeDefinitionDocument -Releases @($release) -SharedValidation (New-TestValidation -Version '0.0.1') -UpstreamSources @{
             llamaCppGitHub = @{
                 kind            = 'githubRelease'
                 repositoryOwner = 'ggml-org'
@@ -1297,7 +1297,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
                 verification = @{ mode = 'required' }
             }
         )
-        $documents = Write-TestPackageDocuments -RootPath $rootPath -GlobalDocument (New-TestPackageGlobalDocument) -DefinitionDocument (New-TestVSCodeDefinitionDocument -Releases @($release) -ReleaseDefaultsValidation (New-TestValidation -Version '0.0.1') -UpstreamSources @{
+        $documents = Write-TestPackageDocuments -RootPath $rootPath -GlobalDocument (New-TestPackageGlobalDocument) -DefinitionDocument (New-TestVSCodeDefinitionDocument -Releases @($release) -SharedValidation (New-TestValidation -Version '0.0.1') -UpstreamSources @{
             llamaCppGitHub = @{
                 kind            = 'githubRelease'
                 repositoryOwner = 'ggml-org'
@@ -1418,7 +1418,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
         { Resolve-PackageSource -SourceDefinition $sourceDefinition -AcquisitionCandidate $candidate -Package $package } | Should -Throw '*does not contain asset*llama-b8863-bin-win-cpu-x64.zip*'
     }
 
-    It 'builds an effective release from releaseDefaults and uses ReleaseTrack in path resolution' {
+    It 'builds an effective release from shared defaults and uses ReleaseTrack in path resolution' {
         $rootPath = Join-Path $TestDrive 'effective-release'
         $packageArchive = New-TestPackageArchiveInfo -RootPath (Join-Path $rootPath 'archive') -Version '2.0.0'
         $release = New-TestPackageRelease -Id 'vsCode-win-x64-stable' -Version '2.0.0' -Architecture 'x64' -Flavor 'win32-x64' -FileName 'VSCode-win32-x64-2.0.0.zip' -AcquisitionCandidates @(
@@ -1428,7 +1428,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
                 verification = @{ mode = 'optional'; algorithm = 'sha256'; sha256 = $packageArchive.Sha256 }
             }
         )
-        $documents = Write-TestPackageDocuments -RootPath $rootPath -GlobalDocument (New-TestPackageGlobalDocument -ReleaseTrack 'stable') -DefinitionDocument (New-TestVSCodeDefinitionDocument -Releases @($release) -ReleaseDefaultsValidation (New-TestValidation -Version '2.0.0'))
+        $documents = Write-TestPackageDocuments -RootPath $rootPath -GlobalDocument (New-TestPackageGlobalDocument -ReleaseTrack 'stable') -DefinitionDocument (New-TestVSCodeDefinitionDocument -Releases @($release) -SharedValidation (New-TestValidation -Version '2.0.0'))
 
         [Environment]::SetEnvironmentVariable($script:SourceInventoryEnvVarName, (Join-Path $TestDrive 'missing-inventory.json'), 'Process')
         Mock Get-PackageGlobalConfigPath { $documents.GlobalConfigPath }
@@ -1459,7 +1459,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
                 verification = @{ mode = 'none' }
             }
         )
-        $documents = Write-TestPackageDocuments -RootPath $rootPath -GlobalDocument (New-TestPackageGlobalDocument) -DefinitionDocument (New-TestVSCodeDefinitionDocument -Releases @($release) -ReleaseDefaultsValidation (New-TestValidation -Version '2.0.0'))
+        $documents = Write-TestPackageDocuments -RootPath $rootPath -GlobalDocument (New-TestPackageGlobalDocument) -DefinitionDocument (New-TestVSCodeDefinitionDocument -Releases @($release) -SharedValidation (New-TestValidation -Version '2.0.0'))
 
         [Environment]::SetEnvironmentVariable($script:SourceInventoryEnvVarName, (Join-Path $TestDrive 'missing-inventory.json'), 'Process')
         Mock Get-PackageGlobalConfigPath { $documents.GlobalConfigPath }

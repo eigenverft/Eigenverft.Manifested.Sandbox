@@ -1,6 +1,5 @@
 {
-  "$schema": "./eigenverft-module-package-definition.schema.json",
-  "schemaVersion": "1.0",
+  "schemaVersion": "1.1",
   "id": "NodeRuntime",
   "display": {
     "default": {
@@ -8,8 +7,7 @@
       "publisher": "OpenJS Foundation",
       "corporation": "OpenJS Foundation",
       "summary": "Portable Node.js runtime"
-    },
-    "localizations": {}
+    }
   },
   "upstreamSources": {
     "nodeJsRelease": {
@@ -34,7 +32,12 @@
     ],
     "apps": []
   },
-  "releaseDefaults": {
+  "shared": {
+    "ownershipPolicy": {
+      "allowAdoptExternal": false,
+      "upgradeAdoptedInstall": false,
+      "requirePackageOwnership": true
+    },
     "compatibility": {
       "checks": [
         {
@@ -43,6 +46,17 @@
           "value": "10.0"
         }
       ]
+    },
+    "remove": {
+      "keepInstallDirectory": false,
+      "keepInventoryRecord": false,
+      "requireProcessExit": [],
+      "keepShims": false
+    },
+    "discovery": {
+      "enableDetection": false,
+      "searchLocations": [],
+      "installRootRules": []
     },
     "install": {
       "kind": "expandArchive",
@@ -96,16 +110,6 @@
       "signatures": [],
       "fileDetails": [],
       "registryChecks": []
-    },
-    "existingInstallDiscovery": {
-      "enableDetection": false,
-      "searchLocations": [],
-      "installRootRules": []
-    },
-    "existingInstallPolicy": {
-      "allowAdoptExternal": false,
-      "upgradeAdoptedInstall": false,
-      "requirePackageOwnership": true
     }
   },
   "releases": [
@@ -125,8 +129,6 @@
       },
       "packageFile": {
         "fileName": "node-v24.15.0-win-x64.zip",
-        "format": "zip",
-        "portable": true,
         "contentHash": {
           "algorithm": "sha256",
           "value": "cc5149eabd53779ce1e7bdc5401643622d0c7e6800ade18928a767e940bb0e62"
@@ -167,8 +169,6 @@
       },
       "packageFile": {
         "fileName": "node-v24.15.0-win-arm64.zip",
-        "format": "zip",
-        "portable": true,
         "contentHash": {
           "algorithm": "sha256",
           "value": "c9eb7402eda26e2ba7e44b6727fc85a8de56c5095b1f71ebd3062892211aa116"
@@ -193,5 +193,6 @@
         }
       ]
     }
-  ]
+  ],
+  "$schema": "./eigenverft-module-package-definition-1.1.schema.json"
 }

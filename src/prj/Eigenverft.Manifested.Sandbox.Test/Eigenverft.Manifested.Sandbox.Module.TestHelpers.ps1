@@ -425,8 +425,6 @@ function global:New-TestPackageRelease {
         else {
             $packageFile = @{
                 fileName = $FileName
-                format   = 'zip'
-                portable = $true
             }
             if (-not [string]::IsNullOrWhiteSpace($PackageFileSha256)) {
                 $packageFile.contentHash = @{
@@ -453,10 +451,10 @@ function global:New-TestPackageRelease {
         $release.validation = $Validation
     }
     if ($PSBoundParameters.ContainsKey('ExistingInstallDiscovery')) {
-        $release.existingInstallDiscovery = $ExistingInstallDiscovery
+        $release.discovery = $ExistingInstallDiscovery
     }
     if ($PSBoundParameters.ContainsKey('ExistingInstallPolicy')) {
-        $release.existingInstallPolicy = $ExistingInstallPolicy
+        $release.ownershipPolicy = $ExistingInstallPolicy
     }
 
     return (ConvertTo-TestPsObject $release)
@@ -471,23 +469,23 @@ function global:New-TestVSCodeDefinitionDocument {
 
         [hashtable]$UpstreamSources = $null,
 
-        [hashtable]$ReleaseDefaultsInstall = $null,
+        [hashtable]$SharedInstall = $null,
 
-        [hashtable]$ReleaseDefaultsValidation = $null,
+        [hashtable]$SharedValidation = $null,
 
-        [hashtable]$ReleaseDefaultsExistingInstallDiscovery = $null,
+        [hashtable]$SharedExistingInstallDiscovery = $null,
 
-        [hashtable]$ReleaseDefaultsExistingInstallPolicy = $null
+        [hashtable]$SharedExistingInstallPolicy = $null
     )
 
-    if ($null -eq $ReleaseDefaultsInstall) {
-        $ReleaseDefaultsInstall = @{
+    if ($null -eq $SharedInstall) {
+        $SharedInstall = @{
             kind             = 'expandArchive'
             installDirectory = 'vscode-runtime/{releaseTrack}/{version}/{flavor}'
             pathRegistration = @{
                 mode   = 'user'
                 source = @{
-                    kind  = 'commandEntryPoint'
+                    kind  = 'shim'
                     value = 'code'
                 }
             }
@@ -495,18 +493,24 @@ function global:New-TestVSCodeDefinitionDocument {
             createDirectories = @('data')
         }
     }
-    if ($null -eq $ReleaseDefaultsValidation) {
-        $ReleaseDefaultsValidation = New-TestValidation -Version '0.0.0'
+    if ($null -eq $SharedValidation) {
+        $SharedValidation = New-TestValidation -Version '0.0.0'
     }
-    if ($null -eq $ReleaseDefaultsExistingInstallDiscovery) {
-        $ReleaseDefaultsExistingInstallDiscovery = New-TestExistingInstallDiscovery -EnableDetection $false
+    if ($null -eq $SharedExistingInstallDiscovery) {
+        $SharedExistingInstallDiscovery = New-TestExistingInstallDiscovery -EnableDetection $false
     }
-    if ($null -eq $ReleaseDefaultsExistingInstallPolicy) {
-        $ReleaseDefaultsExistingInstallPolicy = New-TestExistingInstallPolicy
+    if ($null -eq $SharedExistingInstallPolicy) {
+        $SharedExistingInstallPolicy = New-TestExistingInstallPolicy
     }
 
+    $sharedRemove = @{
+        keepInstallDirectory  = $false
+        keepInventoryRecord   = $false
+        keepShims               = $false
+        requireProcessExit      = [int[]]@()
+    }
     return @{
-        schemaVersion = '1.0'
+        schemaVersion = '1.1'
         id = 'VSCodeRuntime'
         display = @{
             default       = @{
@@ -515,7 +519,6 @@ function global:New-TestVSCodeDefinitionDocument {
                 corporation = 'Microsoft Corporation'
                 summary     = 'Code editor'
             }
-            localizations = @{}
         }
         upstreamSources = if ($PSBoundParameters.ContainsKey('UpstreamSources') -and $null -ne $UpstreamSources) {
             $UpstreamSources
@@ -542,14 +545,15 @@ function global:New-TestVSCodeDefinitionDocument {
                 }
             )
         }
-        releaseDefaults = @{
-            compatibility            = @{
+        shared = @{
+            compatibility = @{
                 checks = [object[]]@()
             }
-            install                  = $ReleaseDefaultsInstall
-            validation               = $ReleaseDefaultsValidation
-            existingInstallDiscovery = $ReleaseDefaultsExistingInstallDiscovery
-            existingInstallPolicy    = $ReleaseDefaultsExistingInstallPolicy
+            install                  = $SharedInstall
+            validation               = $SharedValidation
+            discovery                = $SharedExistingInstallDiscovery
+            ownershipPolicy          = $SharedExistingInstallPolicy
+            remove                   = $sharedRemove
         }
         releases = $Releases
     }

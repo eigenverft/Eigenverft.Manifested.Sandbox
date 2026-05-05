@@ -1,6 +1,5 @@
 {
-  "$schema": "./eigenverft-module-package-definition.schema.json",
-  "schemaVersion": "1.0",
+  "schemaVersion": "1.1",
   "id": "GitRuntime",
   "display": {
     "default": {
@@ -8,8 +7,7 @@
       "publisher": "git-for-windows",
       "corporation": "git-for-windows",
       "summary": "Portable MinGit runtime"
-    },
-    "localizations": {}
+    }
   },
   "upstreamSources": {
     "gitForWindowsGitHub": {
@@ -27,7 +25,12 @@
     ],
     "apps": []
   },
-  "releaseDefaults": {
+  "shared": {
+    "ownershipPolicy": {
+      "allowAdoptExternal": false,
+      "upgradeAdoptedInstall": false,
+      "requirePackageOwnership": true
+    },
     "compatibility": {
       "checks": [
         {
@@ -36,6 +39,17 @@
           "value": "10.0"
         }
       ]
+    },
+    "remove": {
+      "keepInstallDirectory": false,
+      "keepInventoryRecord": false,
+      "requireProcessExit": [],
+      "keepShims": false
+    },
+    "discovery": {
+      "enableDetection": false,
+      "searchLocations": [],
+      "installRootRules": []
     },
     "install": {
       "kind": "expandArchive",
@@ -71,16 +85,6 @@
       "signatures": [],
       "fileDetails": [],
       "registryChecks": []
-    },
-    "existingInstallDiscovery": {
-      "enableDetection": false,
-      "searchLocations": [],
-      "installRootRules": []
-    },
-    "existingInstallPolicy": {
-      "allowAdoptExternal": false,
-      "upgradeAdoptedInstall": false,
-      "requirePackageOwnership": true
     }
   },
   "releases": [
@@ -100,8 +104,6 @@
       },
       "packageFile": {
         "fileName": "MinGit-2.54.0-64-bit.zip",
-        "format": "zip",
-        "portable": true,
         "contentHash": {
           "algorithm": "sha256",
           "value": "04f937e1f0918b17b9be6f2294cb2bb66e96e1d9832d1c298e2de088a1d0e668"
@@ -141,8 +143,6 @@
       },
       "packageFile": {
         "fileName": "MinGit-2.54.0-arm64.zip",
-        "format": "zip",
-        "portable": true,
         "contentHash": {
           "algorithm": "sha256",
           "value": "68f6bdda5b58f4e40f431c0da48b05ba5596445314d5e491e7b4aebb1ec2e985"
@@ -166,5 +166,6 @@
         }
       ]
     }
-  ]
+  ],
+  "$schema": "./eigenverft-module-package-definition-1.1.schema.json"
 }

@@ -1,6 +1,5 @@
 {
-  "$schema": "./eigenverft-module-package-definition.schema.json",
-  "schemaVersion": "1.0",
+  "schemaVersion": "1.1",
   "id": "CodexCli",
   "display": {
     "default": {
@@ -8,8 +7,7 @@
       "publisher": "OpenAI",
       "corporation": "OpenAI",
       "summary": "Pinned Codex CLI npm runtime"
-    },
-    "localizations": {}
+    }
   },
   "upstreamSources": {},
   "dependencies": [
@@ -31,7 +29,12 @@
     ],
     "apps": []
   },
-  "releaseDefaults": {
+  "shared": {
+    "ownershipPolicy": {
+      "allowAdoptExternal": false,
+      "upgradeAdoptedInstall": false,
+      "requirePackageOwnership": true
+    },
     "compatibility": {
       "checks": [
         {
@@ -40,6 +43,17 @@
           "value": "10.0"
         }
       ]
+    },
+    "remove": {
+      "keepInstallDirectory": false,
+      "keepInventoryRecord": false,
+      "requireProcessExit": [],
+      "keepShims": false
+    },
+    "discovery": {
+      "enableDetection": false,
+      "searchLocations": [],
+      "installRootRules": []
     },
     "install": {
       "kind": "npmGlobalPackage",
@@ -75,16 +89,6 @@
       "signatures": [],
       "fileDetails": [],
       "registryChecks": []
-    },
-    "existingInstallDiscovery": {
-      "enableDetection": false,
-      "searchLocations": [],
-      "installRootRules": []
-    },
-    "existingInstallPolicy": {
-      "allowAdoptExternal": false,
-      "upgradeAdoptedInstall": false,
-      "requirePackageOwnership": true
     }
   },
   "releases": [
@@ -116,5 +120,6 @@
         ]
       }
     }
-  ]
+  ],
+  "$schema": "./eigenverft-module-package-definition-1.1.schema.json"
 }

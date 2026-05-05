@@ -1,6 +1,5 @@
 {
-  "$schema": "./eigenverft-module-package-definition.schema.json",
-  "schemaVersion": "1.0",
+  "schemaVersion": "1.1",
   "id": "PowerShell7",
   "display": {
     "default": {
@@ -8,8 +7,7 @@
       "publisher": "Microsoft",
       "corporation": "Microsoft Corporation",
       "summary": "Portable PowerShell 7 runtime"
-    },
-    "localizations": {}
+    }
   },
   "upstreamSources": {
     "powerShellGitHub": {
@@ -27,7 +25,12 @@
     ],
     "apps": []
   },
-  "releaseDefaults": {
+  "shared": {
+    "ownershipPolicy": {
+      "allowAdoptExternal": false,
+      "upgradeAdoptedInstall": false,
+      "requirePackageOwnership": true
+    },
     "compatibility": {
       "checks": [
         {
@@ -36,6 +39,17 @@
           "value": "10.0"
         }
       ]
+    },
+    "remove": {
+      "keepInstallDirectory": false,
+      "keepInventoryRecord": false,
+      "requireProcessExit": [],
+      "keepShims": false
+    },
+    "discovery": {
+      "enableDetection": false,
+      "searchLocations": [],
+      "installRootRules": []
     },
     "install": {
       "kind": "expandArchive",
@@ -72,16 +86,6 @@
       "signatures": [],
       "fileDetails": [],
       "registryChecks": []
-    },
-    "existingInstallDiscovery": {
-      "enableDetection": false,
-      "searchLocations": [],
-      "installRootRules": []
-    },
-    "existingInstallPolicy": {
-      "allowAdoptExternal": false,
-      "upgradeAdoptedInstall": false,
-      "requirePackageOwnership": true
     }
   },
   "releases": [
@@ -101,8 +105,6 @@
       },
       "packageFile": {
         "fileName": "PowerShell-7.6.1-win-x64.zip",
-        "format": "zip",
-        "portable": true,
         "contentHash": {
           "algorithm": "sha256",
           "value": "b5c9e8457ca7df4998abe3cc2c58e6dd4005ad1b4c5320bbac86244a747db91d"
@@ -142,8 +144,6 @@
       },
       "packageFile": {
         "fileName": "PowerShell-7.6.1-win-arm64.zip",
-        "format": "zip",
-        "portable": true,
         "contentHash": {
           "algorithm": "sha256",
           "value": "f8976558a687dd610eec33a42868a090f611f3bfbc0ae69c2bc5d986e3b53847"
@@ -167,5 +167,6 @@
         }
       ]
     }
-  ]
+  ],
+  "$schema": "./eigenverft-module-package-definition-1.1.schema.json"
 }

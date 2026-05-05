@@ -1,6 +1,5 @@
 {
-  "$schema": "./eigenverft-module-package-definition.schema.json",
-  "schemaVersion": "1.0",
+  "schemaVersion": "1.1",
   "id": "LlamaCppRuntime",
   "display": {
     "default": {
@@ -8,21 +7,18 @@
       "publisher": "ggml-org",
       "corporation": "ggml-org",
       "summary": "Local LLM runtime and CLI tools"
-    },
-    "localizations": {}
-  },
-  "dependencies": [
-    {
-      "repositoryId": "EigenverftModule",
-      "definitionId": "VisualCppRedistributable"
     }
-  ],
+  },
   "upstreamSources": {
     "llamaCppGitHub": {
       "kind": "githubRelease",
       "repositoryOwner": "ggml-org",
       "repositoryName": "llama.cpp"
     }
+  },
+  "dependencies": {
+    "repositoryId": "EigenverftModule",
+    "definitionId": "VisualCppRedistributable"
   },
   "providedTools": {
     "commands": [
@@ -49,7 +45,12 @@
     ],
     "apps": []
   },
-  "releaseDefaults": {
+  "shared": {
+    "ownershipPolicy": {
+      "allowAdoptExternal": false,
+      "upgradeAdoptedInstall": false,
+      "requirePackageOwnership": false
+    },
     "compatibility": {
       "checks": [
         {
@@ -58,6 +59,17 @@
           "value": "10.0"
         }
       ]
+    },
+    "remove": {
+      "keepInstallDirectory": false,
+      "keepInventoryRecord": false,
+      "requireProcessExit": [],
+      "keepShims": false
+    },
+    "discovery": {
+      "enableDetection": false,
+      "searchLocations": [],
+      "installRootRules": []
     },
     "install": {
       "kind": "expandArchive",
@@ -106,16 +118,6 @@
       "signatures": [],
       "fileDetails": [],
       "registryChecks": []
-    },
-    "existingInstallDiscovery": {
-      "enableDetection": false,
-      "searchLocations": [],
-      "installRootRules": []
-    },
-    "existingInstallPolicy": {
-      "allowAdoptExternal": false,
-      "upgradeAdoptedInstall": false,
-      "requirePackageOwnership": false
     }
   },
   "releases": [
@@ -135,8 +137,6 @@
       },
       "packageFile": {
         "fileName": "llama-b8863-bin-win-cpu-x64.zip",
-        "format": "zip",
-        "portable": true,
         "contentHash": {
           "algorithm": "sha256",
           "value": "5a0c3bbd25c29185116ca24a10e9f124c5e4fc170822be82634bd543d8e91c0e"
@@ -160,5 +160,6 @@
         }
       ]
     }
-  ]
+  ],
+  "$schema": "./eigenverft-module-package-definition-1.1.schema.json"
 }

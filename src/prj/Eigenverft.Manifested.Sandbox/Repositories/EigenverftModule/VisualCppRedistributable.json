@@ -1,6 +1,5 @@
 {
-  "$schema": "./eigenverft-module-package-definition.schema.json",
-  "schemaVersion": "1.0",
+  "schemaVersion": "1.1",
   "id": "VisualCppRedistributable",
   "display": {
     "default": {
@@ -8,8 +7,7 @@
       "publisher": "Microsoft",
       "corporation": "Microsoft Corporation",
       "summary": "Machine-wide Visual C++ runtime prerequisite"
-    },
-    "localizations": {}
+    }
   },
   "upstreamSources": {
     "visualCppRedistributableDownload": {
@@ -21,7 +19,12 @@
     "commands": [],
     "apps": []
   },
-  "releaseDefaults": {
+  "shared": {
+    "ownershipPolicy": {
+      "allowAdoptExternal": false,
+      "upgradeAdoptedInstall": false,
+      "requirePackageOwnership": false
+    },
     "compatibility": {
       "checks": [
         {
@@ -30,6 +33,17 @@
           "value": "10.0"
         }
       ]
+    },
+    "remove": {
+      "keepInstallDirectory": false,
+      "keepInventoryRecord": false,
+      "requireProcessExit": [],
+      "keepShims": false
+    },
+    "discovery": {
+      "enableDetection": false,
+      "searchLocations": [],
+      "installRootRules": []
     },
     "install": {
       "kind": "runInstaller",
@@ -83,16 +97,6 @@
           "expectedValue": "14.0"
         }
       ]
-    },
-    "existingInstallDiscovery": {
-      "enableDetection": false,
-      "searchLocations": [],
-      "installRootRules": []
-    },
-    "existingInstallPolicy": {
-      "allowAdoptExternal": false,
-      "upgradeAdoptedInstall": false,
-      "requirePackageOwnership": false
     }
   },
   "releases": [
@@ -111,8 +115,6 @@
       },
       "packageFile": {
         "fileName": "vc_redist.x64.exe",
-        "format": "exe",
-        "portable": false,
         "publisherSignature": {
           "kind": "authenticode",
           "requireValid": true,
@@ -138,5 +140,6 @@
         }
       ]
     }
-  ]
+  ],
+  "$schema": "./eigenverft-module-package-definition-1.1.schema.json"
 }

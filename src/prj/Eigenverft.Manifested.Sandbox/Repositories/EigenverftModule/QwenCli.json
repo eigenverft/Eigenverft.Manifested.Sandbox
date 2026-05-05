@@ -1,6 +1,5 @@
 {
-  "$schema": "./eigenverft-module-package-definition.schema.json",
-  "schemaVersion": "1.0",
+  "schemaVersion": "1.1",
   "id": "QwenCli",
   "display": {
     "default": {
@@ -8,16 +7,13 @@
       "publisher": "Alibaba Cloud",
       "corporation": "Alibaba Cloud",
       "summary": "Pinned Qwen CLI npm runtime"
-    },
-    "localizations": {}
+    }
   },
   "upstreamSources": {},
-  "dependencies": [
-    {
-      "repositoryId": "EigenverftModule",
-      "definitionId": "NodeRuntime"
-    }
-  ],
+  "dependencies": {
+    "repositoryId": "EigenverftModule",
+    "definitionId": "NodeRuntime"
+  },
   "providedTools": {
     "commands": [
       {
@@ -27,7 +23,12 @@
     ],
     "apps": []
   },
-  "releaseDefaults": {
+  "shared": {
+    "ownershipPolicy": {
+      "allowAdoptExternal": false,
+      "upgradeAdoptedInstall": false,
+      "requirePackageOwnership": true
+    },
     "compatibility": {
       "checks": [
         {
@@ -36,6 +37,17 @@
           "value": "10.0"
         }
       ]
+    },
+    "remove": {
+      "keepInstallDirectory": false,
+      "keepInventoryRecord": false,
+      "requireProcessExit": [],
+      "keepShims": false
+    },
+    "discovery": {
+      "enableDetection": false,
+      "searchLocations": [],
+      "installRootRules": []
     },
     "install": {
       "kind": "npmGlobalPackage",
@@ -71,16 +83,6 @@
       "signatures": [],
       "fileDetails": [],
       "registryChecks": []
-    },
-    "existingInstallDiscovery": {
-      "enableDetection": false,
-      "searchLocations": [],
-      "installRootRules": []
-    },
-    "existingInstallPolicy": {
-      "allowAdoptExternal": false,
-      "upgradeAdoptedInstall": false,
-      "requirePackageOwnership": true
     }
   },
   "releases": [
@@ -112,5 +114,6 @@
         ]
       }
     }
-  ]
+  ],
+  "$schema": "./eigenverft-module-package-definition-1.1.schema.json"
 }

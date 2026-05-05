@@ -1,6 +1,5 @@
 {
-  "$schema": "./eigenverft-module-package-definition.schema.json",
-  "schemaVersion": "1.0",
+  "schemaVersion": "1.1",
   "id": "Qwen35_2B_Q8_0_Model",
   "display": {
     "default": {
@@ -8,8 +7,7 @@
       "publisher": "Unsloth",
       "corporation": "Unsloth AI",
       "summary": "Quantized GGUF model resource for llama.cpp-compatible runtimes"
-    },
-    "localizations": {}
+    }
   },
   "upstreamSources": {
     "huggingFaceDownload": {
@@ -21,7 +19,12 @@
     "commands": [],
     "apps": []
   },
-  "releaseDefaults": {
+  "shared": {
+    "ownershipPolicy": {
+      "allowAdoptExternal": false,
+      "upgradeAdoptedInstall": false,
+      "requirePackageOwnership": false
+    },
     "compatibility": {
       "checks": [
         {
@@ -31,6 +34,17 @@
           "onFail": "warn"
         }
       ]
+    },
+    "remove": {
+      "keepInstallDirectory": false,
+      "keepInventoryRecord": false,
+      "requireProcessExit": [],
+      "keepShims": false
+    },
+    "discovery": {
+      "enableDetection": false,
+      "searchLocations": [],
+      "installRootRules": []
     },
     "install": {
       "kind": "placePackageFile",
@@ -50,16 +64,6 @@
       "signatures": [],
       "fileDetails": [],
       "registryChecks": []
-    },
-    "existingInstallDiscovery": {
-      "enableDetection": false,
-      "searchLocations": [],
-      "installRootRules": []
-    },
-    "existingInstallPolicy": {
-      "allowAdoptExternal": false,
-      "upgradeAdoptedInstall": false,
-      "requirePackageOwnership": false
     }
   },
   "releases": [
@@ -78,8 +82,6 @@
       },
       "packageFile": {
         "fileName": "Qwen3.5-2B-Q8_0.gguf",
-        "format": "gguf",
-        "portable": true,
         "contentHash": {
           "algorithm": "sha256",
           "value": "1b04acba824817554f4ce23639bc8495ff70453b8fcb047900c731521021f2c1"
@@ -104,5 +106,6 @@
         }
       ]
     }
-  ]
+  ],
+  "$schema": "./eigenverft-module-package-definition-1.1.schema.json"
 }
