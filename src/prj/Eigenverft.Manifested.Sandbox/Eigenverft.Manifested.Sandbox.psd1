@@ -13,7 +13,7 @@
 RootModule = 'Eigenverft.Manifested.Sandbox.psm1'
 
 # Version number of this module.
-  ModuleVersion = '1.20262.35265'
+  ModuleVersion = '1.20262.37423'
 
 # Supported PSEditions
 CompatiblePSEditions = @('Desktop', 'Core')
@@ -202,7 +202,7 @@ PrivateData = @{
         ReleaseNotes = 'Added sandbox-managed Python runtime initialization with pip bootstrap and proxy-aware pip config ownership, plus refreshed runtime state and bootstrap documentation.'
 
         # Prerelease string of this module
-        Prerelease = ''
+        Prerelease = 'dev'
 
         # Flag to indicate whether the module requires explicit user acceptance for install/update/save
         # RequireLicenseAcceptance = $false
