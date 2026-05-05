@@ -25,21 +25,21 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - execut
         Assert-MockCalled Write-Host -Times 1
     }
 
-    It 'loads Write-StandardMessage from ExecutionEngine and the Package logger adapter from Support Package' {
+    It 'loads Write-StandardMessage from ExecutionCore and the Package logger adapter from Support Package' {
         $writeStandardMessage = Get-Command Write-StandardMessage -CommandType Function
         $packageExecutionMessage = Get-Command Write-PackageExecutionMessage -CommandType Function
 
-        $writeStandardMessage.ScriptBlock.File | Should -Match 'Support\\ExecutionEngine\\.*StandardMessage\.ps1$'
+        $writeStandardMessage.ScriptBlock.File | Should -Match 'Support\\ExecutionCore\\.*StandardMessage\.ps1$'
         $packageExecutionMessage.ScriptBlock.File | Should -Match 'Support\\Package\\.*ExecutionMessage\.ps1$'
     }
 
-    It 'loads archive helpers from ExecutionEngine' {
+    It 'loads archive helpers from ExecutionCore' {
         $expandArchiveToStage = Get-Command Expand-ArchiveToStage -CommandType Function
 
-        $expandArchiveToStage.ScriptBlock.File | Should -Match 'Support\\ExecutionEngine\\.*Archive\.ps1$'
+        $expandArchiveToStage.ScriptBlock.File | Should -Match 'Support\\ExecutionCore\\.*Archive\.ps1$'
     }
 
-    It 'loads command resolution and filesystem helpers from ExecutionEngine' {
+    It 'loads command resolution and filesystem helpers from ExecutionCore' {
         $getResolvedApplicationPath = Get-Command Get-ResolvedApplicationPath -CommandType Function
         $removePathIfExists = Get-Command Remove-PathIfExists -CommandType Function
         $copyFileToPath = Get-Command Copy-FileToPath -CommandType Function
@@ -47,21 +47,21 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - execut
         $resolveTemplateText = Get-Command Resolve-TemplateText -CommandType Function
         $resolveConfiguredPath = Get-Command Resolve-ConfiguredPath -CommandType Function
 
-        $getResolvedApplicationPath.ScriptBlock.File | Should -Match 'Support\\ExecutionEngine\\.*CommandResolution\.ps1$'
-        $removePathIfExists.ScriptBlock.File | Should -Match 'Support\\ExecutionEngine\\.*FileSystem\.ps1$'
-        $copyFileToPath.ScriptBlock.File | Should -Match 'Support\\ExecutionEngine\\.*FileSystem\.ps1$'
-        $getStableShortHash.ScriptBlock.File | Should -Match 'Support\\ExecutionEngine\\.*PathTemplate\.ps1$'
-        $resolveTemplateText.ScriptBlock.File | Should -Match 'Support\\ExecutionEngine\\.*PathTemplate\.ps1$'
-        $resolveConfiguredPath.ScriptBlock.File | Should -Match 'Support\\ExecutionEngine\\.*PathTemplate\.ps1$'
+        $getResolvedApplicationPath.ScriptBlock.File | Should -Match 'Support\\ExecutionCore\\.*CommandResolution\.ps1$'
+        $removePathIfExists.ScriptBlock.File | Should -Match 'Support\\ExecutionCore\\.*FileSystem\.ps1$'
+        $copyFileToPath.ScriptBlock.File | Should -Match 'Support\\ExecutionCore\\.*FileSystem\.ps1$'
+        $getStableShortHash.ScriptBlock.File | Should -Match 'Support\\ExecutionCore\\.*PathTemplate\.ps1$'
+        $resolveTemplateText.ScriptBlock.File | Should -Match 'Support\\ExecutionCore\\.*PathTemplate\.ps1$'
+        $resolveConfiguredPath.ScriptBlock.File | Should -Match 'Support\\ExecutionCore\\.*PathTemplate\.ps1$'
     }
 
-    It 'loads generic npm helpers from ExecutionEngine and the Package npm adapter from Support Package' {
+    It 'loads generic npm helpers from ExecutionCore and the Package npm adapter from Support Package' {
         $getNpmRegistryUri = Get-Command Get-NpmRegistryUri -CommandType Function
         $getNpmGlobalConfigArguments = Get-Command Get-NpmGlobalConfigArguments -CommandType Function
         $installPackageNpmPackage = Get-Command Install-PackageNpmPackage -CommandType Function
 
-        $getNpmRegistryUri.ScriptBlock.File | Should -Match 'Support\\ExecutionEngine\\.*Npm\.ps1$'
-        $getNpmGlobalConfigArguments.ScriptBlock.File | Should -Match 'Support\\ExecutionEngine\\.*Npm\.ps1$'
+        $getNpmRegistryUri.ScriptBlock.File | Should -Match 'Support\\ExecutionCore\\.*Npm\.ps1$'
+        $getNpmGlobalConfigArguments.ScriptBlock.File | Should -Match 'Support\\ExecutionCore\\.*Npm\.ps1$'
         $installPackageNpmPackage.ScriptBlock.File | Should -Match 'Support\\Package\\.*Npm\.ps1$'
     }
 

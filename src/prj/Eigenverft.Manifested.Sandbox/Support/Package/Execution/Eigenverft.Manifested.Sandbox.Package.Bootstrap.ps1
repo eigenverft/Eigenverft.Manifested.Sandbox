@@ -2,7 +2,7 @@
     Eigenverft.Manifested.Sandbox.Package.Bootstrap
 #>
 
-$script:ManifestedPackageRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
+$script:ManifestedPackageRoot = Split-Path -Parent (Split-Path -Parent (Split-Path -Parent $PSScriptRoot))
 $script:ManifestedPackageConfigurationRoot = Join-Path $script:ManifestedPackageRoot 'Configuration'
 $script:ManifestedPackageRepositoriesRoot = Join-Path $script:ManifestedPackageRoot 'Repositories'
 $script:ManifestedPackageDefaultRepositoryId = 'EigenverftModule'

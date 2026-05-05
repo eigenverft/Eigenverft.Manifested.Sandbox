@@ -1,5 +1,5 @@
 <#
-    Eigenverft.Manifested.Sandbox.Upstream.GitHubRelease
+    Eigenverft.Manifested.Sandbox.ExecutionCore.Upstream.GitHubRelease
 #>
 
 function Get-GitHubRelease {

@@ -1,0 +1,677 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://eigenverft.local/schemas/eigenverft-module-package-definition.schema.json",
+  "description": "Schema for package JSON files in Repositories/EigenverftModule (schemaVersion 1.0).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "id",
+    "display",
+    "upstreamSources",
+    "providedTools",
+    "releaseDefaults",
+    "releases"
+  ],
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "description": "Optional JSON Schema association for editors and linters."
+    },
+    "schemaVersion": {
+      "description": "Must be 1.0 for this schema revision.",
+      "type": "string",
+      "const": "1.0"
+    },
+    "id": {
+      "description": "Stable id for this package (matches filename stem and references from dependencies).",
+      "type": "string",
+      "minLength": 1
+    },
+    "display": {
+      "description": "Localized labels for UIs, logs, and documentation.",
+      "allOf": [{ "$ref": "#/$defs/display" }]
+    },
+    "upstreamSources": {
+      "description": "Keyed sources (download base URIs, GitHub release APIs) referenced by acquisition candidates. May be {} when unused.",
+      "type": "object",
+      "additionalProperties": { "$ref": "#/$defs/upstreamSource" }
+    },
+    "dependencies": {
+      "description": "Packages that must be satisfied before this one (optional; omit key if none).",
+      "type": "array",
+      "items": { "$ref": "#/$defs/dependencyRef" }
+    },
+    "providedTools": {
+      "description": "Shim targets and apps this package exposes after install.",
+      "allOf": [{ "$ref": "#/$defs/providedTools" }]
+    },
+    "releaseDefaults": {
+      "description": "Shared compatibility, install, validation, discovery, and ownership policy; releases specialize on top.",
+      "allOf": [{ "$ref": "#/$defs/releaseDefaults" }]
+    },
+    "releases": {
+      "description": "Concrete versions/flavors; each row may add package files and acquisition hints.",
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/release" }
+    }
+  },
+  "$defs": {
+    "display": {
+      "description": "Default locale plus optional per-locale overrides of display fields.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["default", "localizations"],
+      "properties": {
+        "default": { "$ref": "#/$defs/displayEntry" },
+        "localizations": {
+          "type": "object",
+          "additionalProperties": { "$ref": "#/$defs/displayEntry" }
+        }
+      }
+    },
+    "displayEntry": {
+      "description": "Single-locale name, publisher, corporation, and short summary.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "publisher", "corporation", "summary"],
+      "properties": {
+        "name": { "type": "string" },
+        "publisher": { "type": "string" },
+        "corporation": { "type": "string" },
+        "summary": { "type": "string" }
+      }
+    },
+    "dependencyRef": {
+      "description": "Pointer to another package definition in a repository.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["repositoryId", "definitionId"],
+      "properties": {
+        "repositoryId": { "type": "string" },
+        "definitionId": { "type": "string" }
+      }
+    },
+    "upstreamSource": {
+      "description": "How to reach bits on the network: static download base or GitHub release API.",
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "baseUri"],
+          "properties": {
+            "kind": { "const": "download" },
+            "baseUri": { "type": "string", "minLength": 1 }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "repositoryOwner", "repositoryName"],
+          "properties": {
+            "kind": { "const": "githubRelease" },
+            "repositoryOwner": { "type": "string" },
+            "repositoryName": { "type": "string" }
+          }
+        }
+      ]
+    },
+    "providedTools": {
+      "description": "CLI shims (commands) and GUI/binary apps relative to the install root.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["commands", "apps"],
+      "properties": {
+        "commands": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/namedRelativePath" }
+        },
+        "apps": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/namedRelativePath" }
+        }
+      }
+    },
+    "namedRelativePath": {
+      "description": "Logical tool name and path under the package install directory.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "relativePath"],
+      "properties": {
+        "name": { "type": "string" },
+        "relativePath": { "type": "string" }
+      }
+    },
+    "releaseDefaults": {
+      "description": "Template applied to every release: how to install, verify, and detect existing copies.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "compatibility",
+        "install",
+        "validation",
+        "existingInstallDiscovery",
+        "existingInstallPolicy"
+      ],
+      "properties": {
+        "compatibility": { "$ref": "#/$defs/compatibility" },
+        "install": { "$ref": "#/$defs/install" },
+        "validation": { "$ref": "#/$defs/validation" },
+        "existingInstallDiscovery": { "$ref": "#/$defs/existingInstallDiscovery" },
+        "existingInstallPolicy": { "$ref": "#/$defs/existingInstallPolicy" }
+      }
+    },
+    "compatibility": {
+      "description": "Pre-install checks (OS version, memory, etc.) evaluated before acquisition.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["checks"],
+      "properties": {
+        "checks": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/compatibilityCheck" }
+        }
+      }
+    },
+    "compatibilityCheck": {
+      "description": "One structured check: kind selects semantics; operator/value are interpreted by the engine.",
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "operator", "value"],
+          "properties": {
+            "kind": { "const": "osVersion" },
+            "operator": { "type": "string" },
+            "value": { "type": "string" }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "operator", "value"],
+          "properties": {
+            "kind": { "const": "physicalOrVideoMemoryGiB" },
+            "operator": { "type": "string" },
+            "value": { "type": "number" },
+            "onFail": { "type": "string" }
+          }
+        }
+      ]
+    },
+    "pathRegistration": {
+      "description": "Whether and how install paths or shims are registered for the user (e.g. PATH, shims dir).",
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["mode"],
+          "properties": {
+            "mode": { "const": "none" }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["mode", "source"],
+          "properties": {
+            "mode": { "const": "user" },
+            "source": { "$ref": "#/$defs/pathRegistrationSource" }
+          }
+        }
+      ]
+    },
+    "pathRegistrationSource": {
+      "description": "Shim name(s) to register when mode is user; single value or list for multi-binary packages.",
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "value"],
+          "properties": {
+            "kind": { "const": "shim" },
+            "value": { "type": "string" }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "values"],
+          "properties": {
+            "kind": { "const": "shim" },
+            "values": {
+              "type": "array",
+              "items": { "type": "string" },
+              "minItems": 1
+            }
+          }
+        }
+      ]
+    },
+    "install": {
+      "description": "Install strategy for this definition (archive, npm global, file placement, NSIS, or generic installer).",
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "installDirectory",
+            "pathRegistration",
+            "expandedRoot",
+            "createDirectories"
+          ],
+          "properties": {
+            "kind": { "const": "expandArchive" },
+            "installDirectory": { "type": "string" },
+            "pathRegistration": { "$ref": "#/$defs/pathRegistration" },
+            "expandedRoot": { "type": "string" },
+            "createDirectories": {
+              "type": "array",
+              "items": { "type": "string" }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "installerCommand",
+            "packageSpec",
+            "installDirectory",
+            "pathRegistration"
+          ],
+          "properties": {
+            "kind": { "const": "npmGlobalPackage" },
+            "installerCommand": { "type": "string" },
+            "packageSpec": { "type": "string" },
+            "installDirectory": { "type": "string" },
+            "pathRegistration": { "$ref": "#/$defs/pathRegistration" }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "installDirectory",
+            "targetRelativePath",
+            "pathRegistration"
+          ],
+          "properties": {
+            "kind": { "const": "placePackageFile" },
+            "installDirectory": { "type": "string" },
+            "targetRelativePath": { "type": "string" },
+            "pathRegistration": { "$ref": "#/$defs/pathRegistration" }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "installDirectory",
+            "installerKind",
+            "uiMode",
+            "elevation",
+            "timeoutSec",
+            "commandArguments",
+            "targetDirectoryArgument",
+            "successExitCodes",
+            "restartExitCodes",
+            "pathRegistration"
+          ],
+          "properties": {
+            "kind": { "const": "nsisInstaller" },
+            "installDirectory": { "type": "string" },
+            "installerKind": { "type": "string" },
+            "uiMode": { "type": "string" },
+            "elevation": { "type": "string" },
+            "timeoutSec": { "type": "number" },
+            "commandArguments": {
+              "type": "array",
+              "items": { "type": "string" }
+            },
+            "targetDirectoryArgument": {
+              "type": "object",
+              "additionalProperties": true
+            },
+            "successExitCodes": {
+              "type": "array",
+              "items": { "type": "integer" }
+            },
+            "restartExitCodes": {
+              "type": "array",
+              "items": { "type": "integer" }
+            },
+            "pathRegistration": { "$ref": "#/$defs/pathRegistration" }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "targetKind",
+            "installerKind",
+            "uiMode",
+            "elevation",
+            "timeoutSec",
+            "logRelativePath",
+            "commandArguments",
+            "successExitCodes",
+            "restartExitCodes",
+            "pathRegistration"
+          ],
+          "properties": {
+            "kind": { "const": "runInstaller" },
+            "targetKind": { "type": "string" },
+            "installerKind": { "type": "string" },
+            "uiMode": { "type": "string" },
+            "elevation": { "type": "string" },
+            "timeoutSec": { "type": "number" },
+            "logRelativePath": { "type": "string" },
+            "commandArguments": {
+              "type": "array",
+              "items": { "type": "string" }
+            },
+            "successExitCodes": {
+              "type": "array",
+              "items": { "type": "integer" }
+            },
+            "restartExitCodes": {
+              "type": "array",
+              "items": { "type": "integer" }
+            },
+            "pathRegistration": { "$ref": "#/$defs/pathRegistration" }
+          }
+        }
+      ]
+    },
+    "validation": {
+      "description": "Post-install checks: expected files, optional command/version probes, signatures, registry keys.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["files", "directories", "commandChecks", "signatures", "fileDetails"],
+      "properties": {
+        "files": { "type": "array", "items": { "type": "string" } },
+        "directories": { "type": "array", "items": { "type": "string" } },
+        "commandChecks": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/commandCheck" }
+        },
+        "metadataFiles": {
+          "type": "array",
+          "items": { "type": "object", "additionalProperties": true }
+        },
+        "signatures": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/signatureCheck" }
+        },
+        "fileDetails": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/fileDetail" }
+        },
+        "registryChecks": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/registryCheck" }
+        }
+      }
+    },
+    "commandCheck": {
+      "description": "Run a provided tool with arguments; outputPattern extracts a value to compare optionally to expectedValue.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["entryPoint", "arguments", "outputPattern"],
+      "properties": {
+        "entryPoint": { "type": "string" },
+        "arguments": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "outputPattern": { "type": "string" },
+        "expectedValue": { "type": "string" }
+      }
+    },
+    "signatureCheck": {
+      "description": "Authenticode (or similar) expectation on a file under the install root.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["relativePath", "requireValid", "subjectContains"],
+      "properties": {
+        "relativePath": { "type": "string" },
+        "requireValid": { "type": "boolean" },
+        "subjectContains": { "type": "string" }
+      }
+    },
+    "fileDetail": {
+      "description": "Optional Win32 version resource expectations for a binary (product/file version strings).",
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["relativePath"],
+      "properties": {
+        "relativePath": { "type": "string" },
+        "productName": { "type": "string" },
+        "fileDescription": { "type": "string" },
+        "fileVersion": { "type": "string" },
+        "productVersion": { "type": "string" }
+      }
+    },
+    "registryCheck": {
+      "description": "Assert a registry value under one of several candidate paths (machine prerequisites).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["paths"],
+      "properties": {
+        "paths": {
+          "type": "array",
+          "items": { "type": "string" },
+          "minItems": 1
+        },
+        "valueName": { "type": "string" },
+        "expectedValue": {},
+        "operator": { "type": "string" }
+      }
+    },
+    "existingInstallDiscovery": {
+      "description": "How to find an already-installed copy (commands, paths, uninstall registry, root rules).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["enableDetection", "searchLocations", "installRootRules"],
+      "properties": {
+        "enableDetection": { "type": "boolean" },
+        "searchLocations": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/searchLocation" }
+        },
+        "installRootRules": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/installRootRule" }
+        }
+      }
+    },
+    "searchLocation": {
+      "description": "One heuristic location to probe for an existing install root.",
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "name"],
+          "properties": {
+            "kind": { "const": "command" },
+            "name": { "type": "string" }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "path"],
+          "properties": {
+            "kind": { "const": "path" },
+            "path": { "type": "string" }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "searchOrder", "paths", "installDirectorySource"],
+          "properties": {
+            "kind": { "const": "windowsUninstallRegistryKey" },
+            "searchOrder": { "type": "number" },
+            "paths": {
+              "type": "array",
+              "items": { "type": "string" },
+              "minItems": 1
+            },
+            "installDirectorySource": { "type": "string" }
+          }
+        }
+      ]
+    },
+    "installRootRule": {
+      "description": "Map from a discovered file (e.g. code.cmd) to the install root relative path.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["match", "installRootRelativePath"],
+      "properties": {
+        "match": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "value"],
+          "properties": {
+            "kind": { "const": "fileName" },
+            "value": { "type": "string" }
+          }
+        },
+        "installRootRelativePath": { "type": "string" }
+      }
+    },
+    "existingInstallPolicy": {
+      "description": "Whether external installs may be adopted, upgraded, and ownership requirements.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "allowAdoptExternal",
+        "upgradeAdoptedInstall",
+        "requirePackageOwnership"
+      ],
+      "properties": {
+        "allowAdoptExternal": { "type": "boolean" },
+        "upgradeAdoptedInstall": { "type": "boolean" },
+        "requirePackageOwnership": { "type": "boolean" }
+      }
+    },
+    "release": {
+      "description": "One concrete build: version, track, flavor, OS/CPU constraints, optional artifact and acquisition list.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "version", "releaseTrack", "flavor", "constraints"],
+      "properties": {
+        "id": { "type": "string" },
+        "version": { "type": "string" },
+        "releaseTag": { "type": "string" },
+        "releaseTrack": { "type": "string" },
+        "flavor": { "type": "string" },
+        "constraints": { "$ref": "#/$defs/constraints" },
+        "packageFile": { "$ref": "#/$defs/packageFile" },
+        "acquisitionCandidates": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/acquisitionCandidate" }
+        }
+      }
+    },
+    "constraints": {
+      "description": "Which OS and CPU architectures this release row applies to.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["os", "cpu"],
+      "properties": {
+        "os": {
+          "type": "array",
+          "items": { "type": "string" },
+          "minItems": 1
+        },
+        "cpu": {
+          "type": "array",
+          "items": { "type": "string" },
+          "minItems": 1
+        }
+      }
+    },
+    "contentHash": {
+      "description": "Expected digest of the package file after download (e.g. sha256).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["algorithm", "value"],
+      "properties": {
+        "algorithm": { "type": "string" },
+        "value": { "type": "string" }
+      }
+    },
+    "publisherSignature": {
+      "description": "Code-signing expectation on the installer or archive.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "requireValid", "subjectContains"],
+      "properties": {
+        "kind": { "const": "authenticode" },
+        "requireValid": { "type": "boolean" },
+        "subjectContains": { "type": "string" }
+      }
+    },
+    "packageFile": {
+      "description": "Logical artifact identity: name, format, portability, optional hash and signature.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["fileName", "format", "portable"],
+      "properties": {
+        "fileName": { "type": "string" },
+        "format": { "type": "string" },
+        "portable": { "type": "boolean" },
+        "contentHash": { "$ref": "#/$defs/contentHash" },
+        "publisherSignature": { "$ref": "#/$defs/publisherSignature" }
+      }
+    },
+    "acquisitionCandidate": {
+      "description": "Ordered strategy to obtain bits: local depot first, then download from a named upstream source.",
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "searchOrder", "verification"],
+          "properties": {
+            "kind": { "const": "packageDepot" },
+            "searchOrder": { "type": "number" },
+            "verification": { "$ref": "#/$defs/verification" }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "sourceId", "searchOrder", "verification"],
+          "properties": {
+            "kind": { "const": "download" },
+            "sourceId": { "type": "string" },
+            "sourcePath": { "type": "string" },
+            "searchOrder": { "type": "number" },
+            "verification": { "$ref": "#/$defs/verification" }
+          }
+        }
+      ]
+    },
+    "verification": {
+      "description": "Whether hash/signature verification is required or optional for this acquisition step.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mode"],
+      "properties": {
+        "mode": {
+          "type": "string",
+          "enum": ["required", "optional"]
+        }
+      }
+    }
+  }
+}

@@ -1,4 +1,5 @@
 {
+  "$schema": "./eigenverft-module-package-definition.schema.json",
   "schemaVersion": "1.0",
   "id": "OpenCodeCli",
   "display": {
