@@ -420,15 +420,16 @@ Resolve-PackagePaths -PackageResult $result
     if (-not $package) {
         throw 'Resolve-PackagePaths requires a selected release.'
     }
-    $installKind = if ($package.PSObject.Properties['install'] -and $package.install -and $package.install.PSObject.Properties['kind']) {
-        [string]$package.install.kind
+    $assignedBlock = Get-PackageEffectiveReleaseAssignedBlock -Release $package
+    $installKind = if ($assignedBlock -and $assignedBlock.PSObject.Properties['kind']) {
+        [string]$assignedBlock.kind
     }
     else {
         $null
     }
-    $installTargetKind = if ($package.PSObject.Properties['install'] -and $package.install -and $package.install.PSObject.Properties['targetKind'] -and
-        -not [string]::IsNullOrWhiteSpace([string]$package.install.targetKind)) {
-        [string]$package.install.targetKind
+    $installTargetKind = if ($assignedBlock -and $assignedBlock.PSObject.Properties['targetKind'] -and
+        -not [string]::IsNullOrWhiteSpace([string]$assignedBlock.targetKind)) {
+        [string]$assignedBlock.targetKind
     }
     else {
         'directory'
@@ -437,14 +438,14 @@ Resolve-PackagePaths -PackageResult $result
     $packageDepotRelativeDirectory = Get-PackagePackageDepotRelativeDirectory -PackageConfig $packageConfig -Package $package
     $packageWorkSlotDirectory = Get-PackagePackageWorkSlotDirectory -PackageConfig $packageConfig -Package $package
     $installDirectoryTemplate = $null
-    if ($package.PSObject.Properties['install'] -and $package.install -and
-        $package.install.PSObject.Properties['installDirectory'] -and
-        -not [string]::IsNullOrWhiteSpace([string]$package.install.installDirectory)) {
-        $installDirectoryTemplate = Resolve-PackageTemplateText -Text ([string]$package.install.installDirectory) -PackageConfig $packageConfig -Package $package
+    if ($assignedBlock -and
+        $assignedBlock.PSObject.Properties['installDirectory'] -and
+        -not [string]::IsNullOrWhiteSpace([string]$assignedBlock.installDirectory)) {
+        $installDirectoryTemplate = Resolve-PackageTemplateText -Text ([string]$assignedBlock.installDirectory) -PackageConfig $packageConfig -Package $package
     }
     elseif (-not [string]::Equals($installKind, 'reuseExisting', [System.StringComparison]::OrdinalIgnoreCase) -and
         -not [string]::Equals($installTargetKind, 'machinePrerequisite', [System.StringComparison]::OrdinalIgnoreCase)) {
-        throw "Package definition '$($definition.id)' does not define an install target path. Use install.installDirectory."
+        throw "Package definition '$($definition.id)' does not define an install target path. Use assigned.installDirectory (wire: install.installDirectory)."
     }
 
     $normalizedPackageDepotRelativeDirectory = $packageDepotRelativeDirectory.Trim() -replace '/', '\'
@@ -511,7 +512,7 @@ Creates the initial Package result object.
 
 .DESCRIPTION
 Creates the result object that later Package stage helpers enrich with
-release selection, package file, install, ownership, validation, and entry-point data.
+release selection, package file, assigned-state, ownership, validation, and entry-point data.
 
 .PARAMETER PackageConfig
 The resolved Package config object for the command.
@@ -574,7 +575,8 @@ New-PackageResult -PackageConfig $config
         InstallOrigin                    = $null
         PackageFilePreparation                  = $null
         Dependencies                     = @()
-        Install                          = $null
+        Assigned                         = $null
+        Removed                          = $null
         Validation                       = $null
         EntryPoints                      = $null
         PathRegistration                 = $null

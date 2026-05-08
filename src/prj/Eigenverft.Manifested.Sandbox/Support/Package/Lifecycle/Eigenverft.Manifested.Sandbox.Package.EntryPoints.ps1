@@ -187,7 +187,7 @@ Complete-PackageResult -PackageResult $result
     else {
         $PackageResult.Status = 'Failed'
         if ([string]::IsNullOrWhiteSpace($PackageResult.FailureReason)) {
-            $PackageResult.FailureReason = 'InstalledPackageValidationFailed'
+            $PackageResult.FailureReason = 'AssignedPackageValidationFailed'
         }
     }
 

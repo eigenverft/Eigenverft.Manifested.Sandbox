@@ -543,8 +543,8 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
         $result.Package.version | Should -Be '8863'
         $result.Package.releaseTag | Should -Be 'b8863'
         $result.Package.packageFile.fileName | Should -Be 'llama-b8863-bin-win-cpu-x64.zip'
-        $result.Package.install.pathRegistration.source.kind | Should -Be 'shim'
-        $result.Package.install.pathRegistration.source.values | Should -Be @('llama-cli', 'llama-server', 'llama-quantize', 'llama-bench', 'llama-tokenize')
+        $result.Package.assigned.pathRegistration.source.kind | Should -Be 'shim'
+        $result.Package.assigned.pathRegistration.source.values | Should -Be @('llama-cli', 'llama-server', 'llama-quantize', 'llama-bench', 'llama-tokenize')
     }
 
     It 'loads the shipped GitRuntime definition and selects the fixed GitHub-backed release' {
@@ -576,8 +576,8 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
         $result.Package.releaseTag | Should -Be 'v2.54.0.windows.1'
         $result.Package.packageFile.fileName | Should -Be $expectedFileName
         $result.Package.packageFile.contentHash.value | Should -Be $expectedSha256
-        $result.Package.install.pathRegistration.source.kind | Should -Be 'shim'
-        $result.Package.install.pathRegistration.source.value | Should -Be 'git'
+        $result.Package.assigned.pathRegistration.source.kind | Should -Be 'shim'
+        $result.Package.assigned.pathRegistration.source.value | Should -Be 'git'
     }
 
     It 'loads the shipped GitHubCli definition and selects the fixed GitHub-backed release' {
@@ -609,8 +609,8 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
         $result.Package.releaseTag | Should -Be 'v2.91.0'
         $result.Package.packageFile.fileName | Should -Be $expectedFileName
         $result.Package.packageFile.contentHash.value | Should -Be $expectedSha256
-        $result.Package.install.pathRegistration.source.kind | Should -Be 'shim'
-        $result.Package.install.pathRegistration.source.value | Should -Be 'gh'
+        $result.Package.assigned.pathRegistration.source.kind | Should -Be 'shim'
+        $result.Package.assigned.pathRegistration.source.value | Should -Be 'gh'
     }
 
     It 'loads the shipped NotepadPlusPlus definition and selects the fixed NSIS installer release' {
@@ -638,8 +638,8 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
         $sourceDefinition.Kind | Should -Be 'download'
         $sourceDefinition.BaseUri | Should -Be 'https://github.com/notepad-plus-plus/notepad-plus-plus/releases/download/v8.9.4/'
         $result.Package.version | Should -Be '8.9.4'
-        $result.Package.install.kind | Should -Be 'nsisInstaller'
-        $result.Package.install.targetDirectoryArgument.prefix | Should -Be '/D='
+        $result.Package.assigned.kind | Should -Be 'nsisInstaller'
+        $result.Package.assigned.targetDirectoryArgument.prefix | Should -Be '/D='
         $result.Package.existingInstallDiscovery.searchLocations[0].kind | Should -Be 'windowsUninstallRegistryKey'
         $result.Package.existingInstallDiscovery.searchLocations[0].installDirectorySource | Should -Be 'displayIconDirectory'
         $result.Package.packageFile.fileName | Should -Be $expectedFileName
@@ -674,8 +674,8 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
         $result.Package.releaseTag | Should -Be 'v24.15.0'
         $result.Package.packageFile.fileName | Should -Be $expectedFileName
         $result.Package.packageFile.contentHash.value | Should -Be $expectedSha256
-        $result.Package.install.pathRegistration.source.kind | Should -Be 'shim'
-        $result.Package.install.pathRegistration.source.values | Should -Be @('node', 'npm', 'npx')
+        $result.Package.assigned.pathRegistration.source.kind | Should -Be 'shim'
+        $result.Package.assigned.pathRegistration.source.values | Should -Be @('node', 'npm', 'npx')
     }
 
     It 'loads the shipped npm-backed CLI runtime definitions without package-file acquisition' {
@@ -697,11 +697,11 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
 
             $config.DefinitionId | Should -Be $case.DefinitionId
             $result.Package.version | Should -Be $case.Version
-            $result.Package.install.kind | Should -Be 'npmGlobalPackage'
-            $result.Package.install.installerCommand | Should -Be 'npm'
-            $result.Package.install.packageSpec | Should -Be $case.PackageSpec
-            $result.Package.install.pathRegistration.source.kind | Should -Be 'shim'
-            $result.Package.install.pathRegistration.source.value | Should -Be $case.Command
+            $result.Package.assigned.kind | Should -Be 'npmGlobalPackage'
+            $result.Package.assigned.installerCommand | Should -Be 'npm'
+            $result.Package.assigned.packageSpec | Should -Be $case.PackageSpec
+            $result.Package.assigned.pathRegistration.source.kind | Should -Be 'shim'
+            $result.Package.assigned.pathRegistration.source.value | Should -Be $case.Command
             $config.Definition.providedTools.commands[0].relativePath | Should -Be $case.RelativePath
             if ($case.DefinitionId -eq 'CodexCli') {
                 @($config.Definition.dependencies.definitionId) | Should -Be @('VisualCppRedistributable', 'NodeRuntime')
@@ -808,9 +808,9 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
         $result.Package.releaseTag | Should -Be '3.13.13'
         $result.Package.packageFile.fileName | Should -Be $expectedFileName
         $result.Package.packageFile.contentHash.value | Should -Be $expectedSha256
-        $result.Package.install.expandedRoot | Should -Be 'tools'
-        $result.Package.install.pathRegistration.source.kind | Should -Be 'shim'
-        $result.Package.install.pathRegistration.source.value | Should -Be 'python'
+        $result.Package.assigned.expandedRoot | Should -Be 'tools'
+        $result.Package.assigned.pathRegistration.source.kind | Should -Be 'shim'
+        $result.Package.assigned.pathRegistration.source.value | Should -Be 'python'
         $result.Package.validation.commandChecks[1].arguments | Should -Be @('-m', 'pip', '--version')
     }
 
@@ -843,8 +843,8 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
         $result.Package.releaseTag | Should -Be 'v7.6.1'
         $result.Package.packageFile.fileName | Should -Be $expectedFileName
         $result.Package.packageFile.contentHash.value | Should -Be $expectedSha256
-        $result.Package.install.pathRegistration.source.kind | Should -Be 'shim'
-        $result.Package.install.pathRegistration.source.value | Should -Be 'pwsh'
+        $result.Package.assigned.pathRegistration.source.kind | Should -Be 'shim'
+        $result.Package.assigned.pathRegistration.source.value | Should -Be 'pwsh'
     }
 
     It 'loads the shipped VisualCppRedistributable definition as an elevated machine prerequisite' {
@@ -859,10 +859,10 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
         $sourceDefinition.Kind | Should -Be 'download'
         $sourceDefinition.BaseUri | Should -Be 'https://aka.ms/'
         $result.PackageId | Should -Be 'vc-runtime-x64-stable'
-        $result.Package.install.kind | Should -Be 'runInstaller'
-        $result.Package.install.targetKind | Should -Be 'machinePrerequisite'
-        $result.Package.install.elevation | Should -Be 'required'
-        $result.Package.install.commandArguments | Should -Be @('/install', '/quiet', '/norestart', '/log', '{logPath}')
+        $result.Package.assigned.kind | Should -Be 'runInstaller'
+        $result.Package.assigned.targetKind | Should -Be 'machinePrerequisite'
+        $result.Package.assigned.elevation | Should -Be 'required'
+        $result.Package.assigned.commandArguments | Should -Be @('/install', '/quiet', '/norestart', '/log', '{logPath}')
         $result.Package.packageFile.fileName | Should -Be 'vc_redist.x64.exe'
         $result.Package.packageFile.publisherSignature.subjectContains | Should -Be 'Microsoft Corporation'
     }
@@ -885,7 +885,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
         $result.Package.packageFile.fileName | Should -Be 'Qwen3.5-2B-Q8_0.gguf'
         $result.Package.packageFile.contentHash.algorithm | Should -Be 'sha256'
         $result.Package.packageFile.contentHash.value | Should -Be '1b04acba824817554f4ce23639bc8495ff70453b8fcb047900c731521021f2c1'
-        $result.Package.install.kind | Should -Be 'placePackageFile'
+        $result.Package.assigned.kind | Should -Be 'placePackageFile'
         $result.Compatibility.Count | Should -Be 1
         $result.Compatibility[0].Kind | Should -Be 'physicalOrVideoMemoryGiB'
         $result.Compatibility[0].OnFail | Should -Be 'warn'
@@ -910,7 +910,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
         $result.Package.packageFile.fileName | Should -Be 'Qwen3.5-9B-Q6_K.gguf'
         $result.Package.packageFile.contentHash.algorithm | Should -Be 'sha256'
         $result.Package.packageFile.contentHash.value | Should -Be '91898433cf5ce0a8f45516a4cc3e9343b6e01d052d01f684309098c66a326c59'
-        $result.Package.install.kind | Should -Be 'placePackageFile'
+        $result.Package.assigned.kind | Should -Be 'placePackageFile'
         $result.Compatibility.Count | Should -Be 1
         $result.Compatibility[0].Kind | Should -Be 'physicalOrVideoMemoryGiB'
         $result.Compatibility[0].OnFail | Should -Be 'warn'
@@ -958,7 +958,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
             Document = ConvertTo-TestPsObject -InputObject $definitionDocument
         }
 
-        { Assert-PackageDefinitionSchema -DefinitionDocumentInfo $definitionInfo -DefinitionId 'VSCodeRuntime' } | Should -Throw '*install.managerDependency*'
+        { Assert-PackageDefinitionSchema -DefinitionDocumentInfo $definitionInfo -DefinitionId 'VSCodeRuntime' } | Should -Throw '*assigned.managerDependency*'
     }
 
     It 'fails clearly when a definition is missing schemaVersion' {
@@ -1459,7 +1459,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
         $result = Resolve-PackagePaths -PackageResult $result
 
         $result.EffectiveRelease | Should -Not -BeNullOrEmpty
-        $result.Package.install.kind | Should -Be 'expandArchive'
+        $result.Package.assigned.kind | Should -Be 'expandArchive'
         $result.Package.validation.commandChecks[0].expectedValue | Should -Be '{version}'
         $result.PackageWorkSlotDirectory | Should -Match '^VSCodeRuntime-[0-9a-f]{8}$'
         $result.PackageFilePath | Should -Match '\\FileStage\\VSCodeRuntime-[0-9a-f]{8}\\'

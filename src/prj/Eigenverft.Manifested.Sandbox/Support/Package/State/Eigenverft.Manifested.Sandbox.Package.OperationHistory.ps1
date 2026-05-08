@@ -96,7 +96,7 @@ Creates one operation-history record from a finalized Package result.
     $packageFilePreparation = $PackageResult.PackageFilePreparation
     $selectedSource = if ($packageFilePreparation -and $packageFilePreparation.PSObject.Properties['SelectedSource']) { $packageFilePreparation.SelectedSource } else { $null }
     $verification = if ($packageFilePreparation -and $packageFilePreparation.PSObject.Properties['Verification']) { $packageFilePreparation.Verification } else { $null }
-    $installStatus = if ($PackageResult.Install -and $PackageResult.Install.PSObject.Properties['Status']) { [string]$PackageResult.Install.Status } else { $null }
+    $installStatus = if ($PackageResult.Assigned -and $PackageResult.Assigned.PSObject.Properties['Status']) { [string]$PackageResult.Assigned.Status } else { $null }
     $operationId = if ($PackageResult.PSObject.Properties['OperationId'] -and -not [string]::IsNullOrWhiteSpace([string]$PackageResult.OperationId)) {
         [string]$PackageResult.OperationId
     }

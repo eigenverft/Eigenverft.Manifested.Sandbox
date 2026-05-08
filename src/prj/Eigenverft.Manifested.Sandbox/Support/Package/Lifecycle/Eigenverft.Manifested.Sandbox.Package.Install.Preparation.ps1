@@ -32,9 +32,10 @@ function Get-PackageInstallTargetKind {
         [psobject]$Package
     )
 
-    if ($Package.install -and $Package.install.PSObject.Properties['targetKind'] -and
-        -not [string]::IsNullOrWhiteSpace([string]$Package.install.targetKind)) {
-        return [string]$Package.install.targetKind
+    $assigned = Get-PackageEffectiveReleaseAssignedBlock -Release $Package
+    if ($assigned -and $assigned.PSObject.Properties['targetKind'] -and
+        -not [string]::IsNullOrWhiteSpace([string]$assigned.targetKind)) {
+        return [string]$assigned.targetKind
     }
 
     return 'directory'
@@ -47,7 +48,10 @@ function Get-PackageInstallerElevationPlan {
         [psobject]$PackageResult
     )
 
-    $install = $PackageResult.Package.install
+    $install = Get-PackageEffectiveReleaseAssignedBlock -Release $PackageResult.Package
+    if (-not $install) {
+        throw 'Get-PackageInstallerElevationPlan requires a selected release with an assigned block.'
+    }
     $mode = if ($install.PSObject.Properties['elevation'] -and -not [string]::IsNullOrWhiteSpace([string]$install.elevation)) {
         ([string]$install.elevation).ToLowerInvariant()
     }
@@ -64,13 +68,13 @@ function Get-PackageInstallerElevationPlan {
     }
 }
 
-function Resolve-PackagePreInstallSatisfaction {
+function Resolve-PackagePreAssignmentSatisfaction {
 <#
 .SYNOPSIS
 Checks whether a machine-prerequisite package is already satisfied.
 
 .DESCRIPTION
-Runs validation before acquisition/install for prerequisite-style packages that
+Runs validation before acquisition/assign for prerequisite-style packages that
 do not own an install directory. When validation succeeds, later acquisition
 and installer steps are skipped.
 
@@ -78,7 +82,7 @@ and installer steps are skipped.
 The Package result object to enrich.
 
 .EXAMPLE
-Resolve-PackagePreInstallSatisfaction -PackageResult $result
+Resolve-PackagePreAssignmentSatisfaction -PackageResult $result
 #>
     [CmdletBinding()]
     param(
@@ -87,21 +91,22 @@ Resolve-PackagePreInstallSatisfaction -PackageResult $result
     )
 
     $package = $PackageResult.Package
-    if (-not $package -or -not $package.install) {
+    $assignedBlock = Get-PackageEffectiveReleaseAssignedBlock -Release $package
+    if (-not $package -or -not $assignedBlock) {
         return $PackageResult
     }
 
-    $installKind = if ($package.install.PSObject.Properties['kind']) { [string]$package.install.kind } else { $null }
+    $installKind = if ($assignedBlock.PSObject.Properties['kind']) { [string]$assignedBlock.kind } else { $null }
     $targetKind = Get-PackageInstallTargetKind -Package $package
     if (-not [string]::Equals($installKind, 'runInstaller', [System.StringComparison]::OrdinalIgnoreCase) -or
         -not [string]::Equals($targetKind, 'machinePrerequisite', [System.StringComparison]::OrdinalIgnoreCase)) {
         return $PackageResult
     }
 
-    $PackageResult = Test-PackageInstalledPackage -PackageResult $PackageResult
+    $PackageResult = Test-PackageAssignedReadiness -PackageResult $PackageResult
     if ($PackageResult.Validation -and $PackageResult.Validation.Accepted) {
         $PackageResult.InstallOrigin = 'AlreadySatisfied'
-        $PackageResult.Install = [pscustomobject]@{
+        $PackageResult.Assigned = [pscustomobject]@{
             Status           = 'AlreadySatisfied'
             InstallKind      = 'runInstaller'
             TargetKind       = 'machinePrerequisite'

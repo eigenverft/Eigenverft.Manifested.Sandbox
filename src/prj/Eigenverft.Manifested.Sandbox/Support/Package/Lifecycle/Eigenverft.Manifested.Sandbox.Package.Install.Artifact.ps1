@@ -29,7 +29,10 @@ Install-PackageArchive -PackageResult $result
         throw "Package archive install for '$($PackageResult.PackageId)' requires a saved package file."
     }
 
-    $install = $PackageResult.Package.install
+    $install = Get-PackageEffectiveReleaseAssignedBlock -Release $PackageResult.Package
+    if (-not $install) {
+        throw "Package archive install for '$($PackageResult.PackageId)' requires an assigned block on the selected release."
+    }
     if ([string]::IsNullOrWhiteSpace([string]$PackageResult.PackageInstallStageDirectory)) {
         throw "Package archive install for '$($PackageResult.PackageId)' requires a package install stage directory."
     }
@@ -87,7 +90,10 @@ simple install model.
         [psobject]$PackageResult
     )
 
-    $install = $PackageResult.Package.install
+    $install = Get-PackageEffectiveReleaseAssignedBlock -Release $PackageResult.Package
+    if (-not $install) {
+        throw "Package single-file install for '$($PackageResult.PackageId)' requires an assigned block on the selected release."
+    }
     $targetRelativePath = $null
     if ($install.PSObject.Properties['targetRelativePath'] -and
         -not [string]::IsNullOrWhiteSpace([string]$install.targetRelativePath)) {
@@ -101,7 +107,7 @@ simple install model.
         $targetRelativePath = [string]$PackageResult.Package.packageFile.fileName
     }
     else {
-        throw "Package single-file install for '$($PackageResult.PackageId)' requires install.targetRelativePath or packageFile.fileName."
+        throw "Package single-file install for '$($PackageResult.PackageId)' requires assigned.targetRelativePath or packageFile.fileName."
     }
 
     return (Join-Path $PackageResult.InstallDirectory $targetRelativePath)

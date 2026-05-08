@@ -3,17 +3,28 @@
   "$id": "https://eigenverft.local/schemas/eigenverft-module-package-definition-1.1.schema.json",
   "title": "Eigenverft module package definition (schemaVersion 1.1 wire)",
   "$comment": "Mandatory baseline wire model. schemaVersion is fixed to \"1.1\" (see properties.schemaVersion.const); successor to the retired 1.0 definition line.",
-  "description": "Package definition (schemaVersion 1.1): package-scoped root with one shared lifecycle block (install/remove/discovery/validation). Supersedes earlier on-disk shapes including schemaVersion 1.0.",
+  "description": "Package definition (schemaVersion 1.1): package-scoped root with either legacy shared lifecycle or packageOperations (shared cross-cutting + assigned install + removed). Supersedes earlier on-disk shapes including schemaVersion 1.0.",
   "type": "object",
   "additionalProperties": false,
   "required": [
     "schemaVersion",
     "id",
     "display",
+    "releases",
     "upstreamSources",
-    "providedTools",
-    "shared",
-    "releases"
+    "providedTools"
+  ],
+  "oneOf": [
+    {
+      "required": [
+        "shared"
+      ]
+    },
+    {
+      "required": [
+        "packageOperations"
+      ]
+    }
   ],
   "properties": {
     "$schema": {
@@ -38,6 +49,14 @@
         }
       ]
     },
+    "releases": {
+      "description": "Only per-release facts: identity, constraints, artifact, and acquisition sequence.",
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/releaseNarrow"
+      }
+    },
     "upstreamSources": {
       "description": "Named upstream sources used by release acquisition candidates.",
       "type": "object",
@@ -60,7 +79,7 @@
       ]
     },
     "providedTools": {
-      "description": "Package-owned commands/apps. Single source of truth (no duplicate shim list in shared).",
+      "description": "Package-owned commands/apps. Single source of truth (no duplicate shim list under lifecycle).",
       "allOf": [
         {
           "$ref": "#/$defs/providedTools"
@@ -68,16 +87,12 @@
       ]
     },
     "shared": {
-      "description": "Lifecycle rules shared by all releases: discovery, policy, install/remove pair, and validation expectations.",
+      "description": "Legacy lifecycle block (all releases): compatibility, discovery, ownershipPolicy, install, remove, validation.",
       "$ref": "#/$defs/sharedLifecycle"
     },
-    "releases": {
-      "description": "Only per-release facts: identity, constraints, artifact, and acquisition sequence.",
-      "type": "array",
-      "minItems": 1,
-      "items": {
-        "$ref": "#/$defs/releaseNarrow"
-      }
+    "packageOperations": {
+      "description": "Lifecycle grouping: shared (cross-cutting), assigned (DesiredState Assigned / install graph), removed (remove policy).",
+      "$ref": "#/$defs/packageOperations"
     }
   },
   "$defs": {
@@ -241,6 +256,50 @@
         },
         "validation": {
           "$ref": "#/$defs/validation"
+        }
+      }
+    },
+    "packageOperationsShared": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "compatibility",
+        "discovery",
+        "ownershipPolicy",
+        "validation"
+      ],
+      "properties": {
+        "compatibility": {
+          "$ref": "#/$defs/compatibility"
+        },
+        "discovery": {
+          "$ref": "#/$defs/existingInstallDiscovery"
+        },
+        "ownershipPolicy": {
+          "$ref": "#/$defs/existingInstallPolicy"
+        },
+        "validation": {
+          "$ref": "#/$defs/validation"
+        }
+      }
+    },
+    "packageOperations": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "shared",
+        "assigned",
+        "removed"
+      ],
+      "properties": {
+        "shared": {
+          "$ref": "#/$defs/packageOperationsShared"
+        },
+        "assigned": {
+          "$ref": "#/$defs/install"
+        },
+        "removed": {
+          "$ref": "#/$defs/removePolicy"
         }
       }
     },

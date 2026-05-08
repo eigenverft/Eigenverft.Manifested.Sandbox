@@ -8,6 +8,19 @@ function Get-PackageOutcomeSummary {
         [psobject]$PackageResult
     )
 
+    $assignedStatusText = if ($PackageResult.Assigned -and $PackageResult.Assigned.PSObject.Properties['Status']) {
+        [string]$PackageResult.Assigned.Status
+    }
+    else {
+        '<none>'
+    }
+    $assignedRestartText = if ($PackageResult.Assigned -and $PackageResult.Assigned.PSObject.Properties['Installer'] -and $PackageResult.Assigned.Installer.PSObject.Properties['RestartRequired']) {
+        [string]$PackageResult.Assigned.Installer.RestartRequired
+    }
+    else {
+        '<none>'
+    }
+
     $installDirectoryText = if ([string]::IsNullOrWhiteSpace([string]$PackageResult.InstallDirectory)) {
         '<none>'
     }
@@ -35,16 +48,16 @@ function Get-PackageOutcomeSummary {
             return ("[OUTCOME] Adopted external install '{0}' (existingDecision='{1}', packageFileStep='{2}')." -f $installDirectoryText, $existingDecisionText, $packageFileStatusText)
         }
         'PackageInstalled' {
-            return ("[OUTCOME] Completed Package-owned install into '{0}' with installStatus='{1}' and packageFileStep='{2}'." -f $installDirectoryText, [string]$PackageResult.Install.Status, $packageFileStatusText)
+            return ("[OUTCOME] Completed Package-owned install into '{0}' with installStatus='{1}' and packageFileStep='{2}'." -f $installDirectoryText, $assignedStatusText, $packageFileStatusText)
         }
         'PackageApplied' {
-            return ("[OUTCOME] Applied Package prerequisite with installStatus='{0}', packageFileStep='{1}', restartRequired='{2}'." -f [string]$PackageResult.Install.Status, $packageFileStatusText, [string]$PackageResult.Install.Installer.RestartRequired)
+            return ("[OUTCOME] Applied Package prerequisite with installStatus='{0}', packageFileStep='{1}', restartRequired='{2}'." -f $assignedStatusText, $packageFileStatusText, $assignedRestartText)
         }
         'AlreadySatisfied' {
             return ("[OUTCOME] Package prerequisite already satisfied; installer and package-file acquisition were skipped.")
         }
         default {
-            return ("[OUTCOME] Completed Package run with installOrigin='{0}', installStatus='{1}', packageFileStep='{2}', installDirectory='{3}'." -f [string]$PackageResult.InstallOrigin, [string]$PackageResult.Install.Status, $packageFileStatusText, $installDirectoryText)
+            return ("[OUTCOME] Completed Package run with installOrigin='{0}', installStatus='{1}', packageFileStep='{2}', installDirectory='{3}'." -f [string]$PackageResult.InstallOrigin, $assignedStatusText, $packageFileStatusText, $installDirectoryText)
         }
     }
 }
@@ -61,14 +74,14 @@ function Get-PackageCommandFailureReason {
         'ResolvePackage' { return 'PackageSelectionFailed' }
         'ResolveDependencies' { return 'PackageDependencyFailed' }
         'ResolvePaths' { return 'PackagePathResolutionFailed' }
-        'ResolvePreInstallSatisfaction' { return 'PreInstallSatisfactionCheckFailed' }
+        'ResolvePreAssignmentSatisfaction' { return 'PreAssignmentSatisfactionCheckFailed' }
         'BuildAcquisitionPlan' { return 'AcquisitionPlanBuildFailed' }
         'FindExistingPackage' { return 'ExistingPackageDiscoveryFailed' }
         'ClassifyExistingPackage' { return 'ExistingPackageOwnershipClassificationFailed' }
         'ResolveExistingPackageDecision' { return 'ExistingPackageDecisionFailed' }
-        'PreparePackageInstallFile' { return 'PackageFilePreparationFailed' }
-        'InstallPackage' { return 'PackageInstallFailed' }
-        'ValidateInstalledPackage' { return 'InstalledPackageValidationFailed' }
+        'PreparePackageAssignedFile' { return 'PackageFilePreparationFailed' }
+        'AssignPackage' { return 'PackageAssignFailed' }
+        'ValidateAssignedPackage' { return 'AssignedPackageValidationFailed' }
         'RegisterPath' { return 'PathRegistrationFailed' }
         'ResolveEntryPoints' { return 'EntryPointResolutionFailed' }
         'UpdateInventory' { return 'PackageInventoryUpdateFailed' }
@@ -123,14 +136,14 @@ function Invoke-PackageAssignedFlow {
         [pscustomobject]@{ Name = 'ResolvePackage'; Message = '[STEP] Resolving package selection.'; Action = { param($r) Resolve-PackagePackage -PackageResult $r } },
         [pscustomobject]@{ Name = 'ResolveDependencies'; Message = '[STEP] Ensuring package dependencies.'; Action = { param($r) Resolve-PackageDependencies -PackageResult $r -DependencyStack $DependencyStack } },
         [pscustomobject]@{ Name = 'ResolvePaths'; Message = '[STEP] Resolving package paths.'; Action = { param($r) Resolve-PackagePaths -PackageResult $r } },
-        [pscustomobject]@{ Name = 'ResolvePreInstallSatisfaction'; Message = '[STEP] Checking pre-install satisfaction.'; Action = { param($r) Resolve-PackagePreInstallSatisfaction -PackageResult $r } },
+        [pscustomobject]@{ Name = 'ResolvePreAssignmentSatisfaction'; Message = '[STEP] Checking pre-assignment satisfaction.'; Action = { param($r) Resolve-PackagePreAssignmentSatisfaction -PackageResult $r } },
         [pscustomobject]@{ Name = 'BuildAcquisitionPlan'; Message = '[STEP] Building acquisition plan.'; Action = { param($r) Build-PackageAcquisitionPlan -PackageResult $r } },
         [pscustomobject]@{ Name = 'FindExistingPackage'; Message = '[STEP] Discovering existing installs.'; Action = { param($r) Find-PackageExistingPackage -PackageResult $r } },
         [pscustomobject]@{ Name = 'ClassifyExistingPackage'; Message = '[STEP] Classifying install ownership.'; Action = { param($r) Classify-PackageExistingPackage -PackageResult $r } },
         [pscustomobject]@{ Name = 'ResolveExistingPackageDecision'; Message = '[STEP] Deciding reuse, adoption, or replacement.'; Action = { param($r) Resolve-PackageExistingPackageDecision -PackageResult $r } },
-        [pscustomobject]@{ Name = 'PreparePackageInstallFile'; Message = '[STEP] Ensuring package file is available.'; Action = { param($r) Prepare-PackageInstallFile -PackageResult $r } },
-        [pscustomobject]@{ Name = 'InstallPackage'; Message = '[STEP] Installing or reusing the package.'; Action = { param($r) Install-PackagePackage -PackageResult $r } },
-        [pscustomobject]@{ Name = 'ValidateInstalledPackage'; Message = '[STEP] Validating the installed package.'; Action = { param($r) Test-PackageInstalledPackage -PackageResult $r } },
+        [pscustomobject]@{ Name = 'PreparePackageAssignedFile'; Message = '[STEP] Ensuring package file is available.'; Action = { param($r) Prepare-PackageInstallFile -PackageResult $r } },
+        [pscustomobject]@{ Name = 'AssignPackage'; Message = '[STEP] Assigning the package (install or reuse per assigned.kind).'; Action = { param($r) Set-PackageAssignedState -PackageResult $r } },
+        [pscustomobject]@{ Name = 'ValidateAssignedPackage'; Message = '[STEP] Validating assigned package state.'; Action = { param($r) Test-PackageAssignedReadiness -PackageResult $r } },
         [pscustomobject]@{ Name = 'RegisterPath'; Message = '[STEP] Applying PATH registration.'; Action = { param($r) Register-PackagePath -PackageResult $r } },
         [pscustomobject]@{ Name = 'ResolveEntryPoints'; Message = '[STEP] Resolving entry points.'; Action = { param($r) Resolve-PackageEntryPoints -PackageResult $r } },
         [pscustomobject]@{ Name = 'UpdateInventory'; Message = '[STEP] Updating package inventory.'; Action = { param($r) Update-PackageInventoryRecord -PackageResult $r } },
@@ -153,13 +166,14 @@ function Invoke-PackageAssignedFlow {
             $PackageResult.CurrentStep = $step.Name
             Write-PackageExecutionMessage -Message $step.Message
             $PackageResult = & $step.Action $PackageResult
-            if ($step.Name -eq 'ValidateInstalledPackage' -and (-not $PackageResult.Validation -or -not $PackageResult.Validation.Accepted)) {
+            if ($step.Name -eq 'ValidateAssignedPackage' -and (-not $PackageResult.Validation -or -not $PackageResult.Validation.Accepted)) {
                 $failedCount = if ($PackageResult.Validation -and $PackageResult.Validation.PSObject.Properties['FailedChecks']) { @($PackageResult.Validation.FailedChecks).Count } else { 0 }
                 throw ("Package validation failed for '{0}' with {1} failed check(s)." -f $PackageResult.PackageId, $failedCount)
             }
         }
         Write-PackageExecutionMessage -Message (Get-PackageOutcomeSummary -PackageResult $PackageResult)
-        Write-PackageExecutionMessage -Message ("[OK] Package completed with InstallOrigin='{0}' and InstallStatus='{1}'." -f $PackageResult.InstallOrigin, $PackageResult.Install.Status)
+        $okStatus = if ($PackageResult.Assigned -and $PackageResult.Assigned.PSObject.Properties['Status']) { [string]$PackageResult.Assigned.Status } else { '<n/a>' }
+        Write-PackageExecutionMessage -Message ("[OK] Package completed with InstallOrigin='{0}' and InstallStatus='{1}'." -f $PackageResult.InstallOrigin, $okStatus)
     }
     catch {
         $PackageResult.Status = 'Failed'

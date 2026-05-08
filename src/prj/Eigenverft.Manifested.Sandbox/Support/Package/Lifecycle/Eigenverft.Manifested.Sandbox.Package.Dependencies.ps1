@@ -187,13 +187,13 @@ Resolve-PackageDependencies -PackageResult $result
             DefinitionId   = $dependencyDefinitionId
             Status         = $dependencyStatus
             InstallOrigin  = [string]$dependencyResult.InstallOrigin
-            InstallStatus  = if ($dependencyResult.Install -and $dependencyResult.Install.PSObject.Properties['Status']) { [string]$dependencyResult.Install.Status } else { $null }
+            InstallStatus  = if ($dependencyResult.Assigned -and $dependencyResult.Assigned.PSObject.Properties['Status']) { [string]$dependencyResult.Assigned.Status } else { $null }
             EntryPoints    = if ($dependencyResult.PSObject.Properties['EntryPoints']) { $dependencyResult.EntryPoints } else { $null }
             Commands       = @(Resolve-PackageDependencyCommandEntryPoints -DependencyResult $dependencyResult)
             Result         = $dependencyResult
         }) | Out-Null
 
-        Write-PackageExecutionMessage -Message ("[STATE] Package dependency ready: repository='{0}', definition='{1}', installOrigin='{2}', installStatus='{3}'." -f $dependencyRepositoryId, $dependencyDefinitionId, [string]$dependencyResult.InstallOrigin, $(if ($dependencyResult.Install -and $dependencyResult.Install.PSObject.Properties['Status']) { [string]$dependencyResult.Install.Status } else { '<none>' }))
+        Write-PackageExecutionMessage -Message ("[STATE] Package dependency ready: repository='{0}', definition='{1}', installOrigin='{2}', installStatus='{3}'." -f $dependencyRepositoryId, $dependencyDefinitionId, [string]$dependencyResult.InstallOrigin, $(if ($dependencyResult.Assigned -and $dependencyResult.Assigned.PSObject.Properties['Status']) { [string]$dependencyResult.Assigned.Status } else { '<none>' }))
     }
 
     $PackageResult.Dependencies = @($dependencyRecords.ToArray())

@@ -1,4 +1,5 @@
 {
+  "$schema": "./eigenverft-module-package-definition-1.1.schema.json",
   "schemaVersion": "1.1",
   "id": "GitHubCli",
   "display": {
@@ -7,84 +8,6 @@
       "publisher": "GitHub",
       "corporation": "GitHub, Inc.",
       "summary": "GitHub command-line interface"
-    }
-  },
-  "upstreamSources": {
-    "ghCliGitHub": {
-      "kind": "githubRelease",
-      "repositoryOwner": "cli",
-      "repositoryName": "cli"
-    }
-  },
-  "providedTools": {
-    "commands": [
-      {
-        "name": "gh",
-        "relativePath": "bin/gh.exe"
-      }
-    ],
-    "apps": []
-  },
-  "shared": {
-    "ownershipPolicy": {
-      "allowAdoptExternal": false,
-      "upgradeAdoptedInstall": false,
-      "requirePackageOwnership": true
-    },
-    "compatibility": {
-      "checks": [
-        {
-          "kind": "osVersion",
-          "operator": ">=",
-          "value": "10.0"
-        }
-      ]
-    },
-    "remove": {
-      "keepInstallDirectory": false,
-      "keepInventoryRecord": false,
-      "requireProcessExit": [],
-      "keepShims": false
-    },
-    "discovery": {
-      "enableDetection": false,
-      "searchLocations": [],
-      "installRootRules": []
-    },
-    "install": {
-      "kind": "expandArchive",
-      "installDirectory": "gh-cli-runtime/{releaseTrack}/{version}/{flavor}",
-      "pathRegistration": {
-        "mode": "user",
-        "source": {
-          "kind": "shim",
-          "value": "gh"
-        }
-      },
-      "expandedRoot": "auto",
-      "createDirectories": []
-    },
-    "validation": {
-      "files": [
-        "bin/gh.exe"
-      ],
-      "directories": [
-        "bin"
-      ],
-      "commandChecks": [
-        {
-          "entryPoint": "gh",
-          "arguments": [
-            "--version"
-          ],
-          "outputPattern": "(?im)^gh version\\s+(?<value>\\d+\\.\\d+\\.\\d+)\\b",
-          "expectedValue": "{version}"
-        }
-      ],
-      "metadataFiles": [],
-      "signatures": [],
-      "fileDetails": [],
-      "registryChecks": []
     }
   },
   "releases": [
@@ -167,5 +90,84 @@
       ]
     }
   ],
-  "$schema": "./eigenverft-module-package-definition-1.1.schema.json"
+  "upstreamSources": {
+    "ghCliGitHub": {
+      "kind": "githubRelease",
+      "repositoryOwner": "cli",
+      "repositoryName": "cli"
+    }
+  },
+  "providedTools": {
+    "commands": [
+      {
+        "name": "gh",
+        "relativePath": "bin/gh.exe"
+      }
+    ],
+    "apps": []
+  },
+  "packageOperations": {
+    "shared": {
+      "ownershipPolicy": {
+        "allowAdoptExternal": false,
+        "upgradeAdoptedInstall": false,
+        "requirePackageOwnership": true
+      },
+      "compatibility": {
+        "checks": [
+          {
+            "kind": "osVersion",
+            "operator": ">=",
+            "value": "10.0"
+          }
+        ]
+      },
+      "discovery": {
+        "enableDetection": false,
+        "searchLocations": [],
+        "installRootRules": []
+      },
+      "validation": {
+        "files": [
+          "bin/gh.exe"
+        ],
+        "directories": [
+          "bin"
+        ],
+        "commandChecks": [
+          {
+            "entryPoint": "gh",
+            "arguments": [
+              "--version"
+            ],
+            "outputPattern": "(?im)^gh version\\s+(?<value>\\d+\\.\\d+\\.\\d+)\\b",
+            "expectedValue": "{version}"
+          }
+        ],
+        "metadataFiles": [],
+        "signatures": [],
+        "fileDetails": [],
+        "registryChecks": []
+      }
+    },
+    "assigned": {
+      "kind": "expandArchive",
+      "installDirectory": "gh-cli-runtime/{releaseTrack}/{version}/{flavor}",
+      "pathRegistration": {
+        "mode": "user",
+        "source": {
+          "kind": "shim",
+          "value": "gh"
+        }
+      },
+      "expandedRoot": "auto",
+      "createDirectories": []
+    },
+    "removed": {
+      "keepInstallDirectory": false,
+      "keepInventoryRecord": false,
+      "requireProcessExit": [],
+      "keepShims": false
+    }
+  }
 }

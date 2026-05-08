@@ -1,25 +1,25 @@
 <#
     Eigenverft.Manifested.Sandbox.Package.Install
-    Install-PackagePackage orchestration only. Fragment scripts are dot-sourced from
+    Set-PackageAssignedState orchestration only. Fragment scripts are dot-sourced from
     Eigenverft.Manifested.Sandbox.psm1 (and Eigenverft.Manifested.Sandbox.TestImports.ps1)
     in dependency order immediately before this file.
 #>
 
-function Install-PackagePackage {
+function Set-PackageAssignedState {
 <#
 .SYNOPSIS
-Installs or reuses the selected package.
+Assigns the selected package (install or reuse per assigned.kind).
 
 .DESCRIPTION
 Reuses or adopts a valid existing install when the earlier ownership/policy
 decision allows it, otherwise executes the configured install kind and attaches
-the install result to the Package result object.
+the assigned-state result to the Package result object.
 
 .PARAMETER PackageResult
 The Package result object to enrich.
 
 .EXAMPLE
-Install-PackagePackage -PackageResult $result
+Set-PackageAssignedState -PackageResult $result
 #>
     [CmdletBinding()]
     param(
@@ -28,9 +28,9 @@ Install-PackagePackage -PackageResult $result
     )
 
     $package = $PackageResult.Package
-    $install = $package.install
+    $install = Get-PackageEffectiveReleaseAssignedBlock -Release $package
     if (-not $install -or -not $install.PSObject.Properties['kind']) {
-        throw "Package release '$($package.id)' does not define install.kind."
+        throw "Package release '$($package.id)' does not define assigned.kind."
     }
 
     if ([string]::Equals([string]$PackageResult.InstallOrigin, 'AlreadySatisfied', [System.StringComparison]::OrdinalIgnoreCase)) {
@@ -41,7 +41,7 @@ Install-PackagePackage -PackageResult $result
     if ($PackageResult.ExistingPackage -and $PackageResult.ExistingPackage.Decision -eq 'ReusePackageOwned') {
         $PackageResult.InstallDirectory = $PackageResult.ExistingPackage.InstallDirectory
         $PackageResult.InstallOrigin = 'PackageReused'
-        $PackageResult.Install = [pscustomobject]@{
+        $PackageResult.Assigned = [pscustomobject]@{
             Status           = 'ReusedPackageOwned'
             InstallKind      = 'existingInstall'
             InstallDirectory = $PackageResult.ExistingPackage.InstallDirectory
@@ -56,7 +56,7 @@ Install-PackagePackage -PackageResult $result
     if ($PackageResult.ExistingPackage -and $PackageResult.ExistingPackage.Decision -eq 'AdoptExternal') {
         $PackageResult.InstallDirectory = $PackageResult.ExistingPackage.InstallDirectory
         $PackageResult.InstallOrigin = 'AdoptedExternal'
-        $PackageResult.Install = [pscustomobject]@{
+        $PackageResult.Assigned = [pscustomobject]@{
             Status           = 'AdoptedExternal'
             InstallKind      = 'existingInstall'
             InstallDirectory = $PackageResult.ExistingPackage.InstallDirectory
@@ -78,19 +78,19 @@ Install-PackagePackage -PackageResult $result
 
     switch -Exact ([string]$install.kind) {
         'expandArchive' {
-            Write-PackageExecutionMessage -Message ("[ACTION] Installing package archive into '{0}'." -f $PackageResult.InstallDirectory)
-            $PackageResult.Install = Install-PackageArchive -PackageResult $PackageResult
+            Write-PackageExecutionMessage -Message ("[ACTION] Assigning package archive into '{0}'." -f $PackageResult.InstallDirectory)
+            $PackageResult.Assigned = Install-PackageArchive -PackageResult $PackageResult
         }
         'placePackageFile' {
             Write-PackageExecutionMessage -Message ("[ACTION] Placing package file into '{0}'." -f $PackageResult.InstallDirectory)
-            $PackageResult.Install = Install-PackagePackageFile -PackageResult $PackageResult
+            $PackageResult.Assigned = Install-PackagePackageFile -PackageResult $PackageResult
         }
         'runInstaller' {
             $targetKind = Get-PackageInstallTargetKind -Package $package
             $targetText = if ([string]::IsNullOrWhiteSpace([string]$PackageResult.InstallDirectory)) { '<machine prerequisite>' } else { [string]$PackageResult.InstallDirectory }
             Write-PackageExecutionMessage -Message ("[ACTION] Running installer for target '{0}'." -f $targetText)
             $installerResult = Invoke-PackageInstallerProcess -PackageResult $PackageResult
-            $PackageResult.Install = [pscustomobject]@{
+            $PackageResult.Assigned = [pscustomobject]@{
                 Status           = Get-PackageOwnedInstallStatus -PackageResult $PackageResult
                 InstallKind      = 'runInstaller'
                 TargetKind       = $targetKind
@@ -102,7 +102,7 @@ Install-PackagePackage -PackageResult $result
         'nsisInstaller' {
             Write-PackageExecutionMessage -Message ("[ACTION] Running NSIS installer for target '{0}'." -f $PackageResult.InstallDirectory)
             $installerResult = Invoke-PackageNsisInstallerProcess -PackageResult $PackageResult
-            $PackageResult.Install = [pscustomobject]@{
+            $PackageResult.Assigned = [pscustomobject]@{
                 Status           = Get-PackageOwnedInstallStatus -PackageResult $PackageResult
                 InstallKind      = 'nsisInstaller'
                 TargetKind       = Get-PackageInstallTargetKind -Package $package
@@ -113,10 +113,10 @@ Install-PackagePackage -PackageResult $result
         }
         'npmGlobalPackage' {
             Write-PackageExecutionMessage -Message ("[ACTION] Installing npm global package into '{0}'." -f $PackageResult.InstallDirectory)
-            $PackageResult.Install = Install-PackageNpmPackage -PackageResult $PackageResult
+            $PackageResult.Assigned = Install-PackageNpmPackage -PackageResult $PackageResult
         }
         default {
-            throw "Unsupported Package install kind '$($install.kind)'."
+            throw "Unsupported Package assigned.kind '$($install.kind)'."
         }
     }
 
@@ -126,6 +126,6 @@ Install-PackagePackage -PackageResult $result
     else {
         'PackageInstalled'
     }
-    Write-PackageExecutionMessage -Message ("[ACTION] Completed Package-owned install with status '{0}'." -f $PackageResult.Install.Status)
+    Write-PackageExecutionMessage -Message ("[ACTION] Completed Package-owned assign with status '{0}'." -f $PackageResult.Assigned.Status)
     return $PackageResult
 }

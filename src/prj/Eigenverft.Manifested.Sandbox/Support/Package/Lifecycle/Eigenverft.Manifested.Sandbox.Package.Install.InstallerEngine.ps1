@@ -147,7 +147,10 @@ Invoke-PackageInstallerProcess -PackageResult $result
         [psobject]$PackageResult
     )
 
-    $install = $PackageResult.Package.install
+    $install = Get-PackageEffectiveReleaseAssignedBlock -Release $PackageResult.Package
+    if (-not $install) {
+        throw "Package installer for '$($PackageResult.PackageId)' requires an assigned block on the selected release."
+    }
     $commandPath = if ($install.PSObject.Properties['commandPath'] -and -not [string]::IsNullOrWhiteSpace([string]$install.commandPath)) {
         Resolve-PackageTemplateText -Text ([string]$install.commandPath) -PackageConfig $PackageResult.PackageConfig -Package $PackageResult.Package
     }
@@ -232,7 +235,10 @@ Runs an NSIS installer package through the isolated package install stage.
         [psobject]$PackageResult
     )
 
-    $install = $PackageResult.Package.install
+    $install = Get-PackageEffectiveReleaseAssignedBlock -Release $PackageResult.Package
+    if (-not $install) {
+        throw "Package nsisInstaller for '$($PackageResult.PackageId)' requires an assigned block on the selected release."
+    }
     if ([string]::IsNullOrWhiteSpace([string]$PackageResult.InstallDirectory)) {
         throw "Package nsisInstaller for '$($PackageResult.PackageId)' requires an install directory."
     }

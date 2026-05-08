@@ -64,9 +64,12 @@ function Resolve-PackageNpmInstallerCommand {
         [psobject]$PackageResult
     )
 
-    $install = $PackageResult.Package.install
+    $install = Get-PackageEffectiveReleaseAssignedBlock -Release $PackageResult.Package
+    if (-not $install) {
+        throw "Package npm global package install for '$($PackageResult.PackageId)' requires an assigned block on the selected release."
+    }
     if (-not $install.PSObject.Properties['installerCommand'] -or [string]::IsNullOrWhiteSpace([string]$install.installerCommand)) {
-        throw "Package npm global package install for '$($PackageResult.PackageId)' requires install.installerCommand."
+        throw "Package npm global package install for '$($PackageResult.PackageId)' requires assigned.installerCommand."
     }
 
     $installerCommand = [string]$install.installerCommand
@@ -87,9 +90,12 @@ Installs an exact npm package spec into a staged Package-owned prefix.
         [psobject]$PackageResult
     )
 
-    $install = $PackageResult.Package.install
+    $install = Get-PackageEffectiveReleaseAssignedBlock -Release $PackageResult.Package
+    if (-not $install) {
+        throw "Package npm global package install for '$($PackageResult.PackageId)' requires an assigned block on the selected release."
+    }
     if (-not $install.PSObject.Properties['packageSpec'] -or [string]::IsNullOrWhiteSpace([string]$install.packageSpec)) {
-        throw "Package npm global package install for '$($PackageResult.PackageId)' requires install.packageSpec."
+        throw "Package npm global package install for '$($PackageResult.PackageId)' requires assigned.packageSpec."
     }
 
     $packageSpec = Resolve-PackageTemplateText -Text ([string]$install.packageSpec) -PackageConfig $PackageResult.PackageConfig -Package $PackageResult.Package

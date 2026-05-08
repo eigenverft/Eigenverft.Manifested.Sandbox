@@ -134,3 +134,37 @@ function ConvertTo-PackageObject {
 
     return $InputObject
 }
+
+function Get-PackageEffectiveReleaseAssignedBlock {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $false)]
+        [AllowNull()]
+        [psobject]$Release
+    )
+
+    if ($null -eq $Release) {
+        return $null
+    }
+    if ($Release.PSObject.Properties['assigned'] -and $null -ne $Release.assigned) {
+        return $Release.assigned
+    }
+    return $null
+}
+
+function Get-PackageEffectiveReleaseRemovedBlock {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $false)]
+        [AllowNull()]
+        [psobject]$Release
+    )
+
+    if ($null -eq $Release) {
+        return $null
+    }
+    if ($Release.PSObject.Properties['removed'] -and $null -ne $Release.removed) {
+        return $Release.removed
+    }
+    return $null
+}

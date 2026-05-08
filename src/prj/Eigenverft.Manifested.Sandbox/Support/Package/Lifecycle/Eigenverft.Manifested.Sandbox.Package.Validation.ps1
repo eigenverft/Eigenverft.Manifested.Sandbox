@@ -202,10 +202,10 @@ function New-PackageValidationFailedCheckRecord {
     }
 }
 
-function Test-PackageInstalledPackage {
+function Test-PackageAssignedReadiness {
 <#
 .SYNOPSIS
-Validates an installed package against its Package rules.
+Validates assigned package state against its Package rules.
 
 .DESCRIPTION
 Runs file, directory, command, metadata, signature, file-details, and registry
@@ -216,7 +216,7 @@ the Package result object.
 The Package result object to validate.
 
 .EXAMPLE
-Test-PackageInstalledPackage -PackageResult $result
+Test-PackageAssignedReadiness -PackageResult $result
 #>
     [CmdletBinding()]
     param(
@@ -564,7 +564,7 @@ Test-PackageInstalledPackage -PackageResult $result
     $PackageResult.Validation = [pscustomobject]@{
         Status           = if ($accepted) { 'Ready' } else { 'Failed' }
         Accepted         = $accepted
-        FailureReason    = if ($accepted) { $null } else { 'InstalledPackageValidationFailed' }
+        FailureReason    = if ($accepted) { $null } else { 'AssignedPackageValidationFailed' }
         InstallDirectory = $installDirectory
         Files            = @($fileResults.ToArray())
         Directories      = @($directoryResults.ToArray())

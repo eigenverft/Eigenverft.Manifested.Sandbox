@@ -21,7 +21,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - instal
             PackageInstallStageDirectory = $stagePath
             InstallDirectory             = $installDirectory
             Package                      = [pscustomobject]@{
-                install = [pscustomobject]@{
+                assigned = [pscustomobject]@{
                     kind              = 'expandArchive'
                     expandedRoot      = 'auto'
                     createDirectories = @('data')
@@ -98,7 +98,7 @@ exit /b 0
                 version      = '0.125.0'
                 releaseTrack = 'stable'
                 flavor       = 'win32-x64'
-                install      = [pscustomobject]@{
+                assigned     = [pscustomobject]@{
                     kind              = 'npmGlobalPackage'
                     installerCommand  = 'npm'
                     packageSpec       = '@openai/codex@{version}'
@@ -156,7 +156,7 @@ exit /b 0
                 version      = '0.125.0'
                 releaseTrack = 'stable'
                 flavor       = 'win32-x64'
-                install      = [pscustomobject]@{
+                assigned     = [pscustomobject]@{
                     kind              = 'npmGlobalPackage'
                     installerCommand  = 'npm'
                     packageSpec       = '@openai/codex@{version}'
@@ -192,7 +192,7 @@ exit /b 0
                 version      = '0.125.0'
                 releaseTrack = 'stable'
                 flavor       = 'win32-x64'
-                install      = [pscustomobject]@{
+                assigned     = [pscustomobject]@{
                     kind              = 'npmGlobalPackage'
                     installerCommand  = 'npm'
                     packageSpec       = '@openai/codex@{version}'
@@ -270,7 +270,7 @@ exit /b 0
             }
         } -ParameterFilter { $LiteralPath -eq $registryPath }
 
-        $packageResult = Test-PackageInstalledPackage -PackageResult $packageResult
+        $packageResult = Test-PackageAssignedReadiness -PackageResult $packageResult
 
         $packageResult.Validation.Accepted | Should -BeTrue
         @($packageResult.Validation.Registry | ForEach-Object { $_.Status }) | Should -Be @('Ready', 'Ready')
@@ -382,17 +382,17 @@ exit /b 0
     It 'marks a satisfied machine prerequisite so acquisition and installer execution can be skipped' {
         $packageResult = [pscustomobject]@{
             InstallOrigin = $null
-            Install       = $null
+            Assigned      = $null
             Validation    = $null
             Package       = [pscustomobject]@{
-                install = [pscustomobject]@{
+                assigned = [pscustomobject]@{
                     kind       = 'runInstaller'
                     targetKind = 'machinePrerequisite'
                 }
             }
         }
 
-        Mock Test-PackageInstalledPackage {
+        Mock Test-PackageAssignedReadiness {
             param([psobject]$PackageResult)
             $PackageResult.Validation = [pscustomobject]@{
                 Accepted      = $true
@@ -407,11 +407,11 @@ exit /b 0
             $PackageResult
         }
 
-        $packageResult = Resolve-PackagePreInstallSatisfaction -PackageResult $packageResult
+        $packageResult = Resolve-PackagePreAssignmentSatisfaction -PackageResult $packageResult
 
         $packageResult.InstallOrigin | Should -Be 'AlreadySatisfied'
-        $packageResult.Install.Status | Should -Be 'AlreadySatisfied'
-        $packageResult.Install.TargetKind | Should -Be 'machinePrerequisite'
+        $packageResult.Assigned.Status | Should -Be 'AlreadySatisfied'
+        $packageResult.Assigned.TargetKind | Should -Be 'machinePrerequisite'
     }
 
     It 'runs required-elevation installers with RunAs and quoted log-path arguments' {
@@ -456,7 +456,7 @@ exit /b 0
                 PackageInventoryFilePath           = Join-Path (Join-Path $rootPath 'State') 'package-inventory.json'
             }
             Package = [pscustomobject]@{
-                install = [pscustomobject]@{
+                assigned = [pscustomobject]@{
                     kind           = 'runInstaller'
                     targetKind     = 'machinePrerequisite'
                     installerKind  = 'burn'
@@ -523,7 +523,7 @@ exit /b 0
             InstallDirectory             = $installDirectory
             PackageConfig                = [pscustomobject]@{}
             Package                      = [pscustomobject]@{
-                install = [pscustomobject]@{
+                assigned = [pscustomobject]@{
                     kind = 'nsisInstaller'
                     elevation = 'none'
                     commandArguments = @('/S', '/noUpdater', '/closeRunningNpp')
@@ -564,7 +564,7 @@ exit /b 0
                 packageFile = [pscustomobject]@{
                     fileName = 'Qwen3.5-2B-Q8_0.gguf'
                 }
-                install = [pscustomobject]@{
+                assigned = [pscustomobject]@{
                     kind               = 'placePackageFile'
                     targetRelativePath = 'models/Qwen3.5-2B-Q8_0.gguf'
                 }
@@ -693,13 +693,13 @@ exit /b 0
         Write-TestTextFile -Path $result.DefaultPackageDepotFilePath -Content 'gguf-binary'
 
         $result = Prepare-PackageInstallFile -PackageResult $result
-        $result = Install-PackagePackage -PackageResult $result
-        $result = Test-PackageInstalledPackage -PackageResult $result
+        $result = Set-PackageAssignedState -PackageResult $result
+        $result = Test-PackageAssignedReadiness -PackageResult $result
 
         $result.PackageFilePreparation.Status | Should -Be 'HydratedFromDefaultPackageDepot'
-        $result.Install.InstallKind | Should -Be 'placePackageFile'
-        $result.Install.InstalledFilePath | Should -Be (Join-Path $result.InstallDirectory 'Qwen3.5-2B-Q8_0.gguf')
-        Test-Path -LiteralPath $result.Install.InstalledFilePath -PathType Leaf | Should -BeTrue
+        $result.Assigned.InstallKind | Should -Be 'placePackageFile'
+        $result.Assigned.InstalledFilePath | Should -Be (Join-Path $result.InstallDirectory 'Qwen3.5-2B-Q8_0.gguf')
+        Test-Path -LiteralPath $result.Assigned.InstalledFilePath -PathType Leaf | Should -BeTrue
         $result.Validation.Accepted | Should -BeTrue
     }
 
@@ -757,7 +757,7 @@ exit /b 0
         $result = Invoke-PackageDefinitionCommandCore -DefinitionId 'VSCodeRuntime'
 
         $result.Status | Should -Be 'Failed'
-        $result.FailureReason | Should -Be 'InstalledPackageValidationFailed'
+        $result.FailureReason | Should -Be 'AssignedPackageValidationFailed'
         $result.ErrorMessage | Should -Match 'Package validation failed'
         @($result.Validation.FailedChecks).Count | Should -Be 1
         $result.Validation.FailedChecks[0].Kind | Should -Be 'files'
@@ -769,8 +769,8 @@ exit /b 0
         $historyDocument = Read-PackageJsonDocument -Path $operationHistoryFilePath
         @($historyDocument.Document.records).Count | Should -Be 1
         $historyDocument.Document.records[0].status | Should -Be 'Failed'
-        $historyDocument.Document.records[0].failureReason | Should -Be 'InstalledPackageValidationFailed'
-        $historyDocument.Document.records[0].failedStep | Should -Be 'ValidateInstalledPackage'
+        $historyDocument.Document.records[0].failureReason | Should -Be 'AssignedPackageValidationFailed'
+        $historyDocument.Document.records[0].failedStep | Should -Be 'ValidateAssignedPackage'
         $historyDocument.Document.records[0].packageFilePreparation.status | Should -Be 'HydratedFromDefaultPackageDepot'
         $historyDocument.Document.records[0].packageFilePreparation.packageFilePath | Should -Be $result.PackageFilePath
     }

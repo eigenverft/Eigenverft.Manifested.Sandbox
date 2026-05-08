@@ -68,7 +68,7 @@ or directory path for the requested install directory.
         [string]$InstallDirectoryOverride
     )
 
-    $install = $PackageResult.Package.install
+    $install = Get-PackageEffectiveReleaseAssignedBlock -Release $PackageResult.Package
     if (-not $install -or -not $install.PSObject.Properties['pathRegistration'] -or $null -eq $install.pathRegistration) {
         return $null
     }
@@ -158,9 +158,13 @@ function Get-PackagePathRegistrationCleanupDirectories {
     $currentInstallDirectory = Get-NormalizedPathEntry -PathEntry ([string]$PackageResult.InstallDirectory)
     $cleanupDirectories = New-Object System.Collections.Generic.List[string]
     $candidateInstallDirectories = New-Object System.Collections.Generic.List[string]
-    $currentSource = $PackageResult.Package.install.pathRegistration.source
+    $assignedForPath = Get-PackageEffectiveReleaseAssignedBlock -Release $PackageResult.Package
+    if (-not $assignedForPath -or -not $assignedForPath.PSObject.Properties['pathRegistration'] -or $null -eq $assignedForPath.pathRegistration) {
+        return @()
+    }
+    $currentSource = $assignedForPath.pathRegistration.source
     $currentSourceKind = if ($currentSource.PSObject.Properties['kind']) {
-        [string]$PackageResult.Package.install.pathRegistration.source.kind
+        [string]$assignedForPath.pathRegistration.source.kind
     }
     else {
         $null
@@ -234,7 +238,7 @@ function Register-PackagePath {
 Applies Package PATH registration for a validated install.
 
 .DESCRIPTION
-Updates process and persisted PATH scopes according to install.pathRegistration.
+Updates process and persisted PATH scopes according to assigned.pathRegistration.
 User mode updates Process and User PATH. Machine mode updates Process and
 Machine PATH. None skips registration. Package only writes PATH entries
 for Package-owned outcomes and only cleans stale Package-owned paths
@@ -246,7 +250,7 @@ for the same install slot.
         [psobject]$PackageResult
     )
 
-    $install = $PackageResult.Package.install
+    $install = Get-PackageEffectiveReleaseAssignedBlock -Release $PackageResult.Package
     $pathRegistration = if ($install -and $install.PSObject.Properties['pathRegistration']) { $install.pathRegistration } else { $null }
     $mode = if ($pathRegistration -and $pathRegistration.PSObject.Properties['mode'] -and -not [string]::IsNullOrWhiteSpace([string]$pathRegistration.mode)) {
         ([string]$pathRegistration.mode).ToLowerInvariant()

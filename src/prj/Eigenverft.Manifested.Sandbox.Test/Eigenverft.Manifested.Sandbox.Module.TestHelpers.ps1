@@ -445,7 +445,7 @@ function global:New-TestPackageRelease {
         $release.compatibility = $Compatibility
     }
     if ($PSBoundParameters.ContainsKey('Install')) {
-        $release.install = $Install
+        $release.assigned = $Install
     }
     if ($PSBoundParameters.ContainsKey('Validation')) {
         $release.validation = $Validation

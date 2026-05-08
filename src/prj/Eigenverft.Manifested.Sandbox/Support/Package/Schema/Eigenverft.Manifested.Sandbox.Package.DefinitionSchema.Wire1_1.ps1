@@ -3,9 +3,11 @@
     Validators for the mandatory baseline wire model (schemaVersion 1.1).
     Isolated from dispatch (DefinitionSchema.ps1) and release merge (ReleaseMerge.ps1).
 
-    Validators here run on wire documents only: use shared.discovery / shared.ownershipPolicy (and the
-    same names on a release row if present). Never require existingInstallDiscovery / existingInstallPolicy
-    in definition JSON — those names exist only on the effective release after Resolve-PackageEffectiveRelease.
+    Validators here run on wire documents only: use shared.discovery / shared.ownershipPolicy or
+    packageOperations.shared.discovery / packageOperations.shared.ownershipPolicy (normalized via
+    Get-PackageDefinitionNormalizedSharedView). Same wire names on a release row if present.
+    Never require existingInstallDiscovery / existingInstallPolicy in definition JSON — those names exist
+    only on the effective release after Resolve-PackageEffectiveRelease.
 #>
 
 function Assert-PackageDefinitionWire_DefinitionCore {
@@ -71,13 +73,10 @@ function Assert-PackageDefinitionWire_DefinitionCore {
     }
 
     if ($definition.PSObject.Properties['releaseDefaults']) {
-        throw "Package definition '$($definition.id)' still uses retired property 'releaseDefaults'. Use 'shared' (mandatory baseline wire / schemaVersion 1.1)."
-    }
-    if (-not $definition.PSObject.Properties['shared'] -or $null -eq $definition.shared) {
-        throw "Package definition '$($definition.id)' is missing required property 'shared'."
+        throw "Package definition '$($definition.id)' still uses retired property 'releaseDefaults'. Use 'shared' or 'packageOperations' (mandatory baseline wire / schemaVersion 1.1)."
     }
 
-    $shared = $definition.shared
+    $shared = Get-PackageDefinitionNormalizedSharedView -Definition $definition
     if ($shared.PSObject.Properties['requirements']) {
         throw "Package definition '$($definition.id)' still uses retired property 'shared.requirements'. Use 'shared.compatibility.checks'."
     }
@@ -135,7 +134,7 @@ function Assert-PackageDefinitionWire_OneRelease {
     }
 
     $effectiveRelease = Resolve-PackageEffectiveRelease -Definition $definition -Release $release
-    foreach ($requiredEffectiveProperty in @('install', 'validation', 'compatibility', 'existingInstallDiscovery', 'existingInstallPolicy')) {
+    foreach ($requiredEffectiveProperty in @('assigned', 'validation', 'compatibility', 'existingInstallDiscovery', 'existingInstallPolicy')) {
         if (-not $effectiveRelease.PSObject.Properties[$requiredEffectiveProperty]) {
             throw "Package release '$($release.id)' in '$($definition.id)' is missing required effective property '$requiredEffectiveProperty'."
         }
@@ -229,99 +228,99 @@ function Assert-PackageDefinitionWire_OneRelease {
         throw "Package release '$($release.id)' in '$($definition.id)' still uses retired property 'requireManagedOwnership'. Use 'requirePackageOwnership'."
     }
 
-    $installKind = if ($effectiveRelease.install -and $effectiveRelease.install.PSObject.Properties['kind']) {
-        [string]$effectiveRelease.install.kind
+    $installKind = if ($effectiveRelease.assigned -and $effectiveRelease.assigned.PSObject.Properties['kind']) {
+        [string]$effectiveRelease.assigned.kind
     }
     else {
         $null
     }
 
     if ([string]::IsNullOrWhiteSpace($installKind)) {
-        throw "Package release '$($release.id)' in '$($definition.id)' is missing install.kind."
+        throw "Package release '$($release.id)' in '$($definition.id)' is missing assigned.kind."
     }
 
     if ($installKind -notin @('expandArchive', 'placePackageFile', 'runInstaller', 'nsisInstaller', 'npmGlobalPackage', 'reuseExisting')) {
-        throw "Package release '$($release.id)' in '$($definition.id)' uses unsupported install.kind '$installKind'."
+        throw "Package release '$($release.id)' in '$($definition.id)' uses unsupported assigned.kind '$installKind'."
     }
 
     foreach ($retiredInstallProperty in @('managerKind', 'managerDependency')) {
-        if ($effectiveRelease.install.PSObject.Properties[$retiredInstallProperty]) {
-            throw "Package release '$($release.id)' in '$($definition.id)' still uses retired property 'install.$retiredInstallProperty'. Use install.kind 'npmGlobalPackage' with install.installerCommand."
+        if ($effectiveRelease.assigned.PSObject.Properties[$retiredInstallProperty]) {
+            throw "Package release '$($release.id)' in '$($definition.id)' still uses retired property 'assigned.$retiredInstallProperty'. Use assigned.kind 'npmGlobalPackage' with assigned.installerCommand."
         }
     }
 
-    if ($effectiveRelease.install.PSObject.Properties['targetKind'] -and
-        -not [string]::IsNullOrWhiteSpace([string]$effectiveRelease.install.targetKind) -and
-        ([string]$effectiveRelease.install.targetKind) -notin @('directory', 'machinePrerequisite')) {
-        throw "Package release '$($release.id)' in '$($definition.id)' uses unsupported install.targetKind '$($effectiveRelease.install.targetKind)'."
+    if ($effectiveRelease.assigned.PSObject.Properties['targetKind'] -and
+        -not [string]::IsNullOrWhiteSpace([string]$effectiveRelease.assigned.targetKind) -and
+        ([string]$effectiveRelease.assigned.targetKind) -notin @('directory', 'machinePrerequisite')) {
+        throw "Package release '$($release.id)' in '$($definition.id)' uses unsupported assigned.targetKind '$($effectiveRelease.assigned.targetKind)'."
     }
 
-    if ($effectiveRelease.install.PSObject.Properties['elevation'] -and
-        -not [string]::IsNullOrWhiteSpace([string]$effectiveRelease.install.elevation) -and
-        ([string]$effectiveRelease.install.elevation) -notin @('none', 'required', 'auto')) {
-        throw "Package release '$($release.id)' in '$($definition.id)' uses unsupported install.elevation '$($effectiveRelease.install.elevation)'."
+    if ($effectiveRelease.assigned.PSObject.Properties['elevation'] -and
+        -not [string]::IsNullOrWhiteSpace([string]$effectiveRelease.assigned.elevation) -and
+        ([string]$effectiveRelease.assigned.elevation) -notin @('none', 'required', 'auto')) {
+        throw "Package release '$($release.id)' in '$($definition.id)' uses unsupported assigned.elevation '$($effectiveRelease.assigned.elevation)'."
     }
 
     if ([string]::Equals($installKind, 'npmGlobalPackage', [System.StringComparison]::OrdinalIgnoreCase)) {
-        if (-not $effectiveRelease.install.PSObject.Properties['packageSpec'] -or [string]::IsNullOrWhiteSpace([string]$effectiveRelease.install.packageSpec)) {
-            throw "Package release '$($release.id)' in '$($definition.id)' uses install.kind 'npmGlobalPackage' without install.packageSpec."
+        if (-not $effectiveRelease.assigned.PSObject.Properties['packageSpec'] -or [string]::IsNullOrWhiteSpace([string]$effectiveRelease.assigned.packageSpec)) {
+            throw "Package release '$($release.id)' in '$($definition.id)' uses assigned.kind 'npmGlobalPackage' without assigned.packageSpec."
         }
-        if (-not $effectiveRelease.install.PSObject.Properties['installerCommand'] -or [string]::IsNullOrWhiteSpace([string]$effectiveRelease.install.installerCommand)) {
-            throw "Package release '$($release.id)' in '$($definition.id)' uses install.kind 'npmGlobalPackage' without install.installerCommand."
+        if (-not $effectiveRelease.assigned.PSObject.Properties['installerCommand'] -or [string]::IsNullOrWhiteSpace([string]$effectiveRelease.assigned.installerCommand)) {
+            throw "Package release '$($release.id)' in '$($definition.id)' uses assigned.kind 'npmGlobalPackage' without assigned.installerCommand."
         }
     }
 
     if ([string]::Equals($installKind, 'nsisInstaller', [System.StringComparison]::OrdinalIgnoreCase)) {
-        if ($effectiveRelease.install.PSObject.Properties['targetDirectoryArgument'] -and $null -ne $effectiveRelease.install.targetDirectoryArgument) {
-            $targetDirectoryArgument = $effectiveRelease.install.targetDirectoryArgument
+        if ($effectiveRelease.assigned.PSObject.Properties['targetDirectoryArgument'] -and $null -ne $effectiveRelease.assigned.targetDirectoryArgument) {
+            $targetDirectoryArgument = $effectiveRelease.assigned.targetDirectoryArgument
             if ($targetDirectoryArgument.PSObject.Properties['prefix'] -and [string]::IsNullOrWhiteSpace([string]$targetDirectoryArgument.prefix)) {
-                throw "Package release '$($release.id)' in '$($definition.id)' defines install.targetDirectoryArgument.prefix without a value."
+                throw "Package release '$($release.id)' in '$($definition.id)' defines assigned.targetDirectoryArgument.prefix without a value."
             }
         }
     }
 
-    if ($effectiveRelease.install -and $effectiveRelease.install.PSObject.Properties['pathRegistration'] -and $null -ne $effectiveRelease.install.pathRegistration) {
-        $pathRegistration = $effectiveRelease.install.pathRegistration
+    if ($effectiveRelease.assigned -and $effectiveRelease.assigned.PSObject.Properties['pathRegistration'] -and $null -ne $effectiveRelease.assigned.pathRegistration) {
+        $pathRegistration = $effectiveRelease.assigned.pathRegistration
         if (-not $pathRegistration.PSObject.Properties['mode'] -or [string]::IsNullOrWhiteSpace([string]$pathRegistration.mode)) {
-            throw "Package release '$($release.id)' in '$($definition.id)' defines install.pathRegistration without mode."
+            throw "Package release '$($release.id)' in '$($definition.id)' defines assigned.pathRegistration without mode."
         }
 
         $pathRegistrationMode = ([string]$pathRegistration.mode).ToLowerInvariant()
         if ($pathRegistrationMode -notin @('none', 'user', 'machine')) {
-            throw "Package release '$($release.id)' in '$($definition.id)' uses unsupported install.pathRegistration.mode '$($pathRegistration.mode)'."
+            throw "Package release '$($release.id)' in '$($definition.id)' uses unsupported assigned.pathRegistration.mode '$($pathRegistration.mode)'."
         }
 
         if ($pathRegistrationMode -ne 'none') {
             if (-not $pathRegistration.PSObject.Properties['source'] -or $null -eq $pathRegistration.source) {
-                throw "Package release '$($release.id)' in '$($definition.id)' defines install.pathRegistration.mode '$($pathRegistration.mode)' without source."
+                throw "Package release '$($release.id)' in '$($definition.id)' defines assigned.pathRegistration.mode '$($pathRegistration.mode)' without source."
             }
             if (-not $pathRegistration.source.PSObject.Properties['kind'] -or [string]::IsNullOrWhiteSpace([string]$pathRegistration.source.kind)) {
-                throw "Package release '$($release.id)' in '$($definition.id)' defines install.pathRegistration without source.kind."
+                throw "Package release '$($release.id)' in '$($definition.id)' defines assigned.pathRegistration without source.kind."
             }
 
             switch -Exact ([string]$pathRegistration.source.kind) {
                 'commandEntryPoint' {
                     if (-not $pathRegistration.source.PSObject.Properties['value'] -or [string]::IsNullOrWhiteSpace([string]$pathRegistration.source.value)) {
-                        throw "Package release '$($release.id)' in '$($definition.id)' defines install.pathRegistration source kind 'commandEntryPoint' without source.value."
+                        throw "Package release '$($release.id)' in '$($definition.id)' defines assigned.pathRegistration source kind 'commandEntryPoint' without source.value."
                     }
                     if ($pathRegistration.source.PSObject.Properties['values']) {
-                        throw "Package release '$($release.id)' in '$($definition.id)' defines install.pathRegistration source.values for source kind 'commandEntryPoint'."
+                        throw "Package release '$($release.id)' in '$($definition.id)' defines assigned.pathRegistration source.values for source kind 'commandEntryPoint'."
                     }
                 }
                 'appEntryPoint' {
                     if (-not $pathRegistration.source.PSObject.Properties['value'] -or [string]::IsNullOrWhiteSpace([string]$pathRegistration.source.value)) {
-                        throw "Package release '$($release.id)' in '$($definition.id)' defines install.pathRegistration source kind 'appEntryPoint' without source.value."
+                        throw "Package release '$($release.id)' in '$($definition.id)' defines assigned.pathRegistration source kind 'appEntryPoint' without source.value."
                     }
                     if ($pathRegistration.source.PSObject.Properties['values']) {
-                        throw "Package release '$($release.id)' in '$($definition.id)' defines install.pathRegistration source.values for source kind 'appEntryPoint'."
+                        throw "Package release '$($release.id)' in '$($definition.id)' defines assigned.pathRegistration source.values for source kind 'appEntryPoint'."
                     }
                 }
                 'installRelativeDirectory' {
                     if (-not $pathRegistration.source.PSObject.Properties['value'] -or [string]::IsNullOrWhiteSpace([string]$pathRegistration.source.value)) {
-                        throw "Package release '$($release.id)' in '$($definition.id)' defines install.pathRegistration source kind 'installRelativeDirectory' without source.value."
+                        throw "Package release '$($release.id)' in '$($definition.id)' defines assigned.pathRegistration source kind 'installRelativeDirectory' without source.value."
                     }
                     if ($pathRegistration.source.PSObject.Properties['values']) {
-                        throw "Package release '$($release.id)' in '$($definition.id)' defines install.pathRegistration source.values for source kind 'installRelativeDirectory'."
+                        throw "Package release '$($release.id)' in '$($definition.id)' defines assigned.pathRegistration source.values for source kind 'installRelativeDirectory'."
                     }
                 }
                 'shim' {
@@ -331,11 +330,11 @@ function Assert-PackageDefinitionWire_OneRelease {
                         $hasShimValues = @($pathRegistration.source.values | Where-Object { -not [string]::IsNullOrWhiteSpace([string]$_) }).Count -gt 0
                     }
                     if (-not $hasShimValue -and -not $hasShimValues) {
-                        throw "Package release '$($release.id)' in '$($definition.id)' defines install.pathRegistration source kind 'shim' without source.value or source.values."
+                        throw "Package release '$($release.id)' in '$($definition.id)' defines assigned.pathRegistration source kind 'shim' without source.value or source.values."
                     }
                 }
                 default {
-                    throw "Package release '$($release.id)' in '$($definition.id)' uses unsupported install.pathRegistration.source.kind '$($pathRegistration.source.kind)'."
+                    throw "Package release '$($release.id)' in '$($definition.id)' uses unsupported assigned.pathRegistration.source.kind '$($pathRegistration.source.kind)'."
                 }
             }
         }
@@ -351,13 +350,13 @@ function Assert-PackageDefinitionWire_OneRelease {
         'placePackageFile' {
             $requiresPackageFile = $true
             $requiresAcquisitionCandidates = $true
-            if ($effectiveRelease.install.PSObject.Properties['targetRelativePath'] -and
-                [string]::IsNullOrWhiteSpace([string]$effectiveRelease.install.targetRelativePath)) {
-                throw "Package release '$($release.id)' in '$($definition.id)' defines install.targetRelativePath without a value."
+            if ($effectiveRelease.assigned.PSObject.Properties['targetRelativePath'] -and
+                [string]::IsNullOrWhiteSpace([string]$effectiveRelease.assigned.targetRelativePath)) {
+                throw "Package release '$($release.id)' in '$($definition.id)' defines assigned.targetRelativePath without a value."
             }
         }
         'runInstaller' {
-            if (-not $effectiveRelease.install.PSObject.Properties['commandPath'] -or [string]::IsNullOrWhiteSpace([string]$effectiveRelease.install.commandPath)) {
+            if (-not $effectiveRelease.assigned.PSObject.Properties['commandPath'] -or [string]::IsNullOrWhiteSpace([string]$effectiveRelease.assigned.commandPath)) {
                 $requiresPackageFile = $true
                 $requiresAcquisitionCandidates = $true
             }

@@ -459,8 +459,9 @@ Test-PackagePackageFileAcquisitionRequired -Package $package
         [psobject]$Package
     )
 
-    $installKind = if ($Package.install -and $Package.install.PSObject.Properties['kind']) {
-        [string]$Package.install.kind
+    $assigned = Get-PackageEffectiveReleaseAssignedBlock -Release $Package
+    $installKind = if ($assigned -and $assigned.PSObject.Properties['kind']) {
+        [string]$assigned.kind
     }
     else {
         $null
@@ -471,7 +472,7 @@ Test-PackagePackageFileAcquisitionRequired -Package $package
         'placePackageFile' { return $true }
         'nsisInstaller' { return $true }
         'runInstaller' {
-            return (-not $Package.install.PSObject.Properties['commandPath'] -or [string]::IsNullOrWhiteSpace([string]$Package.install.commandPath))
+            return (-not $assigned.PSObject.Properties['commandPath'] -or [string]::IsNullOrWhiteSpace([string]$assigned.commandPath))
         }
         default { return $false }
     }
@@ -856,8 +857,8 @@ Prepare-PackageInstallFile -PackageResult $result
     $package = $PackageResult.Package
     $packageConfig = $PackageResult.PackageConfig
 
-    if (-not $package -or -not $package.PSObject.Properties['install'] -or -not $package.install) {
-        throw 'Prepare-PackageInstallFile requires a selected release with install settings.'
+    if (-not $package -or -not (Get-PackageEffectiveReleaseAssignedBlock -Release $package)) {
+        throw 'Prepare-PackageInstallFile requires a selected release with assigned settings.'
     }
 
     if ($PackageResult.ExistingPackage -and

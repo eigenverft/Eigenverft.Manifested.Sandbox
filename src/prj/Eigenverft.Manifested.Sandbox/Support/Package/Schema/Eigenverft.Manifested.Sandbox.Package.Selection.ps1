@@ -318,8 +318,9 @@ Attaches the selected release to a Package result.
 .DESCRIPTION
 Filters the definition releases from the resolved Package config by
 platform, architecture, and release track, selects the newest matching release,
-applies definition-level shared lifecycle defaults (Resolve-PackageEffectiveRelease:
-wire discovery/ownershipPolicy become existingInstallDiscovery/existingInstallPolicy),
+applies definition-level packageOperations defaults (Resolve-PackageEffectiveRelease:
+wire discovery/ownershipPolicy become existingInstallDiscovery/existingInstallPolicy;
+release install/remove become assigned/removed),
 and attaches the merged release to the result. PackageResult.Package and EffectiveRelease
 are that effective release row, not the raw definition document.
 

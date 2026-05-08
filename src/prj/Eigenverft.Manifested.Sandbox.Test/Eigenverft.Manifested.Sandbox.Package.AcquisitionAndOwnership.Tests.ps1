@@ -330,12 +330,12 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - acquis
         $result = Find-PackageExistingPackage -PackageResult $result
         $result = Classify-PackageExistingPackage -PackageResult $result
         $result = Resolve-PackageExistingPackageDecision -PackageResult $result
-        $result = Install-PackagePackage -PackageResult $result
+        $result = Set-PackageAssignedState -PackageResult $result
 
         $result.ExistingPackage.SearchKind | Should -Be 'packageTargetInstallPath'
         $result.ExistingPackage.Decision | Should -Be 'ReusePackageOwned'
         $result.InstallOrigin | Should -Be 'PackageReused'
-        $result.Install.Status | Should -Be 'ReusedPackageOwned'
+        $result.Assigned.Status | Should -Be 'ReusedPackageOwned'
     }
 
     It 'marks a failed validation on the managed install path as a repaired managed install after reinstall' {
@@ -369,7 +369,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - acquis
         $null = New-Item -ItemType Directory -Path (Split-Path -Parent $result.DefaultPackageDepotFilePath) -Force
         Copy-Item -LiteralPath $packageArchive.ZipPath -Destination $result.DefaultPackageDepotFilePath -Force
         $result = Prepare-PackageInstallFile -PackageResult $result
-        $result = Install-PackagePackage -PackageResult $result
+        $result = Set-PackageAssignedState -PackageResult $result
 
         Remove-Item -LiteralPath (Join-Path $result.InstallDirectory 'data') -Recurse -Force
 
@@ -381,11 +381,11 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - acquis
         $rerun = Classify-PackageExistingPackage -PackageResult $rerun
         $rerun = Resolve-PackageExistingPackageDecision -PackageResult $rerun
         $rerun = Prepare-PackageInstallFile -PackageResult $rerun
-        $rerun = Install-PackagePackage -PackageResult $rerun
+        $rerun = Set-PackageAssignedState -PackageResult $rerun
 
         $rerun.ExistingPackage.SearchKind | Should -Be 'packageTargetInstallPath'
         $rerun.ExistingPackage.Decision | Should -Be 'ExistingInstallValidationFailed'
-        $rerun.Install.Status | Should -Be 'RepairedPackageOwnedInstall'
+        $rerun.Assigned.Status | Should -Be 'RepairedPackageOwnedInstall'
     }
 
 }

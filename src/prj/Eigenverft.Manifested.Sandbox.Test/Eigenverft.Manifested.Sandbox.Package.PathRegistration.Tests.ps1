@@ -18,7 +18,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - path r
                 }
             }
             Package = ConvertTo-TestPsObject @{
-                install = @{
+                assigned = @{
                     pathRegistration = @{
                         mode = 'none'
                     }
@@ -85,7 +85,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - path r
                 }
             }
             Package = ConvertTo-TestPsObject @{
-                install = @{
+                assigned = @{
                     pathRegistration = @{
                         mode   = 'user'
                         source = @{
@@ -371,7 +371,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - path r
                 }
             }
             Package = ConvertTo-TestPsObject @{
-                install = @{
+                assigned = @{
                     pathRegistration = @{
                         mode   = 'user'
                         source = @{
@@ -418,7 +418,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - path r
                 }
             }
             Package = ConvertTo-TestPsObject @{
-                install = @{
+                assigned = @{
                     pathRegistration = @{
                         mode   = 'user'
                         source = @{
@@ -489,7 +489,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - path r
                 }
             }
             Package = ConvertTo-TestPsObject @{
-                install = @{
+                assigned = @{
                     pathRegistration = @{
                         mode   = 'machine'
                         source = @{
@@ -552,7 +552,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - path r
                 }
             }
             Package = ConvertTo-TestPsObject @{
-                install = @{
+                assigned = @{
                     pathRegistration = @{
                         mode   = 'user'
                         source = @{
@@ -608,7 +608,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - path r
                 }
             }
             Package = ConvertTo-TestPsObject @{
-                install = @{
+                assigned = @{
                     pathRegistration = @{
                         mode   = 'user'
                         source = @{
@@ -660,7 +660,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - path r
                 }
             }
             Package = ConvertTo-TestPsObject @{
-                install = @{
+                assigned = @{
                     pathRegistration = @{
                         mode   = 'user'
                         source = @{
@@ -715,7 +715,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - path r
                 }
             }
             Package = ConvertTo-TestPsObject @{
-                install = @{
+                assigned = @{
                     pathRegistration = @{
                         mode   = 'user'
                         source = @{
@@ -776,7 +776,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - path r
                 }
             }
             Package = ConvertTo-TestPsObject @{
-                install = @{
+                assigned = @{
                     pathRegistration = @{
                         mode   = 'user'
                         source = @{
@@ -824,7 +824,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - path r
                 }
             }
             Package = ConvertTo-TestPsObject @{
-                install = @{
+                assigned = @{
                     pathRegistration = @{
                         mode   = 'user'
                         source = @{

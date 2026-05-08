@@ -267,7 +267,7 @@ Resolve-PackageExistingPackageDecision -PackageResult $result
     $existingInstallPolicy = if ($package.PSObject.Properties['existingInstallPolicy']) { $package.existingInstallPolicy } else { [pscustomobject]@{} }
     $originalInstallDirectory = $PackageResult.InstallDirectory
     $PackageResult.InstallDirectory = $PackageResult.ExistingPackage.InstallDirectory
-    $PackageResult = Test-PackageInstalledPackage -PackageResult $PackageResult
+    $PackageResult = Test-PackageAssignedReadiness -PackageResult $PackageResult
     $PackageResult.ExistingPackage.Validation = $PackageResult.Validation
 
     if (-not $PackageResult.Validation.Accepted) {
