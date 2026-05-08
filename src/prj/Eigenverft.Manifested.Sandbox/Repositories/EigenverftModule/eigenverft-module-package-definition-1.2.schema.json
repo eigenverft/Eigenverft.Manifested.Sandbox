@@ -1,0 +1,1437 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://eigenverft.local/schemas/eigenverft-module-package-definition-1.2.schema.json",
+  "title": "Eigenverft module package definition (schemaVersion 1.2)",
+  "$comment": "Design rationale: schemaVersion 1.2 separates stable update lanes (packageTargets), concrete version facts (versionCatalog), detection facts (discovery/stateDiscovery), upstreams, and lifecycle behavior (packageOperations). Maintainers should be able to ship a normal update by adding one versionCatalog entry plus per-target hashes; unusual vendor changes can override artifact fields per target.",
+  "description": "A package definition for the Eigenverft module package installer engine. The runtime builds an effective assigned package from packageTarget + selected version + selected artifact + packageOperations.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "id",
+    "display",
+    "packageTargets",
+    "versionCatalog",
+    "discovery",
+    "stateDiscovery",
+    "upstreamSources",
+    "packageOperations"
+  ],
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "schemaVersion": {
+      "type": "string",
+      "const": "1.2"
+    },
+    "id": {
+      "$ref": "#/$defs/identifier"
+    },
+    "display": {
+      "$ref": "#/$defs/display"
+    },
+    "dependencies": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/dependency"
+      }
+    },
+    "packageTargets": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/packageTarget"
+      }
+    },
+    "versionCatalog": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/versionCatalogEntry"
+      }
+    },
+    "discovery": {
+      "$ref": "#/$defs/discovery"
+    },
+    "stateDiscovery": {
+      "$ref": "#/$defs/stateDiscovery"
+    },
+    "upstreamSources": {
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/$defs/upstreamSource"
+      }
+    },
+    "packageOperations": {
+      "$ref": "#/$defs/packageOperations"
+    }
+  },
+  "$defs": {
+    "identifier": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]*$"
+    },
+    "display": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "default"
+      ],
+      "properties": {
+        "default": {
+          "$ref": "#/$defs/displayEntry"
+        }
+      }
+    },
+    "displayEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "publisher",
+        "corporation",
+        "summary"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "publisher": {
+          "type": "string",
+          "minLength": 1
+        },
+        "corporation": {
+          "type": "string",
+          "minLength": 1
+        },
+        "summary": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "dependency": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "repositoryId",
+        "definitionId"
+      ],
+      "properties": {
+        "repositoryId": {
+          "$ref": "#/$defs/identifier"
+        },
+        "definitionId": {
+          "$ref": "#/$defs/identifier"
+        }
+      }
+    },
+    "packageTarget": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "channel",
+        "platformTarget",
+        "constraints",
+        "versionSelection"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "channel": {
+          "type": "string",
+          "minLength": 1
+        },
+        "platformTarget": {
+          "type": "string",
+          "minLength": 1
+        },
+        "constraints": {
+          "$ref": "#/$defs/constraints"
+        },
+        "versionSelection": {
+          "$ref": "#/$defs/versionSelection"
+        },
+        "artifactDefaults": {
+          "$ref": "#/$defs/artifactDefaults"
+        }
+      }
+    },
+    "constraints": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "os",
+        "cpu"
+      ],
+      "properties": {
+        "os": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "cpu": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "versionSelection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "strategy",
+        "allowPrerelease"
+      ],
+      "properties": {
+        "strategy": {
+          "type": "string",
+          "enum": [
+            "latestByVersion"
+          ]
+        },
+        "allowPrerelease": {
+          "type": "boolean"
+        }
+      }
+    },
+    "artifactDefaults": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "fileNameTemplate": {
+          "type": "string",
+          "minLength": 1
+        },
+        "artifactSources": {
+          "$ref": "#/$defs/artifactSources"
+        }
+      }
+    },
+    "versionCatalogEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "version",
+        "channels",
+        "artifactsByTarget"
+      ],
+      "properties": {
+        "version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "releaseTag": {
+          "type": "string",
+          "minLength": 1
+        },
+        "channels": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "artifactsByTarget": {
+          "type": "object",
+          "minProperties": 1,
+          "additionalProperties": {
+            "$ref": "#/$defs/artifactForTarget"
+          }
+        }
+      }
+    },
+    "artifactForTarget": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "releaseId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "fileName": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sourcePath": {
+          "type": "string"
+        },
+        "artifactSources": {
+          "$ref": "#/$defs/artifactSources"
+        },
+        "contentHash": {
+          "$ref": "#/$defs/contentHash"
+        },
+        "publisherSignature": {
+          "$ref": "#/$defs/publisherSignature"
+        }
+      }
+    },
+    "artifactSources": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/artifactSource"
+      }
+    },
+    "artifactSource": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "searchOrder",
+            "verification"
+          ],
+          "properties": {
+            "kind": {
+              "const": "packageDepot"
+            },
+            "searchOrder": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "verification": {
+              "$ref": "#/$defs/verification"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "sourceId",
+            "searchOrder",
+            "verification"
+          ],
+          "properties": {
+            "kind": {
+              "const": "download"
+            },
+            "sourceId": {
+              "$ref": "#/$defs/identifier"
+            },
+            "sourcePath": {
+              "type": "string"
+            },
+            "searchOrder": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "verification": {
+              "$ref": "#/$defs/verification"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "sourcePath",
+            "searchOrder",
+            "verification"
+          ],
+          "properties": {
+            "kind": {
+              "const": "filesystem"
+            },
+            "sourceId": {
+              "$ref": "#/$defs/identifier"
+            },
+            "sourcePath": {
+              "type": "string"
+            },
+            "searchOrder": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "verification": {
+              "$ref": "#/$defs/verification"
+            }
+          }
+        }
+      ]
+    },
+    "verification": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "mode"
+      ],
+      "properties": {
+        "mode": {
+          "type": "string",
+          "enum": [
+            "required",
+            "optional",
+            "none"
+          ]
+        }
+      }
+    },
+    "upstreamSource": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "baseUri"
+          ],
+          "properties": {
+            "kind": {
+              "const": "download"
+            },
+            "baseUri": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "repositoryOwner",
+            "repositoryName"
+          ],
+          "properties": {
+            "kind": {
+              "const": "githubRelease"
+            },
+            "repositoryOwner": {
+              "type": "string",
+              "minLength": 1
+            },
+            "repositoryName": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        }
+      ]
+    },
+    "discovery": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "files",
+        "directories",
+        "commands",
+        "apps",
+        "metadataFiles",
+        "signatures",
+        "fileDetails",
+        "registry"
+      ],
+      "properties": {
+        "files": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "directories": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "commands": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/discoveredCommand"
+          }
+        },
+        "apps": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/discoveredApp"
+          }
+        },
+        "metadataFiles": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/metadataFileProbe"
+          }
+        },
+        "signatures": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/signatureProbe"
+          }
+        },
+        "fileDetails": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/fileDetailsProbe"
+          }
+        },
+        "registry": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/registryProbe"
+          }
+        }
+      }
+    },
+    "discoveredCommand": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "relativePath"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "relativePath": {
+          "type": "string",
+          "minLength": 1
+        },
+        "required": {
+          "type": "boolean"
+        },
+        "exposed": {
+          "type": "boolean"
+        },
+        "stateChecks": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/commandStateCheck"
+          }
+        }
+      }
+    },
+    "discoveredApp": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "relativePath"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "relativePath": {
+          "type": "string",
+          "minLength": 1
+        },
+        "required": {
+          "type": "boolean"
+        },
+        "exposed": {
+          "type": "boolean"
+        }
+      }
+    },
+    "commandStateCheck": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "arguments": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "outputPattern": {
+          "type": "string"
+        },
+        "expectedValue": {
+          "type": "string"
+        }
+      }
+    },
+    "metadataFileProbe": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "relativePath",
+        "jsonPath",
+        "expectedValue"
+      ],
+      "properties": {
+        "relativePath": {
+          "type": "string"
+        },
+        "jsonPath": {
+          "type": "string"
+        },
+        "expectedValue": {
+          "type": "string"
+        }
+      }
+    },
+    "signatureProbe": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "relativePath",
+        "requireValid"
+      ],
+      "properties": {
+        "relativePath": {
+          "type": "string"
+        },
+        "requireValid": {
+          "type": "boolean"
+        },
+        "subjectContains": {
+          "type": "string"
+        }
+      }
+    },
+    "fileDetailsProbe": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "relativePath"
+      ],
+      "properties": {
+        "relativePath": {
+          "type": "string"
+        },
+        "productName": {
+          "type": "string"
+        },
+        "fileDescription": {
+          "type": "string"
+        },
+        "fileVersion": {
+          "type": "string"
+        },
+        "productVersion": {
+          "type": "string"
+        }
+      }
+    },
+    "registryProbe": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "paths"
+      ],
+      "properties": {
+        "paths": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string"
+          }
+        },
+        "path": {
+          "type": "string"
+        },
+        "valueName": {
+          "type": "string"
+        },
+        "expectedValue": {},
+        "operator": {
+          "type": "string"
+        }
+      }
+    },
+    "stateDiscovery": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "installed"
+      ],
+      "properties": {
+        "installed": {
+          "$ref": "#/$defs/installedStateDiscovery"
+        }
+      }
+    },
+    "installedStateDiscovery": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "enableDetection",
+        "searchLocations",
+        "installRootRules"
+      ],
+      "properties": {
+        "enableDetection": {
+          "type": "boolean"
+        },
+        "searchLocations": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/installSearchLocation"
+          }
+        },
+        "installRootRules": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/installRootRule"
+          }
+        }
+      }
+    },
+    "installSearchLocation": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": [
+        "kind"
+      ],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": [
+            "command",
+            "path",
+            "directory",
+            "windowsUninstallRegistryKey"
+          ]
+        },
+        "searchOrder": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "name": {
+          "type": "string"
+        },
+        "path": {
+          "type": "string"
+        },
+        "paths": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "installDirectorySource": {
+          "type": "string"
+        }
+      }
+    },
+    "installRootRule": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "match",
+        "installRootRelativePath"
+      ],
+      "properties": {
+        "match": {
+          "type": "object"
+        },
+        "installRootRelativePath": {
+          "type": "string"
+        }
+      }
+    },
+    "packageOperations": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "shared",
+        "assigned",
+        "removed"
+      ],
+      "properties": {
+        "shared": {
+          "$ref": "#/$defs/operationsShared"
+        },
+        "assigned": {
+          "$ref": "#/$defs/assignedOperation"
+        },
+        "removed": {
+          "$ref": "#/$defs/removedOperation"
+        }
+      }
+    },
+    "operationsShared": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "ownershipPolicy",
+        "compatibility"
+      ],
+      "properties": {
+        "ownershipPolicy": {
+          "$ref": "#/$defs/ownershipPolicy"
+        },
+        "compatibility": {
+          "$ref": "#/$defs/compatibility"
+        }
+      }
+    },
+    "assignedOperation": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/assignedExpandArchive"
+        },
+        {
+          "$ref": "#/$defs/assignedNpmGlobalPackage"
+        },
+        {
+          "$ref": "#/$defs/assignedPlacePackageFile"
+        },
+        {
+          "$ref": "#/$defs/assignedNsisInstaller"
+        },
+        {
+          "$ref": "#/$defs/assignedRunInstaller"
+        }
+      ]
+    },
+    "assignedCommon": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "installedStateCheck": {
+          "$ref": "#/$defs/installedStateCheck"
+        },
+        "versionUpdatePolicy": {
+          "$ref": "#/$defs/versionUpdatePolicy"
+        }
+      }
+    },
+    "assignedExpandArchive": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "installDirectory",
+        "pathRegistration",
+        "expandedRoot",
+        "createDirectories"
+      ],
+      "properties": {
+        "kind": {
+          "const": "expandArchive"
+        },
+        "installDirectory": {
+          "type": "string"
+        },
+        "pathRegistration": {
+          "$ref": "#/$defs/pathRegistration"
+        },
+        "expandedRoot": {
+          "type": "string"
+        },
+        "createDirectories": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "installedStateCheck": {
+          "$ref": "#/$defs/installedStateCheck"
+        },
+        "versionUpdatePolicy": {
+          "$ref": "#/$defs/versionUpdatePolicy"
+        }
+      }
+    },
+    "assignedNpmGlobalPackage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "installerCommand",
+        "packageSpec",
+        "installDirectory",
+        "pathRegistration"
+      ],
+      "properties": {
+        "kind": {
+          "const": "npmGlobalPackage"
+        },
+        "installerCommand": {
+          "type": "string"
+        },
+        "packageSpec": {
+          "type": "string"
+        },
+        "installDirectory": {
+          "type": "string"
+        },
+        "pathRegistration": {
+          "$ref": "#/$defs/pathRegistration"
+        },
+        "installedStateCheck": {
+          "$ref": "#/$defs/installedStateCheck"
+        },
+        "versionUpdatePolicy": {
+          "$ref": "#/$defs/versionUpdatePolicy"
+        }
+      }
+    },
+    "assignedPlacePackageFile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "installDirectory",
+        "targetRelativePath",
+        "pathRegistration"
+      ],
+      "properties": {
+        "kind": {
+          "const": "placePackageFile"
+        },
+        "installDirectory": {
+          "type": "string"
+        },
+        "targetRelativePath": {
+          "type": "string"
+        },
+        "pathRegistration": {
+          "$ref": "#/$defs/pathRegistration"
+        },
+        "installedStateCheck": {
+          "$ref": "#/$defs/installedStateCheck"
+        },
+        "versionUpdatePolicy": {
+          "$ref": "#/$defs/versionUpdatePolicy"
+        }
+      }
+    },
+    "assignedNsisInstaller": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "installDirectory",
+        "commandArguments",
+        "targetDirectoryArgument",
+        "pathRegistration"
+      ],
+      "properties": {
+        "kind": {
+          "const": "nsisInstaller"
+        },
+        "installDirectory": {
+          "type": "string"
+        },
+        "installerKind": {
+          "type": "string"
+        },
+        "uiMode": {
+          "type": "string"
+        },
+        "elevation": {
+          "$ref": "#/$defs/elevationMode"
+        },
+        "timeoutSec": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "commandArguments": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "targetDirectoryArgument": {
+          "type": "object",
+          "additionalProperties": true
+        },
+        "successExitCodes": {
+          "$ref": "#/$defs/exitCodes"
+        },
+        "restartExitCodes": {
+          "$ref": "#/$defs/exitCodes"
+        },
+        "pathRegistration": {
+          "$ref": "#/$defs/pathRegistration"
+        },
+        "installedStateCheck": {
+          "$ref": "#/$defs/installedStateCheck"
+        },
+        "versionUpdatePolicy": {
+          "$ref": "#/$defs/versionUpdatePolicy"
+        }
+      }
+    },
+    "assignedRunInstaller": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "targetKind",
+        "installerKind",
+        "uiMode",
+        "elevation",
+        "timeoutSec",
+        "commandArguments",
+        "successExitCodes",
+        "restartExitCodes",
+        "pathRegistration"
+      ],
+      "properties": {
+        "kind": {
+          "const": "runInstaller"
+        },
+        "targetKind": {
+          "type": "string",
+          "enum": [
+            "directory",
+            "machinePrerequisite"
+          ]
+        },
+        "installerKind": {
+          "type": "string"
+        },
+        "uiMode": {
+          "type": "string"
+        },
+        "elevation": {
+          "$ref": "#/$defs/elevationMode"
+        },
+        "timeoutSec": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "logRelativePath": {
+          "type": "string"
+        },
+        "commandArguments": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "successExitCodes": {
+          "$ref": "#/$defs/exitCodes"
+        },
+        "restartExitCodes": {
+          "$ref": "#/$defs/exitCodes"
+        },
+        "pathRegistration": {
+          "$ref": "#/$defs/pathRegistration"
+        },
+        "installedStateCheck": {
+          "$ref": "#/$defs/installedStateCheck"
+        },
+        "versionUpdatePolicy": {
+          "$ref": "#/$defs/versionUpdatePolicy"
+        }
+      }
+    },
+    "installedStateCheck": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "use",
+        "expectedVersion",
+        "require"
+      ],
+      "properties": {
+        "use": {
+          "const": "discovery"
+        },
+        "expectedVersion": {
+          "type": "string"
+        },
+        "require": {
+          "$ref": "#/$defs/discoveryRequirementFlags"
+        }
+      }
+    },
+    "versionUpdatePolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "whenAssigned",
+        "onSameSelectedVersion",
+        "onNewSelectedVersion"
+      ],
+      "properties": {
+        "whenAssigned": {
+          "const": "trackSelectedVersion"
+        },
+        "onSameSelectedVersion": {
+          "const": "reuseOrRepair"
+        },
+        "onNewSelectedVersion": {
+          "type": "string",
+          "enum": [
+            "replacePackageOwnedInstall",
+            "fail"
+          ]
+        }
+      }
+    },
+    "removedOperation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "operation",
+        "verifyAbsent",
+        "cleanup"
+      ],
+      "properties": {
+        "operation": {
+          "$ref": "#/$defs/removeOperation"
+        },
+        "verifyAbsent": {
+          "$ref": "#/$defs/verifyAbsent"
+        },
+        "cleanup": {
+          "$ref": "#/$defs/removeCleanup"
+        }
+      }
+    },
+    "removeOperation": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind"
+          ],
+          "properties": {
+            "kind": {
+              "const": "deleteInstallDirectory"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind"
+          ],
+          "properties": {
+            "kind": {
+              "const": "none"
+            }
+          }
+        }
+      ]
+    },
+    "verifyAbsent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "use",
+        "require"
+      ],
+      "properties": {
+        "use": {
+          "const": "discovery"
+        },
+        "require": {
+          "$ref": "#/$defs/discoveryRequirementFlags"
+        }
+      }
+    },
+    "removeCleanup": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "inventory",
+        "shims",
+        "path",
+        "workDirectories"
+      ],
+      "properties": {
+        "inventory": {
+          "type": "boolean"
+        },
+        "shims": {
+          "type": "boolean"
+        },
+        "path": {
+          "type": "boolean"
+        },
+        "workDirectories": {
+          "type": "boolean"
+        }
+      }
+    },
+    "discoveryRequirementFlags": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "files",
+        "directories",
+        "commands",
+        "apps",
+        "metadataFiles",
+        "signatures",
+        "fileDetails",
+        "registry"
+      ],
+      "properties": {
+        "files": {
+          "type": "boolean"
+        },
+        "directories": {
+          "type": "boolean"
+        },
+        "commands": {
+          "type": "boolean"
+        },
+        "apps": {
+          "type": "boolean"
+        },
+        "metadataFiles": {
+          "type": "boolean"
+        },
+        "signatures": {
+          "type": "boolean"
+        },
+        "fileDetails": {
+          "type": "boolean"
+        },
+        "registry": {
+          "type": "boolean"
+        }
+      }
+    },
+    "pathRegistration": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "mode"
+          ],
+          "properties": {
+            "mode": {
+              "const": "none"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "mode",
+            "source"
+          ],
+          "properties": {
+            "mode": {
+              "type": "string",
+              "enum": [
+                "user",
+                "machine"
+              ]
+            },
+            "source": {
+              "$ref": "#/$defs/pathRegistrationSource"
+            }
+          }
+        }
+      ]
+    },
+    "pathRegistrationSource": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "use"
+          ],
+          "properties": {
+            "kind": {
+              "const": "shim"
+            },
+            "use": {
+              "const": "discovery.commands"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "value"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "commandEntryPoint",
+                "appEntryPoint",
+                "installRelativeDirectory"
+              ]
+            },
+            "value": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        }
+      ]
+    },
+    "ownershipPolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "allowAdoptExternal",
+        "upgradeAdoptedInstall",
+        "requirePackageOwnership"
+      ],
+      "properties": {
+        "allowAdoptExternal": {
+          "type": "boolean"
+        },
+        "upgradeAdoptedInstall": {
+          "type": "boolean"
+        },
+        "requirePackageOwnership": {
+          "type": "boolean"
+        }
+      }
+    },
+    "compatibility": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "checks"
+      ],
+      "properties": {
+        "checks": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/compatibilityCheck"
+          }
+        }
+      }
+    },
+    "compatibilityCheck": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "operator",
+            "value"
+          ],
+          "properties": {
+            "kind": {
+              "const": "osVersion"
+            },
+            "operator": {
+              "type": "string"
+            },
+            "value": {
+              "type": "string"
+            },
+            "onFail": {
+              "$ref": "#/$defs/onFail"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "operator",
+            "value"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "physicalMemoryGiB",
+                "videoMemoryGiB",
+                "physicalOrVideoMemoryGiB"
+              ]
+            },
+            "operator": {
+              "type": "string"
+            },
+            "value": {
+              "type": "number"
+            },
+            "onFail": {
+              "$ref": "#/$defs/onFail"
+            }
+          }
+        }
+      ]
+    },
+    "onFail": {
+      "type": "string",
+      "enum": [
+        "fail",
+        "warn"
+      ]
+    },
+    "contentHash": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "algorithm",
+        "value"
+      ],
+      "properties": {
+        "algorithm": {
+          "const": "sha256"
+        },
+        "value": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "publisherSignature": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "requireValid",
+        "subjectContains"
+      ],
+      "properties": {
+        "kind": {
+          "const": "authenticode"
+        },
+        "requireValid": {
+          "type": "boolean"
+        },
+        "subjectContains": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "elevationMode": {
+      "type": "string",
+      "enum": [
+        "none",
+        "required",
+        "auto"
+      ]
+    },
+    "exitCodes": {
+      "type": "array",
+      "items": {
+        "type": "integer"
+      }
+    }
+  }
+}

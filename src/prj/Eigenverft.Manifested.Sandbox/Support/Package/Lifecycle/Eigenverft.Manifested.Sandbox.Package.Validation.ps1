@@ -2,13 +2,13 @@
     Eigenverft.Manifested.Sandbox.Package.Validation
 #>
 
-function Get-PackageEntryPointDefinition {
+function Get-PackageValidationEntryPointDefinition {
 <#
 .SYNOPSIS
 Returns an entry-point definition by name.
 
 .DESCRIPTION
-Searches the definition provided-tool collections and returns the first matching
+Searches the definition discovery collections and returns the first matching
 command or app entry by name.
 
 .PARAMETER Definition
@@ -18,7 +18,7 @@ The Package definition object.
 The entry-point name to resolve.
 
 .EXAMPLE
-Get-PackageEntryPointDefinition -Definition $definition -EntryPointName code
+Get-PackageValidationEntryPointDefinition -Definition $definition -EntryPointName code
 #>
     [CmdletBinding()]
     param(
@@ -29,13 +29,9 @@ Get-PackageEntryPointDefinition -Definition $definition -EntryPointName code
         [string]$EntryPointName
     )
 
-    foreach ($entryPoint in @($Definition.providedTools.commands)) {
-        if ([string]::Equals([string]$entryPoint.name, $EntryPointName, [System.StringComparison]::OrdinalIgnoreCase)) {
-            return $entryPoint
-        }
-    }
-    foreach ($entryPoint in @($Definition.providedTools.apps)) {
-        if ([string]::Equals([string]$entryPoint.name, $EntryPointName, [System.StringComparison]::OrdinalIgnoreCase)) {
+    foreach ($toolKind in @('commands', 'apps')) {
+        $entryPoint = Get-PackageDiscoveryEntryPoint -Definition $Definition -ToolKind $toolKind -Name $EntryPointName
+        if ($entryPoint) {
             return $entryPoint
         }
     }
@@ -75,9 +71,9 @@ Get-PackageCommandCheckPath -PackageResult $result -CommandCheck $check
     }
 
     if ($CommandCheck.PSObject.Properties['entryPoint'] -and -not [string]::IsNullOrWhiteSpace([string]$CommandCheck.entryPoint)) {
-        $entryPoint = Get-PackageEntryPointDefinition -Definition $PackageResult.PackageConfig.Definition -EntryPointName ([string]$CommandCheck.entryPoint)
+        $entryPoint = Get-PackageValidationEntryPointDefinition -Definition $PackageResult.PackageConfig.Definition -EntryPointName ([string]$CommandCheck.entryPoint)
         if (-not $entryPoint -or -not $entryPoint.PSObject.Properties['relativePath']) {
-            throw "Package validation entry point '$($CommandCheck.entryPoint)' was not found."
+            throw "Package validation entry point '$($CommandCheck.entryPoint)' was not found in discovery.commands or discovery.apps."
         }
 
         return (Join-Path $PackageResult.InstallDirectory (([string]$entryPoint.relativePath) -replace '/', '\'))

@@ -1,16 +1,14 @@
 <#
     Eigenverft.Manifested.Sandbox.Package.DefinitionSchema
-    Package definition JSON validation for the mandatory baseline wire model (schemaVersion 1.1).
+    Package definition JSON validation for the mandatory schemaVersion 1.2 wire model.
 
-    Runtime validation is PowerShell-only (this module + DefinitionSchema.Wire1_1.ps1). The JSON schema file
-    is the editor/contract; keep it aligned with these asserts. Wire field names use shared.* or
-    packageOperations.shared.* (plus packageOperations.assigned / removed); Resolve-PackageEffectiveRelease
-    produces existingInstallDiscovery / existingInstallPolicy on the merged release — see DefinitionSchema.ReleaseMerge.ps1.
+    Runtime validation is PowerShell-only (this module + DefinitionSchema.Wire1_2.ps1). The JSON schema file
+    is the editor/contract; keep it aligned with these asserts.
 #>
 
-# Mandatory baseline schemaVersion for package definitions (wire format; successor to retired 1.0).
+# Mandatory schemaVersion for package definitions.
 $script:PackageDefinitionSupportedSchemaVersions = @(
-    '1.1'
+    '1.2'
 )
 
 function Assert-PackageDefinitionSchemaVersionSupported {
@@ -30,7 +28,7 @@ function Assert-PackageDefinitionSchemaVersionSupported {
     }
 
     $supportedList = ($script:PackageDefinitionSupportedSchemaVersions | ForEach-Object { "'$_'" }) -join ', '
-    throw "Package definition '$DefinitionDocumentPath' uses unsupported schemaVersion '$SchemaVersionText'. The mandatory baseline is schemaVersion '1.1'. Supported schemaVersion values are $supportedList."
+    throw "Package definition '$DefinitionDocumentPath' uses unsupported schemaVersion '$SchemaVersionText'. The mandatory package definition schemaVersion is '1.2'. Supported schemaVersion values are $supportedList."
 }
 
 function Assert-PackageDefinitionSchema {
@@ -39,9 +37,8 @@ function Assert-PackageDefinitionSchema {
 Validates the Package definition schema for this package pass.
 
 .DESCRIPTION
-Rejects retired top-level names, requires baseline fields, then validates the
-only supported shape: mandatory wire schemaVersion '1.1' (upstreamSources,
-providedTools, releases, and either shared or packageOperations). Older definition-schema files are not used.
+Rejects retired top-level names, requires schemaVersion 1.2 fields, then
+validates target/catalog/discovery/packageOperations references.
 
 .PARAMETER DefinitionDocumentInfo
 The loaded Package definition document info.
@@ -70,31 +67,26 @@ Assert-PackageDefinitionSchema -DefinitionDocumentInfo $definitionInfo -Definiti
         }
     }
 
-    foreach ($requiredProperty in @('schemaVersion', 'id', 'display', 'upstreamSources', 'providedTools', 'releases')) {
-        if (-not $definition.PSObject.Properties[$requiredProperty]) {
-            throw "Package definition '$($DefinitionDocumentInfo.Path)' is missing required property '$requiredProperty'."
-        }
-    }
-    $hasShared = $definition.PSObject.Properties['shared'] -and $null -ne $definition.shared
-    $hasPackageOperations = $definition.PSObject.Properties['packageOperations'] -and $null -ne $definition.packageOperations
-    if (-not $hasShared -and -not $hasPackageOperations) {
-        throw "Package definition '$($DefinitionDocumentInfo.Path)' is missing required lifecycle property: provide either 'shared' or 'packageOperations'."
-    }
-    if ($hasShared -and $hasPackageOperations) {
-        throw "Package definition '$($DefinitionDocumentInfo.Path)' defines both 'shared' and 'packageOperations'; use only one wire shape."
-    }
-    if ($definition.PSObject.Properties['releaseDefaults']) {
-        throw "Package definition '$($DefinitionDocumentInfo.Path)' still uses retired property 'releaseDefaults'. Use 'shared' or 'packageOperations' (mandatory baseline wire / schemaVersion 1.1)."
-    }
     $schemaVersionText = [string]$definition.schemaVersion
     if ([string]::IsNullOrWhiteSpace($schemaVersionText)) {
         throw "Package definition '$($DefinitionDocumentInfo.Path)' defines schemaVersion, but it is empty."
     }
     Assert-PackageDefinitionSchemaVersionSupported -SchemaVersionText $schemaVersionText -DefinitionDocumentPath $DefinitionDocumentInfo.Path
 
+    foreach ($requiredProperty in @('schemaVersion', 'id', 'display', 'packageTargets', 'versionCatalog', 'discovery', 'stateDiscovery', 'upstreamSources', 'packageOperations')) {
+        if (-not $definition.PSObject.Properties[$requiredProperty]) {
+            throw "Package definition '$($DefinitionDocumentInfo.Path)' is missing required property '$requiredProperty'."
+        }
+    }
+    foreach ($retiredProperty in @('releases', 'providedTools', 'shared', 'releaseDefaults', 'existingInstallDiscovery', 'existingInstallPolicy')) {
+        if ($definition.PSObject.Properties[$retiredProperty]) {
+            throw "Package definition '$($DefinitionDocumentInfo.Path)' still uses retired schemaVersion 1.1 property '$retiredProperty'. Use schemaVersion 1.2 packageTargets, versionCatalog, discovery, stateDiscovery, and packageOperations."
+        }
+    }
+
     switch -Exact ($schemaVersionText) {
-        '1.1' {
-            Assert-PackageDefinitionSchema_1_1 -DefinitionDocumentInfo $DefinitionDocumentInfo -DefinitionId $DefinitionId -DefinitionRepositoryId $DefinitionRepositoryId
+        '1.2' {
+            Assert-PackageDefinitionSchema_1_2 -DefinitionDocumentInfo $DefinitionDocumentInfo -DefinitionId $DefinitionId -DefinitionRepositoryId $DefinitionRepositoryId
             return
         }
         default {

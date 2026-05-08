@@ -1,6 +1,6 @@
 {
-  "$schema": "./eigenverft-module-package-definition-1.1.schema.json",
-  "schemaVersion": "1.1",
+  "$schema": "./eigenverft-module-package-definition-1.2.schema.json",
+  "schemaVersion": "1.2",
   "id": "GitHubCli",
   "display": {
     "default": {
@@ -10,13 +10,11 @@
       "summary": "GitHub command-line interface"
     }
   },
-  "releases": [
+  "packageTargets": [
     {
-      "id": "gh-cli-runtime-win-x64-stable",
-      "version": "2.91.0",
-      "releaseTag": "v2.91.0",
-      "releaseTrack": "stable",
-      "flavor": "windows_amd64",
+      "id": "GitHubCli-windows_amd64-stable",
+      "channel": "stable",
+      "platformTarget": "windows_amd64",
       "constraints": {
         "os": [
           "windows"
@@ -25,37 +23,35 @@
           "x64"
         ]
       },
-      "packageFile": {
-        "fileName": "gh_2.91.0_windows_amd64.zip",
-        "contentHash": {
-          "algorithm": "sha256",
-          "value": "ced3e6f4bb5a9865056b594b7ad0cf42137dc92c494346f1ca705b5dbf14c88e"
-        }
+      "versionSelection": {
+        "strategy": "latestByVersion",
+        "allowPrerelease": false
       },
-      "acquisitionCandidates": [
-        {
-          "kind": "packageDepot",
-          "searchOrder": 100,
-          "verification": {
-            "mode": "optional"
+      "artifactDefaults": {
+        "fileNameTemplate": "gh_{version}_windows_amd64.zip",
+        "artifactSources": [
+          {
+            "kind": "packageDepot",
+            "searchOrder": 100,
+            "verification": {
+              "mode": "optional"
+            }
+          },
+          {
+            "kind": "download",
+            "sourceId": "ghCliGitHub",
+            "searchOrder": 900,
+            "verification": {
+              "mode": "required"
+            }
           }
-        },
-        {
-          "kind": "download",
-          "sourceId": "ghCliGitHub",
-          "searchOrder": 900,
-          "verification": {
-            "mode": "required"
-          }
-        }
-      ]
+        ]
+      }
     },
     {
-      "id": "gh-cli-runtime-win-arm64-stable",
-      "version": "2.91.0",
-      "releaseTag": "v2.91.0",
-      "releaseTrack": "stable",
-      "flavor": "windows_arm64",
+      "id": "GitHubCli-windows_arm64-stable",
+      "channel": "stable",
+      "platformTarget": "windows_arm64",
       "constraints": {
         "os": [
           "windows"
@@ -64,47 +60,100 @@
           "arm64"
         ]
       },
-      "packageFile": {
-        "fileName": "gh_2.91.0_windows_arm64.zip",
-        "contentHash": {
-          "algorithm": "sha256",
-          "value": "ae0333d2f9b13fc28f785ca7379514f9a1cea382cd4726abb6e6f4d2a874dd15"
-        }
+      "versionSelection": {
+        "strategy": "latestByVersion",
+        "allowPrerelease": false
       },
-      "acquisitionCandidates": [
-        {
-          "kind": "packageDepot",
-          "searchOrder": 100,
-          "verification": {
-            "mode": "optional"
+      "artifactDefaults": {
+        "fileNameTemplate": "gh_{version}_windows_arm64.zip",
+        "artifactSources": [
+          {
+            "kind": "packageDepot",
+            "searchOrder": 100,
+            "verification": {
+              "mode": "optional"
+            }
+          },
+          {
+            "kind": "download",
+            "sourceId": "ghCliGitHub",
+            "searchOrder": 900,
+            "verification": {
+              "mode": "required"
+            }
           }
-        },
-        {
-          "kind": "download",
-          "sourceId": "ghCliGitHub",
-          "searchOrder": 900,
-          "verification": {
-            "mode": "required"
-          }
-        }
-      ]
+        ]
+      }
     }
   ],
+  "versionCatalog": [
+    {
+      "version": "2.91.0",
+      "channels": [
+        "stable"
+      ],
+      "artifactsByTarget": {
+        "GitHubCli-windows_amd64-stable": {
+          "releaseId": "gh-cli-runtime-win-x64-stable",
+          "contentHash": {
+            "algorithm": "sha256",
+            "value": "ced3e6f4bb5a9865056b594b7ad0cf42137dc92c494346f1ca705b5dbf14c88e"
+          }
+        },
+        "GitHubCli-windows_arm64-stable": {
+          "releaseId": "gh-cli-runtime-win-arm64-stable",
+          "contentHash": {
+            "algorithm": "sha256",
+            "value": "ae0333d2f9b13fc28f785ca7379514f9a1cea382cd4726abb6e6f4d2a874dd15"
+          }
+        }
+      },
+      "releaseTag": "v2.91.0"
+    }
+  ],
+  "discovery": {
+    "files": [
+      "bin/gh.exe"
+    ],
+    "directories": [
+      "bin"
+    ],
+    "commands": [
+      {
+        "name": "gh",
+        "relativePath": "bin/gh.exe",
+        "required": true,
+        "exposed": true,
+        "stateChecks": [
+          {
+            "arguments": [
+              "--version"
+            ],
+            "outputPattern": "(?im)^gh version\\s+(?<value>\\d+\\.\\d+\\.\\d+)\\b",
+            "expectedValue": "{version}"
+          }
+        ]
+      }
+    ],
+    "apps": [],
+    "metadataFiles": [],
+    "signatures": [],
+    "fileDetails": [],
+    "registry": []
+  },
+  "stateDiscovery": {
+    "installed": {
+      "enableDetection": false,
+      "searchLocations": [],
+      "installRootRules": []
+    }
+  },
   "upstreamSources": {
     "ghCliGitHub": {
       "kind": "githubRelease",
       "repositoryOwner": "cli",
       "repositoryName": "cli"
     }
-  },
-  "providedTools": {
-    "commands": [
-      {
-        "name": "gh",
-        "relativePath": "bin/gh.exe"
-      }
-    ],
-    "apps": []
   },
   "packageOperations": {
     "shared": {
@@ -121,53 +170,63 @@
             "value": "10.0"
           }
         ]
-      },
-      "discovery": {
-        "enableDetection": false,
-        "searchLocations": [],
-        "installRootRules": []
-      },
-      "validation": {
-        "files": [
-          "bin/gh.exe"
-        ],
-        "directories": [
-          "bin"
-        ],
-        "commandChecks": [
-          {
-            "entryPoint": "gh",
-            "arguments": [
-              "--version"
-            ],
-            "outputPattern": "(?im)^gh version\\s+(?<value>\\d+\\.\\d+\\.\\d+)\\b",
-            "expectedValue": "{version}"
-          }
-        ],
-        "metadataFiles": [],
-        "signatures": [],
-        "fileDetails": [],
-        "registryChecks": []
       }
     },
     "assigned": {
       "kind": "expandArchive",
-      "installDirectory": "gh-cli-runtime/{releaseTrack}/{version}/{flavor}",
+      "installDirectory": "gh-cli-runtime/{channel}/{version}/{platformTarget}",
       "pathRegistration": {
         "mode": "user",
         "source": {
           "kind": "shim",
-          "value": "gh"
+          "use": "discovery.commands"
         }
       },
       "expandedRoot": "auto",
-      "createDirectories": []
+      "createDirectories": [],
+      "installedStateCheck": {
+        "use": "discovery",
+        "expectedVersion": "{version}",
+        "require": {
+          "files": true,
+          "directories": true,
+          "commands": true,
+          "apps": false,
+          "metadataFiles": false,
+          "signatures": false,
+          "fileDetails": false,
+          "registry": false
+        }
+      },
+      "versionUpdatePolicy": {
+        "whenAssigned": "trackSelectedVersion",
+        "onSameSelectedVersion": "reuseOrRepair",
+        "onNewSelectedVersion": "replacePackageOwnedInstall"
+      }
     },
     "removed": {
-      "keepInstallDirectory": false,
-      "keepInventoryRecord": false,
-      "requireProcessExit": [],
-      "keepShims": false
+      "operation": {
+        "kind": "deleteInstallDirectory"
+      },
+      "verifyAbsent": {
+        "use": "discovery",
+        "require": {
+          "files": true,
+          "directories": false,
+          "commands": true,
+          "apps": false,
+          "metadataFiles": false,
+          "signatures": false,
+          "fileDetails": false,
+          "registry": false
+        }
+      },
+      "cleanup": {
+        "inventory": true,
+        "shims": true,
+        "path": true,
+        "workDirectories": true
+      }
     }
   }
 }

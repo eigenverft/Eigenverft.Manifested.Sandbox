@@ -1,5 +1,6 @@
 {
-  "schemaVersion": "1.1",
+  "$schema": "./eigenverft-module-package-definition-1.2.schema.json",
+  "schemaVersion": "1.2",
   "id": "VisualCppRedistributable",
   "display": {
     "default": {
@@ -9,43 +10,123 @@
       "summary": "Machine-wide Visual C++ runtime prerequisite"
     }
   },
+  "packageTargets": [
+    {
+      "id": "VisualCppRedistributable-x64-stable",
+      "channel": "stable",
+      "platformTarget": "x64",
+      "constraints": {
+        "os": [
+          "windows"
+        ],
+        "cpu": [
+          "x64"
+        ]
+      },
+      "versionSelection": {
+        "strategy": "latestByVersion",
+        "allowPrerelease": false
+      },
+      "artifactDefaults": {
+        "fileNameTemplate": "vc_redist.x64.exe",
+        "artifactSources": [
+          {
+            "kind": "packageDepot",
+            "searchOrder": 100,
+            "verification": {
+              "mode": "optional"
+            }
+          },
+          {
+            "kind": "download",
+            "sourceId": "visualCppRedistributableDownload",
+            "sourcePath": "vc14/vc_redist.x64.exe",
+            "searchOrder": 900,
+            "verification": {
+              "mode": "required"
+            }
+          }
+        ]
+      }
+    }
+  ],
+  "versionCatalog": [
+    {
+      "version": "14.0",
+      "channels": [
+        "stable"
+      ],
+      "artifactsByTarget": {
+        "VisualCppRedistributable-x64-stable": {
+          "releaseId": "vc-runtime-x64-stable",
+          "publisherSignature": {
+            "kind": "authenticode",
+            "requireValid": true,
+            "subjectContains": "Microsoft Corporation"
+          }
+        }
+      }
+    }
+  ],
+  "discovery": {
+    "files": [],
+    "directories": [],
+    "commands": [],
+    "apps": [],
+    "metadataFiles": [],
+    "signatures": [],
+    "fileDetails": [],
+    "registry": [
+      {
+        "paths": [
+          "HKLM:\\SOFTWARE\\Microsoft\\VisualStudio\\14.0\\VC\\Runtimes\\x64",
+          "HKLM:\\SOFTWARE\\Wow6432Node\\Microsoft\\VisualStudio\\14.0\\VC\\Runtimes\\x64"
+        ],
+        "valueName": "Installed",
+        "expectedValue": "1"
+      },
+      {
+        "paths": [
+          "HKLM:\\SOFTWARE\\Microsoft\\VisualStudio\\14.0\\VC\\Runtimes\\x64",
+          "HKLM:\\SOFTWARE\\Wow6432Node\\Microsoft\\VisualStudio\\14.0\\VC\\Runtimes\\x64"
+        ],
+        "valueName": "Version",
+        "operator": ">=",
+        "expectedValue": "14.0"
+      }
+    ]
+  },
+  "stateDiscovery": {
+    "installed": {
+      "enableDetection": false,
+      "searchLocations": [],
+      "installRootRules": []
+    }
+  },
   "upstreamSources": {
     "visualCppRedistributableDownload": {
       "kind": "download",
       "baseUri": "https://aka.ms/"
     }
   },
-  "providedTools": {
-    "commands": [],
-    "apps": []
-  },
-  "shared": {
-    "ownershipPolicy": {
-      "allowAdoptExternal": false,
-      "upgradeAdoptedInstall": false,
-      "requirePackageOwnership": false
+  "packageOperations": {
+    "shared": {
+      "ownershipPolicy": {
+        "allowAdoptExternal": false,
+        "upgradeAdoptedInstall": false,
+        "requirePackageOwnership": false
+      },
+      "compatibility": {
+        "checks": [
+          {
+            "kind": "osVersion",
+            "operator": ">=",
+            "value": "10.0"
+          }
+        ]
+      }
     },
-    "compatibility": {
-      "checks": [
-        {
-          "kind": "osVersion",
-          "operator": ">=",
-          "value": "10.0"
-        }
-      ]
-    },
-    "remove": {
-      "keepInstallDirectory": false,
-      "keepInventoryRecord": false,
-      "requireProcessExit": [],
-      "keepShims": false
-    },
-    "discovery": {
-      "enableDetection": false,
-      "searchLocations": [],
-      "installRootRules": []
-    },
-    "install": {
+    "assigned": {
       "kind": "runInstaller",
       "targetKind": "machinePrerequisite",
       "installerKind": "burn",
@@ -69,77 +150,50 @@
       ],
       "pathRegistration": {
         "mode": "none"
+      },
+      "installedStateCheck": {
+        "use": "discovery",
+        "expectedVersion": "{version}",
+        "require": {
+          "files": false,
+          "directories": false,
+          "commands": false,
+          "apps": false,
+          "metadataFiles": false,
+          "signatures": false,
+          "fileDetails": false,
+          "registry": true
+        }
+      },
+      "versionUpdatePolicy": {
+        "whenAssigned": "trackSelectedVersion",
+        "onSameSelectedVersion": "reuseOrRepair",
+        "onNewSelectedVersion": "replacePackageOwnedInstall"
       }
     },
-    "validation": {
-      "files": [],
-      "directories": [],
-      "commandChecks": [],
-      "metadataFiles": [],
-      "signatures": [],
-      "fileDetails": [],
-      "registryChecks": [
-        {
-          "paths": [
-            "HKLM:\\SOFTWARE\\Microsoft\\VisualStudio\\14.0\\VC\\Runtimes\\x64",
-            "HKLM:\\SOFTWARE\\Wow6432Node\\Microsoft\\VisualStudio\\14.0\\VC\\Runtimes\\x64"
-          ],
-          "valueName": "Installed",
-          "expectedValue": "1"
-        },
-        {
-          "paths": [
-            "HKLM:\\SOFTWARE\\Microsoft\\VisualStudio\\14.0\\VC\\Runtimes\\x64",
-            "HKLM:\\SOFTWARE\\Wow6432Node\\Microsoft\\VisualStudio\\14.0\\VC\\Runtimes\\x64"
-          ],
-          "valueName": "Version",
-          "operator": ">=",
-          "expectedValue": "14.0"
-        }
-      ]
-    }
-  },
-  "releases": [
-    {
-      "id": "vc-runtime-x64-stable",
-      "version": "14.0",
-      "releaseTrack": "stable",
-      "flavor": "x64",
-      "constraints": {
-        "os": [
-          "windows"
-        ],
-        "cpu": [
-          "x64"
-        ]
+    "removed": {
+      "operation": {
+        "kind": "none"
       },
-      "packageFile": {
-        "fileName": "vc_redist.x64.exe",
-        "publisherSignature": {
-          "kind": "authenticode",
-          "requireValid": true,
-          "subjectContains": "Microsoft Corporation"
+      "verifyAbsent": {
+        "use": "discovery",
+        "require": {
+          "files": true,
+          "directories": false,
+          "commands": true,
+          "apps": false,
+          "metadataFiles": false,
+          "signatures": false,
+          "fileDetails": false,
+          "registry": false
         }
       },
-      "acquisitionCandidates": [
-        {
-          "kind": "packageDepot",
-          "searchOrder": 100,
-          "verification": {
-            "mode": "optional"
-          }
-        },
-        {
-          "kind": "download",
-          "sourceId": "visualCppRedistributableDownload",
-          "sourcePath": "vc14/vc_redist.x64.exe",
-          "searchOrder": 900,
-          "verification": {
-            "mode": "required"
-          }
-        }
-      ]
+      "cleanup": {
+        "inventory": true,
+        "shims": true,
+        "path": true,
+        "workDirectories": true
+      }
     }
-  ],
-  "$schema": "./eigenverft-module-package-definition-1.1.schema.json"
+  }
 }

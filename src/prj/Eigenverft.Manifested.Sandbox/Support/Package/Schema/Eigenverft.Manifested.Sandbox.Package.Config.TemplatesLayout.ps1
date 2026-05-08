@@ -9,9 +9,9 @@ function Resolve-PackageTemplateText {
 Resolves simple Package template tokens in text.
 
 .DESCRIPTION
-Replaces package-aware tokens such as `{releaseTrack}`, `{version}`, and
-`{flavor}` with the current values from the resolved Package config and
-selected release.
+Replaces package-aware tokens such as `{channel}`, `{version}`, and
+`{platformTarget}` with the current values from the resolved Package config
+and selected package.
 
 .PARAMETER Text
 The text that contains optional Package tokens.
@@ -85,6 +85,7 @@ function Get-PackageTemplateTokenMap {
         $tokens['platform'] = $PackageConfig.Platform
         $tokens['architecture'] = $PackageConfig.Architecture
         $tokens['releaseTrack'] = $PackageConfig.ReleaseTrack
+        $tokens['channel'] = $PackageConfig.ReleaseTrack
         if ($PackageConfig.PSObject.Properties['ApplicationRootDirectory']) {
             $tokens['applicationRootDirectory'] = $PackageConfig.ApplicationRootDirectory
         }
@@ -105,8 +106,11 @@ function Get-PackageTemplateTokenMap {
         $tokens['packageId'] = if ($Package.PSObject.Properties['id']) { [string]$Package.id } else { $null }
         $tokens['releaseId'] = if ($Package.PSObject.Properties['id']) { [string]$Package.id } else { $null }
         $tokens['releaseTrack'] = if ($Package.PSObject.Properties['releaseTrack']) { [string]$Package.releaseTrack } else { $tokens['releaseTrack'] }
+        $tokens['channel'] = if ($Package.PSObject.Properties['channel']) { [string]$Package.channel } else { $tokens['releaseTrack'] }
         $tokens['version'] = if ($Package.PSObject.Properties['version']) { [string]$Package.version } else { $null }
         $tokens['flavor'] = if ($Package.PSObject.Properties['flavor']) { [string]$Package.flavor } else { $null }
+        $tokens['platformTarget'] = if ($Package.PSObject.Properties['platformTarget']) { [string]$Package.platformTarget } else { $tokens['flavor'] }
+        $tokens['packageTargetId'] = if ($Package.PSObject.Properties['packageTargetId']) { [string]$Package.packageTargetId } else { $null }
     }
     foreach ($key in @($ExtraTokens.Keys)) {
         $tokens[$key] = $ExtraTokens[$key]

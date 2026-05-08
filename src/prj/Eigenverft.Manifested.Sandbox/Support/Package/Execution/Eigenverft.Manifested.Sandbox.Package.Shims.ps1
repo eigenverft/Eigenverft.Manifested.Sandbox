@@ -129,9 +129,9 @@ function New-PackageCommandShim {
         [string]$PackageResult.InstallDirectory
     }
 
-    $targetPath = Resolve-PackageProvidedToolPath -Definition $PackageResult.PackageConfig.Definition -ToolKind 'commands' -Name $CommandName -InstallDirectory $baseInstallDirectory
+    $targetPath = Resolve-PackageDiscoveredToolPath -Definition $PackageResult.PackageConfig.Definition -ToolKind 'commands' -Name $CommandName -InstallDirectory $baseInstallDirectory
     if ([string]::IsNullOrWhiteSpace($targetPath)) {
-        throw "Package pathRegistration source shim '$CommandName' was not found in providedTools.commands."
+        throw "Package pathRegistration source shim '$CommandName' was not found in discovery.commands."
     }
     if (-not (Test-Path -LiteralPath $targetPath -PathType Leaf)) {
         throw "Package shim target path '$targetPath' was not found."

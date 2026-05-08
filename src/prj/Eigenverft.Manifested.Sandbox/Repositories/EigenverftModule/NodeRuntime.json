@@ -1,5 +1,6 @@
 {
-  "schemaVersion": "1.1",
+  "$schema": "./eigenverft-module-package-definition-1.2.schema.json",
+  "schemaVersion": "1.2",
   "id": "NodeRuntime",
   "display": {
     "default": {
@@ -9,116 +10,11 @@
       "summary": "Portable Node.js runtime"
     }
   },
-  "upstreamSources": {
-    "nodeJsRelease": {
-      "kind": "download",
-      "baseUri": "https://nodejs.org/dist/v24.15.0/"
-    }
-  },
-  "providedTools": {
-    "commands": [
-      {
-        "name": "node",
-        "relativePath": "node.exe"
-      },
-      {
-        "name": "npm",
-        "relativePath": "npm.cmd"
-      },
-      {
-        "name": "npx",
-        "relativePath": "npx.cmd"
-      }
-    ],
-    "apps": []
-  },
-  "shared": {
-    "ownershipPolicy": {
-      "allowAdoptExternal": false,
-      "upgradeAdoptedInstall": false,
-      "requirePackageOwnership": true
-    },
-    "compatibility": {
-      "checks": [
-        {
-          "kind": "osVersion",
-          "operator": ">=",
-          "value": "10.0"
-        }
-      ]
-    },
-    "remove": {
-      "keepInstallDirectory": false,
-      "keepInventoryRecord": false,
-      "requireProcessExit": [],
-      "keepShims": false
-    },
-    "discovery": {
-      "enableDetection": false,
-      "searchLocations": [],
-      "installRootRules": []
-    },
-    "install": {
-      "kind": "expandArchive",
-      "installDirectory": "node-runtime/{releaseTrack}/{version}/{flavor}",
-      "pathRegistration": {
-        "mode": "user",
-        "source": {
-          "kind": "shim",
-          "values": [
-            "node",
-            "npm",
-            "npx"
-          ]
-        }
-      },
-      "expandedRoot": "auto",
-      "createDirectories": []
-    },
-    "validation": {
-      "files": [
-        "node.exe",
-        "npm.cmd",
-        "npx.cmd"
-      ],
-      "directories": [],
-      "commandChecks": [
-        {
-          "entryPoint": "node",
-          "arguments": [
-            "--version"
-          ],
-          "outputPattern": "(?m)^(?<value>v\\d+\\.\\d+\\.\\d+)\\s*$",
-          "expectedValue": "v{version}"
-        },
-        {
-          "entryPoint": "npm",
-          "arguments": [
-            "--version"
-          ],
-          "outputPattern": "(?m)^(?<value>\\d+\\.\\d+\\.\\d+(?:[-+][0-9A-Za-z.\\-]+)?)\\s*$"
-        },
-        {
-          "entryPoint": "npx",
-          "arguments": [
-            "--version"
-          ],
-          "outputPattern": "(?m)^(?<value>\\d+\\.\\d+\\.\\d+(?:[-+][0-9A-Za-z.\\-]+)?)\\s*$"
-        }
-      ],
-      "metadataFiles": [],
-      "signatures": [],
-      "fileDetails": [],
-      "registryChecks": []
-    }
-  },
-  "releases": [
+  "packageTargets": [
     {
-      "id": "node-runtime-win-x64-stable",
-      "version": "24.15.0",
-      "releaseTag": "v24.15.0",
-      "releaseTrack": "stable",
-      "flavor": "win-x64",
+      "id": "NodeRuntime-win-x64-stable",
+      "channel": "stable",
+      "platformTarget": "win-x64",
       "constraints": {
         "os": [
           "windows"
@@ -127,38 +23,36 @@
           "x64"
         ]
       },
-      "packageFile": {
-        "fileName": "node-v24.15.0-win-x64.zip",
-        "contentHash": {
-          "algorithm": "sha256",
-          "value": "cc5149eabd53779ce1e7bdc5401643622d0c7e6800ade18928a767e940bb0e62"
-        }
+      "versionSelection": {
+        "strategy": "latestByVersion",
+        "allowPrerelease": false
       },
-      "acquisitionCandidates": [
-        {
-          "kind": "packageDepot",
-          "searchOrder": 100,
-          "verification": {
-            "mode": "optional"
+      "artifactDefaults": {
+        "fileNameTemplate": "node-v{version}-win-x64.zip",
+        "artifactSources": [
+          {
+            "kind": "packageDepot",
+            "searchOrder": 100,
+            "verification": {
+              "mode": "optional"
+            }
+          },
+          {
+            "kind": "download",
+            "sourceId": "nodeJsRelease",
+            "sourcePath": "v{version}/node-v{version}-win-x64.zip",
+            "searchOrder": 900,
+            "verification": {
+              "mode": "required"
+            }
           }
-        },
-        {
-          "kind": "download",
-          "sourceId": "nodeJsRelease",
-          "sourcePath": "node-v24.15.0-win-x64.zip",
-          "searchOrder": 900,
-          "verification": {
-            "mode": "required"
-          }
-        }
-      ]
+        ]
+      }
     },
     {
-      "id": "node-runtime-win-arm64-stable",
-      "version": "24.15.0",
-      "releaseTag": "v24.15.0",
-      "releaseTrack": "stable",
-      "flavor": "win-arm64",
+      "id": "NodeRuntime-win-arm64-stable",
+      "channel": "stable",
+      "platformTarget": "win-arm64",
       "constraints": {
         "os": [
           "windows"
@@ -167,32 +61,201 @@
           "arm64"
         ]
       },
-      "packageFile": {
-        "fileName": "node-v24.15.0-win-arm64.zip",
-        "contentHash": {
-          "algorithm": "sha256",
-          "value": "c9eb7402eda26e2ba7e44b6727fc85a8de56c5095b1f71ebd3062892211aa116"
-        }
+      "versionSelection": {
+        "strategy": "latestByVersion",
+        "allowPrerelease": false
       },
-      "acquisitionCandidates": [
-        {
-          "kind": "packageDepot",
-          "searchOrder": 100,
-          "verification": {
-            "mode": "optional"
+      "artifactDefaults": {
+        "fileNameTemplate": "node-v{version}-win-arm64.zip",
+        "artifactSources": [
+          {
+            "kind": "packageDepot",
+            "searchOrder": 100,
+            "verification": {
+              "mode": "optional"
+            }
+          },
+          {
+            "kind": "download",
+            "sourceId": "nodeJsRelease",
+            "sourcePath": "v{version}/node-v{version}-win-arm64.zip",
+            "searchOrder": 900,
+            "verification": {
+              "mode": "required"
+            }
           }
-        },
-        {
-          "kind": "download",
-          "sourceId": "nodeJsRelease",
-          "sourcePath": "node-v24.15.0-win-arm64.zip",
-          "searchOrder": 900,
-          "verification": {
-            "mode": "required"
-          }
-        }
-      ]
+        ]
+      }
     }
   ],
-  "$schema": "./eigenverft-module-package-definition-1.1.schema.json"
+  "versionCatalog": [
+    {
+      "version": "24.15.0",
+      "channels": [
+        "stable"
+      ],
+      "artifactsByTarget": {
+        "NodeRuntime-win-x64-stable": {
+          "releaseId": "node-runtime-win-x64-stable",
+          "contentHash": {
+            "algorithm": "sha256",
+            "value": "cc5149eabd53779ce1e7bdc5401643622d0c7e6800ade18928a767e940bb0e62"
+          }
+        },
+        "NodeRuntime-win-arm64-stable": {
+          "releaseId": "node-runtime-win-arm64-stable",
+          "contentHash": {
+            "algorithm": "sha256",
+            "value": "c9eb7402eda26e2ba7e44b6727fc85a8de56c5095b1f71ebd3062892211aa116"
+          }
+        }
+      },
+      "releaseTag": "v24.15.0"
+    }
+  ],
+  "discovery": {
+    "files": [
+      "node.exe",
+      "npm.cmd",
+      "npx.cmd"
+    ],
+    "directories": [],
+    "commands": [
+      {
+        "name": "node",
+        "relativePath": "node.exe",
+        "required": true,
+        "exposed": true,
+        "stateChecks": [
+          {
+            "arguments": [
+              "--version"
+            ],
+            "outputPattern": "(?m)^(?<value>v\\d+\\.\\d+\\.\\d+)\\s*$",
+            "expectedValue": "v{version}"
+          }
+        ]
+      },
+      {
+        "name": "npm",
+        "relativePath": "npm.cmd",
+        "required": true,
+        "exposed": true,
+        "stateChecks": [
+          {
+            "arguments": [
+              "--version"
+            ],
+            "outputPattern": "(?m)^(?<value>\\d+\\.\\d+\\.\\d+(?:[-+][0-9A-Za-z.\\-]+)?)\\s*$"
+          }
+        ]
+      },
+      {
+        "name": "npx",
+        "relativePath": "npx.cmd",
+        "required": true,
+        "exposed": true,
+        "stateChecks": [
+          {
+            "arguments": [
+              "--version"
+            ],
+            "outputPattern": "(?m)^(?<value>\\d+\\.\\d+\\.\\d+(?:[-+][0-9A-Za-z.\\-]+)?)\\s*$"
+          }
+        ]
+      }
+    ],
+    "apps": [],
+    "metadataFiles": [],
+    "signatures": [],
+    "fileDetails": [],
+    "registry": []
+  },
+  "stateDiscovery": {
+    "installed": {
+      "enableDetection": false,
+      "searchLocations": [],
+      "installRootRules": []
+    }
+  },
+  "upstreamSources": {
+    "nodeJsRelease": {
+      "kind": "download",
+      "baseUri": "https://nodejs.org/dist/"
+    }
+  },
+  "packageOperations": {
+    "shared": {
+      "ownershipPolicy": {
+        "allowAdoptExternal": false,
+        "upgradeAdoptedInstall": false,
+        "requirePackageOwnership": true
+      },
+      "compatibility": {
+        "checks": [
+          {
+            "kind": "osVersion",
+            "operator": ">=",
+            "value": "10.0"
+          }
+        ]
+      }
+    },
+    "assigned": {
+      "kind": "expandArchive",
+      "installDirectory": "node-runtime/{channel}/{version}/{platformTarget}",
+      "pathRegistration": {
+        "mode": "user",
+        "source": {
+          "kind": "shim",
+          "use": "discovery.commands"
+        }
+      },
+      "expandedRoot": "auto",
+      "createDirectories": [],
+      "installedStateCheck": {
+        "use": "discovery",
+        "expectedVersion": "{version}",
+        "require": {
+          "files": true,
+          "directories": false,
+          "commands": true,
+          "apps": false,
+          "metadataFiles": false,
+          "signatures": false,
+          "fileDetails": false,
+          "registry": false
+        }
+      },
+      "versionUpdatePolicy": {
+        "whenAssigned": "trackSelectedVersion",
+        "onSameSelectedVersion": "reuseOrRepair",
+        "onNewSelectedVersion": "replacePackageOwnedInstall"
+      }
+    },
+    "removed": {
+      "operation": {
+        "kind": "deleteInstallDirectory"
+      },
+      "verifyAbsent": {
+        "use": "discovery",
+        "require": {
+          "files": true,
+          "directories": false,
+          "commands": true,
+          "apps": false,
+          "metadataFiles": false,
+          "signatures": false,
+          "fileDetails": false,
+          "registry": false
+        }
+      },
+      "cleanup": {
+        "inventory": true,
+        "shims": true,
+        "path": true,
+        "workDirectories": true
+      }
+    }
+  }
 }

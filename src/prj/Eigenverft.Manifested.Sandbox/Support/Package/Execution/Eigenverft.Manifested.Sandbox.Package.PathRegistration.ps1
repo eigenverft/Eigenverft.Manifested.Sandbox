@@ -27,10 +27,28 @@ function Get-PackagePathRegistrationSourceValues {
     [CmdletBinding()]
     param(
         [AllowNull()]
+        [psobject]$PackageResult,
+
+        [AllowNull()]
         [psobject]$Source
     )
 
     $values = New-Object System.Collections.Generic.List[string]
+    $sourceKind = if ($Source -and $Source.PSObject.Properties['kind']) { [string]$Source.kind } else { $null }
+    if ([string]::Equals($sourceKind, 'shim', [System.StringComparison]::OrdinalIgnoreCase)) {
+        if (-not $Source.PSObject.Properties['use'] -or
+            -not [string]::Equals([string]$Source.use, 'discovery.commands', [System.StringComparison]::Ordinal)) {
+            throw "Package pathRegistration source kind 'shim' requires source.use = 'discovery.commands'."
+        }
+        foreach ($command in @(Get-PackageDiscoveryEntryPoints -Definition $PackageResult.PackageConfig.Definition -ToolKind 'commands' -ExposedOnly)) {
+            $commandName = ([string]$command.name).Trim()
+            if (-not [string]::IsNullOrWhiteSpace($commandName) -and $commandName -notin @($values.ToArray())) {
+                $values.Add($commandName) | Out-Null
+            }
+        }
+        return @($values.ToArray())
+    }
+
     if ($Source -and $Source.PSObject.Properties['value'] -and
         -not [string]::IsNullOrWhiteSpace([string]$Source.value)) {
         $values.Add([string]$Source.value) | Out-Null
@@ -80,10 +98,10 @@ or directory path for the requested install directory.
 
     $source = $pathRegistration.source
     $sourceKind = if ($source.PSObject.Properties['kind']) { [string]$source.kind } else { $null }
-    $sourceValues = @(Get-PackagePathRegistrationSourceValues -Source $source)
+    $sourceValues = @(Get-PackagePathRegistrationSourceValues -PackageResult $PackageResult -Source $source)
     $sourceValue = if ($sourceValues.Count -gt 0) { [string]$sourceValues[0] } else { $null }
     if ([string]::IsNullOrWhiteSpace($sourceKind) -or $sourceValues.Count -eq 0) {
-        throw "Package pathRegistration requires source.kind and source.value or source.values when pathRegistration.mode is not 'none'."
+        throw "Package pathRegistration requires source.kind and a resolvable source value when pathRegistration.mode is not 'none'."
     }
 
     $baseInstallDirectory = if (-not [string]::IsNullOrWhiteSpace($InstallDirectoryOverride)) {
@@ -98,21 +116,21 @@ or directory path for the requested install directory.
             if ($sourceValues.Count -gt 1) {
                 throw "Package pathRegistration source kind 'commandEntryPoint' supports only one source value."
             }
-            $sourcePath = Resolve-PackageProvidedToolPath -Definition $PackageResult.PackageConfig.Definition -ToolKind 'commands' -Name $sourceValue -InstallDirectory $baseInstallDirectory
+            $sourcePath = Resolve-PackageDiscoveredToolPath -Definition $PackageResult.PackageConfig.Definition -ToolKind 'commands' -Name $sourceValue -InstallDirectory $baseInstallDirectory
             if (-not [string]::IsNullOrWhiteSpace($sourcePath)) {
                 return $sourcePath
             }
-            throw "Package pathRegistration source commandEntryPoint '$sourceValue' was not found in providedTools.commands."
+            throw "Package pathRegistration source commandEntryPoint '$sourceValue' was not found in discovery.commands."
         }
         'appEntryPoint' {
             if ($sourceValues.Count -gt 1) {
                 throw "Package pathRegistration source kind 'appEntryPoint' supports only one source value."
             }
-            $sourcePath = Resolve-PackageProvidedToolPath -Definition $PackageResult.PackageConfig.Definition -ToolKind 'apps' -Name $sourceValue -InstallDirectory $baseInstallDirectory
+            $sourcePath = Resolve-PackageDiscoveredToolPath -Definition $PackageResult.PackageConfig.Definition -ToolKind 'apps' -Name $sourceValue -InstallDirectory $baseInstallDirectory
             if (-not [string]::IsNullOrWhiteSpace($sourcePath)) {
                 return $sourcePath
             }
-            throw "Package pathRegistration source appEntryPoint '$sourceValue' was not found in providedTools.apps."
+            throw "Package pathRegistration source appEntryPoint '$sourceValue' was not found in discovery.apps."
         }
         'installRelativeDirectory' {
             if ($sourceValues.Count -gt 1) {
@@ -169,7 +187,7 @@ function Get-PackagePathRegistrationCleanupDirectories {
     else {
         $null
     }
-    $currentSourceValues = @(Get-PackagePathRegistrationSourceValues -Source $currentSource)
+    $currentSourceValues = @(Get-PackagePathRegistrationSourceValues -PackageResult $PackageResult -Source $currentSource)
 
     if ($PackageResult.ExistingPackage -and
         [string]::Equals([string]$PackageResult.ExistingPackage.Classification, 'PackageTarget', [System.StringComparison]::OrdinalIgnoreCase) -and
@@ -219,7 +237,7 @@ function Get-PackagePathRegistrationCleanupDirectories {
 
         foreach ($candidateInstallDirectory in @($directCleanupInstallDirectories.ToArray())) {
             foreach ($currentSourceValue in $currentSourceValues) {
-                $directCommandPath = Resolve-PackageProvidedToolPath -Definition $PackageResult.PackageConfig.Definition -ToolKind 'commands' -Name $currentSourceValue -InstallDirectory $candidateInstallDirectory
+                $directCommandPath = Resolve-PackageDiscoveredToolPath -Definition $PackageResult.PackageConfig.Definition -ToolKind 'commands' -Name $currentSourceValue -InstallDirectory $candidateInstallDirectory
                 if ([string]::IsNullOrWhiteSpace($directCommandPath)) {
                     continue
                 }
@@ -261,7 +279,7 @@ for the same install slot.
 
     $source = if ($pathRegistration -and $pathRegistration.PSObject.Properties['source']) { $pathRegistration.source } else { $null }
     $sourceKind = if ($source -and $source.PSObject.Properties['kind']) { [string]$source.kind } else { $null }
-    $sourceValues = @(Get-PackagePathRegistrationSourceValues -Source $source)
+    $sourceValues = @(Get-PackagePathRegistrationSourceValues -PackageResult $PackageResult -Source $source)
     $sourceValue = if ($sourceValues.Count -gt 0) { $sourceValues -join ',' } else { $null }
 
     if ($mode -eq 'none') {

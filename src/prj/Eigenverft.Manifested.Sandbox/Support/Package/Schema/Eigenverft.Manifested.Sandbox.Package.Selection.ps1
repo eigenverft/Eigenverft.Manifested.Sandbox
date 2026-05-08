@@ -316,13 +316,9 @@ function Resolve-PackagePackage {
 Attaches the selected release to a Package result.
 
 .DESCRIPTION
-Filters the definition releases from the resolved Package config by
-platform, architecture, and release track, selects the newest matching release,
-applies definition-level packageOperations defaults (Resolve-PackageEffectiveRelease:
-wire discovery/ownershipPolicy become existingInstallDiscovery/existingInstallPolicy;
-release install/remove become assigned/removed),
-and attaches the merged release to the result. PackageResult.Package and EffectiveRelease
-are that effective release row, not the raw definition document.
+Selects a schemaVersion 1.2 packageTarget and versionCatalog entry for the
+resolved Package config, projects that target/catalog/artifact into the runtime
+assigned package object, and attaches it to the result.
 
 .PARAMETER PackageResult
 The Package result object to enrich.
@@ -337,41 +333,13 @@ Resolve-PackagePackage -PackageResult $result
     )
 
     $packageConfig = $PackageResult.PackageConfig
-    $definition = $packageConfig.Definition
     $effectiveReleaseTrack = if ([string]::IsNullOrWhiteSpace($packageConfig.ReleaseTrack)) { 'none' } else { [string]$packageConfig.ReleaseTrack }
-
-    $matchingPackages = @(
-        foreach ($release in @($definition.releases)) {
-            $constraints = if ($release.PSObject.Properties['constraints']) { $release.constraints } else { $null }
-            $osConstraints = if ($constraints -and $constraints.PSObject.Properties['os']) { @($constraints.os) } else { @() }
-            $cpuConstraints = if ($constraints -and $constraints.PSObject.Properties['cpu']) { @($constraints.cpu) } else { @() }
-            $packageReleaseTrack = if ($release.PSObject.Properties['releaseTrack'] -and -not [string]::IsNullOrWhiteSpace([string]$release.releaseTrack)) {
-                [string]$release.releaseTrack
-            }
-            else {
-                'none'
-            }
-
-            if ([string]::Equals($packageReleaseTrack, $effectiveReleaseTrack, [System.StringComparison]::OrdinalIgnoreCase) -and
-                (Test-PackageConstraintSetMatch -Values $osConstraints -ActualValue $packageConfig.Platform) -and
-                (Test-PackageConstraintSetMatch -Values $cpuConstraints -ActualValue $packageConfig.Architecture)) {
-                $release
-            }
-        }
-    )
-
-    if (-not $matchingPackages) {
-        throw "No Package release matched platform '$($packageConfig.Platform)', architecture '$($packageConfig.Architecture)', and releaseTrack '$($packageConfig.ReleaseTrack)'."
-    }
 
     if (-not [string]::Equals([string]$packageConfig.SelectionStrategy, 'latestByVersion', [System.StringComparison]::OrdinalIgnoreCase)) {
         throw "Unsupported Package selection strategy '$($packageConfig.SelectionStrategy)'."
     }
 
-    $selectedPackage = $matchingPackages |
-        Sort-Object -Descending -Property @{ Expression = { ConvertTo-PackageVersion -VersionText $_.version } } |
-        Select-Object -First 1
-    $selectedPackage = Resolve-PackageEffectiveRelease -Definition $definition -Release $selectedPackage
+    $selectedPackage = Resolve-PackageEffectivePackage_1_2 -PackageConfig $packageConfig
 
     $PackageResult.Package = $selectedPackage
     $PackageResult.EffectiveRelease = $selectedPackage
@@ -390,8 +358,8 @@ Resolve-PackagePackage -PackageResult $result
         throw "Package release '$($selectedPackage.id)' does not satisfy compatibility.checks. $failedCompatibilityText"
     }
 
-    $selectedFlavor = if ($selectedPackage.PSObject.Properties['flavor']) { [string]$selectedPackage.flavor } else { 'default' }
-    Write-PackageExecutionMessage -Message ("[STATE] Selected release '{0}' version '{1}' for platform '{2}', architecture '{3}', releaseTrack '{4}', flavor '{5}'." -f $PackageResult.PackageId, $PackageResult.PackageVersion, $packageConfig.Platform, $packageConfig.Architecture, $effectiveReleaseTrack, $selectedFlavor)
+    $selectedPlatformTarget = if ($selectedPackage.PSObject.Properties['platformTarget']) { [string]$selectedPackage.platformTarget } else { 'default' }
+    Write-PackageExecutionMessage -Message ("[STATE] Selected package target '{0}' release '{1}' version '{2}' for platform '{3}', architecture '{4}', channel '{5}', platformTarget '{6}'." -f [string]$selectedPackage.packageTargetId, $PackageResult.PackageId, $PackageResult.PackageVersion, $packageConfig.Platform, $packageConfig.Architecture, $effectiveReleaseTrack, $selectedPlatformTarget)
     if (@($compatibilityEvaluation.Checks).Count -gt 0) {
         $compatibilitySummary = @(
             foreach ($checkResult in @($compatibilityEvaluation.Checks)) {

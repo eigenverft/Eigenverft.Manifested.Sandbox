@@ -544,7 +544,8 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
         $result.Package.releaseTag | Should -Be 'b8863'
         $result.Package.packageFile.fileName | Should -Be 'llama-b8863-bin-win-cpu-x64.zip'
         $result.Package.assigned.pathRegistration.source.kind | Should -Be 'shim'
-        $result.Package.assigned.pathRegistration.source.values | Should -Be @('llama-cli', 'llama-server', 'llama-quantize', 'llama-bench', 'llama-tokenize')
+        $result.Package.assigned.pathRegistration.source.use | Should -Be 'discovery.commands'
+        @($config.Definition.discovery.commands.name) | Should -Be @('llama-cli', 'llama-server', 'llama-quantize', 'llama-bench', 'llama-tokenize')
     }
 
     It 'loads the shipped GitRuntime definition and selects the fixed GitHub-backed release' {
@@ -577,7 +578,8 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
         $result.Package.packageFile.fileName | Should -Be $expectedFileName
         $result.Package.packageFile.contentHash.value | Should -Be $expectedSha256
         $result.Package.assigned.pathRegistration.source.kind | Should -Be 'shim'
-        $result.Package.assigned.pathRegistration.source.value | Should -Be 'git'
+        $result.Package.assigned.pathRegistration.source.use | Should -Be 'discovery.commands'
+        $config.Definition.discovery.commands[0].name | Should -Be 'git'
     }
 
     It 'loads the shipped GitHubCli definition and selects the fixed GitHub-backed release' {
@@ -610,7 +612,8 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
         $result.Package.packageFile.fileName | Should -Be $expectedFileName
         $result.Package.packageFile.contentHash.value | Should -Be $expectedSha256
         $result.Package.assigned.pathRegistration.source.kind | Should -Be 'shim'
-        $result.Package.assigned.pathRegistration.source.value | Should -Be 'gh'
+        $result.Package.assigned.pathRegistration.source.use | Should -Be 'discovery.commands'
+        $config.Definition.discovery.commands[0].name | Should -Be 'gh'
     }
 
     It 'loads the shipped NotepadPlusPlus definition and selects the fixed NSIS installer release' {
@@ -636,12 +639,12 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
 
         $config.DefinitionId | Should -Be 'NotepadPlusPlus'
         $sourceDefinition.Kind | Should -Be 'download'
-        $sourceDefinition.BaseUri | Should -Be 'https://github.com/notepad-plus-plus/notepad-plus-plus/releases/download/v8.9.4/'
+        $sourceDefinition.BaseUri | Should -Be 'https://github.com/notepad-plus-plus/notepad-plus-plus/releases/download/'
         $result.Package.version | Should -Be '8.9.4'
         $result.Package.assigned.kind | Should -Be 'nsisInstaller'
         $result.Package.assigned.targetDirectoryArgument.prefix | Should -Be '/D='
-        $result.Package.existingInstallDiscovery.searchLocations[0].kind | Should -Be 'windowsUninstallRegistryKey'
-        $result.Package.existingInstallDiscovery.searchLocations[0].installDirectorySource | Should -Be 'displayIconDirectory'
+        $result.Package.stateDiscovery.installed.searchLocations[0].kind | Should -Be 'windowsUninstallRegistryKey'
+        $result.Package.stateDiscovery.installed.searchLocations[0].installDirectorySource | Should -Be 'displayIconDirectory'
         $result.Package.packageFile.fileName | Should -Be $expectedFileName
         $result.Package.packageFile.contentHash.value | Should -Be $expectedSha256
     }
@@ -669,13 +672,14 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
 
         $config.DefinitionId | Should -Be 'NodeRuntime'
         $sourceDefinition.Kind | Should -Be 'download'
-        $sourceDefinition.BaseUri | Should -Be 'https://nodejs.org/dist/v24.15.0/'
+        $sourceDefinition.BaseUri | Should -Be 'https://nodejs.org/dist/'
         $result.Package.version | Should -Be '24.15.0'
         $result.Package.releaseTag | Should -Be 'v24.15.0'
         $result.Package.packageFile.fileName | Should -Be $expectedFileName
         $result.Package.packageFile.contentHash.value | Should -Be $expectedSha256
         $result.Package.assigned.pathRegistration.source.kind | Should -Be 'shim'
-        $result.Package.assigned.pathRegistration.source.values | Should -Be @('node', 'npm', 'npx')
+        $result.Package.assigned.pathRegistration.source.use | Should -Be 'discovery.commands'
+        @($config.Definition.discovery.commands.name) | Should -Be @('node', 'npm', 'npx')
     }
 
     It 'loads the shipped npm-backed CLI runtime definitions without package-file acquisition' {
@@ -701,8 +705,9 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
             $result.Package.assigned.installerCommand | Should -Be 'npm'
             $result.Package.assigned.packageSpec | Should -Be $case.PackageSpec
             $result.Package.assigned.pathRegistration.source.kind | Should -Be 'shim'
-            $result.Package.assigned.pathRegistration.source.value | Should -Be $case.Command
-            $config.Definition.providedTools.commands[0].relativePath | Should -Be $case.RelativePath
+            $result.Package.assigned.pathRegistration.source.use | Should -Be 'discovery.commands'
+            $config.Definition.discovery.commands[0].name | Should -Be $case.Command
+            $config.Definition.discovery.commands[0].relativePath | Should -Be $case.RelativePath
             if ($case.DefinitionId -eq 'CodexCli') {
                 @($config.Definition.dependencies.definitionId) | Should -Be @('VisualCppRedistributable', 'NodeRuntime')
                 @($config.Definition.dependencies.repositoryId) | Should -Be @('EigenverftModule', 'EigenverftModule')
@@ -711,7 +716,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
                 @($config.Definition.dependencies.definitionId) | Should -Be @('NodeRuntime')
                 @($config.Definition.dependencies.repositoryId) | Should -Be @('EigenverftModule')
             }
-            $result.Package.PSObject.Properties['packageFile'] | Should -BeNullOrEmpty
+            $result.Package.packageFile | Should -BeNullOrEmpty
             $result.AcquisitionPlan.PackageFileRequired | Should -BeFalse
             @($result.AcquisitionPlan.Candidates).Count | Should -Be 0
         }
@@ -810,7 +815,8 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
         $result.Package.packageFile.contentHash.value | Should -Be $expectedSha256
         $result.Package.assigned.expandedRoot | Should -Be 'tools'
         $result.Package.assigned.pathRegistration.source.kind | Should -Be 'shim'
-        $result.Package.assigned.pathRegistration.source.value | Should -Be 'python'
+        $result.Package.assigned.pathRegistration.source.use | Should -Be 'discovery.commands'
+        $config.Definition.discovery.commands[0].name | Should -Be 'python'
         $result.Package.validation.commandChecks[1].arguments | Should -Be @('-m', 'pip', '--version')
     }
 
@@ -844,7 +850,8 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
         $result.Package.packageFile.fileName | Should -Be $expectedFileName
         $result.Package.packageFile.contentHash.value | Should -Be $expectedSha256
         $result.Package.assigned.pathRegistration.source.kind | Should -Be 'shim'
-        $result.Package.assigned.pathRegistration.source.value | Should -Be 'pwsh'
+        $result.Package.assigned.pathRegistration.source.use | Should -Be 'discovery.commands'
+        $config.Definition.discovery.commands[0].name | Should -Be 'pwsh'
     }
 
     It 'loads the shipped VisualCppRedistributable definition as an elevated machine prerequisite' {
@@ -931,7 +938,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
     It 'fails clearly when a definition still uses requireManagedOwnership' {
         $rootPath = Join-Path $TestDrive 'retired-require-managed-ownership'
         $release = New-TestPackageRelease -Id 'vsCode-win-x64-stable' -Version '2.0.0' -Architecture 'x64' -Flavor 'win32-x64' -Install @{ kind = 'reuseExisting' } -Validation (New-TestValidation -Version '2.0.0')
-        $definitionDocument = New-TestVSCodeDefinitionDocument -Releases @($release) -SharedValidation (New-TestValidation -Version '2.0.0') -SharedExistingInstallPolicy @{
+        $definitionDocument = New-TestVSCodeDefinitionDocument -Releases @($release) -SharedValidation (New-TestValidation -Version '2.0.0') -SharedOwnershipPolicy @{
             allowAdoptExternal    = $false
             upgradeAdoptedInstall = $false
             requireManagedOwnership = $false
@@ -976,13 +983,15 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
         $rootPath = Join-Path $TestDrive 'retired-requirements-packages'
         $release = New-TestPackageRelease -Id 'vsCode-win-x64-stable' -Version '2.0.0' -Architecture 'x64' -Flavor 'win32-x64' -Install @{ kind = 'reuseExisting' } -Validation (New-TestValidation -Version '2.0.0')
         $definitionDocument = New-TestVSCodeDefinitionDocument -Releases @($release)
-        $definitionDocument.shared.requirements = @{
-            checks = [object[]]@()
+        $definitionDocument.shared = @{
+            requirements = @{
+                checks = [object[]]@()
+            }
         }
         $documents = Write-TestPackageDocuments -RootPath $rootPath -GlobalDocument (New-TestPackageGlobalDocument) -DefinitionDocument $definitionDocument
 
         $definitionInfo = Read-PackageJsonDocument -Path $documents.DefinitionPath
-        { Assert-PackageDefinitionSchema -DefinitionDocumentInfo $definitionInfo -DefinitionId 'VSCodeRuntime' } | Should -Throw '*shared.requirements*'
+        { Assert-PackageDefinitionSchema -DefinitionDocumentInfo $definitionInfo -DefinitionId 'VSCodeRuntime' } | Should -Throw '*shared*'
     }
 
     It 'fails clearly when an acquisition candidate still uses retired priority' {
@@ -1019,16 +1028,17 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
         }
         $release.packageFile | Add-Member -NotePropertyName autoUpdateSupported -NotePropertyValue $false
         $definitionDocument = New-TestVSCodeDefinitionDocument -Releases @($release)
+        $artifact = $definitionDocument.versionCatalog[0].artifactsByTarget['vsCode-win-x64-stable']
         $definitionInfo = [pscustomobject]@{
             Path     = Join-Path $TestDrive 'VSCodeRuntime.json'
             Document = ConvertTo-TestPsObject -InputObject $definitionDocument
         }
 
         { Assert-PackageDefinitionSchema -DefinitionDocumentInfo $definitionInfo -DefinitionId 'VSCodeRuntime' } | Should -Throw '*packageFile.autoUpdateSupported*'
-        $release.packageFile.PSObject.Properties.Remove('autoUpdateSupported')
+        $null = $artifact.Remove('autoUpdateSupported')
         $definitionInfo.Document = ConvertTo-TestPsObject -InputObject $definitionDocument
         { Assert-PackageDefinitionSchema -DefinitionDocumentInfo $definitionInfo -DefinitionId 'VSCodeRuntime' } | Should -Throw '*packageFile.integrity*'
-        $release.packageFile.PSObject.Properties.Remove('integrity')
+        $null = $artifact.Remove('integrity')
         $definitionInfo.Document = ConvertTo-TestPsObject -InputObject $definitionDocument
         { Assert-PackageDefinitionSchema -DefinitionDocumentInfo $definitionInfo -DefinitionId 'VSCodeRuntime' } | Should -Throw '*packageFile.authenticode*'
     }
@@ -1045,18 +1055,19 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
             algorithm = 'sha256'
         }
         $definitionDocument = New-TestVSCodeDefinitionDocument -Releases @($release)
+        $artifact = $definitionDocument.versionCatalog[0].artifactsByTarget['vsCode-win-x64-stable']
         $definitionInfo = [pscustomobject]@{
             Path     = Join-Path $TestDrive 'VSCodeRuntime.json'
             Document = ConvertTo-TestPsObject -InputObject $definitionDocument
         }
 
         { Assert-PackageDefinitionSchema -DefinitionDocumentInfo $definitionInfo -DefinitionId 'VSCodeRuntime' } | Should -Throw '*packageFile.contentHash without value*'
-        $release.packageFile.PSObject.Properties.Remove('contentHash')
-        $release.packageFile | Add-Member -NotePropertyName contentHash -NotePropertyValue @{
+        $null = $artifact.Remove('contentHash')
+        $artifact.contentHash = @{
             algorithm = 'sha256'
             value     = '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef'
         }
-        $release.packageFile | Add-Member -NotePropertyName publisherSignature -NotePropertyValue @{
+        $artifact.publisherSignature = @{
             requireValid = $true
         }
         $definitionInfo.Document = ConvertTo-TestPsObject -InputObject $definitionDocument

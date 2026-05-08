@@ -1,5 +1,6 @@
 {
-  "schemaVersion": "1.1",
+  "$schema": "./eigenverft-module-package-definition-1.2.schema.json",
+  "schemaVersion": "1.2",
   "id": "NotepadPlusPlus",
   "display": {
     "default": {
@@ -9,43 +10,153 @@
       "summary": "Windows text and source-code editor"
     }
   },
-  "upstreamSources": {
-    "notepadPlusPlusGitHubRelease": {
-      "kind": "download",
-      "baseUri": "https://github.com/notepad-plus-plus/notepad-plus-plus/releases/download/v8.9.4/"
+  "packageTargets": [
+    {
+      "id": "NotepadPlusPlus-win-x64-stable",
+      "channel": "stable",
+      "platformTarget": "win-x64",
+      "constraints": {
+        "os": [
+          "windows"
+        ],
+        "cpu": [
+          "x64"
+        ]
+      },
+      "versionSelection": {
+        "strategy": "latestByVersion",
+        "allowPrerelease": false
+      },
+      "artifactDefaults": {
+        "fileNameTemplate": "npp.{version}.Installer.x64.exe",
+        "artifactSources": [
+          {
+            "kind": "packageDepot",
+            "searchOrder": 100,
+            "verification": {
+              "mode": "required"
+            }
+          },
+          {
+            "kind": "download",
+            "sourceId": "notepadPlusPlusGitHubRelease",
+            "sourcePath": "v{version}/npp.{version}.Installer.x64.exe",
+            "searchOrder": 900,
+            "verification": {
+              "mode": "required"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "NotepadPlusPlus-win-arm64-stable",
+      "channel": "stable",
+      "platformTarget": "win-arm64",
+      "constraints": {
+        "os": [
+          "windows"
+        ],
+        "cpu": [
+          "arm64"
+        ]
+      },
+      "versionSelection": {
+        "strategy": "latestByVersion",
+        "allowPrerelease": false
+      },
+      "artifactDefaults": {
+        "fileNameTemplate": "npp.{version}.Installer.arm64.exe",
+        "artifactSources": [
+          {
+            "kind": "packageDepot",
+            "searchOrder": 100,
+            "verification": {
+              "mode": "required"
+            }
+          },
+          {
+            "kind": "download",
+            "sourceId": "notepadPlusPlusGitHubRelease",
+            "sourcePath": "v{version}/npp.{version}.Installer.arm64.exe",
+            "searchOrder": 900,
+            "verification": {
+              "mode": "required"
+            }
+          }
+        ]
+      }
     }
-  },
-  "providedTools": {
+  ],
+  "versionCatalog": [
+    {
+      "version": "8.9.4",
+      "channels": [
+        "stable"
+      ],
+      "artifactsByTarget": {
+        "NotepadPlusPlus-win-x64-stable": {
+          "releaseId": "notepad-plus-plus-8.9.4-win-x64",
+          "contentHash": {
+            "algorithm": "sha256",
+            "value": "f3629f500d0754d8e870255fff0e00384a37f5402d6f3ad8dd1f4f67d707b593"
+          },
+          "publisherSignature": {
+            "kind": "authenticode",
+            "requireValid": true,
+            "subjectContains": "NOTEPAD++"
+          }
+        },
+        "NotepadPlusPlus-win-arm64-stable": {
+          "releaseId": "notepad-plus-plus-8.9.4-win-arm64",
+          "contentHash": {
+            "algorithm": "sha256",
+            "value": "7d59f0c62caa4d2366f900ca8169fb37cf1dcfce5c79cb3ccb08089b1adbc91"
+          },
+          "publisherSignature": {
+            "kind": "authenticode",
+            "requireValid": true,
+            "subjectContains": "NOTEPAD++"
+          }
+        }
+      }
+    }
+  ],
+  "discovery": {
+    "files": [
+      "notepad++.exe"
+    ],
+    "directories": [],
     "commands": [],
     "apps": [
       {
         "name": "notepad++",
-        "relativePath": "notepad++.exe"
+        "relativePath": "notepad++.exe",
+        "required": true,
+        "exposed": true
       }
-    ]
+    ],
+    "metadataFiles": [],
+    "signatures": [
+      {
+        "relativePath": "notepad++.exe",
+        "requireValid": true,
+        "subjectContains": "NOTEPAD++"
+      }
+    ],
+    "fileDetails": [
+      {
+        "relativePath": "notepad++.exe",
+        "productName": "Notepad++",
+        "fileDescription": "Notepad++",
+        "fileVersion": "{version}",
+        "productVersion": "{version}"
+      }
+    ],
+    "registry": []
   },
-  "shared": {
-    "ownershipPolicy": {
-      "allowAdoptExternal": true,
-      "upgradeAdoptedInstall": false,
-      "requirePackageOwnership": false
-    },
-    "compatibility": {
-      "checks": [
-        {
-          "kind": "osVersion",
-          "operator": ">=",
-          "value": "10.0"
-        }
-      ]
-    },
-    "remove": {
-      "keepInstallDirectory": false,
-      "keepInventoryRecord": false,
-      "requireProcessExit": [],
-      "keepShims": false
-    },
-    "discovery": {
+  "stateDiscovery": {
+    "installed": {
       "enableDetection": true,
       "searchLocations": [
         {
@@ -58,10 +169,34 @@
         }
       ],
       "installRootRules": []
+    }
+  },
+  "upstreamSources": {
+    "notepadPlusPlusGitHubRelease": {
+      "kind": "download",
+      "baseUri": "https://github.com/notepad-plus-plus/notepad-plus-plus/releases/download/"
+    }
+  },
+  "packageOperations": {
+    "shared": {
+      "ownershipPolicy": {
+        "allowAdoptExternal": true,
+        "upgradeAdoptedInstall": false,
+        "requirePackageOwnership": false
+      },
+      "compatibility": {
+        "checks": [
+          {
+            "kind": "osVersion",
+            "operator": ">=",
+            "value": "10.0"
+          }
+        ]
+      }
     },
-    "install": {
+    "assigned": {
       "kind": "nsisInstaller",
-      "installDirectory": "notepad-plus-plus/{releaseTrack}/{version}/{flavor}",
+      "installDirectory": "notepad-plus-plus/{channel}/{version}/{platformTarget}",
       "installerKind": "nsis",
       "uiMode": "silent",
       "elevation": "none",
@@ -81,123 +216,50 @@
       "restartExitCodes": [],
       "pathRegistration": {
         "mode": "none"
+      },
+      "installedStateCheck": {
+        "use": "discovery",
+        "expectedVersion": "{version}",
+        "require": {
+          "files": true,
+          "directories": false,
+          "commands": false,
+          "apps": true,
+          "metadataFiles": false,
+          "signatures": true,
+          "fileDetails": true,
+          "registry": false
+        }
+      },
+      "versionUpdatePolicy": {
+        "whenAssigned": "trackSelectedVersion",
+        "onSameSelectedVersion": "reuseOrRepair",
+        "onNewSelectedVersion": "replacePackageOwnedInstall"
       }
     },
-    "validation": {
-      "files": [
-        "notepad++.exe"
-      ],
-      "directories": [],
-      "commandChecks": [],
-      "metadataFiles": [],
-      "signatures": [
-        {
-          "relativePath": "notepad++.exe",
-          "requireValid": true,
-          "subjectContains": "NOTEPAD++"
+    "removed": {
+      "operation": {
+        "kind": "none"
+      },
+      "verifyAbsent": {
+        "use": "discovery",
+        "require": {
+          "files": true,
+          "directories": false,
+          "commands": true,
+          "apps": false,
+          "metadataFiles": false,
+          "signatures": false,
+          "fileDetails": false,
+          "registry": false
         }
-      ],
-      "fileDetails": [
-        {
-          "relativePath": "notepad++.exe",
-          "productName": "Notepad++",
-          "fileDescription": "Notepad++",
-          "fileVersion": "{version}",
-          "productVersion": "{version}"
-        }
-      ],
-      "registryChecks": []
+      },
+      "cleanup": {
+        "inventory": true,
+        "shims": true,
+        "path": true,
+        "workDirectories": true
+      }
     }
-  },
-  "releases": [
-    {
-      "id": "notepad-plus-plus-8.9.4-win-x64",
-      "version": "8.9.4",
-      "releaseTrack": "stable",
-      "flavor": "win-x64",
-      "constraints": {
-        "os": [
-          "windows"
-        ],
-        "cpu": [
-          "x64"
-        ]
-      },
-      "packageFile": {
-        "fileName": "npp.8.9.4.Installer.x64.exe",
-        "contentHash": {
-          "algorithm": "sha256",
-          "value": "f3629f500d0754d8e870255fff0e00384a37f5402d6f3ad8dd1f4f67d707b593"
-        },
-        "publisherSignature": {
-          "kind": "authenticode",
-          "requireValid": true,
-          "subjectContains": "NOTEPAD++"
-        }
-      },
-      "acquisitionCandidates": [
-        {
-          "kind": "packageDepot",
-          "searchOrder": 100,
-          "verification": {
-            "mode": "required"
-          }
-        },
-        {
-          "kind": "download",
-          "sourceId": "notepadPlusPlusGitHubRelease",
-          "sourcePath": "npp.8.9.4.Installer.x64.exe",
-          "searchOrder": 900,
-          "verification": {
-            "mode": "required"
-          }
-        }
-      ]
-    },
-    {
-      "id": "notepad-plus-plus-8.9.4-win-arm64",
-      "version": "8.9.4",
-      "releaseTrack": "stable",
-      "flavor": "win-arm64",
-      "constraints": {
-        "os": [
-          "windows"
-        ],
-        "cpu": [
-          "arm64"
-        ]
-      },
-      "packageFile": {
-        "fileName": "npp.8.9.4.Installer.arm64.exe",
-        "contentHash": {
-          "algorithm": "sha256",
-          "value": "7d59f0c62caa4d2366f900ca8169fb37cf1dcfce5c79cb3ccb08089b1adbc91"
-        },
-        "publisherSignature": {
-          "kind": "authenticode",
-          "requireValid": true,
-          "subjectContains": "NOTEPAD++"
-        }
-      },
-      "acquisitionCandidates": [
-        {
-          "kind": "packageDepot",
-          "searchOrder": 100,
-          "verification": {
-            "mode": "required"
-          }
-        },
-        {
-          "kind": "download",
-          "sourceId": "notepadPlusPlusGitHubRelease",
-          "sourcePath": "npp.8.9.4.Installer.arm64.exe",
-          "searchOrder": 900,
-          "verification": {
-            "mode": "required"
-          }
-        }
-      ]
-    }
-  ],
-  "$schema": "./eigenverft-module-package-definition-1.1.schema.json"
+  }
 }

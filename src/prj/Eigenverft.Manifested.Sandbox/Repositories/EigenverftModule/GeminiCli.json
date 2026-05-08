@@ -1,5 +1,6 @@
 {
-  "schemaVersion": "1.1",
+  "$schema": "./eigenverft-module-package-definition-1.2.schema.json",
+  "schemaVersion": "1.2",
   "id": "GeminiCli",
   "display": {
     "default": {
@@ -9,88 +10,17 @@
       "summary": "Pinned Gemini CLI npm runtime"
     }
   },
-  "upstreamSources": {},
-  "dependencies": {
-    "repositoryId": "EigenverftModule",
-    "definitionId": "NodeRuntime"
-  },
-  "providedTools": {
-    "commands": [
-      {
-        "name": "gemini",
-        "relativePath": "gemini.cmd"
-      }
-    ],
-    "apps": []
-  },
-  "shared": {
-    "ownershipPolicy": {
-      "allowAdoptExternal": false,
-      "upgradeAdoptedInstall": false,
-      "requirePackageOwnership": true
-    },
-    "compatibility": {
-      "checks": [
-        {
-          "kind": "osVersion",
-          "operator": ">=",
-          "value": "10.0"
-        }
-      ]
-    },
-    "remove": {
-      "keepInstallDirectory": false,
-      "keepInventoryRecord": false,
-      "requireProcessExit": [],
-      "keepShims": false
-    },
-    "discovery": {
-      "enableDetection": false,
-      "searchLocations": [],
-      "installRootRules": []
-    },
-    "install": {
-      "kind": "npmGlobalPackage",
-      "installerCommand": "npm",
-      "packageSpec": "@google/gemini-cli@{version}",
-      "installDirectory": "gemini-runtime/{releaseTrack}/{version}/{flavor}",
-      "pathRegistration": {
-        "mode": "user",
-        "source": {
-          "kind": "shim",
-          "value": "gemini"
-        }
-      }
-    },
-    "validation": {
-      "files": [
-        "gemini.cmd",
-        "node_modules/@google/gemini-cli/package.json"
-      ],
-      "directories": [
-        "node_modules"
-      ],
-      "commandChecks": [
-        {
-          "entryPoint": "gemini",
-          "arguments": [
-            "--version"
-          ],
-          "outputPattern": "(?m)^(?<value>.+\\S.*)$"
-        }
-      ],
-      "metadataFiles": [],
-      "signatures": [],
-      "fileDetails": [],
-      "registryChecks": []
-    }
-  },
-  "releases": [
+  "dependencies": [
     {
-      "id": "gemini-runtime-win32-x64-stable",
-      "version": "0.39.1",
-      "releaseTrack": "stable",
-      "flavor": "win32-x64",
+      "repositoryId": "EigenverftModule",
+      "definitionId": "NodeRuntime"
+    }
+  ],
+  "packageTargets": [
+    {
+      "id": "GeminiCli-win32-x64-stable",
+      "channel": "stable",
+      "platformTarget": "win32-x64",
       "constraints": {
         "os": [
           "windows"
@@ -98,13 +28,16 @@
         "cpu": [
           "x64"
         ]
+      },
+      "versionSelection": {
+        "strategy": "latestByVersion",
+        "allowPrerelease": false
       }
     },
     {
-      "id": "gemini-runtime-win32-arm64-stable",
-      "version": "0.39.1",
-      "releaseTrack": "stable",
-      "flavor": "win32-arm64",
+      "id": "GeminiCli-win32-arm64-stable",
+      "channel": "stable",
+      "platformTarget": "win32-arm64",
       "constraints": {
         "os": [
           "windows"
@@ -112,8 +45,139 @@
         "cpu": [
           "arm64"
         ]
+      },
+      "versionSelection": {
+        "strategy": "latestByVersion",
+        "allowPrerelease": false
       }
     }
   ],
-  "$schema": "./eigenverft-module-package-definition-1.1.schema.json"
+  "versionCatalog": [
+    {
+      "version": "0.39.1",
+      "channels": [
+        "stable"
+      ],
+      "artifactsByTarget": {
+        "GeminiCli-win32-x64-stable": {
+          "releaseId": "gemini-runtime-win32-x64-stable"
+        },
+        "GeminiCli-win32-arm64-stable": {
+          "releaseId": "gemini-runtime-win32-arm64-stable"
+        }
+      }
+    }
+  ],
+  "discovery": {
+    "files": [
+      "gemini.cmd",
+      "node_modules/@google/gemini-cli/package.json"
+    ],
+    "directories": [
+      "node_modules"
+    ],
+    "commands": [
+      {
+        "name": "gemini",
+        "relativePath": "gemini.cmd",
+        "required": true,
+        "exposed": true,
+        "stateChecks": [
+          {
+            "arguments": [
+              "--version"
+            ],
+            "outputPattern": "(?m)^(?<value>.+\\S.*)$"
+          }
+        ]
+      }
+    ],
+    "apps": [],
+    "metadataFiles": [],
+    "signatures": [],
+    "fileDetails": [],
+    "registry": []
+  },
+  "stateDiscovery": {
+    "installed": {
+      "enableDetection": false,
+      "searchLocations": [],
+      "installRootRules": []
+    }
+  },
+  "upstreamSources": {},
+  "packageOperations": {
+    "shared": {
+      "ownershipPolicy": {
+        "allowAdoptExternal": false,
+        "upgradeAdoptedInstall": false,
+        "requirePackageOwnership": true
+      },
+      "compatibility": {
+        "checks": [
+          {
+            "kind": "osVersion",
+            "operator": ">=",
+            "value": "10.0"
+          }
+        ]
+      }
+    },
+    "assigned": {
+      "kind": "npmGlobalPackage",
+      "installerCommand": "npm",
+      "packageSpec": "@google/gemini-cli@{version}",
+      "installDirectory": "gemini-runtime/{channel}/{version}/{platformTarget}",
+      "pathRegistration": {
+        "mode": "user",
+        "source": {
+          "kind": "shim",
+          "use": "discovery.commands"
+        }
+      },
+      "installedStateCheck": {
+        "use": "discovery",
+        "expectedVersion": "{version}",
+        "require": {
+          "files": true,
+          "directories": true,
+          "commands": true,
+          "apps": false,
+          "metadataFiles": false,
+          "signatures": false,
+          "fileDetails": false,
+          "registry": false
+        }
+      },
+      "versionUpdatePolicy": {
+        "whenAssigned": "trackSelectedVersion",
+        "onSameSelectedVersion": "reuseOrRepair",
+        "onNewSelectedVersion": "replacePackageOwnedInstall"
+      }
+    },
+    "removed": {
+      "operation": {
+        "kind": "deleteInstallDirectory"
+      },
+      "verifyAbsent": {
+        "use": "discovery",
+        "require": {
+          "files": true,
+          "directories": false,
+          "commands": true,
+          "apps": false,
+          "metadataFiles": false,
+          "signatures": false,
+          "fileDetails": false,
+          "registry": false
+        }
+      },
+      "cleanup": {
+        "inventory": true,
+        "shims": true,
+        "path": true,
+        "workDirectories": true
+      }
+    }
+  }
 }

@@ -1,5 +1,6 @@
 {
-  "schemaVersion": "1.1",
+  "$schema": "./eigenverft-module-package-definition-1.2.schema.json",
+  "schemaVersion": "1.2",
   "id": "PythonRuntime",
   "display": {
     "default": {
@@ -9,99 +10,11 @@
       "summary": "Portable Python runtime from the official NuGet package"
     }
   },
-  "upstreamSources": {
-    "pythonNuGetPackage": {
-      "kind": "download",
-      "baseUri": "https://api.nuget.org/v3-flatcontainer/"
-    }
-  },
-  "providedTools": {
-    "commands": [
-      {
-        "name": "python",
-        "relativePath": "python.exe"
-      }
-    ],
-    "apps": []
-  },
-  "shared": {
-    "ownershipPolicy": {
-      "allowAdoptExternal": false,
-      "upgradeAdoptedInstall": false,
-      "requirePackageOwnership": true
-    },
-    "compatibility": {
-      "checks": [
-        {
-          "kind": "osVersion",
-          "operator": ">=",
-          "value": "10.0"
-        }
-      ]
-    },
-    "remove": {
-      "keepInstallDirectory": false,
-      "keepInventoryRecord": false,
-      "requireProcessExit": [],
-      "keepShims": false
-    },
-    "discovery": {
-      "enableDetection": false,
-      "searchLocations": [],
-      "installRootRules": []
-    },
-    "install": {
-      "kind": "expandArchive",
-      "installDirectory": "python-runtime/{releaseTrack}/{version}/{flavor}",
-      "pathRegistration": {
-        "mode": "user",
-        "source": {
-          "kind": "shim",
-          "value": "python"
-        }
-      },
-      "expandedRoot": "tools",
-      "createDirectories": []
-    },
-    "validation": {
-      "files": [
-        "python.exe"
-      ],
-      "directories": [
-        "Lib/site-packages/pip"
-      ],
-      "commandChecks": [
-        {
-          "entryPoint": "python",
-          "arguments": [
-            "--version"
-          ],
-          "outputPattern": "(?m)^Python\\s+(?<value>\\d+\\.\\d+\\.\\d+)\\s*$",
-          "expectedValue": "{version}"
-        },
-        {
-          "entryPoint": "python",
-          "arguments": [
-            "-m",
-            "pip",
-            "--version"
-          ],
-          "outputPattern": "(?m)^pip\\s+(?<value>\\d+\\.\\d+(?:\\.\\d+)?(?:[-+][0-9A-Za-z.\\-]+)?)\\s+from\\s+.+$"
-        }
-      ],
-      "metadataFiles": [],
-      "signatures": [],
-      "fileDetails": [],
-      "registryChecks": []
-    }
-  },
-  "releases": [
+  "packageTargets": [
     {
-      "id": "python-runtime-win-x64-stable",
-      "version": "3.13.13",
-      "releaseTag": "3.13.13",
-      "releaseTrack": "stable",
-      "flavor": "win-x64",
+      "id": "PythonRuntime-win-x64-stable",
+      "channel": "stable",
+      "platformTarget": "win-x64",
       "constraints": {
         "os": [
           "windows"
@@ -110,38 +23,36 @@
           "x64"
         ]
       },
-      "packageFile": {
-        "fileName": "python.3.13.13.nupkg",
-        "contentHash": {
-          "algorithm": "sha256",
-          "value": "c2347c2975f661b2dafceacc94218dfe87781955a3cd309c633d343b8c8dac31"
-        }
+      "versionSelection": {
+        "strategy": "latestByVersion",
+        "allowPrerelease": false
       },
-      "acquisitionCandidates": [
-        {
-          "kind": "packageDepot",
-          "searchOrder": 100,
-          "verification": {
-            "mode": "optional"
+      "artifactDefaults": {
+        "fileNameTemplate": "python.{version}.nupkg",
+        "artifactSources": [
+          {
+            "kind": "packageDepot",
+            "searchOrder": 100,
+            "verification": {
+              "mode": "optional"
+            }
+          },
+          {
+            "kind": "download",
+            "sourceId": "pythonNuGetPackage",
+            "sourcePath": "python/{version}/python.{version}.nupkg",
+            "searchOrder": 900,
+            "verification": {
+              "mode": "required"
+            }
           }
-        },
-        {
-          "kind": "download",
-          "sourceId": "pythonNuGetPackage",
-          "sourcePath": "python/3.13.13/python.3.13.13.nupkg",
-          "searchOrder": 900,
-          "verification": {
-            "mode": "required"
-          }
-        }
-      ]
+        ]
+      }
     },
     {
-      "id": "python-runtime-win-arm64-stable",
-      "version": "3.13.13",
-      "releaseTag": "3.13.13",
-      "releaseTrack": "stable",
-      "flavor": "win-arm64",
+      "id": "PythonRuntime-win-arm64-stable",
+      "channel": "stable",
+      "platformTarget": "win-arm64",
       "constraints": {
         "os": [
           "windows"
@@ -150,32 +61,181 @@
           "arm64"
         ]
       },
-      "packageFile": {
-        "fileName": "pythonarm64.3.13.13.nupkg",
-        "contentHash": {
-          "algorithm": "sha256",
-          "value": "2a0406b834d4ff33414f70597b67797466ba2344baa534ab8f62c4eae1c3e599"
-        }
+      "versionSelection": {
+        "strategy": "latestByVersion",
+        "allowPrerelease": false
       },
-      "acquisitionCandidates": [
-        {
-          "kind": "packageDepot",
-          "searchOrder": 100,
-          "verification": {
-            "mode": "optional"
+      "artifactDefaults": {
+        "fileNameTemplate": "pythonarm64.{version}.nupkg",
+        "artifactSources": [
+          {
+            "kind": "packageDepot",
+            "searchOrder": 100,
+            "verification": {
+              "mode": "optional"
+            }
+          },
+          {
+            "kind": "download",
+            "sourceId": "pythonNuGetPackage",
+            "sourcePath": "pythonarm64/{version}/pythonarm64.{version}.nupkg",
+            "searchOrder": 900,
+            "verification": {
+              "mode": "required"
+            }
           }
-        },
-        {
-          "kind": "download",
-          "sourceId": "pythonNuGetPackage",
-          "sourcePath": "pythonarm64/3.13.13/pythonarm64.3.13.13.nupkg",
-          "searchOrder": 900,
-          "verification": {
-            "mode": "required"
-          }
-        }
-      ]
+        ]
+      }
     }
   ],
-  "$schema": "./eigenverft-module-package-definition-1.1.schema.json"
+  "versionCatalog": [
+    {
+      "version": "3.13.13",
+      "channels": [
+        "stable"
+      ],
+      "artifactsByTarget": {
+        "PythonRuntime-win-x64-stable": {
+          "releaseId": "python-runtime-win-x64-stable",
+          "contentHash": {
+            "algorithm": "sha256",
+            "value": "c2347c2975f661b2dafceacc94218dfe87781955a3cd309c633d343b8c8dac31"
+          }
+        },
+        "PythonRuntime-win-arm64-stable": {
+          "releaseId": "python-runtime-win-arm64-stable",
+          "contentHash": {
+            "algorithm": "sha256",
+            "value": "2a0406b834d4ff33414f70597b67797466ba2344baa534ab8f62c4eae1c3e599"
+          }
+        }
+      },
+      "releaseTag": "3.13.13"
+    }
+  ],
+  "discovery": {
+    "files": [
+      "python.exe"
+    ],
+    "directories": [
+      "Lib/site-packages/pip"
+    ],
+    "commands": [
+      {
+        "name": "python",
+        "relativePath": "python.exe",
+        "required": true,
+        "exposed": true,
+        "stateChecks": [
+          {
+            "arguments": [
+              "--version"
+            ],
+            "outputPattern": "(?m)^Python\\s+(?<value>\\d+\\.\\d+\\.\\d+)\\s*$",
+            "expectedValue": "{version}"
+          },
+          {
+            "arguments": [
+              "-m",
+              "pip",
+              "--version"
+            ],
+            "outputPattern": "(?m)^pip\\s+(?<value>\\d+\\.\\d+(?:\\.\\d+)?(?:[-+][0-9A-Za-z.\\-]+)?)\\s+from\\s+.+$"
+          }
+        ]
+      }
+    ],
+    "apps": [],
+    "metadataFiles": [],
+    "signatures": [],
+    "fileDetails": [],
+    "registry": []
+  },
+  "stateDiscovery": {
+    "installed": {
+      "enableDetection": false,
+      "searchLocations": [],
+      "installRootRules": []
+    }
+  },
+  "upstreamSources": {
+    "pythonNuGetPackage": {
+      "kind": "download",
+      "baseUri": "https://api.nuget.org/v3-flatcontainer/"
+    }
+  },
+  "packageOperations": {
+    "shared": {
+      "ownershipPolicy": {
+        "allowAdoptExternal": false,
+        "upgradeAdoptedInstall": false,
+        "requirePackageOwnership": true
+      },
+      "compatibility": {
+        "checks": [
+          {
+            "kind": "osVersion",
+            "operator": ">=",
+            "value": "10.0"
+          }
+        ]
+      }
+    },
+    "assigned": {
+      "kind": "expandArchive",
+      "installDirectory": "python-runtime/{channel}/{version}/{platformTarget}",
+      "pathRegistration": {
+        "mode": "user",
+        "source": {
+          "kind": "shim",
+          "use": "discovery.commands"
+        }
+      },
+      "expandedRoot": "tools",
+      "createDirectories": [],
+      "installedStateCheck": {
+        "use": "discovery",
+        "expectedVersion": "{version}",
+        "require": {
+          "files": true,
+          "directories": true,
+          "commands": true,
+          "apps": false,
+          "metadataFiles": false,
+          "signatures": false,
+          "fileDetails": false,
+          "registry": false
+        }
+      },
+      "versionUpdatePolicy": {
+        "whenAssigned": "trackSelectedVersion",
+        "onSameSelectedVersion": "reuseOrRepair",
+        "onNewSelectedVersion": "replacePackageOwnedInstall"
+      }
+    },
+    "removed": {
+      "operation": {
+        "kind": "deleteInstallDirectory"
+      },
+      "verifyAbsent": {
+        "use": "discovery",
+        "require": {
+          "files": true,
+          "directories": false,
+          "commands": true,
+          "apps": false,
+          "metadataFiles": false,
+          "signatures": false,
+          "fileDetails": false,
+          "registry": false
+        }
+      },
+      "cleanup": {
+        "inventory": true,
+        "shims": true,
+        "path": true,
+        "workDirectories": true
+      }
+    }
+  }
 }

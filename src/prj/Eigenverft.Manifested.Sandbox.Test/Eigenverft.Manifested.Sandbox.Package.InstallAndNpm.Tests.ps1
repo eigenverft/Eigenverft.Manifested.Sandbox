@@ -356,16 +356,18 @@ exit /b 0
             InstallDirectory = $null
             Package          = [pscustomobject]@{
                 id = 'notepad-plus-plus-8.9.4-win-x64'
-                existingInstallDiscovery = [pscustomobject]@{
-                    enableDetection = $true
-                    searchLocations = @(
-                        [pscustomobject]@{
-                            kind = 'windowsUninstallRegistryKey'
-                            paths = @($registryPath)
-                            installDirectorySource = 'displayIconDirectory'
-                        }
-                    )
-                    installRootRules = @()
+                stateDiscovery = [pscustomobject]@{
+                    installed = [pscustomobject]@{
+                        enableDetection = $true
+                        searchLocations = @(
+                            [pscustomobject]@{
+                                kind = 'windowsUninstallRegistryKey'
+                                paths = @($registryPath)
+                                installDirectorySource = 'displayIconDirectory'
+                            }
+                        )
+                        installRootRules = @()
+                    }
                 }
             }
             ExistingPackage  = $null
@@ -587,7 +589,7 @@ exit /b 0
         $preferredTargetInstallDirectory = Join-Path $rootPath 'installs'
         $packageStateIndexFilePath = Join-Path $rootPath 'package-inventory.json'
         $definitionDocument = @{
-            schemaVersion = '1.1'
+            schemaVersion = '1.2'
             id = 'Qwen35_2B_Q8_0_Model'
             display = @{
                 default = @{
@@ -597,85 +599,131 @@ exit /b 0
                     summary = 'Quantized GGUF model resource'
                 }
             }
+            packageTargets = @(
+                @{
+                    id = 'Qwen35_2B_Q8_0_Model-q8-0-stable'
+                    channel = 'stable'
+                    platformTarget = 'q8-0'
+                    constraints = @{
+                        os = @('windows')
+                        cpu = @('x64')
+                    }
+                    versionSelection = @{
+                        strategy = 'latestByVersion'
+                        allowPrerelease = $false
+                    }
+                    artifactDefaults = @{
+                        artifactSources = @(
+                            @{
+                                kind = 'packageDepot'
+                                searchOrder = 250
+                                verification = @{
+                                    mode = 'none'
+                                }
+                            }
+                        )
+                    }
+                }
+            )
+            versionCatalog = @(
+                @{
+                    version = '3.5.0'
+                    channels = @('stable')
+                    artifactsByTarget = @{
+                        'Qwen35_2B_Q8_0_Model-q8-0-stable' = @{
+                            releaseId = 'qwen35-2b-q8-0-stable'
+                            fileName = 'Qwen3.5-2B-Q8_0.gguf'
+                        }
+                    }
+                }
+            )
+            discovery = @{
+                files = @('Qwen3.5-2B-Q8_0.gguf')
+                directories = [object[]]@()
+                commands = [object[]]@()
+                apps = [object[]]@()
+                metadataFiles = [object[]]@()
+                signatures = [object[]]@()
+                fileDetails = [object[]]@()
+                registry = [object[]]@()
+            }
+            stateDiscovery = @{
+                installed = @{
+                    enableDetection = $false
+                    searchLocations = [object[]]@()
+                    installRootRules = [object[]]@()
+                }
+            }
             upstreamSources = @{
                 huggingFaceDownload = @{
                     kind = 'download'
                     baseUri = 'https://huggingface.co/unsloth/Qwen3.5-2B-GGUF/resolve/main/'
                 }
             }
-            providedTools = @{
-                commands = [object[]]@()
-                apps = [object[]]@()
-            }
-            shared = @{
-                compatibility = @{
-                    checks = @(
-                        @{
-                            kind = 'physicalOrVideoMemoryGiB'
-                            operator = '>='
-                            value = 4
-                            onFail = 'warn'
-                        }
-                    )
+            packageOperations = @{
+                shared = @{
+                    compatibility = @{
+                        checks = @(
+                            @{
+                                kind = 'physicalOrVideoMemoryGiB'
+                                operator = '>='
+                                value = 4
+                                onFail = 'warn'
+                            }
+                        )
+                    }
+                    ownershipPolicy = @{
+                        allowAdoptExternal = $false
+                        upgradeAdoptedInstall = $false
+                        requirePackageOwnership = $false
+                    }
                 }
-                install = @{
+                assigned = @{
                     kind = 'placePackageFile'
-                    installDirectory = 'qwen35-2b/{releaseTrack}/{version}/{flavor}'
+                    installDirectory = 'qwen35-2b/{channel}/{version}/{platformTarget}'
                     targetRelativePath = 'Qwen3.5-2B-Q8_0.gguf'
                     pathRegistration = @{
                         mode = 'none'
                     }
+                    installedStateCheck = @{
+                        use = 'discovery'
+                        require = @{
+                            files = $true
+                            directories = $false
+                            commands = $false
+                            apps = $false
+                            metadataFiles = $false
+                            signatures = $false
+                            fileDetails = $false
+                            registry = $false
+                        }
+                    }
                 }
-                validation = @{
-                    files = @('Qwen3.5-2B-Q8_0.gguf')
-                    directories = [object[]]@()
-                    commandChecks = [object[]]@()
-                    metadataFiles = [object[]]@()
-                    signatures = [object[]]@()
-                    fileDetails = [object[]]@()
-                    registryChecks = [object[]]@()
-                }
-                discovery = @{
-                    enableDetection = $false
-                    searchLocations = [object[]]@()
-                    installRootRules = [object[]]@()
-                }
-                ownershipPolicy = @{
-                    allowAdoptExternal = $false
-                    upgradeAdoptedInstall = $false
-                    requirePackageOwnership = $false
-                }
-                remove = @{
-                    keepInstallDirectory = $false
-                    keepInventoryRecord = $false
-                    keepShims = $false
-                    requireProcessExit = [int[]]@()
+                removed = @{
+                    operation = @{
+                        kind = 'none'
+                    }
+                    verifyAbsent = @{
+                        use = 'discovery'
+                        require = @{
+                            files = $true
+                            directories = $false
+                            commands = $false
+                            apps = $false
+                            metadataFiles = $false
+                            signatures = $false
+                            fileDetails = $false
+                            registry = $false
+                        }
+                    }
+                    cleanup = @{
+                        inventory = $true
+                        shims = $true
+                        path = $true
+                        workDirectories = $true
+                    }
                 }
             }
-            releases = @(
-                @{
-                    id = 'qwen35-2b-q8-0-stable'
-                    version = '3.5.0'
-                    releaseTrack = 'stable'
-                    flavor = 'q8-0'
-                    constraints = @{
-                        os = @('windows')
-                        cpu = @('x64')
-                    }
-                    packageFile = @{
-                        fileName = 'Qwen3.5-2B-Q8_0.gguf'
-                    }
-                    acquisitionCandidates = @(
-                        @{
-                            kind = 'packageDepot'
-                            searchOrder = 250
-                            verification = @{
-                                mode = 'none'
-                            }
-                        }
-                    )
-                }
-            )
         }
         $documents = Write-TestPackageDocuments -RootPath $rootPath -GlobalDocument (New-TestPackageGlobalDocument -PackageFileStagingDirectory $packageFileStagingDirectory -DefaultPackageDepotDirectory $defaultPackageDepotDirectory -PreferredTargetInstallDirectory $preferredTargetInstallDirectory -PackageInventoryFilePath $packageStateIndexFilePath) -DefinitionDocument $definitionDocument
 
@@ -788,23 +836,25 @@ exit /b 0
             ExistingPackage  = $null
             Package          = [pscustomobject]@{
                 id = 'VSCodeRuntime'
-                existingInstallDiscovery = [pscustomobject]@{
-                    enableDetection = $true
-                    searchLocations = @(
-                        [pscustomobject]@{
-                            kind = 'command'
-                            name = 'code'
-                        }
-                    )
-                    installRootRules = @(
-                        [pscustomobject]@{
-                            match = [pscustomobject]@{
-                                kind  = 'fileName'
-                                value = 'code.cmd'
+                stateDiscovery = [pscustomobject]@{
+                    installed = [pscustomobject]@{
+                        enableDetection = $true
+                        searchLocations = @(
+                            [pscustomobject]@{
+                                kind = 'command'
+                                name = 'code'
                             }
-                            installRootRelativePath = '..'
-                        }
-                    )
+                        )
+                        installRootRules = @(
+                            [pscustomobject]@{
+                                match = [pscustomobject]@{
+                                    kind  = 'fileName'
+                                    value = 'code.cmd'
+                                }
+                                installRootRelativePath = '..'
+                            }
+                        )
+                    }
                 }
             }
         }
