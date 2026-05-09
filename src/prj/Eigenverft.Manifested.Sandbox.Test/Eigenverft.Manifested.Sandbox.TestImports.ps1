@@ -49,6 +49,7 @@ $moduleProjectRoot = Join-Path (Split-Path -Parent $PSScriptRoot) 'Eigenverft.Ma
 . "$moduleProjectRoot\Support\Package\Execution\Eigenverft.Manifested.Sandbox.Package.Shims.ps1"
 . "$moduleProjectRoot\Support\Package\Execution\Eigenverft.Manifested.Sandbox.Package.PathRegistration.ps1"
 . "$moduleProjectRoot\Support\Package\Lifecycle\Eigenverft.Manifested.Sandbox.Package.CommandFlow.ps1"
+. "$moduleProjectRoot\Support\Package\Lifecycle\Eigenverft.Manifested.Sandbox.Package.Remove.ps1"
 
 # Package definitions
 # Package definitions are JSON-only.

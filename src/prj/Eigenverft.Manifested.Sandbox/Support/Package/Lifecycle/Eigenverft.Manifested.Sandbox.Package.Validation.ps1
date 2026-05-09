@@ -590,5 +590,74 @@ Test-PackageAssignedReadiness -PackageResult $result
     return $PackageResult
 }
 
+function Test-PackageRemovedAbsence {
+<#
+.SYNOPSIS
+Verifies post-removal absence using packageOperations.removed.absenceVerification.
+
+.DESCRIPTION
+Builds a synthetic readiness model from absenceVerification.require and
+presenceDiscovery, reuses Test-PackageAssignedReadiness evaluation, then
+requires that substantive checks do not report full readiness success.
+#>
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [psobject]$PackageResult
+    )
+
+    $definition = $PackageResult.PackageConfig.Definition
+    $removed = $definition.packageOperations.removed
+    $absence = $removed.absenceVerification
+    $fakeAssigned = [pscustomobject]@{
+        readyStateCheck = [pscustomobject]@{
+            require = $absence.require
+        }
+    }
+
+    $readinessModel = New-PackageReadinessFromPresenceDiscovery -Definition $definition -Assigned $fakeAssigned
+    $hadChecks = (@($readinessModel.files).Count -gt 0) -or (@($readinessModel.directories).Count -gt 0) -or
+        (@($readinessModel.commandChecks).Count -gt 0) -or (@($readinessModel.metadataFiles).Count -gt 0) -or
+        (@($readinessModel.signatures).Count -gt 0) -or (@($readinessModel.fileDetails).Count -gt 0) -or
+        (@($readinessModel.registryChecks).Count -gt 0)
+
+    $package = $PackageResult.Package
+    $oldValidation = $null
+    if ($package.PSObject.Properties['validation']) {
+        $oldValidation = $package.validation
+    }
+
+    $null = $package | Add-Member -Force -MemberType NoteProperty -Name 'validation' -Value $readinessModel
+    try {
+        $null = Test-PackageAssignedReadiness -PackageResult $PackageResult
+    }
+    finally {
+        if ($null -ne $oldValidation) {
+            $null = $package | Add-Member -Force -MemberType NoteProperty -Name 'validation' -Value $oldValidation
+        }
+        else {
+            $null = $package.PSObject.Properties.Remove('validation')
+        }
+    }
+
+    $assignAccepted = $PackageResult.Validation.Accepted
+    $absenceAccepted = if (-not $hadChecks) { $true } else { -not $assignAccepted }
+
+    $PackageResult.Removed = [pscustomobject]@{
+        Accepted = $absenceAccepted
+        HadChecks = $hadChecks
+        ReadinessProbeAccepted = $assignAccepted
+    }
+
+    if (-not $absenceAccepted) {
+        throw "Package absence verification failed: presenceDiscovery still reports readiness for removed definition '$($PackageResult.DefinitionId)'."
+    }
+
+    $PackageResult.Validation = $null
+
+    Write-PackageExecutionMessage -Message ("[STATE] Absence verification completed for '{0}' with accepted='{1}'." -f $PackageResult.InstallDirectory, $absenceAccepted)
+
+    return $PackageResult
+}
 
 

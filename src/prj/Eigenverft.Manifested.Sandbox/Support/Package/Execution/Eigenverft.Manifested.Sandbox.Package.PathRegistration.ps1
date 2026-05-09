@@ -370,4 +370,90 @@ for the same install slot.
     return $PackageResult
 }
 
+function Unregister-PackagePathForRemoval {
+<#
+.SYNOPSIS
+Removes Package PATH entries recorded during assignment, without re-adding a primary path.
+
+.DESCRIPTION
+Uses the persisted pathRegistration snapshot from inventory (attached to
+PackageResult.PathRegistration) to remove registeredPath and cleanup
+directories from PATH for the same mode as registration.
+#>
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [psobject]$PackageResult
+    )
+
+    $pathRegistration = if ($PackageResult.PSObject.Properties['PathRegistration'] -and $null -ne $PackageResult.PathRegistration) {
+        $PackageResult.PathRegistration
+    }
+    else {
+        $null
+    }
+
+    if (-not $pathRegistration -or -not $pathRegistration.PSObject.Properties['mode']) {
+        Write-PackageExecutionMessage -Message '[STATE] PATH unregistration skipped because no pathRegistration was resolved.'
+        return $PackageResult
+    }
+
+    $mode = ([string]$pathRegistration.mode).ToLowerInvariant()
+    if ($mode -eq 'none' -or [string]::Equals([string]$pathRegistration.Status, 'Skipped', [System.StringComparison]::OrdinalIgnoreCase) -or
+        [string]::Equals([string]$pathRegistration.Status, 'SkippedNotPackageOwned', [System.StringComparison]::OrdinalIgnoreCase)) {
+        Write-PackageExecutionMessage -Message '[STATE] PATH unregistration skipped because registration was not active.'
+        return $PackageResult
+    }
+
+    if ($mode -notin @('user', 'machine')) {
+        throw "Unsupported Package pathRegistration.mode '$mode' for removal."
+    }
+
+    $registeredPath = if ($pathRegistration.PSObject.Properties['registeredPath'] -and -not [string]::IsNullOrWhiteSpace([string]$pathRegistration.registeredPath)) {
+        [System.IO.Path]::GetFullPath([string]$pathRegistration.registeredPath)
+    }
+    else {
+        $null
+    }
+
+    $cleanupDirectories = New-Object System.Collections.Generic.List[string]
+    if ($registeredPath) {
+        $cleanupDirectories.Add($registeredPath) | Out-Null
+    }
+
+    $cleanupFromRecord = if ($pathRegistration.PSObject.Properties['CleanupDirectories'] -and $null -ne $pathRegistration.CleanupDirectories) {
+        @($pathRegistration.CleanupDirectories)
+    }
+    else {
+        @()
+    }
+    foreach ($dir in @($cleanupFromRecord)) {
+        if (-not [string]::IsNullOrWhiteSpace([string]$dir)) {
+            $normalized = Get-NormalizedPathEntry -PathEntry ([string]$dir)
+            if ($normalized -and $normalized -notin @($cleanupDirectories.ToArray())) {
+                $cleanupDirectories.Add($normalized) | Out-Null
+            }
+        }
+    }
+
+    if ($PackageResult.InstallDirectory -and (Test-Path -LiteralPath $PackageResult.InstallDirectory -PathType Container)) {
+        foreach ($extra in @(Get-PackagePathRegistrationCleanupDirectories -PackageResult $PackageResult)) {
+            $normalized = Get-NormalizedPathEntry -PathEntry $extra
+            if ($normalized -and $normalized -notin @($cleanupDirectories.ToArray())) {
+                $cleanupDirectories.Add($normalized) | Out-Null
+            }
+        }
+    }
+
+    if ($cleanupDirectories.Count -eq 0) {
+        Write-PackageExecutionMessage -Message '[STATE] PATH unregistration skipped because no directories were recorded for cleanup.'
+        return $PackageResult
+    }
+
+    $unregisterResult = Remove-PathEnvironmentDirectories -Mode $mode -DirectoryPaths @($cleanupDirectories.ToArray())
+    Write-PackageExecutionMessage -Message ("[ACTION] PATH unregistration status='{0}' mode='{1}' updatedTargets='{2}'." -f $unregisterResult.Status, $mode, $(if ($unregisterResult.UpdatedTargets.Count -gt 0) { @($unregisterResult.UpdatedTargets) -join ',' } else { '<none>' }))
+
+    return $PackageResult
+}
+
 

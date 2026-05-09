@@ -46,6 +46,7 @@
 . "$PSScriptRoot\Support\Package\Execution\Eigenverft.Manifested.Sandbox.Package.Shims.ps1"
 . "$PSScriptRoot\Support\Package\Execution\Eigenverft.Manifested.Sandbox.Package.PathRegistration.ps1"
 . "$PSScriptRoot\Support\Package\Lifecycle\Eigenverft.Manifested.Sandbox.Package.CommandFlow.ps1"
+. "$PSScriptRoot\Support\Package\Lifecycle\Eigenverft.Manifested.Sandbox.Package.Remove.ps1"
 
 # Package definitions
 # Package definitions are JSON-only.

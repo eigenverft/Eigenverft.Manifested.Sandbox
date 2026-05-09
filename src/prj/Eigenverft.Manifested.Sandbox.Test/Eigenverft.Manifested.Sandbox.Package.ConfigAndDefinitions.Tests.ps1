@@ -403,8 +403,8 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
         { Resolve-PackageDefinitionReference -RepositoryId 'OtherRepository' -DefinitionId 'VSCodeRuntime' } | Should -Throw "*Only 'EigenverftModule' is currently supported*"
     }
 
-    It 'returns a clean not-implemented result for removed desired state' {
-        $rootPath = Join-Path $TestDrive 'removed-state-not-implemented'
+    It 'completes removed desired state when inventory is missing and whenNotInInventory is succeed' {
+        $rootPath = Join-Path $TestDrive 'removed-no-inventory-succeed'
         $globalDocument = New-TestPackageGlobalDocument -ApplicationRootDirectory (Join-Path $rootPath 'AppRoot')
         $definitionDocument = New-TestVSCodeDefinitionDocument -Releases @(
             New-TestPackageRelease -Id 'vsCode-win-x64-stable' -Version '2.0.0' -Architecture 'x64' -ArtifactDistributionVariant 'win32-x64' -FileName 'VSCode-win32-x64-2.0.0.zip' -AcquisitionCandidates @(
@@ -416,6 +416,10 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
         )
         $documents = Write-TestPackageDocuments -RootPath $rootPath -GlobalDocument $globalDocument -DefinitionDocument $definitionDocument
 
+        $inventoryPath = Join-Path (Join-Path $rootPath 'AppRoot') 'State\package-inventory.json'
+        $null = New-Item -ItemType Directory -Path (Split-Path -Parent $inventoryPath) -Force
+        Write-TestJsonDocument -Path $inventoryPath -Document @{ schemaVersion = 1; records = @() }
+
         [Environment]::SetEnvironmentVariable($script:SourceInventoryEnvVarName, (Join-Path $TestDrive 'missing-inventory.json'), 'Process')
         Mock Get-PackageGlobalConfigPath { $documents.GlobalConfigPath }
         Mock Get-PackageDepotInventoryPath { $documents.DepotInventoryPath }
@@ -423,11 +427,200 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
 
         $result = Invoke-PackageDefinitionCommand -DefinitionId 'VSCodeRuntime' -DesiredState Removed
 
-        $result.RepositoryId | Should -Be 'EigenverftModule'
-        $result.DesiredState | Should -Be 'Removed'
+        $result.Status | Should -Be 'Ready'
+        $result.Removed.Accepted | Should -Be $true
+    }
+
+    It 'fails removed desired state when inventory is missing and whenNotInInventory is fail' {
+        $rootPath = Join-Path $TestDrive 'removed-no-inventory-fail'
+        $globalDocument = New-TestPackageGlobalDocument -ApplicationRootDirectory (Join-Path $rootPath 'AppRoot')
+        $definitionDocument = New-TestVSCodeDefinitionDocument -Releases @(
+            New-TestPackageRelease -Id 'vsCode-win-x64-stable' -Version '2.0.0' -Architecture 'x64' -ArtifactDistributionVariant 'win32-x64' -FileName 'VSCode-win32-x64-2.0.0.zip' -AcquisitionCandidates @(
+                @{
+                    kind        = 'packageDepot'
+                    searchOrder = 10
+                }
+            )
+        )
+        $definitionDocument.packageOperations.removed.policy.whenNotInInventory = 'fail'
+        $documents = Write-TestPackageDocuments -RootPath $rootPath -GlobalDocument $globalDocument -DefinitionDocument $definitionDocument
+
+        $inventoryPath = Join-Path (Join-Path $rootPath 'AppRoot') 'State\package-inventory.json'
+        $null = New-Item -ItemType Directory -Path (Split-Path -Parent $inventoryPath) -Force
+        Write-TestJsonDocument -Path $inventoryPath -Document @{ schemaVersion = 1; records = @() }
+
+        [Environment]::SetEnvironmentVariable($script:SourceInventoryEnvVarName, (Join-Path $TestDrive 'missing-inventory.json'), 'Process')
+        Mock Get-PackageGlobalConfigPath { $documents.GlobalConfigPath }
+        Mock Get-PackageDepotInventoryPath { $documents.DepotInventoryPath }
+        Mock Get-PackageDefinitionPath { param($DefinitionId) $documents.DefinitionPath }
+
+        $result = Invoke-PackageDefinitionCommand -DefinitionId 'VSCodeRuntime' -DesiredState Removed
+
         $result.Status | Should -Be 'Failed'
-        $result.FailureReason | Should -Be 'PackageDesiredStateNotImplemented'
-        $result.ErrorMessage | Should -Match "DesiredState 'Removed' is not implemented"
+        $result.FailureReason | Should -Be 'RemovalInventoryResolutionFailed'
+    }
+
+    It 'fails removed flow when removeDependencies policy is true' {
+        $rootPath = Join-Path $TestDrive 'removed-deps-not-implemented'
+        $globalDocument = New-TestPackageGlobalDocument -ApplicationRootDirectory (Join-Path $rootPath 'AppRoot')
+        $definitionDocument = New-TestVSCodeDefinitionDocument -Releases @(
+            New-TestPackageRelease -Id 'vsCode-win-x64-stable' -Version '2.0.0' -Architecture 'x64' -ArtifactDistributionVariant 'win32-x64' -FileName 'VSCode-win32-x64-2.0.0.zip' -AcquisitionCandidates @(
+                @{
+                    kind        = 'packageDepot'
+                    searchOrder = 10
+                }
+            )
+        )
+        $definitionDocument.packageOperations.removed.policy.removeDependencies = $true
+        $documents = Write-TestPackageDocuments -RootPath $rootPath -GlobalDocument $globalDocument -DefinitionDocument $definitionDocument
+
+        $inventoryPath = Join-Path (Join-Path $rootPath 'AppRoot') 'State\package-inventory.json'
+        $null = New-Item -ItemType Directory -Path (Split-Path -Parent $inventoryPath) -Force
+        Write-TestJsonDocument -Path $inventoryPath -Document @{ schemaVersion = 1; records = @() }
+
+        [Environment]::SetEnvironmentVariable($script:SourceInventoryEnvVarName, (Join-Path $TestDrive 'missing-inventory.json'), 'Process')
+        Mock Get-PackageGlobalConfigPath { $documents.GlobalConfigPath }
+        Mock Get-PackageDepotInventoryPath { $documents.DepotInventoryPath }
+        Mock Get-PackageDefinitionPath { param($DefinitionId) $documents.DefinitionPath }
+
+        $result = Invoke-PackageDefinitionCommand -DefinitionId 'VSCodeRuntime' -DesiredState Removed
+
+        $result.Status | Should -Be 'Failed'
+        $result.FailureReason | Should -Be 'RemovalPolicyRejected'
+        $result.ErrorMessage | Should -Match 'removeDependencies'
+    }
+
+    It 'removes install directory and inventory when removed flow runs with matching inventory record' {
+        $rootPath = Join-Path $TestDrive 'removed-delete-success'
+        $globalDocument = New-TestPackageGlobalDocument -ApplicationRootDirectory (Join-Path $rootPath 'AppRoot')
+        $definitionDocument = New-TestVSCodeDefinitionDocument -Releases @(
+            New-TestPackageRelease -Id 'vsCode-win-x64-stable' -Version '2.0.0' -Architecture 'x64' -ArtifactDistributionVariant 'win32-x64' -FileName 'VSCode-win32-x64-2.0.0.zip' -AcquisitionCandidates @(
+                @{
+                    kind        = 'packageDepot'
+                    searchOrder = 10
+                }
+            )
+        )
+        $documents = Write-TestPackageDocuments -RootPath $rootPath -GlobalDocument $globalDocument -DefinitionDocument $definitionDocument
+
+        $appRoot = Join-Path $rootPath 'AppRoot'
+        $preferredRoot = Join-Path $appRoot 'Installed'
+        $installDir = Join-Path $preferredRoot 'vscode-runtime\stable\2.0.0\win32-x64'
+        $null = New-Item -ItemType Directory -Path (Join-Path $installDir 'bin') -Force
+        Write-TestTextFile -Path (Join-Path $installDir 'Code.exe') -Content 'x'
+        Write-TestTextFile -Path (Join-Path $installDir 'bin\code.cmd') -Content '@echo off'
+
+        $inventoryPath = Join-Path $appRoot 'State\package-inventory.json'
+        $null = New-Item -ItemType Directory -Path (Split-Path -Parent $inventoryPath) -Force
+        $record = @{
+            installSlotId       = 'VSCodeRuntime:stable:win32-x64'
+            definitionId        = 'VSCodeRuntime'
+            definitionRepositoryId = 'EigenverftModule'
+            definitionFileName  = 'VSCodeRuntime.json'
+            definitionSourcePath = (Join-Path $rootPath 'VSCodeRuntime.json')
+            definitionLocalPath = (Join-Path $rootPath 'VSCodeRuntime.json')
+            releaseTrack        = 'stable'
+            artifactDistributionVariant = 'win32-x64'
+            currentReleaseId    = 'vsCode-win-x64-stable'
+            currentVersion      = '2.0.0'
+            installDirectory    = $installDir
+            ownershipKind       = 'PackageInstalled'
+            pathRegistration    = $null
+            updatedAtUtc        = [DateTime]::UtcNow.ToString('o')
+        }
+        Write-TestJsonDocument -Path $inventoryPath -Document @{ schemaVersion = 1; records = @($record) }
+
+        [Environment]::SetEnvironmentVariable($script:SourceInventoryEnvVarName, (Join-Path $TestDrive 'missing-inventory.json'), 'Process')
+        Mock Get-PackageGlobalConfigPath { $documents.GlobalConfigPath }
+        Mock Get-PackageDepotInventoryPath { $documents.DepotInventoryPath }
+        Mock Get-PackageDefinitionPath { param($DefinitionId) $documents.DefinitionPath }
+
+        $result = Invoke-PackageDefinitionCommand -DefinitionId 'VSCodeRuntime' -DesiredState Removed
+
+        $result.Status | Should -Be 'Ready'
+        $result.Removed.Accepted | Should -Be $true
+        Test-Path -LiteralPath $installDir | Should -Be $false
+
+        $invAfter = Get-Content -LiteralPath $inventoryPath -Raw | ConvertFrom-Json
+        @($invAfter.records).Count | Should -Be 0
+    }
+
+    It 'blocks removed when another inventory record definition still depends on the target' {
+        $rootPath = Join-Path $TestDrive 'removed-blocked-by-dependents'
+        $defDir = Join-Path $rootPath 'RepoDefs'
+        $null = New-Item -ItemType Directory -Path $defDir -Force
+        $moduleProjectRoot = Join-Path (Split-Path -Parent $PSScriptRoot) 'Eigenverft.Manifested.Sandbox'
+        $shippedDefs = Join-Path $moduleProjectRoot 'Repositories\EigenverftModule'
+        Copy-Item -LiteralPath (Join-Path $shippedDefs 'CodexCli.json') -Destination (Join-Path $defDir 'CodexCli.json') -Force
+        Copy-Item -LiteralPath (Join-Path $shippedDefs 'NodeRuntime.json') -Destination (Join-Path $defDir 'NodeRuntime.json') -Force
+
+        $globalDocument = New-TestPackageGlobalDocument -ApplicationRootDirectory (Join-Path $rootPath 'AppRoot')
+        $definitionDocument = New-TestVSCodeDefinitionDocument -Releases @(
+            New-TestPackageRelease -Id 'vsCode-win-x64-stable' -Version '2.0.0' -Architecture 'x64' -ArtifactDistributionVariant 'win32-x64' -FileName 'VSCode-win32-x64-2.0.0.zip' -AcquisitionCandidates @(
+                @{
+                    kind        = 'packageDepot'
+                    searchOrder = 10
+                }
+            )
+        )
+        $documents = Write-TestPackageDocuments -RootPath $rootPath -GlobalDocument $globalDocument -DefinitionDocument $definitionDocument
+
+        Mock Get-PackageDefinitionPath { param($DefinitionId) Join-Path $defDir ("$DefinitionId.json") }
+
+        $appRoot = Join-Path $rootPath 'AppRoot'
+        $codexDir = Join-Path $appRoot 'Installed\codex-cli'
+        $nodeDir = Join-Path $appRoot 'Installed\node'
+        $null = New-Item -ItemType Directory -Path $codexDir -Force
+        $null = New-Item -ItemType Directory -Path $nodeDir -Force
+
+        $now = [DateTime]::UtcNow.ToString('o')
+        $records = @(
+            @{
+                installSlotId                = 'CodexCli:stable:win32-x64'
+                definitionId                 = 'CodexCli'
+                definitionRepositoryId       = 'EigenverftModule'
+                definitionFileName           = 'CodexCli.json'
+                definitionSourcePath         = (Join-Path $defDir 'CodexCli.json')
+                definitionLocalPath          = (Join-Path $defDir 'CodexCli.json')
+                releaseTrack                 = 'stable'
+                artifactDistributionVariant  = 'win32-x64'
+                currentReleaseId             = 'CodexCli-win32-x64-stable'
+                currentVersion               = '0.125.0'
+                installDirectory             = $codexDir
+                ownershipKind                = 'PackageInstalled'
+                pathRegistration             = $null
+                updatedAtUtc                 = $now
+            }
+            @{
+                installSlotId                = 'NodeRuntime:stable:win-x64'
+                definitionId                 = 'NodeRuntime'
+                definitionRepositoryId       = 'EigenverftModule'
+                definitionFileName           = 'NodeRuntime.json'
+                definitionSourcePath         = (Join-Path $defDir 'NodeRuntime.json')
+                definitionLocalPath          = (Join-Path $defDir 'NodeRuntime.json')
+                releaseTrack                 = 'stable'
+                artifactDistributionVariant  = 'win-x64'
+                currentReleaseId             = 'NodeRuntime-win-x64-stable'
+                currentVersion               = '22.0.0'
+                installDirectory             = $nodeDir
+                ownershipKind                = 'PackageInstalled'
+                pathRegistration             = $null
+                updatedAtUtc                 = $now
+            }
+        )
+        $inventoryPath = Join-Path $appRoot 'State\package-inventory.json'
+        $null = New-Item -ItemType Directory -Path (Split-Path -Parent $inventoryPath) -Force
+        Write-TestJsonDocument -Path $inventoryPath -Document @{ schemaVersion = 1; records = $records }
+
+        [Environment]::SetEnvironmentVariable($script:SourceInventoryEnvVarName, (Join-Path $TestDrive 'missing-inventory.json'), 'Process')
+        Mock Get-PackageGlobalConfigPath { $documents.GlobalConfigPath }
+        Mock Get-PackageDepotInventoryPath { $documents.DepotInventoryPath }
+
+        $result = Invoke-PackageDefinitionCommand -DefinitionId 'NodeRuntime' -DesiredState Removed
+
+        $result.Status | Should -Be 'Failed'
+        $result.FailureReason | Should -Be 'RemovalDependencyDependentsBlocked'
+        $result.ErrorMessage | Should -Match 'CodexCli'
     }
 
     It 'fails clearly when global config still uses retired ownershipTracking' {

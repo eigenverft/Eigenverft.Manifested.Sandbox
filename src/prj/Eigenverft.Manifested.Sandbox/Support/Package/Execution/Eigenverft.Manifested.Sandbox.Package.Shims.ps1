@@ -170,3 +170,41 @@ function New-PackageCommandShim {
     }
 }
 
+function Remove-PackageCommandShimsForDefinition {
+<#
+.SYNOPSIS
+Removes Package-owned command shims for the current definition.
+
+.DESCRIPTION
+Deletes shim files under ShimDirectory that carry Package shim metadata for
+the definition identified on PackageResult.
+#>
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [psobject]$PackageResult
+    )
+
+    $definitionId = [string]$PackageResult.DefinitionId
+    if ([string]::IsNullOrWhiteSpace($definitionId)) {
+        $definitionId = [string]$PackageResult.PackageConfig.DefinitionId
+    }
+
+    foreach ($command in @(Get-PackagePresenceDiscoveryEntryPoints -Definition $PackageResult.PackageConfig.Definition -ToolKind 'commands' -ExposedOnly)) {
+        $commandName = [string]$command.name
+        if ([string]::IsNullOrWhiteSpace($commandName)) {
+            continue
+        }
+        $shimPath = Get-PackageCommandShimPath -PackageResult $PackageResult -CommandName $commandName
+        if (-not (Test-Path -LiteralPath $shimPath -PathType Leaf)) {
+            continue
+        }
+        if (-not (Test-PackageCommandShimOwnedByDefinition -ShimPath $shimPath -DefinitionId $definitionId)) {
+            Write-PackageExecutionMessage -Level 'WRN' -Message ("[WARN] Skipping shim removal for '{0}' because it is not owned by definition '{1}'." -f $shimPath, $definitionId)
+            continue
+        }
+        Remove-Item -LiteralPath $shimPath -Force -ErrorAction Stop
+        Write-PackageExecutionMessage -Message ("[ACTION] Removed command shim '{0}'." -f $shimPath)
+    }
+}
+

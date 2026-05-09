@@ -29,6 +29,35 @@ Get-PackageInstallSlotId -PackageResult $result
     return ('{0}:{1}:{2}' -f $definitionId, $releaseTrack, $artifactDistributionVariant)
 }
 
+function Assert-PackageInventoryRecordOptionalExtensions {
+    [CmdletBinding()]
+    param(
+        [AllowNull()]
+        [object]$Record
+    )
+
+    if ($null -eq $Record) {
+        return
+    }
+
+    if ($Record.PSObject.Properties['dependencyInstallSlotIds'] -and $null -ne $Record.dependencyInstallSlotIds) {
+        $raw = $Record.dependencyInstallSlotIds
+        if ($raw -is [string]) {
+            throw "Package inventory record for installSlotId '$([string]$Record.installSlotId)' has invalid dependencyInstallSlotIds (expected a JSON array of strings, not a single string)."
+        }
+
+        foreach ($entry in @($raw)) {
+            if ($null -eq $entry) {
+                continue
+            }
+
+            if ($entry -isnot [string]) {
+                throw "Package inventory record for installSlotId '$([string]$Record.installSlotId)' has invalid dependencyInstallSlotIds entry (expected string)."
+            }
+        }
+    }
+}
+
 function Get-PackageInventory {
 <#
 .SYNOPSIS
@@ -64,6 +93,10 @@ Get-PackageInventory -PackageConfig $config
 
     $documentInfo = Read-PackageJsonDocument -Path $indexPath
     $records = if ($documentInfo.Document.PSObject.Properties['records']) { @($documentInfo.Document.records) } else { @() }
+    foreach ($record in @($records)) {
+        Assert-PackageInventoryRecordOptionalExtensions -Record $record
+    }
+
     return [pscustomobject]@{
         Path    = $documentInfo.Path
         Records = $records
@@ -93,6 +126,7 @@ Save-PackageInventory -InventoryPath $path -Records $records
         [string]$InventoryPath,
 
         [Parameter(Mandatory = $true)]
+        [AllowEmptyCollection()]
         [object[]]$Records
     )
 
@@ -354,6 +388,17 @@ Update-PackageInventoryRecord -PackageResult $result
         }
     )
 
+    $dependencyInstallSlotIds = @(
+        foreach ($dependencyRow in @($PackageResult.Dependencies)) {
+            $dependencyResult = if ($dependencyRow.PSObject.Properties['Result']) { $dependencyRow.Result } else { $null }
+            if (-not $dependencyResult) {
+                continue
+            }
+
+            Get-PackageInstallSlotId -PackageResult $dependencyResult
+        }
+    ) | Select-Object -Unique
+
     $newRecord = [pscustomobject]@{
         installSlotId   = $installSlotId
         definitionId    = $PackageResult.DefinitionId
@@ -368,6 +413,7 @@ Update-PackageInventoryRecord -PackageResult $result
         installDirectory = $normalizedInstallDirectory
         ownershipKind   = $ownershipKind
         pathRegistration = $pathRegistrationRecord
+        dependencyInstallSlotIds = @($dependencyInstallSlotIds)
         updatedAtUtc    = [DateTime]::UtcNow.ToString('o')
     }
     $records += $newRecord
@@ -382,6 +428,47 @@ Update-PackageInventoryRecord -PackageResult $result
     }
 
     Write-PackageExecutionMessage -Message ("[STATE] Updated package inventory record for installSlotId '{0}' with ownershipKind='{1}' at '{2}'." -f $installSlotId, $ownershipKind, $index.Path)
+
+    return $PackageResult
+}
+
+function Remove-PackageInventoryRecordForInstallSlot {
+<#
+.SYNOPSIS
+Removes the inventory record for the current Package install slot.
+
+.DESCRIPTION
+Loads the inventory, drops records matching installSlotId (or the same
+normalized install directory when present), and persists the document.
+#>
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [psobject]$PackageResult
+    )
+
+    $index = Get-PackageInventory -PackageConfig $PackageResult.PackageConfig
+    $installSlotId = Get-PackageInstallSlotId -PackageResult $PackageResult
+    $normalizedInstallDirectory = if ([string]::IsNullOrWhiteSpace([string]$PackageResult.InstallDirectory)) {
+        $null
+    }
+    else {
+        [System.IO.Path]::GetFullPath([string]$PackageResult.InstallDirectory)
+    }
+
+    $records = @(
+        foreach ($record in @($index.Records)) {
+            $sameSlot = [string]::Equals([string]$record.installSlotId, $installSlotId, [System.StringComparison]::OrdinalIgnoreCase)
+            $sameDir = (-not [string]::IsNullOrWhiteSpace($normalizedInstallDirectory)) -and
+                [string]::Equals([string]$record.installDirectory, $normalizedInstallDirectory, [System.StringComparison]::OrdinalIgnoreCase)
+            if (-not $sameSlot -and -not $sameDir) {
+                $record
+            }
+        }
+    )
+
+    Save-PackageInventory -InventoryPath $index.Path -Records $records
+    Write-PackageExecutionMessage -Message ("[ACTION] Removed package inventory record for installSlotId '{0}'." -f $installSlotId)
 
     return $PackageResult
 }

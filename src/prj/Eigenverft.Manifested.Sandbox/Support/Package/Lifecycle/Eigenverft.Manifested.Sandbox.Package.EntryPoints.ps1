@@ -97,6 +97,10 @@ Complete-PackageResult -PackageResult $result
     if (-not [string]::IsNullOrWhiteSpace($PackageResult.ErrorMessage)) {
         $PackageResult.Status = 'Failed'
     }
+    elseif ([string]::Equals([string]$PackageResult.DesiredState, 'Removed', [System.StringComparison]::OrdinalIgnoreCase) -and
+        $PackageResult.Removed -and $PackageResult.Removed.PSObject.Properties['Accepted'] -and [bool]$PackageResult.Removed.Accepted) {
+        $PackageResult.Status = 'Ready'
+    }
     elseif ($PackageResult.Validation -and $PackageResult.Validation.Accepted) {
         $PackageResult.Status = 'Ready'
     }

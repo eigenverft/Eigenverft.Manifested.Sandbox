@@ -68,7 +68,10 @@ the caller.
         [string]$UiMode,
 
         [AllowNull()]
-        [string]$LogPath
+        [string]$LogPath,
+
+        [AllowNull()]
+        [string]$ElevationMode
     )
 
     if ([string]::IsNullOrWhiteSpace($CommandPath)) {
@@ -82,7 +85,7 @@ the caller.
     }
     $null = New-Item -ItemType Directory -Path $WorkingDirectory -Force
 
-    $elevationPlan = Get-PackageInstallerElevationPlan -PackageResult $PackageResult
+    $elevationPlan = Get-PackageInstallerElevationPlan -PackageResult $PackageResult -ElevationMode $ElevationMode
     Write-PackageExecutionMessage -Message ("[STATE] Installer execution: targetKind='{0}', installerKind='{1}', uiMode='{2}', elevation='{3}', processIsElevated='{4}', willElevate='{5}'." -f $TargetKind, $InstallerKind, $UiMode, $elevationPlan.Mode, $elevationPlan.ProcessIsElevated, $elevationPlan.ShouldElevate)
 
     $startProcessParameters = @{

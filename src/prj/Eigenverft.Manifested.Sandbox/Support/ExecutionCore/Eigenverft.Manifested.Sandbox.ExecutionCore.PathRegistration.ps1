@@ -193,6 +193,63 @@ function Remove-PathEntries {
     }
 }
 
+function Remove-PathEnvironmentDirectories {
+<#
+.SYNOPSIS
+Removes directory entries from PATH for the requested scopes without adding a new entry.
+
+.DESCRIPTION
+Used by Package removal to drop previously registered directories from Process
+and User or Machine PATH.
+#>
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [ValidateSet('user', 'machine')]
+        [string]$Mode,
+
+        [AllowEmptyCollection()]
+        [string[]]$DirectoryPaths
+    )
+
+    $directoriesToRemove = @(
+        foreach ($directoryPath in @($DirectoryPaths)) {
+            $normalizedDirectoryPath = Get-NormalizedPathEntry -PathEntry $directoryPath
+            if (-not [string]::IsNullOrWhiteSpace($normalizedDirectoryPath)) {
+                $normalizedDirectoryPath
+            }
+        }
+    )
+
+    $targets = @('Process')
+    if ($Mode -eq 'user') {
+        $targets += 'User'
+    }
+    elseif ($Mode -eq 'machine') {
+        $targets += 'Machine'
+    }
+
+    $updatedTargets = New-Object System.Collections.Generic.List[string]
+    $cleanedTargets = New-Object System.Collections.Generic.List[string]
+    foreach ($target in @($targets)) {
+        $currentValue = Get-EnvironmentVariableValue -Name 'Path' -Target $target
+        $cleanupResult = Remove-PathEntries -CurrentValue $currentValue -DirectoryPaths $directoriesToRemove
+        if ($cleanupResult.Changed) {
+            Set-EnvironmentVariableValue -Name 'Path' -Value $cleanupResult.Value -Target $target
+            $updatedTargets.Add($target) | Out-Null
+            $cleanedTargets.Add($target) | Out-Null
+        }
+    }
+
+    return [pscustomobject]@{
+        Status             = if ($updatedTargets.Count -gt 0) { 'Unregistered' } else { 'AlreadyAbsent' }
+        Mode               = $Mode
+        CleanedTargets     = @($cleanedTargets.ToArray())
+        UpdatedTargets     = @($updatedTargets.ToArray())
+        RemovedDirectories = @($directoriesToRemove)
+    }
+}
+
 function Register-PathEnvironment {
 <#
 .SYNOPSIS

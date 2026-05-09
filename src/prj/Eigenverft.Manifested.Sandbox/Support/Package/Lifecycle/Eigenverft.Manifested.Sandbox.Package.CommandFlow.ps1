@@ -86,6 +86,12 @@ function Get-PackageCommandFailureReason {
         'ResolveEntryPoints' { return 'EntryPointResolutionFailed' }
         'UpdateInventory' { return 'PackageInventoryUpdateFailed' }
         'ClearPackageWorkDirectories' { return 'PackageWorkDirectoryCleanupFailed' }
+        'ResolveRemovalInstallContext' { return 'RemovalInventoryResolutionFailed' }
+        'AssertRemovalPolicy' { return 'RemovalPolicyRejected' }
+        'AssertRemovalDependencyDependents' { return 'RemovalDependencyDependentsBlocked' }
+        'ExecuteRemovedOperation' { return 'RemovedOperationFailed' }
+        'PostRemoveCleanup' { return 'PostRemoveCleanupFailed' }
+        'VerifyRemovedAbsence' { return 'RemovedAbsenceVerificationFailed' }
         default { return 'PackageCommandFailed' }
     }
 }
@@ -205,14 +211,13 @@ function Invoke-PackageDefinitionCommandCore {
     $result = New-PackageResult -DesiredState $DesiredState -PackageConfig $packageConfig
 
     if ([string]::Equals($DesiredState, 'Removed', [System.StringComparison]::OrdinalIgnoreCase)) {
-        Write-PackageExecutionMessage -Message ("[START] Invoke-PackageDefinitionCommand repository='{0}' definition='{1}' desiredState='{2}'." -f $result.RepositoryId, $result.DefinitionId, $result.DesiredState)
-        $result.CurrentStep = 'ResolveDesiredState'
-        $result.Status = 'Failed'
-        $result.FailureReason = 'PackageDesiredStateNotImplemented'
-        $result.ErrorMessage = "DesiredState 'Removed' is not implemented yet for package definition '$DefinitionId'."
-        Write-PackageExecutionMessage -Level 'ERR' -Message ("[FAIL] DesiredState 'Removed' is not implemented yet for package definition '{0}'." -f $DefinitionId)
+        $result = Invoke-PackageRemovedFlow -PackageResult $result
+        $failedStep = if ([string]::Equals([string]$result.Status, 'Failed', [System.StringComparison]::OrdinalIgnoreCase)) { [string]$result.CurrentStep } else { $null }
         $completedResult = Complete-PackageResult -PackageResult $result
-        Add-PackageOperationHistoryRecord -PackageConfig $packageConfig -PackageResult $completedResult -FailedStep 'ResolveDesiredState'
+        if ([string]::Equals([string]$completedResult.Status, 'Failed', [System.StringComparison]::OrdinalIgnoreCase) -and [string]::IsNullOrWhiteSpace($failedStep)) {
+            $failedStep = [string]$result.CurrentStep
+        }
+        Add-PackageOperationHistoryRecord -PackageConfig $packageConfig -PackageResult $completedResult -FailedStep $failedStep
         return $completedResult
     }
 

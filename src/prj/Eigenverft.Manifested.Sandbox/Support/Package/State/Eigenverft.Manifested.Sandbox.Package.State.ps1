@@ -77,6 +77,13 @@ function Select-PackageStateOwnershipRecord {
         }
     }
 
+    $dependencyInstallSlotIds = if ($Record.PSObject.Properties['dependencyInstallSlotIds'] -and $null -ne $Record.dependencyInstallSlotIds) {
+        @($Record.dependencyInstallSlotIds | ForEach-Object { [string]$_ })
+    }
+    else {
+        @()
+    }
+
     return [pscustomobject]@{
         InstallSlotId          = $Record.installSlotId
         DefinitionId           = $Record.definitionId
@@ -92,6 +99,7 @@ function Select-PackageStateOwnershipRecord {
         InstallDirectoryExists = $installDirectoryExists
         OwnershipKind          = $Record.ownershipKind
         PathRegistration       = $pathRegistration
+        DependencyInstallSlotIds = @($dependencyInstallSlotIds)
         UpdatedAtUtc           = $Record.updatedAtUtc
     }
 }

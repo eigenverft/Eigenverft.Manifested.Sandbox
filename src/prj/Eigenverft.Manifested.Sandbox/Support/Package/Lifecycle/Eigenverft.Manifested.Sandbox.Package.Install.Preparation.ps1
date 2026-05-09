@@ -45,18 +45,26 @@ function Get-PackageInstallerElevationPlan {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true)]
-        [psobject]$PackageResult
+        [psobject]$PackageResult,
+
+        [AllowNull()]
+        [string]$ElevationMode
     )
 
-    $install = Get-PackageEffectiveReleaseAssignedBlock -Release $PackageResult.Package
-    if (-not $install) {
-        throw 'Get-PackageInstallerElevationPlan requires a selected release with an assigned block.'
-    }
-    $mode = if ($install.PSObject.Properties['elevation'] -and -not [string]::IsNullOrWhiteSpace([string]$install.elevation)) {
-        ([string]$install.elevation).ToLowerInvariant()
+    if (-not [string]::IsNullOrWhiteSpace($ElevationMode)) {
+        $mode = ([string]$ElevationMode).ToLowerInvariant()
     }
     else {
-        'none'
+        $install = Get-PackageEffectiveReleaseAssignedBlock -Release $PackageResult.Package
+        if (-not $install) {
+            throw 'Get-PackageInstallerElevationPlan requires a selected release with an assigned block.'
+        }
+        $mode = if ($install.PSObject.Properties['elevation'] -and -not [string]::IsNullOrWhiteSpace([string]$install.elevation)) {
+            ([string]$install.elevation).ToLowerInvariant()
+        }
+        else {
+            'none'
+        }
     }
     $processIsElevated = Test-ProcessElevation
     $shouldElevate = ($mode -in @('required', 'auto')) -and (-not $processIsElevated)
