@@ -54,7 +54,6 @@ $moduleProjectRoot = Join-Path (Split-Path -Parent $PSScriptRoot) 'Eigenverft.Ma
 # Package definitions are JSON-only.
 
 # Package commands
-. "$moduleProjectRoot\Commands\Eigenverft.Manifested.Sandbox.Cmd.Qwen35_2B_Q8_0_Model.ps1"
 . "$moduleProjectRoot\Commands\Eigenverft.Manifested.Sandbox.Cmd.Qwen35_9B_Q6_K_Model.ps1"
 . "$moduleProjectRoot\Commands\Eigenverft.Manifested.Sandbox.Cmd.LlamaCppRuntime.ps1"
 . "$moduleProjectRoot\Commands\Eigenverft.Manifested.Sandbox.Cmd.VisualCppRedistributable.ps1"
@@ -62,10 +61,7 @@ $moduleProjectRoot = Join-Path (Split-Path -Parent $PSScriptRoot) 'Eigenverft.Ma
 . "$moduleProjectRoot\Commands\Eigenverft.Manifested.Sandbox.Cmd.PythonRuntime.ps1"
 . "$moduleProjectRoot\Commands\Eigenverft.Manifested.Sandbox.Cmd.NodeRuntime.ps1"
 . "$moduleProjectRoot\Commands\Eigenverft.Manifested.Sandbox.Cmd.CodexCli.ps1"
-. "$moduleProjectRoot\Commands\Eigenverft.Manifested.Sandbox.Cmd.GeminiCli.ps1"
 . "$moduleProjectRoot\Commands\Eigenverft.Manifested.Sandbox.Cmd.OpenCodeCli.ps1"
-. "$moduleProjectRoot\Commands\Eigenverft.Manifested.Sandbox.Cmd.QwenCli.ps1"
-. "$moduleProjectRoot\Commands\Eigenverft.Manifested.Sandbox.Cmd.GitHubCli.ps1"
 . "$moduleProjectRoot\Commands\Eigenverft.Manifested.Sandbox.Cmd.GitRuntime.ps1"
 . "$moduleProjectRoot\Commands\Eigenverft.Manifested.Sandbox.Cmd.NotepadPlusPlus.ps1"
 . "$moduleProjectRoot\Commands\Eigenverft.Manifested.Sandbox.Cmd.VSCodeRuntime.ps1"

@@ -19,20 +19,25 @@
   ],
   "properties": {
     "$schema": {
-      "type": "string"
+      "type": "string",
+      "description": "Optional editor hint pointing to this JSON schema. It is not used as the runtime version gate."
     },
     "schemaVersion": {
       "type": "string",
-      "const": "1.2"
+      "const": "1.2",
+      "description": "The package-definition wire format version. Runtime support is intentionally strict; schemaVersion 1.2 definitions do not use 1.1 release/default blocks."
     },
     "id": {
-      "$ref": "#/$defs/identifier"
+      "$ref": "#/$defs/identifier",
+      "description": "Stable package definition id used by Invoke-Package and inventory records. Renaming this intentionally creates a new package identity."
     },
     "display": {
-      "$ref": "#/$defs/display"
+      "$ref": "#/$defs/display",
+      "description": "Human-facing package text for output, state views, and future catalog/repository browsing."
     },
     "dependencies": {
       "type": "array",
+      "description": "Package definitions that must be assigned before this package can be assigned. Dependencies are package-level because they describe readiness prerequisites, not an individual installer switch.",
       "items": {
         "$ref": "#/$defs/dependency"
       }
@@ -40,6 +45,7 @@
     "packageTargets": {
       "type": "array",
       "minItems": 1,
+      "description": "Selectable lanes for platform/channel/architecture. A target answers: which machine shape and update lane can use which catalog artifact?",
       "items": {
         "$ref": "#/$defs/packageTarget"
       }
@@ -47,34 +53,41 @@
     "versionCatalog": {
       "type": "array",
       "minItems": 1,
+      "description": "Concrete package versions and artifact facts. Normal maintainer updates should mostly add one entry here with hashes and target artifacts.",
       "items": {
         "$ref": "#/$defs/versionCatalogEntry"
       }
     },
     "discovery": {
-      "$ref": "#/$defs/discovery"
+      "$ref": "#/$defs/discovery",
+      "description": "Neutral facts about files, commands, apps, registry probes, and state checks exposed by an installed package. Assignment, validation, shims, and future removal all reuse this data."
     },
     "stateDiscovery": {
-      "$ref": "#/$defs/stateDiscovery"
+      "$ref": "#/$defs/stateDiscovery",
+      "description": "Rules for finding an already-installed package on the machine before deciding whether to reuse, adopt, ignore, repair, or install."
     },
     "upstreamSources": {
       "type": "object",
+      "description": "Definition-local upstream endpoints referenced by artifacts. The artifact chooses the source; this block stores the reusable endpoint details.",
       "additionalProperties": {
         "$ref": "#/$defs/upstreamSource"
       }
     },
     "packageOperations": {
-      "$ref": "#/$defs/packageOperations"
+      "$ref": "#/$defs/packageOperations",
+      "description": "Lifecycle behavior for assigning or removing the selected package. Version facts stay in versionCatalog; operation mechanics stay here."
     }
   },
   "$defs": {
     "identifier": {
       "type": "string",
       "minLength": 1,
-      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]*$"
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]*$",
+      "description": "Portable id segment. Keep ids stable and avoid spaces so paths, inventory keys, and repository references stay predictable."
     },
     "display": {
       "type": "object",
+      "description": "Localized display container. Only default text is modeled in 1.2; the shape leaves room for later localization.",
       "additionalProperties": false,
       "required": [
         "default"
@@ -87,6 +100,7 @@
     },
     "displayEntry": {
       "type": "object",
+      "description": "Default display metadata for humans. These fields do not control source selection or install behavior.",
       "additionalProperties": false,
       "required": [
         "name",
@@ -115,6 +129,7 @@
     },
     "dependency": {
       "type": "object",
+      "description": "A package-level dependency reference. Repository id is explicit so future repository sources do not silently inherit the wrong package universe.",
       "additionalProperties": false,
       "required": [
         "repositoryId",
@@ -131,6 +146,8 @@
     },
     "packageTarget": {
       "type": "object",
+      "$comment": "Targets are intentionally separate from versions. Maintainers can add a new version without duplicating OS/CPU/channel rules, and can add a new platform target without rewriting old version metadata.",
+      "description": "A selectable target lane such as stable win-x64, stable arm64, or a model quantization flavor.",
       "additionalProperties": false,
       "required": [
         "id",
@@ -141,29 +158,36 @@
       ],
       "properties": {
         "id": {
-          "$ref": "#/$defs/identifier"
+          "$ref": "#/$defs/identifier",
+          "description": "Target id used as the key inside versionCatalog[].artifactsByTarget."
         },
         "channel": {
           "type": "string",
-          "minLength": 1
+          "minLength": 1,
+          "description": "Update lane such as stable. This replaces the older releaseTrack wording."
         },
         "platformTarget": {
           "type": "string",
-          "minLength": 1
+          "minLength": 1,
+          "description": "Package-facing platform or flavor label, for example win-x64, windows_amd64, q8-0, or 64-bit. This replaces the older flavor wording."
         },
         "constraints": {
-          "$ref": "#/$defs/constraints"
+          "$ref": "#/$defs/constraints",
+          "description": "Machine constraints used to decide whether this target is selectable."
         },
         "versionSelection": {
-          "$ref": "#/$defs/versionSelection"
+          "$ref": "#/$defs/versionSelection",
+          "description": "How the runtime selects a version from versionCatalog for this target."
         },
         "artifactDefaults": {
-          "$ref": "#/$defs/artifactDefaults"
+          "$ref": "#/$defs/artifactDefaults",
+          "description": "Default artifact source/file naming for this target. A versionCatalog artifact can override these when a vendor changes layout."
         }
       }
     },
     "constraints": {
       "type": "object",
+      "description": "Platform selection constraints. These are selection filters, not user-facing compatibility warnings.",
       "additionalProperties": false,
       "required": [
         "os",
@@ -190,6 +214,8 @@
     },
     "versionSelection": {
       "type": "object",
+      "$comment": "latestByVersion sorts the versionCatalog entries and selects the newest matching entry. It is not a network latest lookup.",
+      "description": "Target-local version choice policy. 1.2 supports deterministic catalog selection only.",
       "additionalProperties": false,
       "required": [
         "strategy",
@@ -209,6 +235,7 @@
     },
     "artifactDefaults": {
       "type": "object",
+      "description": "Target-level defaults for artifacts so version entries stay short when source layout is stable across updates.",
       "additionalProperties": false,
       "properties": {
         "fileNameTemplate": {
@@ -222,6 +249,8 @@
     },
     "versionCatalogEntry": {
       "type": "object",
+      "$comment": "Version entries are the maintainer update surface. Keep source mechanics reusable in packageTargets/upstreamSources unless a specific version truly differs.",
+      "description": "One concrete package version and the artifact facts available for one or more packageTargets.",
       "additionalProperties": false,
       "required": [
         "version",
@@ -231,15 +260,18 @@
       "properties": {
         "version": {
           "type": "string",
-          "minLength": 1
+          "minLength": 1,
+          "description": "Package version used for selection, paths, validation tokens, and inventory. It may be semver, a vendor build number, or another stable version string."
         },
         "releaseTag": {
           "type": "string",
-          "minLength": 1
+          "minLength": 1,
+          "description": "Optional upstream release tag. Required by runtime validation when a selected artifact uses a githubRelease source."
         },
         "channels": {
           "type": "array",
           "minItems": 1,
+          "description": "Channels this version participates in, such as stable. A target only considers catalog entries containing its channel.",
           "items": {
             "type": "string",
             "minLength": 1
@@ -248,6 +280,7 @@
         "artifactsByTarget": {
           "type": "object",
           "minProperties": 1,
+          "description": "Artifact facts keyed by packageTargets[].id. Keys must match target ids so source selection stays explicit.",
           "additionalProperties": {
             "$ref": "#/$defs/artifactForTarget"
           }
@@ -256,41 +289,51 @@
     },
     "artifactForTarget": {
       "type": "object",
+      "description": "Concrete file/source/hash facts for a version on a specific target. Values here override target artifactDefaults.",
       "additionalProperties": false,
       "properties": {
         "releaseId": {
           "type": "string",
-          "minLength": 1
+          "minLength": 1,
+          "description": "Stable selected-release id written into results and inventory. Use a human-readable id that identifies version, channel, and target."
         },
         "fileName": {
           "type": "string",
-          "minLength": 1
+          "minLength": 1,
+          "description": "Expected package file or asset name. For GitHub release artifacts this is the exact asset selector."
         },
         "sourcePath": {
-          "type": "string"
+          "type": "string",
+          "description": "Optional source-relative path. Supports tokens such as {version}, {releaseTag}, {channel}, and {platformTarget}."
         },
         "artifactSources": {
-          "$ref": "#/$defs/artifactSources"
+          "$ref": "#/$defs/artifactSources",
+          "description": "Optional source candidates for this version/target. Use this when a specific version changes acquisition behavior."
         },
         "contentHash": {
-          "$ref": "#/$defs/contentHash"
+          "$ref": "#/$defs/contentHash",
+          "description": "Trust boundary for downloaded or depot package files. A valid hash is the acceptance signal, not upstream metadata alone."
         },
         "publisherSignature": {
-          "$ref": "#/$defs/publisherSignature"
+          "$ref": "#/$defs/publisherSignature",
+          "description": "Publisher signature requirement for executable package files when fixed hashes are unsuitable, for example evergreen vendor installers."
         }
       }
     },
     "artifactSources": {
       "type": "array",
       "minItems": 1,
+      "description": "Ordered acquisition candidates. Lower searchOrder is tried first; fallback behavior is controlled by global config.",
       "items": {
         "$ref": "#/$defs/artifactSource"
       }
     },
     "artifactSource": {
+      "$comment": "packageDepot is durable reuse, download/filesystem are acquisition sources. Raw package files are staged before validation and install.",
       "oneOf": [
         {
           "type": "object",
+          "description": "Acquire from configured package depots using the package depot relative layout.",
           "additionalProperties": false,
           "required": [
             "kind",
@@ -299,19 +342,23 @@
           ],
           "properties": {
             "kind": {
-              "const": "packageDepot"
+              "const": "packageDepot",
+              "description": "Search readable package depots for the package file."
             },
             "searchOrder": {
               "type": "integer",
-              "minimum": 0
+              "minimum": 0,
+              "description": "Lower values are attempted earlier."
             },
             "verification": {
-              "$ref": "#/$defs/verification"
+              "$ref": "#/$defs/verification",
+              "description": "Verification expectation for this source candidate."
             }
           }
         },
         {
           "type": "object",
+          "description": "Acquire from an upstream source defined in upstreamSources.",
           "additionalProperties": false,
           "required": [
             "kind",
@@ -321,25 +368,31 @@
           ],
           "properties": {
             "kind": {
-              "const": "download"
+              "const": "download",
+              "description": "Download from a definition-local upstream source."
             },
             "sourceId": {
-              "$ref": "#/$defs/identifier"
+              "$ref": "#/$defs/identifier",
+              "description": "Key into upstreamSources."
             },
             "sourcePath": {
-              "type": "string"
+              "type": "string",
+              "description": "Optional source-relative path for this candidate. If omitted, artifact sourcePath may supply it."
             },
             "searchOrder": {
               "type": "integer",
-              "minimum": 0
+              "minimum": 0,
+              "description": "Lower values are attempted earlier."
             },
             "verification": {
-              "$ref": "#/$defs/verification"
+              "$ref": "#/$defs/verification",
+              "description": "Verification expectation for this source candidate."
             }
           }
         },
         {
           "type": "object",
+          "description": "Acquire from a concrete filesystem path or filesystem source.",
           "additionalProperties": false,
           "required": [
             "kind",
@@ -349,20 +402,25 @@
           ],
           "properties": {
             "kind": {
-              "const": "filesystem"
+              "const": "filesystem",
+              "description": "Copy a raw package file from the filesystem."
             },
             "sourceId": {
-              "$ref": "#/$defs/identifier"
+              "$ref": "#/$defs/identifier",
+              "description": "Optional configured filesystem source id."
             },
             "sourcePath": {
-              "type": "string"
+              "type": "string",
+              "description": "Filesystem path or source-relative file path."
             },
             "searchOrder": {
               "type": "integer",
-              "minimum": 0
+              "minimum": 0,
+              "description": "Lower values are attempted earlier."
             },
             "verification": {
-              "$ref": "#/$defs/verification"
+              "$ref": "#/$defs/verification",
+              "description": "Verification expectation for this source candidate."
             }
           }
         }
@@ -370,6 +428,7 @@
     },
     "verification": {
       "type": "object",
+      "description": "How strongly this source candidate must be verified. The actual hash/signature rules live on the artifact.",
       "additionalProperties": false,
       "required": [
         "mode"
@@ -386,9 +445,11 @@
       }
     },
     "upstreamSource": {
+      "$comment": "Upstream sources are intentionally separate from artifacts so version entries can stay small and source types can be extended later.",
       "oneOf": [
         {
           "type": "object",
+          "description": "Plain HTTP(S) source. The runtime combines baseUri with sourcePath/package file data.",
           "additionalProperties": false,
           "required": [
             "kind",
@@ -396,16 +457,19 @@
           ],
           "properties": {
             "kind": {
-              "const": "download"
+              "const": "download",
+              "description": "Use direct URL construction from baseUri plus artifact/candidate path."
             },
             "baseUri": {
               "type": "string",
-              "minLength": 1
+              "minLength": 1,
+              "description": "Base URI. Keep version-specific path segments in sourcePath when possible so future version updates stay localized."
             }
           }
         },
         {
           "type": "object",
+          "description": "GitHub REST release lookup by owner, repository, and selected version releaseTag.",
           "additionalProperties": false,
           "required": [
             "kind",
@@ -414,15 +478,18 @@
           ],
           "properties": {
             "kind": {
-              "const": "githubRelease"
+              "const": "githubRelease",
+              "description": "Resolve metadata through the GitHub releases/tags API."
             },
             "repositoryOwner": {
               "type": "string",
-              "minLength": 1
+              "minLength": 1,
+              "description": "GitHub repository owner or organization."
             },
             "repositoryName": {
               "type": "string",
-              "minLength": 1
+              "minLength": 1,
+              "description": "GitHub repository name."
             }
           }
         }
@@ -430,6 +497,8 @@
     },
     "discovery": {
       "type": "object",
+      "$comment": "discovery replaces providedTools plus validation-only entries. The same facts can expose shims, validate assignment, and later verify removal.",
+      "description": "Install-state facts relative to the selected install directory. Keep this neutral: it describes what exists, not which operation uses it.",
       "additionalProperties": false,
       "required": [
         "files",
@@ -444,48 +513,56 @@
       "properties": {
         "files": {
           "type": "array",
+          "description": "Files expected relative to the install directory. Used when installedStateCheck.require.files is true.",
           "items": {
             "type": "string"
           }
         },
         "directories": {
           "type": "array",
+          "description": "Directories expected relative to the install directory.",
           "items": {
             "type": "string"
           }
         },
         "commands": {
           "type": "array",
+          "description": "Command entry points provided by the package. Exposed commands are used for shim generation and dependency command lookup.",
           "items": {
             "$ref": "#/$defs/discoveredCommand"
           }
         },
         "apps": {
           "type": "array",
+          "description": "Application entry points provided by the package. These are not necessarily added to PATH.",
           "items": {
             "$ref": "#/$defs/discoveredApp"
           }
         },
         "metadataFiles": {
           "type": "array",
+          "description": "Structured metadata file probes used during validation.",
           "items": {
             "$ref": "#/$defs/metadataFileProbe"
           }
         },
         "signatures": {
           "type": "array",
+          "description": "Authenticode signature probes for installed files.",
           "items": {
             "$ref": "#/$defs/signatureProbe"
           }
         },
         "fileDetails": {
           "type": "array",
+          "description": "Windows file-version/resource metadata probes.",
           "items": {
             "$ref": "#/$defs/fileDetailsProbe"
           }
         },
         "registry": {
           "type": "array",
+          "description": "Registry probes used to validate machine prerequisites or installer state.",
           "items": {
             "$ref": "#/$defs/registryProbe"
           }
@@ -494,6 +571,7 @@
     },
     "discoveredCommand": {
       "type": "object",
+      "description": "A command executable or command shim target exposed by the installed package.",
       "additionalProperties": false,
       "required": [
         "name",
@@ -502,20 +580,25 @@
       "properties": {
         "name": {
           "type": "string",
-          "minLength": 1
+          "minLength": 1,
+          "description": "Command name as users or dependent packages reference it, for example git, npm, or codex."
         },
         "relativePath": {
           "type": "string",
-          "minLength": 1
+          "minLength": 1,
+          "description": "Path to the command relative to the install directory."
         },
         "required": {
-          "type": "boolean"
+          "type": "boolean",
+          "description": "Whether validation should consider this entry mandatory when command checks are enabled."
         },
         "exposed": {
-          "type": "boolean"
+          "type": "boolean",
+          "description": "Whether this command is exposed for shims and dependency command lookup."
         },
         "stateChecks": {
           "type": "array",
+          "description": "Command-output checks run against this entry point when installed-state validation requires commands.",
           "items": {
             "$ref": "#/$defs/commandStateCheck"
           }
@@ -524,6 +607,7 @@
     },
     "discoveredApp": {
       "type": "object",
+      "description": "A GUI or app executable exposed by the installed package.",
       "additionalProperties": false,
       "required": [
         "name",
@@ -548,6 +632,7 @@
     },
     "commandStateCheck": {
       "type": "object",
+      "description": "Validation rule for a discovered command. Output can be matched and compared against the selected version through tokens.",
       "additionalProperties": false,
       "properties": {
         "arguments": {
@@ -566,6 +651,7 @@
     },
     "metadataFileProbe": {
       "type": "object",
+      "description": "Validation rule for reading a value from an installed metadata file.",
       "additionalProperties": false,
       "required": [
         "relativePath",
@@ -586,6 +672,7 @@
     },
     "signatureProbe": {
       "type": "object",
+      "description": "Validation rule for an installed file's Authenticode signature.",
       "additionalProperties": false,
       "required": [
         "relativePath",
@@ -605,6 +692,7 @@
     },
     "fileDetailsProbe": {
       "type": "object",
+      "description": "Validation rule for Windows file details such as product name or file version.",
       "additionalProperties": false,
       "required": [
         "relativePath"
@@ -629,6 +717,7 @@
     },
     "registryProbe": {
       "type": "object",
+      "description": "Validation rule for registry-based state, most often machine-wide prerequisites.",
       "additionalProperties": false,
       "required": [
         "paths"
@@ -655,6 +744,7 @@
     },
     "stateDiscovery": {
       "type": "object",
+      "description": "Machine-state discovery groups. In 1.2 only installed state is modeled; future states can be added without changing discovery facts.",
       "additionalProperties": false,
       "required": [
         "installed"
@@ -667,6 +757,7 @@
     },
     "installedStateDiscovery": {
       "type": "object",
+      "description": "How the runtime searches for an already-installed copy before assignment.",
       "additionalProperties": false,
       "required": [
         "enableDetection",
@@ -675,16 +766,19 @@
       ],
       "properties": {
         "enableDetection": {
-          "type": "boolean"
+          "type": "boolean",
+          "description": "When false, skip external/current install discovery and only use Package inventory/target paths."
         },
         "searchLocations": {
           "type": "array",
+          "description": "Candidate sources for locating installed software, such as command lookup, direct path, directory, or uninstall registry key.",
           "items": {
             "$ref": "#/$defs/installSearchLocation"
           }
         },
         "installRootRules": {
           "type": "array",
+          "description": "Rules that turn a discovered executable/file path into the package install root.",
           "items": {
             "$ref": "#/$defs/installRootRule"
           }
@@ -693,6 +787,7 @@
     },
     "installSearchLocation": {
       "type": "object",
+      "description": "One place to search for an installed package candidate.",
       "additionalProperties": true,
       "required": [
         "kind"
@@ -730,6 +825,7 @@
     },
     "installRootRule": {
       "type": "object",
+      "description": "Maps a discovered path to an install root, for example code.cmd under bin maps one directory up.",
       "additionalProperties": false,
       "required": [
         "match",
@@ -746,6 +842,8 @@
     },
     "packageOperations": {
       "type": "object",
+      "$comment": "Operations intentionally reference discovery instead of duplicating file/command facts. Assigned is implemented today; removed is modeled for the desired-state pipeline but execution can be deferred per package.",
+      "description": "Shared and desired-state-specific package behavior.",
       "additionalProperties": false,
       "required": [
         "shared",
@@ -766,6 +864,8 @@
     },
     "operationsShared": {
       "type": "object",
+      "$comment": "Shared operation settings intentionally stay outside assigned/removed actions when they describe package-wide policy rather than one specific process step.",
+      "description": "Operation settings shared by desired states, especially assignment ownership policy and compatibility gates.",
       "additionalProperties": false,
       "required": [
         "ownershipPolicy",
@@ -773,14 +873,17 @@
       ],
       "properties": {
         "ownershipPolicy": {
-          "$ref": "#/$defs/ownershipPolicy"
+          "$ref": "#/$defs/ownershipPolicy",
+          "description": "How Assigned handles existing installs, adopted installs, and Package-owned inventory."
         },
         "compatibility": {
-          "$ref": "#/$defs/compatibility"
+          "$ref": "#/$defs/compatibility",
+          "description": "Compatibility checks evaluated before Assigned work. Removal is intentionally not blocked by compatibility."
         }
       }
     },
     "assignedOperation": {
+      "description": "How DesiredState=Assigned makes the selected package ready on the machine.",
       "oneOf": [
         {
           "$ref": "#/$defs/assignedExpandArchive"
@@ -801,18 +904,22 @@
     },
     "assignedCommon": {
       "type": "object",
+      "description": "Common optional assignment controls embedded into each assigned operation kind.",
       "additionalProperties": false,
       "properties": {
         "installedStateCheck": {
-          "$ref": "#/$defs/installedStateCheck"
+          "$ref": "#/$defs/installedStateCheck",
+          "description": "How to decide whether the desired package state is already present after install or reuse."
         },
         "versionUpdatePolicy": {
-          "$ref": "#/$defs/versionUpdatePolicy"
+          "$ref": "#/$defs/versionUpdatePolicy",
+          "description": "How an already assigned package behaves when the selected catalog version is unchanged or newer."
         }
       }
     },
     "assignedExpandArchive": {
       "type": "object",
+      "description": "Assign by expanding an archive into an owned install directory.",
       "additionalProperties": false,
       "required": [
         "kind",
@@ -823,33 +930,41 @@
       ],
       "properties": {
         "kind": {
-          "const": "expandArchive"
+          "const": "expandArchive",
+          "description": "Uses the generic archive expansion flow."
         },
         "installDirectory": {
-          "type": "string"
+          "type": "string",
+          "description": "Install directory template relative to the configured installed root unless absolute. Supports package/version/target tokens."
         },
         "pathRegistration": {
-          "$ref": "#/$defs/pathRegistration"
+          "$ref": "#/$defs/pathRegistration",
+          "description": "PATH/shim registration behavior after assignment."
         },
         "expandedRoot": {
-          "type": "string"
+          "type": "string",
+          "description": "Archive root selection, such as auto or a concrete subdirectory like tools."
         },
         "createDirectories": {
           "type": "array",
+          "description": "Directories to create after extraction, relative to the install directory.",
           "items": {
             "type": "string"
           }
         },
         "installedStateCheck": {
-          "$ref": "#/$defs/installedStateCheck"
+          "$ref": "#/$defs/installedStateCheck",
+          "description": "Discovery-backed state check after archive expansion."
         },
         "versionUpdatePolicy": {
-          "$ref": "#/$defs/versionUpdatePolicy"
+          "$ref": "#/$defs/versionUpdatePolicy",
+          "description": "Archive replacement/reuse behavior when assignment is repeated."
         }
       }
     },
     "assignedNpmGlobalPackage": {
       "type": "object",
+      "description": "Assign by running npm install -g into a staged prefix and promoting the result into the package install directory.",
       "additionalProperties": false,
       "required": [
         "kind",
@@ -860,30 +975,38 @@
       ],
       "properties": {
         "kind": {
-          "const": "npmGlobalPackage"
+          "const": "npmGlobalPackage",
+          "description": "Uses npm as an installer backend for a globally installed CLI package under a Package-owned prefix."
         },
         "installerCommand": {
-          "type": "string"
+          "type": "string",
+          "description": "Command name resolved from ready package dependencies, for example npm. The runtime does not fall back to system PATH."
         },
         "packageSpec": {
-          "type": "string"
+          "type": "string",
+          "description": "npm package spec. Use {version} to keep the package version centralized in versionCatalog."
         },
         "installDirectory": {
-          "type": "string"
+          "type": "string",
+          "description": "Final Package-owned prefix directory that receives the promoted npm global install."
         },
         "pathRegistration": {
-          "$ref": "#/$defs/pathRegistration"
+          "$ref": "#/$defs/pathRegistration",
+          "description": "Usually shim-based for CLI packages so only the package shim root needs to be on PATH."
         },
         "installedStateCheck": {
-          "$ref": "#/$defs/installedStateCheck"
+          "$ref": "#/$defs/installedStateCheck",
+          "description": "Discovery-backed state check for generated npm command shims."
         },
         "versionUpdatePolicy": {
-          "$ref": "#/$defs/versionUpdatePolicy"
+          "$ref": "#/$defs/versionUpdatePolicy",
+          "description": "Npm package replacement/reuse behavior when assignment is repeated."
         }
       }
     },
     "assignedPlacePackageFile": {
       "type": "object",
+      "description": "Assign by placing a single package file into an install directory, useful for resources such as model files.",
       "additionalProperties": false,
       "required": [
         "kind",
@@ -893,27 +1016,34 @@
       ],
       "properties": {
         "kind": {
-          "const": "placePackageFile"
+          "const": "placePackageFile",
+          "description": "Copies the verified artifact into the install directory without expanding or executing it."
         },
         "installDirectory": {
-          "type": "string"
+          "type": "string",
+          "description": "Directory that owns the placed package file, commonly a model/resource folder."
         },
         "targetRelativePath": {
-          "type": "string"
+          "type": "string",
+          "description": "Relative file path under installDirectory where the prepared artifact is placed."
         },
         "pathRegistration": {
-          "$ref": "#/$defs/pathRegistration"
+          "$ref": "#/$defs/pathRegistration",
+          "description": "Usually none for resource/model packages."
         },
         "installedStateCheck": {
-          "$ref": "#/$defs/installedStateCheck"
+          "$ref": "#/$defs/installedStateCheck",
+          "description": "Discovery-backed state check for the placed file."
         },
         "versionUpdatePolicy": {
-          "$ref": "#/$defs/versionUpdatePolicy"
+          "$ref": "#/$defs/versionUpdatePolicy",
+          "description": "Resource replacement/reuse behavior when assignment is repeated."
         }
       }
     },
     "assignedNsisInstaller": {
       "type": "object",
+      "description": "Assign by running an NSIS installer from the package install stage.",
       "additionalProperties": false,
       "required": [
         "kind",
@@ -924,53 +1054,67 @@
       ],
       "properties": {
         "kind": {
-          "const": "nsisInstaller"
+          "const": "nsisInstaller",
+          "description": "Runs a Nullsoft Scriptable Install System installer with NSIS-specific target-directory handling."
         },
         "installDirectory": {
-          "type": "string"
+          "type": "string",
+          "description": "Target install directory passed to the NSIS installer when targetDirectoryArgument is enabled."
         },
         "installerKind": {
-          "type": "string"
+          "type": "string",
+          "description": "Human-readable installer family metadata for output and diagnostics."
         },
         "uiMode": {
-          "type": "string"
+          "type": "string",
+          "description": "Expected UI behavior such as silent or passive. Arguments still remain explicit in commandArguments."
         },
         "elevation": {
-          "$ref": "#/$defs/elevationMode"
+          "$ref": "#/$defs/elevationMode",
+          "description": "Whether the process should run without elevation, require elevation, or auto-elevate when needed."
         },
         "timeoutSec": {
           "type": "integer",
-          "minimum": 1
+          "minimum": 1,
+          "description": "Maximum installer runtime in seconds before the operation fails."
         },
         "commandArguments": {
           "type": "array",
+          "description": "Installer arguments owned by the package definition. Package-specific switches belong here, not in engine code.",
           "items": {
             "type": "string"
           }
         },
         "targetDirectoryArgument": {
           "type": "object",
-          "additionalProperties": true
+          "additionalProperties": true,
+          "description": "NSIS target-directory argument configuration. The runtime appends this last because NSIS requires /D=... to be final."
         },
         "successExitCodes": {
-          "$ref": "#/$defs/exitCodes"
+          "$ref": "#/$defs/exitCodes",
+          "description": "Exit codes treated as successful completion."
         },
         "restartExitCodes": {
-          "$ref": "#/$defs/exitCodes"
+          "$ref": "#/$defs/exitCodes",
+          "description": "Exit codes treated as successful completion with restart required."
         },
         "pathRegistration": {
-          "$ref": "#/$defs/pathRegistration"
+          "$ref": "#/$defs/pathRegistration",
+          "description": "PATH/shim registration after the installer has completed and validation has passed."
         },
         "installedStateCheck": {
-          "$ref": "#/$defs/installedStateCheck"
+          "$ref": "#/$defs/installedStateCheck",
+          "description": "Discovery-backed state check after installer execution."
         },
         "versionUpdatePolicy": {
-          "$ref": "#/$defs/versionUpdatePolicy"
+          "$ref": "#/$defs/versionUpdatePolicy",
+          "description": "Installer replacement/reuse behavior when assignment is repeated."
         }
       }
     },
     "assignedRunInstaller": {
       "type": "object",
+      "description": "Assign by running a generic installer process, commonly for machine prerequisites such as Visual C++ Redistributable.",
       "additionalProperties": false,
       "required": [
         "kind",
@@ -986,56 +1130,71 @@
       ],
       "properties": {
         "kind": {
-          "const": "runInstaller"
+          "const": "runInstaller",
+          "description": "Runs a generic installer process without installer-family-specific argument shaping."
         },
         "targetKind": {
           "type": "string",
+          "description": "Whether the installer creates a directory-target package or applies a machine-wide prerequisite.",
           "enum": [
             "directory",
             "machinePrerequisite"
           ]
         },
         "installerKind": {
-          "type": "string"
+          "type": "string",
+          "description": "Installer family metadata, for example burn, msi, inno, or vendor-specific labels."
         },
         "uiMode": {
-          "type": "string"
+          "type": "string",
+          "description": "Expected UI mode used for diagnostics. The runtime does not infer switches from this field."
         },
         "elevation": {
-          "$ref": "#/$defs/elevationMode"
+          "$ref": "#/$defs/elevationMode",
+          "description": "Whether the installer must elevate, may auto-elevate, or must stay unelevated."
         },
         "timeoutSec": {
           "type": "integer",
-          "minimum": 1
+          "minimum": 1,
+          "description": "Maximum installer runtime in seconds before the operation fails."
         },
         "logRelativePath": {
-          "type": "string"
+          "type": "string",
+          "description": "Optional log path relative to the package log root. Tokens such as {timestamp} may be used by runtime code."
         },
         "commandArguments": {
           "type": "array",
+          "description": "Literal ordered installer arguments. Package definitions own switches because installer families vary.",
           "items": {
             "type": "string"
           }
         },
         "successExitCodes": {
-          "$ref": "#/$defs/exitCodes"
+          "$ref": "#/$defs/exitCodes",
+          "description": "Exit codes treated as successful completion."
         },
         "restartExitCodes": {
-          "$ref": "#/$defs/exitCodes"
+          "$ref": "#/$defs/exitCodes",
+          "description": "Exit codes treated as successful completion with restart required."
         },
         "pathRegistration": {
-          "$ref": "#/$defs/pathRegistration"
+          "$ref": "#/$defs/pathRegistration",
+          "description": "PATH/shim registration after installer completion. Machine prerequisites usually use mode none."
         },
         "installedStateCheck": {
-          "$ref": "#/$defs/installedStateCheck"
+          "$ref": "#/$defs/installedStateCheck",
+          "description": "Discovery-backed state check after installer execution."
         },
         "versionUpdatePolicy": {
-          "$ref": "#/$defs/versionUpdatePolicy"
+          "$ref": "#/$defs/versionUpdatePolicy",
+          "description": "Generic installer replacement/reuse behavior when assignment is repeated."
         }
       }
     },
     "installedStateCheck": {
       "type": "object",
+      "$comment": "Installed-state checks intentionally point back to discovery so validation, adoption, update checks, and removal verification do not duplicate file/command/app knowledge.",
+      "description": "Defines which discovery groups must pass for the selected package to be considered installed or ready.",
       "additionalProperties": false,
       "required": [
         "use",
@@ -1044,18 +1203,23 @@
       ],
       "properties": {
         "use": {
-          "const": "discovery"
+          "const": "discovery",
+          "description": "Use the package discovery section as the source of truth for state checks."
         },
         "expectedVersion": {
-          "type": "string"
+          "type": "string",
+          "description": "Expected version expression, usually {version}, compared by discovery state checks that expose versions."
         },
         "require": {
-          "$ref": "#/$defs/discoveryRequirementFlags"
+          "$ref": "#/$defs/discoveryRequirementFlags",
+          "description": "Discovery groups that are mandatory for this state check."
         }
       }
     },
     "versionUpdatePolicy": {
       "type": "object",
+      "$comment": "Version update policy is intentionally separated from catalog selection: selection chooses the desired version, this block says how to handle an already assigned different version.",
+      "description": "Assignment behavior when inventory already contains this package slot.",
       "additionalProperties": false,
       "required": [
         "whenAssigned",
@@ -1064,13 +1228,16 @@
       ],
       "properties": {
         "whenAssigned": {
-          "const": "trackSelectedVersion"
+          "const": "trackSelectedVersion",
+          "description": "Compare the current inventory version with the version selected from versionCatalog."
         },
         "onSameSelectedVersion": {
-          "const": "reuseOrRepair"
+          "const": "reuseOrRepair",
+          "description": "Reuse a healthy install or repair it when the same selected version is already tracked."
         },
         "onNewSelectedVersion": {
           "type": "string",
+          "description": "Behavior when the selected catalog version differs from the tracked inventory version.",
           "enum": [
             "replacePackageOwnedInstall",
             "fail"
@@ -1080,6 +1247,8 @@
     },
     "removedOperation": {
       "type": "object",
+      "$comment": "Removal is modeled but intentionally smaller than assignment in v1. The operation removes package-owned state; cleanup tells the runtime which side effects to remove afterward.",
+      "description": "How DesiredState=Removed handles a package that is tracked in inventory.",
       "additionalProperties": false,
       "required": [
         "operation",
@@ -1088,39 +1257,47 @@
       ],
       "properties": {
         "operation": {
-          "$ref": "#/$defs/removeOperation"
+          "$ref": "#/$defs/removeOperation",
+          "description": "The actual removal mechanism, such as deleting the install directory."
         },
         "verifyAbsent": {
-          "$ref": "#/$defs/verifyAbsent"
+          "$ref": "#/$defs/verifyAbsent",
+          "description": "Discovery-backed absence verification after removal."
         },
         "cleanup": {
-          "$ref": "#/$defs/removeCleanup"
+          "$ref": "#/$defs/removeCleanup",
+          "description": "Which package side effects are cleaned after removal succeeds."
         }
       }
     },
     "removeOperation": {
+      "description": "Supported package removal mechanisms.",
       "oneOf": [
         {
           "type": "object",
+          "description": "Remove a Package-owned directory tree. Suitable for archive, npm-prefix, and placed-file packages.",
           "additionalProperties": false,
           "required": [
             "kind"
           ],
           "properties": {
             "kind": {
-              "const": "deleteInstallDirectory"
+              "const": "deleteInstallDirectory",
+              "description": "Delete the tracked install directory."
             }
           }
         },
         {
           "type": "object",
+          "description": "Removal is explicitly unsupported for this package.",
           "additionalProperties": false,
           "required": [
             "kind"
           ],
           "properties": {
             "kind": {
-              "const": "none"
+              "const": "none",
+              "description": "Do not perform removal."
             }
           }
         }
@@ -1128,6 +1305,7 @@
     },
     "verifyAbsent": {
       "type": "object",
+      "description": "Discovery requirements used to verify the package is absent after removal.",
       "additionalProperties": false,
       "required": [
         "use",
@@ -1135,15 +1313,18 @@
       ],
       "properties": {
         "use": {
-          "const": "discovery"
+          "const": "discovery",
+          "description": "Use the same discovery model that assignment uses for presence checks."
         },
         "require": {
-          "$ref": "#/$defs/discoveryRequirementFlags"
+          "$ref": "#/$defs/discoveryRequirementFlags",
+          "description": "Discovery groups that must be absent or no longer accepted after removal."
         }
       }
     },
     "removeCleanup": {
       "type": "object",
+      "description": "Side-effect cleanup toggles applied after removal succeeds.",
       "additionalProperties": false,
       "required": [
         "inventory",
@@ -1153,21 +1334,27 @@
       ],
       "properties": {
         "inventory": {
-          "type": "boolean"
+          "type": "boolean",
+          "description": "Remove the package inventory record."
         },
         "shims": {
-          "type": "boolean"
+          "type": "boolean",
+          "description": "Remove generated command shims owned by this package."
         },
         "path": {
-          "type": "boolean"
+          "type": "boolean",
+          "description": "Remove PATH entries owned by this package."
         },
         "workDirectories": {
-          "type": "boolean"
+          "type": "boolean",
+          "description": "Remove package-specific staging/work directories."
         }
       }
     },
     "discoveryRequirementFlags": {
       "type": "object",
+      "$comment": "Flags let each operation reuse discovery but decide which discovery groups matter. For example a resource model may require files but no commands.",
+      "description": "Boolean switches selecting which discovery groups are required by a state check.",
       "additionalProperties": false,
       "required": [
         "files",
@@ -1181,47 +1368,60 @@
       ],
       "properties": {
         "files": {
-          "type": "boolean"
+          "type": "boolean",
+          "description": "Require file probes from discovery.files."
         },
         "directories": {
-          "type": "boolean"
+          "type": "boolean",
+          "description": "Require directory probes from discovery.directories."
         },
         "commands": {
-          "type": "boolean"
+          "type": "boolean",
+          "description": "Require command probes from discovery.commands."
         },
         "apps": {
-          "type": "boolean"
+          "type": "boolean",
+          "description": "Require application probes from discovery.apps."
         },
         "metadataFiles": {
-          "type": "boolean"
+          "type": "boolean",
+          "description": "Require metadata-file probes from discovery.metadataFiles."
         },
         "signatures": {
-          "type": "boolean"
+          "type": "boolean",
+          "description": "Require signature probes from discovery.signatures."
         },
         "fileDetails": {
-          "type": "boolean"
+          "type": "boolean",
+          "description": "Require file-version/detail probes from discovery.fileDetails."
         },
         "registry": {
-          "type": "boolean"
+          "type": "boolean",
+          "description": "Require registry probes from discovery.registry."
         }
       }
     },
     "pathRegistration": {
+      "$comment": "PATH registration is separate from install kind so package operations can switch between direct PATH and shims without rewriting installer semantics.",
+      "description": "Controls whether the package modifies PATH and which discovered path is registered.",
       "oneOf": [
         {
           "type": "object",
+          "description": "No PATH or shim registration.",
           "additionalProperties": false,
           "required": [
             "mode"
           ],
           "properties": {
             "mode": {
-              "const": "none"
+              "const": "none",
+              "description": "Skip PATH registration."
             }
           }
         },
         {
           "type": "object",
+          "description": "Register a user or machine PATH entry from a discovered source.",
           "additionalProperties": false,
           "required": [
             "mode",
@@ -1230,22 +1430,26 @@
           "properties": {
             "mode": {
               "type": "string",
+              "description": "PATH scope to update.",
               "enum": [
                 "user",
                 "machine"
               ]
             },
             "source": {
-              "$ref": "#/$defs/pathRegistrationSource"
+              "$ref": "#/$defs/pathRegistrationSource",
+              "description": "Discovery-backed source used to compute the registered path or shim root."
             }
           }
         }
       ]
     },
     "pathRegistrationSource": {
+      "description": "Source selector for direct PATH registration or shim generation.",
       "oneOf": [
         {
           "type": "object",
+          "description": "Generate shims from exposed discovery.commands and register the shared shim root.",
           "additionalProperties": false,
           "required": [
             "kind",
@@ -1253,15 +1457,18 @@
           ],
           "properties": {
             "kind": {
-              "const": "shim"
+              "const": "shim",
+              "description": "Use generated command shims instead of placing install directories directly on PATH."
             },
             "use": {
-              "const": "discovery.commands"
+              "const": "discovery.commands",
+              "description": "Generate shims from commands marked exposed=true in discovery.commands."
             }
           }
         },
         {
           "type": "object",
+          "description": "Register a path derived from one named command, app, or install-relative directory.",
           "additionalProperties": false,
           "required": [
             "kind",
@@ -1270,6 +1477,7 @@
           "properties": {
             "kind": {
               "type": "string",
+              "description": "How value should be resolved into a path.",
               "enum": [
                 "commandEntryPoint",
                 "appEntryPoint",
@@ -1278,7 +1486,8 @@
             },
             "value": {
               "type": "string",
-              "minLength": 1
+              "minLength": 1,
+              "description": "Command/app name or install-relative directory value, depending on kind."
             }
           }
         }
@@ -1286,6 +1495,8 @@
     },
     "ownershipPolicy": {
       "type": "object",
+      "$comment": "Ownership policy is assignment policy, not discovery. Discovery finds candidates; this policy decides whether Package may adopt, replace, or require its own inventory.",
+      "description": "Rules for accepting, adopting, or requiring Package-owned installs during DesiredState=Assigned.",
       "additionalProperties": false,
       "required": [
         "allowAdoptExternal",
@@ -1294,18 +1505,23 @@
       ],
       "properties": {
         "allowAdoptExternal": {
-          "type": "boolean"
+          "type": "boolean",
+          "description": "Allow an existing non-Package install to satisfy assignment and be tracked as adopted."
         },
         "upgradeAdoptedInstall": {
-          "type": "boolean"
+          "type": "boolean",
+          "description": "Allow Package to replace an adopted external install when a different selected version is required."
         },
         "requirePackageOwnership": {
-          "type": "boolean"
+          "type": "boolean",
+          "description": "Require Package-owned inventory for the package to be considered ready."
         }
       }
     },
     "compatibility": {
       "type": "object",
+      "$comment": "Compatibility checks are gates/advisories for assignment, not proof of installation. Use discovery for installed state.",
+      "description": "Environment checks that decide whether assignment should continue, warn, or fail.",
       "additionalProperties": false,
       "required": [
         "checks"
@@ -1313,6 +1529,7 @@
       "properties": {
         "checks": {
           "type": "array",
+          "description": "Compatibility checks evaluated before assignment work starts.",
           "items": {
             "$ref": "#/$defs/compatibilityCheck"
           }
@@ -1320,9 +1537,11 @@
       }
     },
     "compatibilityCheck": {
+      "description": "One compatibility check. onFail defaults in runtime behavior when omitted.",
       "oneOf": [
         {
           "type": "object",
+          "description": "Operating-system version compatibility check.",
           "additionalProperties": false,
           "required": [
             "kind",
@@ -1331,21 +1550,26 @@
           ],
           "properties": {
             "kind": {
-              "const": "osVersion"
+              "const": "osVersion",
+              "description": "Compare the current OS version against value."
             },
             "operator": {
-              "type": "string"
+              "type": "string",
+              "description": "Comparison operator such as >=."
             },
             "value": {
-              "type": "string"
+              "type": "string",
+              "description": "Expected OS version value."
             },
             "onFail": {
-              "$ref": "#/$defs/onFail"
+              "$ref": "#/$defs/onFail",
+              "description": "Whether a rejected check blocks assignment or only warns."
             }
           }
         },
         {
           "type": "object",
+          "description": "Memory/resource compatibility check measured in GiB.",
           "additionalProperties": false,
           "required": [
             "kind",
@@ -1355,6 +1579,7 @@
           "properties": {
             "kind": {
               "type": "string",
+              "description": "Memory source to evaluate. physicalOrVideoMemoryGiB passes when either physical RAM or VRAM satisfies the threshold.",
               "enum": [
                 "physicalMemoryGiB",
                 "videoMemoryGiB",
@@ -1362,13 +1587,16 @@
               ]
             },
             "operator": {
-              "type": "string"
+              "type": "string",
+              "description": "Comparison operator such as >=."
             },
             "value": {
-              "type": "number"
+              "type": "number",
+              "description": "Threshold in GiB."
             },
             "onFail": {
-              "$ref": "#/$defs/onFail"
+              "$ref": "#/$defs/onFail",
+              "description": "Whether a rejected check blocks assignment or only warns."
             }
           }
         }
@@ -1376,6 +1604,7 @@
     },
     "onFail": {
       "type": "string",
+      "description": "Compatibility failure behavior. fail blocks assignment; warn records and reports the issue but continues.",
       "enum": [
         "fail",
         "warn"
@@ -1383,6 +1612,8 @@
     },
     "contentHash": {
       "type": "object",
+      "$comment": "Content hash is the deterministic trust boundary for fixed package files. Publisher signatures can add provenance checks but do not replace the hash for pinned artifacts.",
+      "description": "Cryptographic content hash for a package artifact.",
       "additionalProperties": false,
       "required": [
         "algorithm",
@@ -1390,16 +1621,20 @@
       ],
       "properties": {
         "algorithm": {
-          "const": "sha256"
+          "const": "sha256",
+          "description": "Hash algorithm. Only sha256 is supported in schema 1.2."
         },
         "value": {
           "type": "string",
-          "minLength": 1
+          "minLength": 1,
+          "description": "Expected lowercase or uppercase SHA-256 hex digest."
         }
       }
     },
     "publisherSignature": {
       "type": "object",
+      "$comment": "Publisher signature is currently modeled for Windows Authenticode because installer EXEs may be vendor-signed while their download URL is not content-addressed.",
+      "description": "Publisher signature requirement for executable package artifacts.",
       "additionalProperties": false,
       "required": [
         "kind",
@@ -1408,19 +1643,23 @@
       ],
       "properties": {
         "kind": {
-          "const": "authenticode"
+          "const": "authenticode",
+          "description": "Windows Authenticode signature validation."
         },
         "requireValid": {
-          "type": "boolean"
+          "type": "boolean",
+          "description": "Require the signature chain/status to be valid."
         },
         "subjectContains": {
           "type": "string",
-          "minLength": 1
+          "minLength": 1,
+          "description": "Substring expected in the signing certificate subject."
         }
       }
     },
     "elevationMode": {
       "type": "string",
+      "description": "Process elevation behavior for installer operations.",
       "enum": [
         "none",
         "required",
@@ -1429,6 +1668,7 @@
     },
     "exitCodes": {
       "type": "array",
+      "description": "Integer process exit codes.",
       "items": {
         "type": "integer"
       }

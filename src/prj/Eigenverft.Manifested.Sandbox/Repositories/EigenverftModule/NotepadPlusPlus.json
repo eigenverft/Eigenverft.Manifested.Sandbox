@@ -1,6 +1,6 @@
 {
-  "$schema": "./eigenverft-module-package-definition-1.2.schema.json",
-  "schemaVersion": "1.2",
+  "$schema": "./eigenverft-module-package-definition-1.3.schema.json",
+  "schemaVersion": "1.3",
   "id": "NotepadPlusPlus",
   "display": {
     "default": {
@@ -10,26 +10,27 @@
       "summary": "Windows text and source-code editor"
     }
   },
-  "packageTargets": [
-    {
-      "id": "NotepadPlusPlus-win-x64-stable",
-      "channel": "stable",
-      "platformTarget": "win-x64",
-      "constraints": {
-        "os": [
-          "windows"
-        ],
-        "cpu": [
-          "x64"
-        ]
-      },
-      "versionSelection": {
-        "strategy": "latestByVersion",
-        "allowPrerelease": false
-      },
-      "artifactDefaults": {
+  "dependencies": [],
+  "artifacts": {
+    "targets": [
+      {
+        "id": "NotepadPlusPlus-win-x64-stable",
+        "releaseTrack": "stable",
+        "artifactDistributionVariant": "win-x64",
+        "constraints": {
+          "os": [
+            "windows"
+          ],
+          "cpu": [
+            "x64"
+          ]
+        },
+        "versionSelection": {
+          "strategy": "latestByVersion",
+          "allowPrerelease": false
+        },
         "fileNameTemplate": "npp.{version}.Installer.x64.exe",
-        "artifactSources": [
+        "acquisitionCandidates": [
           {
             "kind": "packageDepot",
             "searchOrder": 100,
@@ -47,27 +48,25 @@
             }
           }
         ]
-      }
-    },
-    {
-      "id": "NotepadPlusPlus-win-arm64-stable",
-      "channel": "stable",
-      "platformTarget": "win-arm64",
-      "constraints": {
-        "os": [
-          "windows"
-        ],
-        "cpu": [
-          "arm64"
-        ]
       },
-      "versionSelection": {
-        "strategy": "latestByVersion",
-        "allowPrerelease": false
-      },
-      "artifactDefaults": {
+      {
+        "id": "NotepadPlusPlus-win-arm64-stable",
+        "releaseTrack": "stable",
+        "artifactDistributionVariant": "win-arm64",
+        "constraints": {
+          "os": [
+            "windows"
+          ],
+          "cpu": [
+            "arm64"
+          ]
+        },
+        "versionSelection": {
+          "strategy": "latestByVersion",
+          "allowPrerelease": false
+        },
         "fileNameTemplate": "npp.{version}.Installer.arm64.exe",
-        "artifactSources": [
+        "acquisitionCandidates": [
           {
             "kind": "packageDepot",
             "searchOrder": 100,
@@ -86,43 +85,49 @@
           }
         ]
       }
-    }
-  ],
-  "versionCatalog": [
-    {
-      "version": "8.9.4",
-      "channels": [
-        "stable"
-      ],
-      "artifactsByTarget": {
-        "NotepadPlusPlus-win-x64-stable": {
-          "releaseId": "notepad-plus-plus-8.9.4-win-x64",
-          "contentHash": {
-            "algorithm": "sha256",
-            "value": "f3629f500d0754d8e870255fff0e00384a37f5402d6f3ad8dd1f4f67d707b593"
+    ],
+    "releases": [
+      {
+        "version": "8.9.4",
+        "releaseTracks": [
+          "stable"
+        ],
+        "targetArtifacts": {
+          "NotepadPlusPlus-win-x64-stable": {
+            "artifactId": "notepad-plus-plus-8.9.4-win-x64",
+            "contentHash": {
+              "algorithm": "sha256",
+              "value": "f3629f500d0754d8e870255fff0e00384a37f5402d6f3ad8dd1f4f67d707b593"
+            },
+            "publisherSignature": {
+              "kind": "authenticode",
+              "requireValid": true,
+              "subjectContains": "NOTEPAD++"
+            }
           },
-          "publisherSignature": {
-            "kind": "authenticode",
-            "requireValid": true,
-            "subjectContains": "NOTEPAD++"
-          }
-        },
-        "NotepadPlusPlus-win-arm64-stable": {
-          "releaseId": "notepad-plus-plus-8.9.4-win-arm64",
-          "contentHash": {
-            "algorithm": "sha256",
-            "value": "7d59f0c62caa4d2366f900ca8169fb37cf1dcfce5c79cb3ccb08089b1adbc91"
-          },
-          "publisherSignature": {
-            "kind": "authenticode",
-            "requireValid": true,
-            "subjectContains": "NOTEPAD++"
+          "NotepadPlusPlus-win-arm64-stable": {
+            "artifactId": "notepad-plus-plus-8.9.4-win-arm64",
+            "contentHash": {
+              "algorithm": "sha256",
+              "value": "7d59f0c62caa4d2366f900ca8169fb37cf1dcfce5c79cb3ccb08089b1adbc91"
+            },
+            "publisherSignature": {
+              "kind": "authenticode",
+              "requireValid": true,
+              "subjectContains": "NOTEPAD++"
+            }
           }
         }
       }
+    ],
+    "sources": {
+      "notepadPlusPlusGitHubRelease": {
+        "kind": "download",
+        "baseUri": "https://github.com/notepad-plus-plus/notepad-plus-plus/releases/download/"
+      }
     }
-  ],
-  "discovery": {
+  },
+  "presenceDiscovery": {
     "files": [
       "notepad++.exe"
     ],
@@ -132,8 +137,8 @@
       {
         "name": "notepad++",
         "relativePath": "notepad++.exe",
-        "required": true,
-        "exposed": true
+        "requiredForState": true,
+        "exposeApp": true
       }
     ],
     "metadataFiles": [],
@@ -155,30 +160,23 @@
     ],
     "registry": []
   },
-  "stateDiscovery": {
-    "installed": {
-      "enableDetection": true,
-      "searchLocations": [
-        {
-          "kind": "windowsUninstallRegistryKey",
-          "searchOrder": 100,
-          "paths": [
-            "HKLM:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\Notepad++"
-          ],
-          "installDirectorySource": "displayIconDirectory"
-        }
-      ],
-      "installRootRules": []
-    }
-  },
-  "upstreamSources": {
-    "notepadPlusPlusGitHubRelease": {
-      "kind": "download",
-      "baseUri": "https://github.com/notepad-plus-plus/notepad-plus-plus/releases/download/"
-    }
+  "existingInstallDiscovery": {
+    "enabled": true,
+    "searchLocations": [
+      {
+        "id": "notepadPlusPlusUninstallRegistry",
+        "kind": "windowsUninstallRegistryKey",
+        "searchOrder": 100,
+        "paths": [
+          "HKLM:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\Notepad++"
+        ],
+        "installDirectorySource": "displayIconDirectory"
+      }
+    ],
+    "installRootRules": []
   },
   "packageOperations": {
-    "shared": {
+    "policy": {
       "ownershipPolicy": {
         "allowAdoptExternal": true,
         "upgradeAdoptedInstall": false,
@@ -195,30 +193,29 @@
       }
     },
     "assigned": {
-      "kind": "nsisInstaller",
-      "installDirectory": "notepad-plus-plus/{channel}/{version}/{platformTarget}",
-      "installerKind": "nsis",
-      "uiMode": "silent",
-      "elevation": "none",
-      "timeoutSec": 300,
-      "commandArguments": [
-        "/S",
-        "/noUpdater",
-        "/closeRunningNpp"
-      ],
-      "targetDirectoryArgument": {
-        "enabled": true,
-        "prefix": "/D="
+      "install": {
+        "kind": "nsisInstaller",
+        "installDirectory": "notepad-plus-plus/{releaseTrack}/{version}/{artifactDistributionVariant}",
+        "installerKind": "nsis",
+        "uiMode": "silent",
+        "elevation": "none",
+        "timeoutSec": 300,
+        "commandArguments": [
+          "/S",
+          "/noUpdater",
+          "/closeRunningNpp"
+        ],
+        "targetDirectoryArgument": {
+          "enabled": true,
+          "prefix": "/D="
+        },
+        "successExitCodes": [
+          0
+        ],
+        "restartExitCodes": []
       },
-      "successExitCodes": [
-        0
-      ],
-      "restartExitCodes": [],
-      "pathRegistration": {
-        "mode": "none"
-      },
-      "installedStateCheck": {
-        "use": "discovery",
+      "readyStateCheck": {
+        "use": "presenceDiscovery",
         "expectedVersion": "{version}",
         "require": {
           "files": true,
@@ -231,6 +228,9 @@
           "registry": false
         }
       },
+      "pathRegistration": {
+        "mode": "none"
+      },
       "versionUpdatePolicy": {
         "whenAssigned": "trackSelectedVersion",
         "onSameSelectedVersion": "reuseOrRepair",
@@ -238,11 +238,38 @@
       }
     },
     "removed": {
-      "operation": {
-        "kind": "none"
+      "policy": {
+        "whenNotInInventory": "succeed",
+        "allowedInventoryOwnershipKinds": [
+          "PackageInstalled",
+          "AdoptedExternal"
+        ],
+        "allowUntrackedExternalRemoval": false,
+        "removeDependencies": false
       },
-      "verifyAbsent": {
-        "use": "discovery",
+      "operation": {
+        "kind": "nsisUninstaller",
+        "commandSource": {
+          "use": "existingInstallDiscovery",
+          "searchLocationId": "notepadPlusPlusUninstallRegistry",
+          "registryValueOrder": [
+            "QuietUninstallString",
+            "UninstallString"
+          ]
+        },
+        "commandArguments": [
+          "/S"
+        ],
+        "elevation": "auto",
+        "timeoutSec": 300,
+        "successExitCodes": [
+          0
+        ],
+        "restartExitCodes": [],
+        "uiMode": "silent"
+      },
+      "absenceVerification": {
+        "use": "presenceDiscovery",
         "require": {
           "files": true,
           "directories": false,
@@ -254,10 +281,10 @@
           "registry": false
         }
       },
-      "cleanup": {
-        "inventory": true,
-        "shims": true,
-        "path": true,
+      "postRemoveCleanup": {
+        "packageInventoryRecord": true,
+        "generatedShims": true,
+        "pathEntries": true,
         "workDirectories": true
       }
     }

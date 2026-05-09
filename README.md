@@ -112,8 +112,6 @@ The module currently exports these public commands:
 - `Get-SandboxVersion`
 - `Initialize-ProxyAccessProfile`
 - `Invoke-CodexCli`
-- `Invoke-GeminiCli`
-- `Invoke-GitHubCli`
 - `Invoke-GitRuntime`
 - `Invoke-LlamaCppRuntime`
 - `Invoke-NodeRuntime`
@@ -121,9 +119,7 @@ The module currently exports these public commands:
 - `Invoke-OpenCodeCli`
 - `Invoke-PowerShell7`
 - `Invoke-PythonRuntime`
-- `Invoke-Qwen35-2B-Q8-0-Model`
 - `Invoke-Qwen35-9B-Q6-K-Model`
-- `Invoke-QwenCli`
 - `Invoke-VisualCppRedistributable`
 - `Invoke-VSCodeRuntime`
 - `Invoke-WebRequestEx`
@@ -144,27 +140,23 @@ Invoke-VisualCppRedistributable
 Invoke-PythonRuntime
 Invoke-PowerShell7
 Invoke-GitRuntime
-Invoke-GitHubCli
 Invoke-VSCodeRuntime
 Invoke-NotepadPlusPlus
 Invoke-NodeRuntime
 Invoke-OpenCodeCli
-Invoke-GeminiCli
-Invoke-QwenCli
 Invoke-CodexCli
 Invoke-LlamaCppRuntime
-Invoke-Qwen35-2B-Q8-0-Model
 Invoke-Qwen35-9B-Q6-K-Model
 Get-PackageState
 ```
 
 - `Get-SandboxVersion` is the quick way to show user-facing module info for the current session, including the resolved module version and the full exported command list in alphabetical order.
 - `Get-PackageState` reads the local package state and package-file indexes, reports configured directories, and shows whether copied package definition JSON files and install directories still exist.
-- `Invoke-PythonRuntime`, `Invoke-PowerShell7`, `Invoke-GitRuntime`, `Invoke-GitHubCli`, `Invoke-VSCodeRuntime`, `Invoke-NotepadPlusPlus`, and `Invoke-NodeRuntime` ensure pinned package definitions are ready from the configured depot/download flow.
-- `Invoke-OpenCodeCli`, `Invoke-GeminiCli`, `Invoke-QwenCli`, and `Invoke-CodexCli` install pinned npm-backed CLI packages through the package npm backend. They depend on the packaged Node runtime, and Codex also ensures the Visual C++ Redistributable prerequisite.
+- `Invoke-PythonRuntime`, `Invoke-PowerShell7`, `Invoke-GitRuntime`, `Invoke-VSCodeRuntime`, `Invoke-NotepadPlusPlus`, and `Invoke-NodeRuntime` ensure pinned package definitions are ready from the configured depot/download flow.
+- `Invoke-OpenCodeCli` and `Invoke-CodexCli` install pinned npm-backed CLI packages through the package npm backend. They depend on the packaged Node runtime, and Codex also ensures the Visual C++ Redistributable prerequisite.
 - `Invoke-VisualCppRedistributable` is different because the VC runtime is a machine prerequisite rather than a portable package directory. It can report already-satisfied state from registry validation and only runs the Microsoft installer when needed.
 - `Invoke-LlamaCppRuntime` installs the pinned llama.cpp runtime package.
-- `Invoke-Qwen35-2B-Q8-0-Model` and `Invoke-Qwen35-9B-Q6-K-Model` place pinned Qwen 3.5 GGUF model resources for llama.cpp-compatible runtimes.
+- `Invoke-Qwen35-9B-Q6-K-Model` places a pinned Qwen 3.5 GGUF model resource for llama.cpp-compatible runtimes.
 
 ## 📦 Direct Module Usage
 

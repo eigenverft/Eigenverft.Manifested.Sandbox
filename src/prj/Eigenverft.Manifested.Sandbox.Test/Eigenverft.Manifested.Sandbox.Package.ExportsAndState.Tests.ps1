@@ -30,110 +30,21 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - export
         $command.Parameters.Keys | Should -Not -Contain 'DependencyStack'
     }
 
-    It 'exports Invoke-VSCodeRuntime and keeps it parameterless' {
-        $module = Import-Module -Name $script:ModuleManifestPath -Force -PassThru
-        $command = Get-Command -Name 'Invoke-VSCodeRuntime'
-
-        $command | Should -Not -BeNullOrEmpty
-        $publicParameterNames = @($command.Parameters.Keys | Where-Object {
-                $_ -notin [System.Management.Automation.PSCmdlet]::CommonParameters -and
-                $_ -notin [System.Management.Automation.PSCmdlet]::OptionalCommonParameters
-            })
-        $publicParameterNames.Count | Should -Be 0
-    }
-
-    It 'exports Invoke-NotepadPlusPlus and keeps it parameterless' {
-        $module = Import-Module -Name $script:ModuleManifestPath -Force -PassThru
-        $command = Get-Command -Name 'Invoke-NotepadPlusPlus'
-
-        $command | Should -Not -BeNullOrEmpty
-        $publicParameterNames = @($command.Parameters.Keys | Where-Object {
-                $_ -notin [System.Management.Automation.PSCmdlet]::CommonParameters -and
-                $_ -notin [System.Management.Automation.PSCmdlet]::OptionalCommonParameters
-            })
-        $publicParameterNames.Count | Should -Be 0
-    }
-
-    It 'exports Invoke-LlamaCppRuntime and keeps it parameterless' {
-        $module = Import-Module -Name $script:ModuleManifestPath -Force -PassThru
-        $command = Get-Command -Name 'Invoke-LlamaCppRuntime'
-
-        $command | Should -Not -BeNullOrEmpty
-        $publicParameterNames = @($command.Parameters.Keys | Where-Object {
-                $_ -notin [System.Management.Automation.PSCmdlet]::CommonParameters -and
-                $_ -notin [System.Management.Automation.PSCmdlet]::OptionalCommonParameters
-            })
-        $publicParameterNames.Count | Should -Be 0
-    }
-
-    It 'exports Invoke-Qwen35-2B-Q8-0-Model and keeps it parameterless' {
-        $module = Import-Module -Name $script:ModuleManifestPath -Force -PassThru
-        $command = Get-Command -Name 'Invoke-Qwen35-2B-Q8-0-Model'
-
-        $command | Should -Not -BeNullOrEmpty
-        $publicParameterNames = @($command.Parameters.Keys | Where-Object {
-                $_ -notin [System.Management.Automation.PSCmdlet]::CommonParameters -and
-                $_ -notin [System.Management.Automation.PSCmdlet]::OptionalCommonParameters
-            })
-        $publicParameterNames.Count | Should -Be 0
-    }
-
-    It 'exports Invoke-GitRuntime and keeps it parameterless' {
-        $module = Import-Module -Name $script:ModuleManifestPath -Force -PassThru
-        $command = Get-Command -Name 'Invoke-GitRuntime'
-
-        $command | Should -Not -BeNullOrEmpty
-        $publicParameterNames = @($command.Parameters.Keys | Where-Object {
-                $_ -notin [System.Management.Automation.PSCmdlet]::CommonParameters -and
-                $_ -notin [System.Management.Automation.PSCmdlet]::OptionalCommonParameters
-            })
-        $publicParameterNames.Count | Should -Be 0
-    }
-
-    It 'exports Invoke-GitHubCli and keeps it parameterless' {
-        $module = Import-Module -Name $script:ModuleManifestPath -Force -PassThru
-        $command = Get-Command -Name 'Invoke-GitHubCli'
-
-        $command | Should -Not -BeNullOrEmpty
-        $publicParameterNames = @($command.Parameters.Keys | Where-Object {
-                $_ -notin [System.Management.Automation.PSCmdlet]::CommonParameters -and
-                $_ -notin [System.Management.Automation.PSCmdlet]::OptionalCommonParameters
-        })
-        $publicParameterNames.Count | Should -Be 0
-    }
-
-    It 'exports Invoke-Qwen35-9B-Q6-K-Model and keeps it parameterless' {
-        $module = Import-Module -Name $script:ModuleManifestPath -Force -PassThru
-        $command = Get-Command -Name 'Invoke-Qwen35-9B-Q6-K-Model'
-
-        $command | Should -Not -BeNullOrEmpty
-        $publicParameterNames = @($command.Parameters.Keys | Where-Object {
-                $_ -notin [System.Management.Automation.PSCmdlet]::CommonParameters -and
-                $_ -notin [System.Management.Automation.PSCmdlet]::OptionalCommonParameters
-            })
-        $publicParameterNames.Count | Should -Be 0
-    }
-
-    It 'exports Invoke-NodeRuntime and keeps it parameterless' {
-        $module = Import-Module -Name $script:ModuleManifestPath -Force -PassThru
-        $command = Get-Command -Name 'Invoke-NodeRuntime'
-
-        $command | Should -Not -BeNullOrEmpty
-        $publicParameterNames = @($command.Parameters.Keys | Where-Object {
-                $_ -notin [System.Management.Automation.PSCmdlet]::CommonParameters -and
-                $_ -notin [System.Management.Automation.PSCmdlet]::OptionalCommonParameters
-        })
-        $publicParameterNames.Count | Should -Be 0
-    }
-
-    It 'exports npm-backed Package CLI runtime commands and keeps them parameterless' {
+    It 'exports shipped package wrapper commands and keeps them parameterless' {
         $module = Import-Module -Name $script:ModuleManifestPath -Force -PassThru
 
         foreach ($commandName in @(
                 'Invoke-CodexCli'
-                'Invoke-GeminiCli'
+                'Invoke-GitRuntime'
+                'Invoke-LlamaCppRuntime'
+                'Invoke-NodeRuntime'
+                'Invoke-NotepadPlusPlus'
                 'Invoke-OpenCodeCli'
-                'Invoke-QwenCli'
+                'Invoke-PowerShell7'
+                'Invoke-PythonRuntime'
+                'Invoke-Qwen35-9B-Q6-K-Model'
+                'Invoke-VisualCppRedistributable'
+                'Invoke-VSCodeRuntime'
             )) {
             $command = Get-Command -Name $commandName
             $command | Should -Not -BeNullOrEmpty
@@ -143,42 +54,6 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - export
             })
             $publicParameterNames.Count | Should -Be 0
         }
-    }
-
-    It 'exports Invoke-PythonRuntime and keeps it parameterless' {
-        $module = Import-Module -Name $script:ModuleManifestPath -Force -PassThru
-        $command = Get-Command -Name 'Invoke-PythonRuntime'
-
-        $command | Should -Not -BeNullOrEmpty
-        $publicParameterNames = @($command.Parameters.Keys | Where-Object {
-                $_ -notin [System.Management.Automation.PSCmdlet]::CommonParameters -and
-                $_ -notin [System.Management.Automation.PSCmdlet]::OptionalCommonParameters
-        })
-        $publicParameterNames.Count | Should -Be 0
-    }
-
-    It 'exports Invoke-PowerShell7 and keeps it parameterless' {
-        $module = Import-Module -Name $script:ModuleManifestPath -Force -PassThru
-        $command = Get-Command -Name 'Invoke-PowerShell7'
-
-        $command | Should -Not -BeNullOrEmpty
-        $publicParameterNames = @($command.Parameters.Keys | Where-Object {
-                $_ -notin [System.Management.Automation.PSCmdlet]::CommonParameters -and
-                $_ -notin [System.Management.Automation.PSCmdlet]::OptionalCommonParameters
-            })
-        $publicParameterNames.Count | Should -Be 0
-    }
-
-    It 'exports Invoke-VisualCppRedistributable and keeps it parameterless' {
-        $module = Import-Module -Name $script:ModuleManifestPath -Force -PassThru
-        $command = Get-Command -Name 'Invoke-VisualCppRedistributable'
-
-        $command | Should -Not -BeNullOrEmpty
-        $publicParameterNames = @($command.Parameters.Keys | Where-Object {
-                $_ -notin [System.Management.Automation.PSCmdlet]::CommonParameters -and
-                $_ -notin [System.Management.Automation.PSCmdlet]::OptionalCommonParameters
-        })
-        $publicParameterNames.Count | Should -Be 0
     }
 
     It 'exports Get-PackageState with only the Raw view switch' {
@@ -428,6 +303,10 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - export
         Get-Command -Name 'Invoke-Package-QwenCliRuntime' -Module $module -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
         Get-Command -Name 'Invoke-Package-Qwen35-2B-Q6K' -Module $module -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
         Get-Command -Name 'Invoke-Package-LlamaCppRuntime' -Module $module -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
+        Get-Command -Name 'Invoke-GeminiCli' -Module $module -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
+        Get-Command -Name 'Invoke-GitHubCli' -Module $module -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
+        Get-Command -Name 'Invoke-Qwen35-2B-Q8-0-Model' -Module $module -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
+        Get-Command -Name 'Invoke-QwenCli' -Module $module -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
     }
 
 }

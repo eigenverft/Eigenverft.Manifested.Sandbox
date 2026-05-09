@@ -306,11 +306,11 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
             }
         }
 
-        $result = Invoke-PackageDefinitionCommand -DefinitionId 'GitHubCli'
+        $result = Invoke-PackageDefinitionCommand -DefinitionId 'GitRuntime'
 
         Assert-MockCalled Invoke-PackageDefinitionCommandCore -Times 1 -ParameterFilter {
             $RepositoryId -eq 'EigenverftModule' -and
-            $DefinitionId -eq 'GitHubCli' -and
+            $DefinitionId -eq 'GitRuntime' -and
             $DesiredState -eq 'Assigned'
         }
         $result.Status | Should -Be 'Ready'
@@ -326,11 +326,11 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
             }
         }
 
-        $result = Invoke-Package -DefinitionId 'GitHubCli'
+        $result = Invoke-Package -DefinitionId 'GitRuntime'
 
         Assert-MockCalled Invoke-PackageDefinitionCommandCore -Times 1 -ParameterFilter {
             $RepositoryId -eq 'EigenverftModule' -and
-            $DefinitionId -eq 'GitHubCli' -and
+            $DefinitionId -eq 'GitRuntime' -and
             $DesiredState -eq 'Assigned'
         }
         $result.Status | Should -Be 'Ready'
@@ -346,11 +346,11 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
             }
         }
 
-        $results = @(Invoke-PackageDefinitionCommand -DefinitionId GitHubCli, CodexCli)
+        $results = @(Invoke-PackageDefinitionCommand -DefinitionId GitRuntime, CodexCli)
 
-        Assert-MockCalled Invoke-PackageDefinitionCommandCore -Times 1 -ParameterFilter { $DefinitionId -eq 'GitHubCli' }
+        Assert-MockCalled Invoke-PackageDefinitionCommandCore -Times 1 -ParameterFilter { $DefinitionId -eq 'GitRuntime' }
         Assert-MockCalled Invoke-PackageDefinitionCommandCore -Times 1 -ParameterFilter { $DefinitionId -eq 'CodexCli' }
-        @($results.DefinitionId) | Should -Be @('GitHubCli', 'CodexCli')
+        @($results.DefinitionId) | Should -Be @('GitRuntime', 'CodexCli')
     }
 
     It 'continues public package definition command arrays after a failed result by default' {
@@ -359,15 +359,15 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
                 RepositoryId = $RepositoryId
                 DefinitionId = $DefinitionId
                 DesiredState = $DesiredState
-                Status       = if ($DefinitionId -eq 'GitHubCli') { 'Failed' } else { 'Ready' }
+                Status       = if ($DefinitionId -eq 'GitRuntime') { 'Failed' } else { 'Ready' }
             }
         }
 
-        $results = @(Invoke-PackageDefinitionCommand -DefinitionId GitHubCli, CodexCli)
+        $results = @(Invoke-PackageDefinitionCommand -DefinitionId GitRuntime, CodexCli)
 
-        Assert-MockCalled Invoke-PackageDefinitionCommandCore -Times 1 -ParameterFilter { $DefinitionId -eq 'GitHubCli' }
+        Assert-MockCalled Invoke-PackageDefinitionCommandCore -Times 1 -ParameterFilter { $DefinitionId -eq 'GitRuntime' }
         Assert-MockCalled Invoke-PackageDefinitionCommandCore -Times 1 -ParameterFilter { $DefinitionId -eq 'CodexCli' }
-        @($results.DefinitionId) | Should -Be @('GitHubCli', 'CodexCli')
+        @($results.DefinitionId) | Should -Be @('GitRuntime', 'CodexCli')
         $results[0].Status | Should -Be 'Failed'
         $results[1].Status | Should -Be 'Ready'
     }
@@ -378,15 +378,15 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
                 RepositoryId = $RepositoryId
                 DefinitionId = $DefinitionId
                 DesiredState = $DesiredState
-                Status       = if ($DefinitionId -eq 'GitHubCli') { 'Failed' } else { 'Ready' }
+                Status       = if ($DefinitionId -eq 'GitRuntime') { 'Failed' } else { 'Ready' }
             }
         }
 
-        $results = @(Invoke-PackageDefinitionCommand -DefinitionId GitHubCli, CodexCli -FailFast)
+        $results = @(Invoke-PackageDefinitionCommand -DefinitionId GitRuntime, CodexCli -FailFast)
 
-        Assert-MockCalled Invoke-PackageDefinitionCommandCore -Times 1 -ParameterFilter { $DefinitionId -eq 'GitHubCli' }
+        Assert-MockCalled Invoke-PackageDefinitionCommandCore -Times 1 -ParameterFilter { $DefinitionId -eq 'GitRuntime' }
         Assert-MockCalled Invoke-PackageDefinitionCommandCore -Times 0 -ParameterFilter { $DefinitionId -eq 'CodexCli' }
-        @($results.DefinitionId) | Should -Be @('GitHubCli')
+        @($results.DefinitionId) | Should -Be @('GitRuntime')
         $results[0].Status | Should -Be 'Failed'
     }
 
@@ -582,40 +582,6 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
         $config.Definition.discovery.commands[0].name | Should -Be 'git'
     }
 
-    It 'loads the shipped GitHubCli definition and selects the fixed GitHub-backed release' {
-        [Environment]::SetEnvironmentVariable($script:SourceInventoryEnvVarName, (Join-Path $TestDrive 'missing-inventory.json'), 'Process')
-
-        $config = Get-PackageConfig -DefinitionId 'GitHubCli'
-        $result = New-PackageResult -PackageConfig $config
-        $result = Resolve-PackagePackage -PackageResult $result
-        $sourceDefinition = Get-PackageSourceDefinition -PackageConfig $config -SourceRef ([pscustomobject]@{ scope = 'definition'; id = 'ghCliGitHub' })
-
-        $expectedFileName = if ([string]::Equals([string]$config.Architecture, 'arm64', [System.StringComparison]::OrdinalIgnoreCase)) {
-            'gh_2.91.0_windows_arm64.zip'
-        }
-        else {
-            'gh_2.91.0_windows_amd64.zip'
-        }
-        $expectedSha256 = if ([string]::Equals([string]$config.Architecture, 'arm64', [System.StringComparison]::OrdinalIgnoreCase)) {
-            'ae0333d2f9b13fc28f785ca7379514f9a1cea382cd4726abb6e6f4d2a874dd15'
-        }
-        else {
-            'ced3e6f4bb5a9865056b594b7ad0cf42137dc92c494346f1ca705b5dbf14c88e'
-        }
-
-        $config.DefinitionId | Should -Be 'GitHubCli'
-        $sourceDefinition.Kind | Should -Be 'githubRelease'
-        $sourceDefinition.RepositoryOwner | Should -Be 'cli'
-        $sourceDefinition.RepositoryName | Should -Be 'cli'
-        $result.Package.version | Should -Be '2.91.0'
-        $result.Package.releaseTag | Should -Be 'v2.91.0'
-        $result.Package.packageFile.fileName | Should -Be $expectedFileName
-        $result.Package.packageFile.contentHash.value | Should -Be $expectedSha256
-        $result.Package.assigned.pathRegistration.source.kind | Should -Be 'shim'
-        $result.Package.assigned.pathRegistration.source.use | Should -Be 'discovery.commands'
-        $config.Definition.discovery.commands[0].name | Should -Be 'gh'
-    }
-
     It 'loads the shipped NotepadPlusPlus definition and selects the fixed NSIS installer release' {
         [Environment]::SetEnvironmentVariable($script:SourceInventoryEnvVarName, (Join-Path $TestDrive 'missing-inventory.json'), 'Process')
 
@@ -687,9 +653,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
 
         $cases = @(
             [pscustomobject]@{ DefinitionId = 'CodexCli'; PackageSpec = '@openai/codex@{version}'; Version = '0.125.0'; Command = 'codex'; RelativePath = 'codex.cmd' }
-            [pscustomobject]@{ DefinitionId = 'GeminiCli'; PackageSpec = '@google/gemini-cli@{version}'; Version = '0.39.1'; Command = 'gemini'; RelativePath = 'gemini.cmd' }
             [pscustomobject]@{ DefinitionId = 'OpenCodeCli'; PackageSpec = 'opencode-ai@{version}'; Version = '1.14.24'; Command = 'opencode'; RelativePath = 'opencode.cmd' }
-            [pscustomobject]@{ DefinitionId = 'QwenCli'; PackageSpec = '@qwen-code/qwen-code@{version}'; Version = '0.15.2'; Command = 'qwen'; RelativePath = 'qwen.cmd' }
         )
 
         foreach ($case in $cases) {
@@ -872,31 +836,6 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
         $result.Package.assigned.commandArguments | Should -Be @('/install', '/quiet', '/norestart', '/log', '{logPath}')
         $result.Package.packageFile.fileName | Should -Be 'vc_redist.x64.exe'
         $result.Package.packageFile.publisherSignature.subjectContains | Should -Be 'Microsoft Corporation'
-    }
-
-    It 'loads the shipped Qwen35_2B_Q8_0_Model definition and selects the fixed Hugging Face-backed resource release' {
-        [Environment]::SetEnvironmentVariable($script:SourceInventoryEnvVarName, (Join-Path $TestDrive 'missing-inventory.json'), 'Process')
-        Mock Get-PhysicalMemoryGiB { 2.0 }
-        Mock Get-VideoMemoryGiB { 1.0 }
-
-        $config = Get-PackageConfig -DefinitionId 'Qwen35_2B_Q8_0_Model'
-        $result = New-PackageResult -PackageConfig $config
-        $result = Resolve-PackagePackage -PackageResult $result
-        $sourceDefinition = Get-PackageSourceDefinition -PackageConfig $config -SourceRef ([pscustomobject]@{ scope = 'definition'; id = 'huggingFaceDownload' })
-
-        $config.DefinitionId | Should -Be 'Qwen35_2B_Q8_0_Model'
-        $sourceDefinition.Kind | Should -Be 'download'
-        $sourceDefinition.BaseUri | Should -Be 'https://huggingface.co/unsloth/Qwen3.5-2B-GGUF/resolve/main/'
-        $result.PackageId | Should -Be 'qwen35-2b-q8-0-stable'
-        $result.Package.version | Should -Be '3.5.0'
-        $result.Package.packageFile.fileName | Should -Be 'Qwen3.5-2B-Q8_0.gguf'
-        $result.Package.packageFile.contentHash.algorithm | Should -Be 'sha256'
-        $result.Package.packageFile.contentHash.value | Should -Be '1b04acba824817554f4ce23639bc8495ff70453b8fcb047900c731521021f2c1'
-        $result.Package.assigned.kind | Should -Be 'placePackageFile'
-        $result.Compatibility.Count | Should -Be 1
-        $result.Compatibility[0].Kind | Should -Be 'physicalOrVideoMemoryGiB'
-        $result.Compatibility[0].OnFail | Should -Be 'warn'
-        $result.Compatibility[0].Accepted | Should -BeFalse
     }
 
     It 'loads the shipped Qwen35_9B_Q6_K_Model definition and selects the fixed Hugging Face-backed resource release' {

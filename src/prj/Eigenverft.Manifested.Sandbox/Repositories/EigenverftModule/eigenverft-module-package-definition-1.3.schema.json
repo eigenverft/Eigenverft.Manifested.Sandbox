@@ -1,0 +1,1609 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://eigenverft.local/schemas/eigenverft-module-package-definition-1.3.schema.json",
+  "title": "Eigenverft module package definition (schemaVersion 1.3)",
+  "$comment": "Design rationale: schemaVersion 1.3 groups artifact target selection, release facts, and upstream sources under artifacts because maintainers update those together. It also separates presenceDiscovery from existingInstallDiscovery so assignment and removal can reuse shared facts without inventing a second remove-only discovery language.",
+  "description": "A package definition for the Eigenverft package installer engine. Version 1.3 is a design cleanup for maintainers: artifacts describe what can be acquired, presenceDiscovery describes what proves readiness/absence, existingInstallDiscovery describes how to find external/adopted installs, and packageOperations describes desired-state behavior.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "id",
+    "display",
+    "artifacts",
+    "presenceDiscovery",
+    "existingInstallDiscovery",
+    "packageOperations"
+  ],
+  "properties": {
+    "$comment": {
+      "type": "string",
+      "description": "Optional maintainer note. Runtime ignores it."
+    },
+    "$schema": {
+      "type": "string",
+      "description": "Optional editor hint pointing to this JSON schema."
+    },
+    "schemaVersion": {
+      "type": "string",
+      "const": "1.3",
+      "description": "The package-definition wire format version. Runtime compatibility is intentionally strict."
+    },
+    "id": {
+      "$ref": "#/$defs/identifier",
+      "description": "Stable package definition id used by Invoke-Package and inventory records. Renaming this intentionally creates a new package identity."
+    },
+    "display": {
+      "$ref": "#/$defs/display",
+      "description": "Human-facing package text for output, state views, and future catalog/repository browsing."
+    },
+    "dependencies": {
+      "type": "array",
+      "description": "Package definitions that must be assigned before this package can be assigned.",
+      "items": {
+        "$ref": "#/$defs/dependency"
+      }
+    },
+    "artifacts": {
+      "$ref": "#/$defs/artifacts",
+      "description": "Artifact target, release, and source data. This is the normal maintainer update surface."
+    },
+    "presenceDiscovery": {
+      "$ref": "#/$defs/presenceDiscovery",
+      "description": "Facts that prove the package is present and usable after assignment, and absent after removal."
+    },
+    "existingInstallDiscovery": {
+      "$ref": "#/$defs/existingInstallDiscovery",
+      "description": "Rules for finding installs that already exist outside the selected Package inventory record."
+    },
+    "packageOperations": {
+      "$ref": "#/$defs/packageOperations",
+      "description": "Desired-state behavior for assignment and removal."
+    }
+  },
+  "$defs": {
+    "identifier": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]*$",
+      "description": "Portable id segment. Keep ids stable and avoid spaces so paths, inventory keys, and repository references stay predictable."
+    },
+    "display": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "default"
+      ],
+      "properties": {
+        "default": {
+          "$ref": "#/$defs/displayEntry"
+        }
+      }
+    },
+    "displayEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "publisher",
+        "corporation",
+        "summary"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "publisher": {
+          "type": "string",
+          "minLength": 1
+        },
+        "corporation": {
+          "type": "string",
+          "minLength": 1
+        },
+        "summary": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "dependency": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "repositoryId",
+        "definitionId"
+      ],
+      "properties": {
+        "repositoryId": {
+          "$ref": "#/$defs/identifier",
+          "description": "Package-definition repository id, not a vendor source id."
+        },
+        "definitionId": {
+          "$ref": "#/$defs/identifier",
+          "description": "Package definition id to assign before this package."
+        }
+      }
+    },
+    "artifacts": {
+      "type": "object",
+      "$comment": "artifacts.targets describe selectable target lanes. artifacts.releases describe concrete version/artifact facts. artifacts.sources describe reusable upstream endpoints.",
+      "additionalProperties": false,
+      "required": [
+        "targets",
+        "releases",
+        "sources"
+      ],
+      "properties": {
+        "$comment": {
+          "type": "string"
+        },
+        "targets": {
+          "type": "array",
+          "minItems": 1,
+          "description": "Selectable artifact target lanes such as stable windows_amd64 or stable q8-0.",
+          "items": {
+            "$ref": "#/$defs/artifactTarget"
+          }
+        },
+        "releases": {
+          "type": "array",
+          "minItems": 1,
+          "description": "Concrete release/version facts and per-target artifact trust metadata.",
+          "items": {
+            "$ref": "#/$defs/artifactRelease"
+          }
+        },
+        "sources": {
+          "type": "object",
+          "description": "Definition-local artifact sources referenced by acquisition candidates and upstreamRelease.",
+          "additionalProperties": {
+            "$ref": "#/$defs/artifactSourceEndpoint"
+          }
+        }
+      }
+    },
+    "artifactTarget": {
+      "type": "object",
+      "$comment": "artifactDistributionVariant is intentionally long because it is not only platform. It can represent platform packaging, CPU/GPU build, model quantization, installer edition, or another distributed artifact form.",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "releaseTrack",
+        "artifactDistributionVariant",
+        "constraints",
+        "versionSelection"
+      ],
+      "properties": {
+        "$comment": {
+          "type": "string"
+        },
+        "id": {
+          "$ref": "#/$defs/identifier",
+          "description": "Artifact target id used as key in artifacts.releases[].targetArtifacts."
+        },
+        "releaseTrack": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Update lane such as stable."
+        },
+        "artifactDistributionVariant": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The distributed artifact form for this target, for example windows_amd64, win32-x64, q8-0, or cpu-x64."
+        },
+        "constraints": {
+          "$ref": "#/$defs/constraints",
+          "description": "Machine constraints used to decide whether this target is selectable."
+        },
+        "versionSelection": {
+          "$ref": "#/$defs/versionSelection",
+          "description": "How the runtime selects a release from artifacts.releases for this target."
+        },
+        "fileNameTemplate": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Default package file or asset name template for this target. Omit for operations such as npmGlobalPackage that do not acquire a raw package file."
+        },
+        "acquisitionCandidates": {
+          "$ref": "#/$defs/acquisitionCandidates",
+          "description": "Default ordered candidates used to acquire the raw artifact for this target. Omit when assignment does not need a package file."
+        }
+      }
+    },
+    "constraints": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "os",
+        "cpu"
+      ],
+      "properties": {
+        "os": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "cpu": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "versionSelection": {
+      "type": "object",
+      "$comment": "latestByVersion selects from this definition's artifacts.releases. It is not a network latest lookup.",
+      "additionalProperties": false,
+      "required": [
+        "strategy",
+        "allowPrerelease"
+      ],
+      "properties": {
+        "strategy": {
+          "type": "string",
+          "enum": [
+            "latestByVersion"
+          ]
+        },
+        "allowPrerelease": {
+          "type": "boolean"
+        }
+      }
+    },
+    "artifactRelease": {
+      "type": "object",
+      "$comment": "This is the fast update surface for maintainers: add a release with version, release tracks, upstream release tag, and per-target hashes.",
+      "additionalProperties": false,
+      "required": [
+        "version",
+        "releaseTracks",
+        "targetArtifacts"
+      ],
+      "properties": {
+        "$comment": {
+          "type": "string"
+        },
+        "version": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Package version used for selection, paths, validation tokens, and inventory."
+        },
+        "releaseTracks": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "upstreamRelease": {
+          "$ref": "#/$defs/upstreamRelease",
+          "description": "Optional upstream release metadata shared by target artifacts in this release."
+        },
+        "targetArtifacts": {
+          "type": "object",
+          "minProperties": 1,
+          "description": "Concrete artifact facts keyed by artifacts.targets[].id.",
+          "additionalProperties": {
+            "$ref": "#/$defs/targetArtifact"
+          }
+        }
+      }
+    },
+    "upstreamRelease": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sourceId"
+      ],
+      "properties": {
+        "sourceId": {
+          "$ref": "#/$defs/identifier",
+          "description": "Key into artifacts.sources."
+        },
+        "releaseTag": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Fixed upstream release tag. Required by runtime when the selected source kind is githubRelease."
+        }
+      }
+    },
+    "targetArtifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "artifactId"
+      ],
+      "properties": {
+        "artifactId": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Stable selected-artifact id written into results and inventory."
+        },
+        "fileName": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Exact package file or asset name override for this release/target."
+        },
+        "sourcePath": {
+          "type": "string",
+          "description": "Optional source-relative path override for this release/target."
+        },
+        "acquisitionCandidates": {
+          "$ref": "#/$defs/acquisitionCandidates",
+          "description": "Optional acquisition candidate override for this release/target."
+        },
+        "contentHash": {
+          "$ref": "#/$defs/contentHash",
+          "description": "Trust boundary for fixed package files."
+        },
+        "publisherSignature": {
+          "$ref": "#/$defs/publisherSignature",
+          "description": "Publisher signature requirement for executable artifacts when fixed hashes are unsuitable."
+        }
+      }
+    },
+    "acquisitionCandidates": {
+      "type": "array",
+      "minItems": 1,
+      "description": "Ordered candidates used to acquire raw package files. Lower searchOrder runs first.",
+      "items": {
+        "$ref": "#/$defs/acquisitionCandidate"
+      }
+    },
+    "acquisitionCandidate": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "searchOrder",
+            "verification"
+          ],
+          "properties": {
+            "kind": {
+              "const": "packageDepot"
+            },
+            "searchOrder": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "verification": {
+              "$ref": "#/$defs/verification"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "sourceId",
+            "searchOrder",
+            "verification"
+          ],
+          "properties": {
+            "kind": {
+              "const": "download"
+            },
+            "sourceId": {
+              "$ref": "#/$defs/identifier"
+            },
+            "sourcePath": {
+              "type": "string"
+            },
+            "searchOrder": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "verification": {
+              "$ref": "#/$defs/verification"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "sourcePath",
+            "searchOrder",
+            "verification"
+          ],
+          "properties": {
+            "kind": {
+              "const": "filesystem"
+            },
+            "sourceId": {
+              "$ref": "#/$defs/identifier"
+            },
+            "sourcePath": {
+              "type": "string"
+            },
+            "searchOrder": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "verification": {
+              "$ref": "#/$defs/verification"
+            }
+          }
+        }
+      ]
+    },
+    "verification": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "mode"
+      ],
+      "properties": {
+        "mode": {
+          "type": "string",
+          "enum": [
+            "required",
+            "optional",
+            "none"
+          ]
+        }
+      }
+    },
+    "artifactSourceEndpoint": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "baseUri"
+          ],
+          "properties": {
+            "kind": {
+              "const": "download"
+            },
+            "baseUri": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        {
+          "type": "object",
+          "$comment": "GitHub field names are prefixed with github to avoid confusion with package repository ids.",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "githubOwner",
+            "githubRepository"
+          ],
+          "properties": {
+            "kind": {
+              "const": "githubRelease"
+            },
+            "githubOwner": {
+              "type": "string",
+              "minLength": 1
+            },
+            "githubRepository": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        }
+      ]
+    },
+    "presenceDiscovery": {
+      "type": "object",
+      "$comment": "Presence discovery replaces providedTools/discovery wording. It describes what proves presence, not where to fetch or how to install.",
+      "additionalProperties": false,
+      "required": [
+        "files",
+        "directories",
+        "commands",
+        "apps",
+        "metadataFiles",
+        "signatures",
+        "fileDetails",
+        "registry"
+      ],
+      "properties": {
+        "$comment": {
+          "type": "string"
+        },
+        "files": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "directories": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "commands": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/presenceCommand"
+          }
+        },
+        "apps": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/presenceApp"
+          }
+        },
+        "metadataFiles": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/metadataFileProbe"
+          }
+        },
+        "signatures": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/signatureProbe"
+          }
+        },
+        "fileDetails": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/fileDetailsProbe"
+          }
+        },
+        "registry": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/registryProbe"
+          }
+        }
+      }
+    },
+    "presenceCommand": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "relativePath",
+        "requiredForState",
+        "exposeCommand"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "relativePath": {
+          "type": "string",
+          "minLength": 1
+        },
+        "requiredForState": {
+          "type": "boolean"
+        },
+        "exposeCommand": {
+          "type": "boolean"
+        },
+        "stateChecks": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/commandStateCheck"
+          }
+        }
+      }
+    },
+    "presenceApp": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "relativePath",
+        "requiredForState",
+        "exposeApp"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "relativePath": {
+          "type": "string",
+          "minLength": 1
+        },
+        "requiredForState": {
+          "type": "boolean"
+        },
+        "exposeApp": {
+          "type": "boolean"
+        }
+      }
+    },
+    "commandStateCheck": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "arguments": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "outputPattern": {
+          "type": "string"
+        },
+        "expectedValue": {
+          "type": "string"
+        }
+      }
+    },
+    "metadataFileProbe": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": [
+        "relativePath"
+      ],
+      "properties": {
+        "relativePath": {
+          "type": "string"
+        }
+      }
+    },
+    "signatureProbe": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "relativePath",
+        "requireValid",
+        "subjectContains"
+      ],
+      "properties": {
+        "relativePath": {
+          "type": "string"
+        },
+        "requireValid": {
+          "type": "boolean"
+        },
+        "subjectContains": {
+          "type": "string"
+        }
+      }
+    },
+    "fileDetailsProbe": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": [
+        "relativePath"
+      ],
+      "properties": {
+        "relativePath": {
+          "type": "string"
+        },
+        "fileVersion": {
+          "type": "string"
+        },
+        "productVersion": {
+          "type": "string"
+        },
+        "productName": {
+          "type": "string"
+        },
+        "fileDescription": {
+          "type": "string"
+        }
+      }
+    },
+    "registryProbe": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "paths",
+        "valueName"
+      ],
+      "properties": {
+        "paths": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string"
+          }
+        },
+        "valueName": {
+          "type": "string"
+        },
+        "operator": {
+          "type": "string"
+        },
+        "expectedValue": {
+          "type": "string"
+        }
+      }
+    },
+    "existingInstallDiscovery": {
+      "type": "object",
+      "$comment": "Existing install discovery is shared by assignment/adoption and removal. Give search locations stable ids so removal operations can reference the same registry/path discovery data.",
+      "additionalProperties": false,
+      "required": [
+        "enabled",
+        "searchLocations",
+        "installRootRules"
+      ],
+      "properties": {
+        "$comment": {
+          "type": "string"
+        },
+        "enabled": {
+          "type": "boolean"
+        },
+        "searchLocations": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/existingInstallSearchLocation"
+          }
+        },
+        "installRootRules": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/installRootRule"
+          }
+        }
+      }
+    },
+    "existingInstallSearchLocation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "kind",
+        "searchOrder"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/identifier",
+          "description": "Stable id so packageOperations.removed.operation.commandSource can reference this discovery source."
+        },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "command",
+            "path",
+            "directory",
+            "windowsUninstallRegistryKey"
+          ]
+        },
+        "searchOrder": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "name": {
+          "type": "string"
+        },
+        "path": {
+          "type": "string"
+        },
+        "paths": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "installDirectorySource": {
+          "type": "string",
+          "enum": [
+            "installLocation",
+            "displayIcon",
+            "displayIconDirectory",
+            "uninstallString",
+            "uninstallStringDirectory"
+          ]
+        }
+      }
+    },
+    "installRootRule": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "match",
+        "installRootRelativePath"
+      ],
+      "properties": {
+        "match": {
+          "type": "object"
+        },
+        "installRootRelativePath": {
+          "type": "string"
+        }
+      }
+    },
+    "packageOperations": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "policy",
+        "assigned",
+        "removed"
+      ],
+      "properties": {
+        "$comment": {
+          "type": "string"
+        },
+        "policy": {
+          "$ref": "#/$defs/packageOperationPolicy"
+        },
+        "assigned": {
+          "$ref": "#/$defs/assignedOperation"
+        },
+        "removed": {
+          "$ref": "#/$defs/removedOperation"
+        }
+      }
+    },
+    "packageOperationPolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "ownershipPolicy",
+        "compatibility"
+      ],
+      "properties": {
+        "ownershipPolicy": {
+          "$ref": "#/$defs/ownershipPolicy"
+        },
+        "compatibility": {
+          "$ref": "#/$defs/compatibility"
+        }
+      }
+    },
+    "assignedOperation": {
+      "type": "object",
+      "$comment": "Assigned receives a selected artifact and makes the package ready. Artifact lookup stays under artifacts.",
+      "additionalProperties": false,
+      "required": [
+        "install",
+        "readyStateCheck",
+        "pathRegistration",
+        "versionUpdatePolicy"
+      ],
+      "properties": {
+        "$comment": {
+          "type": "string"
+        },
+        "install": {
+          "$ref": "#/$defs/assignInstallOperation"
+        },
+        "readyStateCheck": {
+          "$ref": "#/$defs/readyStateCheck"
+        },
+        "pathRegistration": {
+          "$ref": "#/$defs/pathRegistration"
+        },
+        "versionUpdatePolicy": {
+          "$ref": "#/$defs/versionUpdatePolicy"
+        }
+      }
+    },
+    "assignInstallOperation": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/assignExpandArchive"
+        },
+        {
+          "$ref": "#/$defs/assignNpmGlobalPackage"
+        },
+        {
+          "$ref": "#/$defs/assignPlacePackageFile"
+        },
+        {
+          "$ref": "#/$defs/assignNsisInstaller"
+        },
+        {
+          "$ref": "#/$defs/assignRunInstaller"
+        }
+      ]
+    },
+    "assignExpandArchive": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "installDirectory",
+        "expandedRoot",
+        "createDirectories"
+      ],
+      "properties": {
+        "kind": {
+          "const": "expandArchive"
+        },
+        "installDirectory": {
+          "type": "string"
+        },
+        "expandedRoot": {
+          "type": "string"
+        },
+        "createDirectories": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "assignNpmGlobalPackage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "installerCommand",
+        "packageSpec",
+        "installDirectory"
+      ],
+      "properties": {
+        "kind": {
+          "const": "npmGlobalPackage"
+        },
+        "installerCommand": {
+          "type": "string"
+        },
+        "packageSpec": {
+          "type": "string"
+        },
+        "installDirectory": {
+          "type": "string"
+        }
+      }
+    },
+    "assignPlacePackageFile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "installDirectory",
+        "targetRelativePath"
+      ],
+      "properties": {
+        "kind": {
+          "const": "placePackageFile"
+        },
+        "installDirectory": {
+          "type": "string"
+        },
+        "targetRelativePath": {
+          "type": "string"
+        }
+      }
+    },
+    "assignNsisInstaller": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "installDirectory",
+        "commandArguments",
+        "targetDirectoryArgument"
+      ],
+      "properties": {
+        "kind": {
+          "const": "nsisInstaller"
+        },
+        "installDirectory": {
+          "type": "string"
+        },
+        "installerKind": {
+          "type": "string"
+        },
+        "uiMode": {
+          "type": "string"
+        },
+        "elevation": {
+          "$ref": "#/$defs/elevationMode"
+        },
+        "timeoutSec": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "commandArguments": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "targetDirectoryArgument": {
+          "type": "object",
+          "additionalProperties": true
+        },
+        "successExitCodes": {
+          "$ref": "#/$defs/exitCodes"
+        },
+        "restartExitCodes": {
+          "$ref": "#/$defs/exitCodes"
+        }
+      }
+    },
+    "assignRunInstaller": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "targetKind",
+        "installerKind",
+        "uiMode",
+        "elevation",
+        "timeoutSec",
+        "commandArguments",
+        "successExitCodes",
+        "restartExitCodes"
+      ],
+      "properties": {
+        "kind": {
+          "const": "runInstaller"
+        },
+        "targetKind": {
+          "type": "string",
+          "enum": [
+            "directory",
+            "machinePrerequisite"
+          ]
+        },
+        "installerKind": {
+          "type": "string"
+        },
+        "uiMode": {
+          "type": "string"
+        },
+        "elevation": {
+          "$ref": "#/$defs/elevationMode"
+        },
+        "timeoutSec": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "logRelativePath": {
+          "type": "string"
+        },
+        "commandArguments": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "successExitCodes": {
+          "$ref": "#/$defs/exitCodes"
+        },
+        "restartExitCodes": {
+          "$ref": "#/$defs/exitCodes"
+        }
+      }
+    },
+    "readyStateCheck": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "use",
+        "expectedVersion",
+        "require"
+      ],
+      "properties": {
+        "use": {
+          "const": "presenceDiscovery"
+        },
+        "expectedVersion": {
+          "type": "string"
+        },
+        "require": {
+          "$ref": "#/$defs/presenceRequirementFlags"
+        }
+      }
+    },
+    "versionUpdatePolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "whenAssigned",
+        "onSameSelectedVersion",
+        "onNewSelectedVersion"
+      ],
+      "properties": {
+        "whenAssigned": {
+          "const": "trackSelectedVersion"
+        },
+        "onSameSelectedVersion": {
+          "const": "reuseOrRepair"
+        },
+        "onNewSelectedVersion": {
+          "type": "string",
+          "enum": [
+            "replacePackageOwnedInstall",
+            "fail"
+          ]
+        }
+      }
+    },
+    "removedOperation": {
+      "type": "object",
+      "$comment": "Removal references presenceDiscovery/existingInstallDiscovery instead of duplicating discovery facts. Policy decides what ownership classes may be touched.",
+      "additionalProperties": false,
+      "required": [
+        "policy",
+        "operation",
+        "absenceVerification",
+        "postRemoveCleanup"
+      ],
+      "properties": {
+        "$comment": {
+          "type": "string"
+        },
+        "policy": {
+          "$ref": "#/$defs/removePolicy"
+        },
+        "operation": {
+          "$ref": "#/$defs/removeOperation"
+        },
+        "absenceVerification": {
+          "$ref": "#/$defs/absenceVerification"
+        },
+        "postRemoveCleanup": {
+          "$ref": "#/$defs/postRemoveCleanup"
+        }
+      }
+    },
+    "removePolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "whenNotInInventory",
+        "allowedInventoryOwnershipKinds",
+        "allowUntrackedExternalRemoval",
+        "removeDependencies"
+      ],
+      "properties": {
+        "whenNotInInventory": {
+          "type": "string",
+          "enum": [
+            "succeed",
+            "fail"
+          ]
+        },
+        "allowedInventoryOwnershipKinds": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "PackageInstalled",
+              "PackageApplied",
+              "AdoptedExternal"
+            ]
+          }
+        },
+        "allowUntrackedExternalRemoval": {
+          "type": "boolean",
+          "description": "High-risk opt-in. When false, removal never deletes an external install discovered live without inventory."
+        },
+        "removeDependencies": {
+          "type": "boolean",
+          "description": "Whether removing this package should also remove dependencies. Expected false for v1."
+        }
+      }
+    },
+    "removeOperation": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "pathSource"
+          ],
+          "properties": {
+            "kind": {
+              "const": "deleteInstallDirectory"
+            },
+            "pathSource": {
+              "const": "inventory.installDirectory",
+              "description": "Delete the install directory tracked in inventory, not a newly computed directory from current config."
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "commandSource",
+            "commandArguments",
+            "elevation",
+            "timeoutSec",
+            "successExitCodes",
+            "restartExitCodes",
+            "uiMode"
+          ],
+          "properties": {
+            "kind": {
+              "const": "nsisUninstaller"
+            },
+            "commandSource": {
+              "$ref": "#/$defs/uninstallCommandSource"
+            },
+            "commandArguments": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "elevation": {
+              "$ref": "#/$defs/elevationMode"
+            },
+            "timeoutSec": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "successExitCodes": {
+              "$ref": "#/$defs/exitCodes"
+            },
+            "restartExitCodes": {
+              "$ref": "#/$defs/exitCodes"
+            },
+            "uiMode": {
+              "type": "string"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind"
+          ],
+          "properties": {
+            "kind": {
+              "const": "none"
+            }
+          }
+        }
+      ]
+    },
+    "uninstallCommandSource": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "use",
+        "searchLocationId",
+        "registryValueOrder"
+      ],
+      "properties": {
+        "use": {
+          "const": "existingInstallDiscovery"
+        },
+        "searchLocationId": {
+          "$ref": "#/$defs/identifier",
+          "description": "Id of an existingInstallDiscovery.searchLocations entry."
+        },
+        "registryValueOrder": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "enum": [
+              "QuietUninstallString",
+              "UninstallString"
+            ]
+          }
+        }
+      }
+    },
+    "absenceVerification": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "use",
+        "require"
+      ],
+      "properties": {
+        "use": {
+          "const": "presenceDiscovery"
+        },
+        "require": {
+          "$ref": "#/$defs/presenceRequirementFlags"
+        }
+      }
+    },
+    "postRemoveCleanup": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "packageInventoryRecord",
+        "generatedShims",
+        "pathEntries",
+        "workDirectories"
+      ],
+      "properties": {
+        "packageInventoryRecord": {
+          "type": "boolean"
+        },
+        "generatedShims": {
+          "type": "boolean"
+        },
+        "pathEntries": {
+          "type": "boolean"
+        },
+        "workDirectories": {
+          "type": "boolean"
+        }
+      }
+    },
+    "presenceRequirementFlags": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "files",
+        "directories",
+        "commands",
+        "apps",
+        "metadataFiles",
+        "signatures",
+        "fileDetails",
+        "registry"
+      ],
+      "properties": {
+        "files": {
+          "type": "boolean"
+        },
+        "directories": {
+          "type": "boolean"
+        },
+        "commands": {
+          "type": "boolean"
+        },
+        "apps": {
+          "type": "boolean"
+        },
+        "metadataFiles": {
+          "type": "boolean"
+        },
+        "signatures": {
+          "type": "boolean"
+        },
+        "fileDetails": {
+          "type": "boolean"
+        },
+        "registry": {
+          "type": "boolean"
+        }
+      }
+    },
+    "pathRegistration": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "mode"
+          ],
+          "properties": {
+            "mode": {
+              "const": "none"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "mode",
+            "source"
+          ],
+          "properties": {
+            "mode": {
+              "type": "string",
+              "enum": [
+                "user",
+                "machine"
+              ]
+            },
+            "source": {
+              "$ref": "#/$defs/pathRegistrationSource"
+            }
+          }
+        }
+      ]
+    },
+    "pathRegistrationSource": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "use"
+          ],
+          "properties": {
+            "kind": {
+              "const": "shim"
+            },
+            "use": {
+              "const": "presenceDiscovery.commands"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "value"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "commandEntryPoint",
+                "appEntryPoint",
+                "installRelativeDirectory"
+              ]
+            },
+            "value": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        }
+      ]
+    },
+    "ownershipPolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "allowAdoptExternal",
+        "upgradeAdoptedInstall",
+        "requirePackageOwnership"
+      ],
+      "properties": {
+        "allowAdoptExternal": {
+          "type": "boolean"
+        },
+        "upgradeAdoptedInstall": {
+          "type": "boolean"
+        },
+        "requirePackageOwnership": {
+          "type": "boolean"
+        }
+      }
+    },
+    "compatibility": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "checks"
+      ],
+      "properties": {
+        "checks": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/compatibilityCheck"
+          }
+        }
+      }
+    },
+    "compatibilityCheck": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "operator",
+            "value"
+          ],
+          "properties": {
+            "kind": {
+              "const": "osVersion"
+            },
+            "operator": {
+              "type": "string"
+            },
+            "value": {
+              "type": "string"
+            },
+            "onFail": {
+              "$ref": "#/$defs/onFail"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "operator",
+            "value"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "physicalMemoryGiB",
+                "videoMemoryGiB",
+                "physicalOrVideoMemoryGiB"
+              ]
+            },
+            "operator": {
+              "type": "string"
+            },
+            "value": {
+              "type": "number"
+            },
+            "onFail": {
+              "$ref": "#/$defs/onFail"
+            }
+          }
+        }
+      ]
+    },
+    "onFail": {
+      "type": "string",
+      "enum": [
+        "fail",
+        "warn"
+      ]
+    },
+    "contentHash": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "algorithm",
+        "value"
+      ],
+      "properties": {
+        "algorithm": {
+          "const": "sha256"
+        },
+        "value": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "publisherSignature": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "requireValid",
+        "subjectContains"
+      ],
+      "properties": {
+        "kind": {
+          "const": "authenticode"
+        },
+        "requireValid": {
+          "type": "boolean"
+        },
+        "subjectContains": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "elevationMode": {
+      "type": "string",
+      "enum": [
+        "none",
+        "required",
+        "auto"
+      ]
+    },
+    "exitCodes": {
+      "type": "array",
+      "items": {
+        "type": "integer"
+      }
+    }
+  }
+}

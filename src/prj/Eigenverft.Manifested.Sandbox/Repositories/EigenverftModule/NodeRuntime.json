@@ -1,6 +1,6 @@
 {
-  "$schema": "./eigenverft-module-package-definition-1.2.schema.json",
-  "schemaVersion": "1.2",
+  "$schema": "./eigenverft-module-package-definition-1.3.schema.json",
+  "schemaVersion": "1.3",
   "id": "NodeRuntime",
   "display": {
     "default": {
@@ -10,26 +10,27 @@
       "summary": "Portable Node.js runtime"
     }
   },
-  "packageTargets": [
-    {
-      "id": "NodeRuntime-win-x64-stable",
-      "channel": "stable",
-      "platformTarget": "win-x64",
-      "constraints": {
-        "os": [
-          "windows"
-        ],
-        "cpu": [
-          "x64"
-        ]
-      },
-      "versionSelection": {
-        "strategy": "latestByVersion",
-        "allowPrerelease": false
-      },
-      "artifactDefaults": {
+  "dependencies": [],
+  "artifacts": {
+    "targets": [
+      {
+        "id": "NodeRuntime-win-x64-stable",
+        "releaseTrack": "stable",
+        "artifactDistributionVariant": "win-x64",
+        "constraints": {
+          "os": [
+            "windows"
+          ],
+          "cpu": [
+            "x64"
+          ]
+        },
+        "versionSelection": {
+          "strategy": "latestByVersion",
+          "allowPrerelease": false
+        },
         "fileNameTemplate": "node-v{version}-win-x64.zip",
-        "artifactSources": [
+        "acquisitionCandidates": [
           {
             "kind": "packageDepot",
             "searchOrder": 100,
@@ -47,27 +48,25 @@
             }
           }
         ]
-      }
-    },
-    {
-      "id": "NodeRuntime-win-arm64-stable",
-      "channel": "stable",
-      "platformTarget": "win-arm64",
-      "constraints": {
-        "os": [
-          "windows"
-        ],
-        "cpu": [
-          "arm64"
-        ]
       },
-      "versionSelection": {
-        "strategy": "latestByVersion",
-        "allowPrerelease": false
-      },
-      "artifactDefaults": {
+      {
+        "id": "NodeRuntime-win-arm64-stable",
+        "releaseTrack": "stable",
+        "artifactDistributionVariant": "win-arm64",
+        "constraints": {
+          "os": [
+            "windows"
+          ],
+          "cpu": [
+            "arm64"
+          ]
+        },
+        "versionSelection": {
+          "strategy": "latestByVersion",
+          "allowPrerelease": false
+        },
         "fileNameTemplate": "node-v{version}-win-arm64.zip",
-        "artifactSources": [
+        "acquisitionCandidates": [
           {
             "kind": "packageDepot",
             "searchOrder": 100,
@@ -86,34 +85,43 @@
           }
         ]
       }
-    }
-  ],
-  "versionCatalog": [
-    {
-      "version": "24.15.0",
-      "channels": [
-        "stable"
-      ],
-      "artifactsByTarget": {
-        "NodeRuntime-win-x64-stable": {
-          "releaseId": "node-runtime-win-x64-stable",
-          "contentHash": {
-            "algorithm": "sha256",
-            "value": "cc5149eabd53779ce1e7bdc5401643622d0c7e6800ade18928a767e940bb0e62"
-          }
+    ],
+    "releases": [
+      {
+        "version": "24.15.0",
+        "releaseTracks": [
+          "stable"
+        ],
+        "upstreamRelease": {
+          "sourceId": "nodeJsRelease",
+          "releaseTag": "v24.15.0"
         },
-        "NodeRuntime-win-arm64-stable": {
-          "releaseId": "node-runtime-win-arm64-stable",
-          "contentHash": {
-            "algorithm": "sha256",
-            "value": "c9eb7402eda26e2ba7e44b6727fc85a8de56c5095b1f71ebd3062892211aa116"
+        "targetArtifacts": {
+          "NodeRuntime-win-x64-stable": {
+            "artifactId": "node-runtime-win-x64-stable",
+            "contentHash": {
+              "algorithm": "sha256",
+              "value": "cc5149eabd53779ce1e7bdc5401643622d0c7e6800ade18928a767e940bb0e62"
+            }
+          },
+          "NodeRuntime-win-arm64-stable": {
+            "artifactId": "node-runtime-win-arm64-stable",
+            "contentHash": {
+              "algorithm": "sha256",
+              "value": "c9eb7402eda26e2ba7e44b6727fc85a8de56c5095b1f71ebd3062892211aa116"
+            }
           }
         }
-      },
-      "releaseTag": "v24.15.0"
+      }
+    ],
+    "sources": {
+      "nodeJsRelease": {
+        "kind": "download",
+        "baseUri": "https://nodejs.org/dist/"
+      }
     }
-  ],
-  "discovery": {
+  },
+  "presenceDiscovery": {
     "files": [
       "node.exe",
       "npm.cmd",
@@ -124,8 +132,8 @@
       {
         "name": "node",
         "relativePath": "node.exe",
-        "required": true,
-        "exposed": true,
+        "requiredForState": true,
+        "exposeCommand": true,
         "stateChecks": [
           {
             "arguments": [
@@ -139,8 +147,8 @@
       {
         "name": "npm",
         "relativePath": "npm.cmd",
-        "required": true,
-        "exposed": true,
+        "requiredForState": true,
+        "exposeCommand": true,
         "stateChecks": [
           {
             "arguments": [
@@ -153,8 +161,8 @@
       {
         "name": "npx",
         "relativePath": "npx.cmd",
-        "required": true,
-        "exposed": true,
+        "requiredForState": true,
+        "exposeCommand": true,
         "stateChecks": [
           {
             "arguments": [
@@ -171,21 +179,13 @@
     "fileDetails": [],
     "registry": []
   },
-  "stateDiscovery": {
-    "installed": {
-      "enableDetection": false,
-      "searchLocations": [],
-      "installRootRules": []
-    }
-  },
-  "upstreamSources": {
-    "nodeJsRelease": {
-      "kind": "download",
-      "baseUri": "https://nodejs.org/dist/"
-    }
+  "existingInstallDiscovery": {
+    "enabled": false,
+    "searchLocations": [],
+    "installRootRules": []
   },
   "packageOperations": {
-    "shared": {
+    "policy": {
       "ownershipPolicy": {
         "allowAdoptExternal": false,
         "upgradeAdoptedInstall": false,
@@ -202,19 +202,14 @@
       }
     },
     "assigned": {
-      "kind": "expandArchive",
-      "installDirectory": "node-runtime/{channel}/{version}/{platformTarget}",
-      "pathRegistration": {
-        "mode": "user",
-        "source": {
-          "kind": "shim",
-          "use": "discovery.commands"
-        }
+      "install": {
+        "kind": "expandArchive",
+        "installDirectory": "node-runtime/{releaseTrack}/{version}/{artifactDistributionVariant}",
+        "expandedRoot": "auto",
+        "createDirectories": []
       },
-      "expandedRoot": "auto",
-      "createDirectories": [],
-      "installedStateCheck": {
-        "use": "discovery",
+      "readyStateCheck": {
+        "use": "presenceDiscovery",
         "expectedVersion": "{version}",
         "require": {
           "files": true,
@@ -227,6 +222,13 @@
           "registry": false
         }
       },
+      "pathRegistration": {
+        "mode": "user",
+        "source": {
+          "kind": "shim",
+          "use": "presenceDiscovery.commands"
+        }
+      },
       "versionUpdatePolicy": {
         "whenAssigned": "trackSelectedVersion",
         "onSameSelectedVersion": "reuseOrRepair",
@@ -234,11 +236,20 @@
       }
     },
     "removed": {
-      "operation": {
-        "kind": "deleteInstallDirectory"
+      "policy": {
+        "whenNotInInventory": "succeed",
+        "allowedInventoryOwnershipKinds": [
+          "PackageInstalled"
+        ],
+        "allowUntrackedExternalRemoval": false,
+        "removeDependencies": false
       },
-      "verifyAbsent": {
-        "use": "discovery",
+      "operation": {
+        "kind": "deleteInstallDirectory",
+        "pathSource": "inventory.installDirectory"
+      },
+      "absenceVerification": {
+        "use": "presenceDiscovery",
         "require": {
           "files": true,
           "directories": false,
@@ -250,10 +261,10 @@
           "registry": false
         }
       },
-      "cleanup": {
-        "inventory": true,
-        "shims": true,
-        "path": true,
+      "postRemoveCleanup": {
+        "packageInventoryRecord": true,
+        "generatedShims": true,
+        "pathEntries": true,
         "workDirectories": true
       }
     }

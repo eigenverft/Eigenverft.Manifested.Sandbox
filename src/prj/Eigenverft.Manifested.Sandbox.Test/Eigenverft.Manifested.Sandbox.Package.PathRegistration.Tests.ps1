@@ -154,32 +154,6 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - path r
         Get-Content -LiteralPath $packageResult.PathRegistration.SourcePath -Raw | Should -Match ([regex]::Escape((Join-Path $cmdDirectory 'git.exe')))
     }
 
-    It 'resolves shipped GitHubCli PATH registration to a command shim' {
-        [Environment]::SetEnvironmentVariable($script:SourceInventoryEnvVarName, (Join-Path $TestDrive 'missing-inventory.json'), 'Process')
-
-        $installRoot = Join-Path $TestDrive 'path-registration-shipped-ghcli'
-        $binDirectory = Join-Path $installRoot 'bin'
-        $null = New-Item -ItemType Directory -Path $binDirectory -Force
-        Write-TestTextFile -Path (Join-Path $binDirectory 'gh.exe') -Content 'fake gh'
-
-        $config = Get-PackageConfig -DefinitionId 'GitHubCli'
-        $packageResult = New-PackageResult -PackageConfig $config
-        $packageResult = Resolve-PackagePackage -PackageResult $packageResult
-        $packageResult.InstallDirectory = $installRoot
-        $packageResult.InstallOrigin = 'PackageInstalled'
-
-        Mock Get-EnvironmentVariableValue {}
-        Mock Set-EnvironmentVariableValue {}
-
-        $packageResult = Register-PackagePath -PackageResult $packageResult
-
-        $packageResult.PathRegistration.Status | Should -Be 'Registered'
-        $packageResult.PathRegistration.SourceKind | Should -Be 'shim'
-        $packageResult.PathRegistration.RegisteredPath | Should -Be $config.ShimDirectory
-        $packageResult.PathRegistration.SourcePath | Should -Be (Join-Path $config.ShimDirectory 'gh.cmd')
-        Get-Content -LiteralPath $packageResult.PathRegistration.SourcePath -Raw | Should -Match ([regex]::Escape((Join-Path $binDirectory 'gh.exe')))
-    }
-
     It 'resolves shipped NodeRuntime PATH registration to command shims' {
         [Environment]::SetEnvironmentVariable($script:SourceInventoryEnvVarName, (Join-Path $TestDrive 'missing-inventory.json'), 'Process')
 
@@ -214,9 +188,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - path r
 
         $cases = @(
             [pscustomobject]@{ DefinitionId = 'CodexCli'; CommandName = 'codex'; CommandFile = 'codex.cmd' }
-            [pscustomobject]@{ DefinitionId = 'GeminiCli'; CommandName = 'gemini'; CommandFile = 'gemini.cmd' }
             [pscustomobject]@{ DefinitionId = 'OpenCodeCli'; CommandName = 'opencode'; CommandFile = 'opencode.cmd' }
-            [pscustomobject]@{ DefinitionId = 'QwenCli'; CommandName = 'qwen'; CommandFile = 'qwen.cmd' }
         )
 
         foreach ($case in $cases) {

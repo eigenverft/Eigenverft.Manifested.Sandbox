@@ -80,13 +80,9 @@ FunctionsToExport = @(
     'Invoke-PythonRuntime',
     'Invoke-NodeRuntime',
     'Invoke-CodexCli',
-    'Invoke-GeminiCli',
     'Invoke-OpenCodeCli',
-    'Invoke-QwenCli',
-    'Invoke-Qwen35-2B-Q8-0-Model',
     'Invoke-Qwen35-9B-Q6-K-Model',
     'Invoke-LlamaCppRuntime',
-    'Invoke-GitHubCli',
     'Invoke-GitRuntime',
     'Invoke-NotepadPlusPlus',
     'Invoke-VSCodeRuntime',
@@ -158,7 +154,7 @@ FileList = @(
     'Configuration\Internal\DepotInventory.json',
     'Repositories\EigenverftModule\eigenverft-module-package-definition-1.1.schema.json',
     'Repositories\EigenverftModule\eigenverft-module-package-definition-1.2.schema.json',
-    'Repositories\EigenverftModule\Qwen35_2B_Q8_0_Model.json',
+    'Repositories\EigenverftModule\eigenverft-module-package-definition-1.3.schema.json',
     'Repositories\EigenverftModule\Qwen35_9B_Q6_K_Model.json',
     'Repositories\EigenverftModule\LlamaCppRuntime.json',
     'Repositories\EigenverftModule\VisualCppRedistributable.json',
@@ -166,14 +162,10 @@ FileList = @(
     'Repositories\EigenverftModule\PythonRuntime.json',
     'Repositories\EigenverftModule\NodeRuntime.json',
     'Repositories\EigenverftModule\CodexCli.json',
-    'Repositories\EigenverftModule\GeminiCli.json',
     'Repositories\EigenverftModule\OpenCodeCli.json',
-    'Repositories\EigenverftModule\QwenCli.json',
-    'Repositories\EigenverftModule\GitHubCli.json',
     'Repositories\EigenverftModule\GitRuntime.json',
     'Repositories\EigenverftModule\NotepadPlusPlus.json',
     'Repositories\EigenverftModule\VSCodeRuntime.json',
-    'Commands\Eigenverft.Manifested.Sandbox.Cmd.Qwen35_2B_Q8_0_Model.ps1',
     'Commands\Eigenverft.Manifested.Sandbox.Cmd.Qwen35_9B_Q6_K_Model.ps1',
     'Commands\Eigenverft.Manifested.Sandbox.Cmd.LlamaCppRuntime.ps1',
     'Commands\Eigenverft.Manifested.Sandbox.Cmd.VisualCppRedistributable.ps1',
@@ -181,10 +173,7 @@ FileList = @(
     'Commands\Eigenverft.Manifested.Sandbox.Cmd.PythonRuntime.ps1',
     'Commands\Eigenverft.Manifested.Sandbox.Cmd.NodeRuntime.ps1',
     'Commands\Eigenverft.Manifested.Sandbox.Cmd.CodexCli.ps1',
-    'Commands\Eigenverft.Manifested.Sandbox.Cmd.GeminiCli.ps1',
     'Commands\Eigenverft.Manifested.Sandbox.Cmd.OpenCodeCli.ps1',
-    'Commands\Eigenverft.Manifested.Sandbox.Cmd.QwenCli.ps1',
-    'Commands\Eigenverft.Manifested.Sandbox.Cmd.GitHubCli.ps1',
     'Commands\Eigenverft.Manifested.Sandbox.Cmd.GitRuntime.ps1',
     'Commands\Eigenverft.Manifested.Sandbox.Cmd.NotepadPlusPlus.ps1',
     'Commands\Eigenverft.Manifested.Sandbox.Cmd.VSCodeRuntime.ps1',
@@ -199,7 +188,7 @@ PrivateData = @{
     PSData = @{
 
         # Tags applied to this module. These help with module discovery in online galleries.
-        Tags = @('Eigenverft', 'Manifested', 'Sandbox', 'WindowsSandbox', 'PowerShell', 'Bootstrap', 'Python', 'Node.js', 'Git', 'GitHubCLI', 'VSCode', 'Codex', 'OpenCode', 'Gemini', 'Qwen', 'Windows')
+        Tags = @('Eigenverft', 'Manifested', 'Sandbox', 'WindowsSandbox', 'PowerShell', 'Bootstrap', 'Python', 'Node.js', 'Git', 'VSCode', 'Codex', 'OpenCode', 'Qwen', 'Windows')
 
         # A URL to the license for this module.
         LicenseUri = 'https://github.com/eigenverft/Eigenverft.Manifested.Sandbox/blob/main/LICENSE'

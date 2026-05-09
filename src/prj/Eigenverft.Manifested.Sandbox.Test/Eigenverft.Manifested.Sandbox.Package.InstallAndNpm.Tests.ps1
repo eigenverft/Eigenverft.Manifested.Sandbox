@@ -554,21 +554,21 @@ exit /b 0
 
     It 'installs a single package file into the configured target-relative path' {
         $rootPath = Join-Path $TestDrive 'package-install-file-route'
-        $packageFilePath = Join-Path $rootPath 'package\Qwen3.5-2B-Q8_0.gguf'
+        $packageFilePath = Join-Path $rootPath 'package\Qwen3.5-9B-Q6_K.gguf'
         $installDirectory = Join-Path $rootPath 'install'
         Write-TestTextFile -Path $packageFilePath -Content 'gguf-binary'
 
         $packageResult = [pscustomobject]@{
-            PackageId        = 'Qwen35_2B_Q8_0_Model'
+            PackageId        = 'Qwen35_9B_Q6_K_Model'
             PackageFilePath  = $packageFilePath
             InstallDirectory = $installDirectory
             Package          = [pscustomobject]@{
                 packageFile = [pscustomobject]@{
-                    fileName = 'Qwen3.5-2B-Q8_0.gguf'
+                    fileName = 'Qwen3.5-9B-Q6_K.gguf'
                 }
                 assigned = [pscustomobject]@{
                     kind               = 'placePackageFile'
-                    targetRelativePath = 'models/Qwen3.5-2B-Q8_0.gguf'
+                    targetRelativePath = 'models/Qwen3.5-9B-Q6_K.gguf'
                 }
             }
             ExistingPackage = $null
@@ -577,7 +577,7 @@ exit /b 0
         $installResult = Install-PackagePackageFile -PackageResult $packageResult
 
         $installResult.InstallKind | Should -Be 'placePackageFile'
-        $installResult.InstalledFilePath | Should -Be (Join-Path $installDirectory 'models\Qwen3.5-2B-Q8_0.gguf')
+        $installResult.InstalledFilePath | Should -Be (Join-Path $installDirectory 'models\Qwen3.5-9B-Q6_K.gguf')
         Test-Path -LiteralPath $installResult.InstalledFilePath -PathType Leaf | Should -BeTrue
         (Get-Content -LiteralPath $installResult.InstalledFilePath -Raw) | Should -Be 'gguf-binary'
     }
@@ -590,7 +590,7 @@ exit /b 0
         $packageStateIndexFilePath = Join-Path $rootPath 'package-inventory.json'
         $definitionDocument = @{
             schemaVersion = '1.2'
-            id = 'Qwen35_2B_Q8_0_Model'
+            id = 'Qwen35_9B_Q6_K_Model'
             display = @{
                 default = @{
                     name = 'Qwen 3.5 2B Q8_0'
@@ -601,7 +601,7 @@ exit /b 0
             }
             packageTargets = @(
                 @{
-                    id = 'Qwen35_2B_Q8_0_Model-q8-0-stable'
+                    id = 'Qwen35_9B_Q6_K_Model-q6-k-stable'
                     channel = 'stable'
                     platformTarget = 'q8-0'
                     constraints = @{
@@ -630,15 +630,15 @@ exit /b 0
                     version = '3.5.0'
                     channels = @('stable')
                     artifactsByTarget = @{
-                        'Qwen35_2B_Q8_0_Model-q8-0-stable' = @{
-                            releaseId = 'qwen35-2b-q8-0-stable'
-                            fileName = 'Qwen3.5-2B-Q8_0.gguf'
+                        'Qwen35_9B_Q6_K_Model-q6-k-stable' = @{
+                            releaseId = 'qwen35-9b-q6-k-stable'
+                            fileName = 'Qwen3.5-9B-Q6_K.gguf'
                         }
                     }
                 }
             )
             discovery = @{
-                files = @('Qwen3.5-2B-Q8_0.gguf')
+                files = @('Qwen3.5-9B-Q6_K.gguf')
                 directories = [object[]]@()
                 commands = [object[]]@()
                 apps = [object[]]@()
@@ -681,7 +681,7 @@ exit /b 0
                 assigned = @{
                     kind = 'placePackageFile'
                     installDirectory = 'qwen35-2b/{channel}/{version}/{platformTarget}'
-                    targetRelativePath = 'Qwen3.5-2B-Q8_0.gguf'
+                    targetRelativePath = 'Qwen3.5-9B-Q6_K.gguf'
                     pathRegistration = @{
                         mode = 'none'
                     }
@@ -731,7 +731,7 @@ exit /b 0
         Mock Get-PackageGlobalConfigPath { $documents.GlobalConfigPath }
         Mock Get-PackageDefinitionPath { param($DefinitionId) $documents.DefinitionPath }
 
-        $config = Get-PackageConfig -DefinitionId 'Qwen35_2B_Q8_0_Model'
+        $config = Get-PackageConfig -DefinitionId 'Qwen35_9B_Q6_K_Model'
         $result = New-PackageResult -PackageConfig $config
         $result = Resolve-PackagePackage -PackageResult $result
         $result = Resolve-PackagePaths -PackageResult $result
@@ -746,7 +746,7 @@ exit /b 0
 
         $result.PackageFilePreparation.Status | Should -Be 'HydratedFromDefaultPackageDepot'
         $result.Assigned.InstallKind | Should -Be 'placePackageFile'
-        $result.Assigned.InstalledFilePath | Should -Be (Join-Path $result.InstallDirectory 'Qwen3.5-2B-Q8_0.gguf')
+        $result.Assigned.InstalledFilePath | Should -Be (Join-Path $result.InstallDirectory 'Qwen3.5-9B-Q6_K.gguf')
         Test-Path -LiteralPath $result.Assigned.InstalledFilePath -PathType Leaf | Should -BeTrue
         $result.Validation.Accepted | Should -BeTrue
     }

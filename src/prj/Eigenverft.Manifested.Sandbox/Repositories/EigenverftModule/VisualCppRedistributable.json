@@ -1,6 +1,6 @@
 {
-  "$schema": "./eigenverft-module-package-definition-1.2.schema.json",
-  "schemaVersion": "1.2",
+  "$schema": "./eigenverft-module-package-definition-1.3.schema.json",
+  "schemaVersion": "1.3",
   "id": "VisualCppRedistributable",
   "display": {
     "default": {
@@ -10,26 +10,27 @@
       "summary": "Machine-wide Visual C++ runtime prerequisite"
     }
   },
-  "packageTargets": [
-    {
-      "id": "VisualCppRedistributable-x64-stable",
-      "channel": "stable",
-      "platformTarget": "x64",
-      "constraints": {
-        "os": [
-          "windows"
-        ],
-        "cpu": [
-          "x64"
-        ]
-      },
-      "versionSelection": {
-        "strategy": "latestByVersion",
-        "allowPrerelease": false
-      },
-      "artifactDefaults": {
+  "dependencies": [],
+  "artifacts": {
+    "targets": [
+      {
+        "id": "VisualCppRedistributable-x64-stable",
+        "releaseTrack": "stable",
+        "artifactDistributionVariant": "x64",
+        "constraints": {
+          "os": [
+            "windows"
+          ],
+          "cpu": [
+            "x64"
+          ]
+        },
+        "versionSelection": {
+          "strategy": "latestByVersion",
+          "allowPrerelease": false
+        },
         "fileNameTemplate": "vc_redist.x64.exe",
-        "artifactSources": [
+        "acquisitionCandidates": [
           {
             "kind": "packageDepot",
             "searchOrder": 100,
@@ -48,27 +49,33 @@
           }
         ]
       }
-    }
-  ],
-  "versionCatalog": [
-    {
-      "version": "14.0",
-      "channels": [
-        "stable"
-      ],
-      "artifactsByTarget": {
-        "VisualCppRedistributable-x64-stable": {
-          "releaseId": "vc-runtime-x64-stable",
-          "publisherSignature": {
-            "kind": "authenticode",
-            "requireValid": true,
-            "subjectContains": "Microsoft Corporation"
+    ],
+    "releases": [
+      {
+        "version": "14.0",
+        "releaseTracks": [
+          "stable"
+        ],
+        "targetArtifacts": {
+          "VisualCppRedistributable-x64-stable": {
+            "artifactId": "vc-runtime-x64-stable",
+            "publisherSignature": {
+              "kind": "authenticode",
+              "requireValid": true,
+              "subjectContains": "Microsoft Corporation"
+            }
           }
         }
       }
+    ],
+    "sources": {
+      "visualCppRedistributableDownload": {
+        "kind": "download",
+        "baseUri": "https://aka.ms/"
+      }
     }
-  ],
-  "discovery": {
+  },
+  "presenceDiscovery": {
     "files": [],
     "directories": [],
     "commands": [],
@@ -96,21 +103,13 @@
       }
     ]
   },
-  "stateDiscovery": {
-    "installed": {
-      "enableDetection": false,
-      "searchLocations": [],
-      "installRootRules": []
-    }
-  },
-  "upstreamSources": {
-    "visualCppRedistributableDownload": {
-      "kind": "download",
-      "baseUri": "https://aka.ms/"
-    }
+  "existingInstallDiscovery": {
+    "enabled": false,
+    "searchLocations": [],
+    "installRootRules": []
   },
   "packageOperations": {
-    "shared": {
+    "policy": {
       "ownershipPolicy": {
         "allowAdoptExternal": false,
         "upgradeAdoptedInstall": false,
@@ -127,32 +126,31 @@
       }
     },
     "assigned": {
-      "kind": "runInstaller",
-      "targetKind": "machinePrerequisite",
-      "installerKind": "burn",
-      "uiMode": "quiet",
-      "elevation": "required",
-      "timeoutSec": 300,
-      "logRelativePath": "visual-cpp-redist/{timestamp}.log",
-      "commandArguments": [
-        "/install",
-        "/quiet",
-        "/norestart",
-        "/log",
-        "{logPath}"
-      ],
-      "successExitCodes": [
-        0,
-        1638
-      ],
-      "restartExitCodes": [
-        3010
-      ],
-      "pathRegistration": {
-        "mode": "none"
+      "install": {
+        "kind": "runInstaller",
+        "targetKind": "machinePrerequisite",
+        "installerKind": "burn",
+        "uiMode": "quiet",
+        "elevation": "required",
+        "timeoutSec": 300,
+        "logRelativePath": "visual-cpp-redist/{timestamp}.log",
+        "commandArguments": [
+          "/install",
+          "/quiet",
+          "/norestart",
+          "/log",
+          "{logPath}"
+        ],
+        "successExitCodes": [
+          0,
+          1638
+        ],
+        "restartExitCodes": [
+          3010
+        ]
       },
-      "installedStateCheck": {
-        "use": "discovery",
+      "readyStateCheck": {
+        "use": "presenceDiscovery",
         "expectedVersion": "{version}",
         "require": {
           "files": false,
@@ -165,6 +163,9 @@
           "registry": true
         }
       },
+      "pathRegistration": {
+        "mode": "none"
+      },
       "versionUpdatePolicy": {
         "whenAssigned": "trackSelectedVersion",
         "onSameSelectedVersion": "reuseOrRepair",
@@ -172,11 +173,17 @@
       }
     },
     "removed": {
+      "policy": {
+        "whenNotInInventory": "succeed",
+        "allowedInventoryOwnershipKinds": [],
+        "allowUntrackedExternalRemoval": false,
+        "removeDependencies": false
+      },
       "operation": {
         "kind": "none"
       },
-      "verifyAbsent": {
-        "use": "discovery",
+      "absenceVerification": {
+        "use": "presenceDiscovery",
         "require": {
           "files": true,
           "directories": false,
@@ -188,10 +195,10 @@
           "registry": false
         }
       },
-      "cleanup": {
-        "inventory": true,
-        "shims": true,
-        "path": true,
+      "postRemoveCleanup": {
+        "packageInventoryRecord": true,
+        "generatedShims": true,
+        "pathEntries": true,
         "workDirectories": true
       }
     }
