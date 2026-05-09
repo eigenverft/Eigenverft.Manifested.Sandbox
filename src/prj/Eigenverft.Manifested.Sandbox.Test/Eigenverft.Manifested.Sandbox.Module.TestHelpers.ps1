@@ -156,7 +156,7 @@ function global:New-TestPackageGlobalDocument {
         [string]$ShimDirectory,
         [string]$PackageInventoryFilePath,
         [string]$PackageOperationHistoryFilePath,
-        [string]$PackageDepotRelativePath = '{definitionId}/{releaseTrack}/{version}/{flavor}',
+        [string]$PackageDepotRelativePath = '{definitionId}/{releaseTrack}/{version}/{artifactDistributionVariant}',
         [string]$PackageWorkSlotDirectory = '{definitionId}-{slotHash}',
         [bool]$AllowFallback = $true,
         [string]$ReleaseTrack = 'stable',
@@ -356,6 +356,7 @@ function global:New-TestInstalledStateDiscovery {
 
     return @{
         enableDetection = $EnableDetection
+        enabled         = $EnableDetection
         searchLocations = $SearchLocations
         installRootRules = $InstallRootRules
     }
@@ -386,8 +387,9 @@ function global:New-TestPackageRelease {
         [Parameter(Mandatory = $true)]
         [string]$Architecture,
 
-        [Parameter(Mandatory = $true)]
-        [string]$Flavor,
+        [string]$ArtifactDistributionVariant,
+
+        [string]$Flavor = 'win32-x64',
 
         [string]$ReleaseTrack = 'stable',
 
@@ -401,11 +403,14 @@ function global:New-TestPackageRelease {
 
         [hashtable]$Compatibility = $null,
 
-        [hashtable]$Install = $null,
+        [Alias('Install')]
+        [hashtable]$Assigned = $null,
 
-        [hashtable]$Validation = $null,
+        [Alias('Validation')]
+        [hashtable]$ReadyStateCheck = $null,
 
-        [hashtable]$StateDiscovery = $null,
+        [Alias('StateDiscovery')]
+        [hashtable]$ExistingInstallDiscovery = $null,
 
         [hashtable]$OwnershipPolicy = $null
     )
@@ -414,7 +419,7 @@ function global:New-TestPackageRelease {
         id           = $Id
         version      = $Version
         releaseTrack = $ReleaseTrack
-        flavor       = $Flavor
+        artifactDistributionVariant = if ([string]::IsNullOrWhiteSpace($ArtifactDistributionVariant)) { [string]$Flavor } else { [string]$ArtifactDistributionVariant }
         constraints  = @{
             os  = @('windows')
             cpu = @($Architecture)
@@ -444,14 +449,14 @@ function global:New-TestPackageRelease {
     if ($PSBoundParameters.ContainsKey('Compatibility')) {
         $release.compatibility = $Compatibility
     }
-    if ($PSBoundParameters.ContainsKey('Install')) {
-        $release.assigned = $Install
+    if ($PSBoundParameters.ContainsKey('Assigned')) {
+        $release.assigned = $Assigned
     }
-    if ($PSBoundParameters.ContainsKey('Validation')) {
-        $release.validation = $Validation
+    if ($PSBoundParameters.ContainsKey('ReadyStateCheck')) {
+        $release.readyStateCheck = $ReadyStateCheck
     }
-    if ($PSBoundParameters.ContainsKey('StateDiscovery')) {
-        $release.discovery = $StateDiscovery
+    if ($PSBoundParameters.ContainsKey('ExistingInstallDiscovery')) {
+        $release.existingInstallDiscovery = $ExistingInstallDiscovery
     }
     if ($PSBoundParameters.ContainsKey('OwnershipPolicy')) {
         $release.ownershipPolicy = $OwnershipPolicy
@@ -482,17 +487,19 @@ function global:New-TestVSCodeDefinitionDocument {
 
     if ($null -eq $SharedInstall) {
         $SharedInstall = @{
-            kind             = 'expandArchive'
-            installDirectory = 'vscode-runtime/{channel}/{version}/{platformTarget}'
-            pathRegistration = @{
-                mode   = 'user'
-                source = @{
-                    kind = 'shim'
-                    use  = 'discovery.commands'
+            install = @{
+                kind             = 'expandArchive'
+                installDirectory = 'vscode-runtime/{releaseTrack}/{version}/{artifactDistributionVariant}'
+                pathRegistration = @{
+                    mode   = 'user'
+                    source = @{
+                        kind = 'shim'
+                        use  = 'presenceDiscovery.commands'
+                    }
                 }
+                expandedRoot     = 'auto'
+                createDirectories = @('data')
             }
-            expandedRoot     = 'auto'
-            createDirectories = @('data')
         }
     }
     if ($null -eq $SharedValidation) {
@@ -505,19 +512,43 @@ function global:New-TestVSCodeDefinitionDocument {
         $SharedOwnershipPolicy = New-TestOwnershipPolicy
     }
 
-    $assigned = if ($firstRelease -and $firstRelease.PSObject.Properties['assigned']) {
+    $rawAssigned = if ($firstRelease -and $firstRelease.PSObject.Properties['assigned']) {
         $firstRelease.assigned
     }
     else {
         $SharedInstall
     }
-    $assigned = ConvertTo-TestPsObject $assigned
-    if ($assigned.pathRegistration -and
-        $assigned.pathRegistration.source -and
-        [string]::Equals([string]$assigned.pathRegistration.source.kind, 'shim', [System.StringComparison]::OrdinalIgnoreCase) -and
-        -not $assigned.pathRegistration.source.PSObject.Properties['use']) {
-        $assigned.pathRegistration.source.PSObject.Properties.Remove('value')
-        $assigned.pathRegistration.source | Add-Member -MemberType NoteProperty -Name 'use' -Value 'discovery.commands' -Force
+    $rawAssigned = ConvertTo-TestPsObject $rawAssigned
+
+    $assigned = [ordered]@{}
+    if ($rawAssigned.PSObject.Properties['install']) {
+        $assigned.install = ConvertTo-TestPsObject $rawAssigned.install
+    }
+    else {
+        $assigned.install = ConvertTo-TestPsObject $rawAssigned
+    }
+
+    if ($rawAssigned.PSObject.Properties['pathRegistration']) {
+        $pathRegistration = ConvertTo-TestPsObject $rawAssigned.pathRegistration
+        if ($pathRegistration.PSObject.Properties['source'] -and
+            $pathRegistration.source -and
+            [string]::Equals([string]$pathRegistration.source.kind, 'shim', [System.StringComparison]::OrdinalIgnoreCase)) {
+            if (-not $pathRegistration.source.PSObject.Properties['use']) {
+                $pathRegistration.source = ConvertTo-TestPsObject $pathRegistration.source
+                $pathRegistration.source.use = 'presenceDiscovery.commands'
+            }
+            elseif ([string]::Equals([string]$pathRegistration.source.use, 'discovery.commands', [System.StringComparison]::OrdinalIgnoreCase)) {
+                $pathRegistration.source.use = 'presenceDiscovery.commands'
+            }
+        }
+        $assigned.pathRegistration = $pathRegistration
+    }
+
+    $readyStateCheck = if ($rawAssigned.PSObject.Properties['readyStateCheck']) {
+        ConvertTo-TestPsObject $rawAssigned.readyStateCheck
+    }
+    elseif ($rawAssigned.PSObject.Properties['installedStateCheck']) {
+        ConvertTo-TestPsObject $rawAssigned.installedStateCheck
     }
 
     $validation = if ($firstRelease -and $firstRelease.PSObject.Properties['validation']) {
@@ -527,11 +558,12 @@ function global:New-TestVSCodeDefinitionDocument {
         $SharedValidation
     }
     $validation = ConvertTo-TestPsObject $validation
-    if (-not $assigned.PSObject.Properties['installedStateCheck']) {
-        $assigned | Add-Member -MemberType NoteProperty -Name 'installedStateCheck' -Value @{
-            use             = 'discovery'
+
+    if (-not $readyStateCheck) {
+        $readyStateCheck = [ordered]@{
+            use             = 'presenceDiscovery'
             expectedVersion = '{version}'
-            require         = @{
+            require         = [ordered]@{
                 files         = (@($validation.files).Count -gt 0)
                 directories   = (@($validation.directories).Count -gt 0)
                 commands      = (@($validation.commandChecks).Count -gt 0)
@@ -541,30 +573,69 @@ function global:New-TestVSCodeDefinitionDocument {
                 fileDetails   = (@($validation.fileDetails).Count -gt 0)
                 registry      = (@($validation.registryChecks).Count -gt 0)
             }
-        } -Force
+        }
     }
+    else {
+        if (-not $readyStateCheck.PSObject.Properties['use']) {
+            $readyStateCheck.use = 'presenceDiscovery'
+        }
+        elseif ([string]::Equals([string]$readyStateCheck.use, 'discovery', [System.StringComparison]::OrdinalIgnoreCase)) {
+            $readyStateCheck.use = 'presenceDiscovery'
+        }
+    }
+    $assigned.readyStateCheck = $readyStateCheck
+
+    if ($rawAssigned.PSObject.Properties['versionUpdatePolicy']) {
+        $assigned.versionUpdatePolicy = ConvertTo-TestPsObject $rawAssigned.versionUpdatePolicy
+    }
+    if ($rawAssigned.PSObject.Properties['kind'] -and -not $rawAssigned.PSObject.Properties['install']) {
+        $assigned.install.kind = [string]$rawAssigned.kind
+    }
+
     $compatibility = if ($firstRelease -and $firstRelease.PSObject.Properties['compatibility']) {
         $firstRelease.compatibility
     }
     else {
-        @{
-            checks = [object[]]@()
-        }
+        @{ checks = [object[]]@() }
     }
-    $installedDiscovery = if ($firstRelease -and $firstRelease.PSObject.Properties['discovery']) {
+
+    $rawExistingInstallDiscovery = if ($firstRelease -and $firstRelease.PSObject.Properties['existingInstallDiscovery']) {
+        $firstRelease.existingInstallDiscovery
+    }
+    elseif ($firstRelease -and $firstRelease.PSObject.Properties['stateDiscovery']) {
+        $firstRelease.stateDiscovery
+    }
+    elseif ($firstRelease -and $firstRelease.PSObject.Properties['discovery']) {
         $firstRelease.discovery
+    }
+    elseif ($firstRelease -and $firstRelease.PSObject.Properties['installedStateDiscovery']) {
+        $firstRelease.installedStateDiscovery
     }
     else {
         $SharedStateDiscovery
     }
+
+    $discoveryPayload = if ($rawExistingInstallDiscovery.PSObject.Properties['installed']) {
+        ConvertTo-TestPsObject $rawExistingInstallDiscovery.installed
+    }
+    else {
+        ConvertTo-TestPsObject $rawExistingInstallDiscovery
+    }
+
+    $existingInstallDiscovery = [ordered]@{
+        enabled         = if ($discoveryPayload.PSObject.Properties['enabled']) { [bool]$discoveryPayload.enabled } elseif ($discoveryPayload.PSObject.Properties['enableDetection']) { [bool]$discoveryPayload.enableDetection } else { $false }
+        searchLocations = @($discoveryPayload.searchLocations)
+        installRootRules = @($discoveryPayload.installRootRules)
+    }
+
     $ownershipPolicy = if ($firstRelease -and $firstRelease.PSObject.Properties['ownershipPolicy']) {
         $firstRelease.ownershipPolicy
     }
     else {
         $SharedOwnershipPolicy
     }
+
     $compatibility = ConvertTo-TestPsObject $compatibility
-    $installedDiscovery = ConvertTo-TestPsObject $installedDiscovery
     $ownershipPolicy = ConvertTo-TestPsObject $ownershipPolicy
 
     $commandStateChecksByName = @{}
@@ -610,12 +681,8 @@ function global:New-TestVSCodeDefinitionDocument {
         $targetId = [string]$release.id
         $artifactSources = @(
             foreach ($candidate in @($release.acquisitionCandidates)) {
-                if ($null -eq $candidate) {
-                    continue
-                }
-                $source = [ordered]@{
-                    kind = [string]$candidate.kind
-                }
+                if ($null -eq $candidate) { continue }
+                $source = [ordered]@{ kind = [string]$candidate.kind }
                 foreach ($propertyName in @('sourceId', 'sourcePath', 'searchOrder', 'priority', 'verification')) {
                     if ($candidate.PSObject.Properties[$propertyName]) {
                         $source[$propertyName] = $candidate.$propertyName
@@ -629,24 +696,20 @@ function global:New-TestVSCodeDefinitionDocument {
         )
 
         $packageTarget = @{
-            id              = $targetId
-            channel         = [string]$release.releaseTrack
-            platformTarget  = [string]$release.flavor
-            constraints     = $release.constraints
-            versionSelection = @{
-                strategy        = 'latestByVersion'
-                allowPrerelease = $false
-            }
+            id                         = $targetId
+            releaseTrack               = [string]$release.releaseTrack
+            artifactDistributionVariant = if ($release.PSObject.Properties['artifactDistributionVariant']) { [string]$release.artifactDistributionVariant } else { [string]$release.flavor }
+            constraints                = $release.constraints
+            versionSelection          = @{ strategy = 'latestByVersion'; allowPrerelease = $false }
         }
         if ($artifactSources.Count -gt 0) {
-            $packageTarget.artifactDefaults = @{
-                artifactSources = $artifactSources
-            }
+            $packageTarget.acquisitionCandidates = $artifactSources
         }
+
         $packageTargets += $packageTarget
 
         $artifact = [ordered]@{
-            releaseId = [string]$release.id
+            artifactId = if ($release.PSObject.Properties['artifactId']) { [string]$release.artifactId } else { $targetId }
         }
         if ($release.packageFile -and $release.packageFile.PSObject.Properties['fileName']) {
             $artifact.fileName = [string]$release.packageFile.fileName
@@ -665,31 +728,50 @@ function global:New-TestVSCodeDefinitionDocument {
 
         $versionEntry = [ordered]@{
             version           = [string]$release.version
-            channels          = @([string]$release.releaseTrack)
-            artifactsByTarget = @{
+            releaseTracks     = @([string]$release.releaseTrack)
+            targetArtifacts   = @{
                 $targetId = $artifact
             }
         }
         if ($release.PSObject.Properties['releaseTag'] -and -not [string]::IsNullOrWhiteSpace([string]$release.releaseTag)) {
-            $versionEntry.releaseTag = [string]$release.releaseTag
+            $versionEntry.upstreamRelease = @{
+                sourceId   = if ($artifactSources.Count -gt 0 -and $artifactSources[0].sourceId) { [string]$artifactSources[0].sourceId } else { 'vsCodeUpdateService' }
+                releaseTag = [string]$release.releaseTag
+            }
+        }
+        if ($release.PSObject.Properties['release']) {
+            $versionEntry.upstreamRelease = $release.release
         }
         $versionCatalog += $versionEntry
     }
 
+    $sources = if ($PSBoundParameters.ContainsKey('UpstreamSources') -and $null -ne $UpstreamSources) {
+        $UpstreamSources
+    }
+    else {
+        @{
+            vsCodeUpdateService = @{ kind = 'download'; baseUri = $UpstreamBaseUri }
+        }
+    }
+
     return @{
-        schemaVersion = '1.2'
-        id = 'VSCodeRuntime'
-        display = @{
-            default       = @{
+        schemaVersion = '1.3'
+        id            = 'VSCodeRuntime'
+        display       = @{
+            default = @{
                 name        = 'Visual Studio Code'
                 publisher   = 'Microsoft'
                 corporation = 'Microsoft Corporation'
                 summary     = 'Code editor'
             }
         }
-        packageTargets = $packageTargets
-        versionCatalog = $versionCatalog
-        discovery = @{
+        dependencies  = @()
+        artifacts     = @{
+            targets  = $packageTargets
+            releases = $versionCatalog
+            sources  = $sources
+        }
+        presenceDiscovery = @{
             files         = @($validation.files)
             directories   = @($validation.directories)
             commands      = $commands
@@ -706,32 +788,26 @@ function global:New-TestVSCodeDefinitionDocument {
             fileDetails   = @($validation.fileDetails)
             registry      = @($validation.registryChecks)
         }
-        stateDiscovery = @{
-            installed = $installedDiscovery
-        }
-        upstreamSources = if ($PSBoundParameters.ContainsKey('UpstreamSources') -and $null -ne $UpstreamSources) {
-            $UpstreamSources
-        }
-        else {
-            @{
-                vsCodeUpdateService = @{
-                    kind    = 'download'
-                    baseUri = $UpstreamBaseUri
-                }
-            }
-        }
+        existingInstallDiscovery = $existingInstallDiscovery
         packageOperations = @{
-            shared = @{
+            policy = @{
                 ownershipPolicy = $ownershipPolicy
                 compatibility   = $compatibility
             }
             assigned = $assigned
             removed = @{
-                operation = @{
-                    kind = 'none'
+                policy = @{
+                    whenNotInInventory = 'succeed'
+                    allowedInventoryOwnershipKinds = @('PackageInstalled')
+                    allowUntrackedExternalRemoval = $false
+                    removeDependencies = $false
                 }
-                verifyAbsent = @{
-                    use     = 'discovery'
+                operation = @{
+                    kind = 'deleteInstallDirectory'
+                    pathSource = 'inventory.installDirectory'
+                }
+                absenceVerification = @{
+                    use = 'presenceDiscovery'
                     require = @{
                         files         = $true
                         directories   = $false
@@ -743,17 +819,16 @@ function global:New-TestVSCodeDefinitionDocument {
                         registry      = $false
                     }
                 }
-                cleanup = @{
-                    inventory       = $true
-                    shims           = $true
-                    path            = $true
+                postRemoveCleanup = @{
+                    packageInventoryRecord = $true
+                    generatedShims = $true
+                    pathEntries = $true
                     workDirectories = $true
                 }
             }
         }
     }
 }
-
 function global:Write-TestPackageDocuments {
     param(
         [Parameter(Mandatory = $true)]
@@ -795,4 +870,5 @@ function global:Write-TestPackageDocuments {
         SourceInventoryPath = $sourceInventoryPath
     }
 }
+
 

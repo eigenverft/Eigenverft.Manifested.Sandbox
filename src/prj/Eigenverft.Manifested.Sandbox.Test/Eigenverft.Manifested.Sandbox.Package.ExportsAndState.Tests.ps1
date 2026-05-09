@@ -151,7 +151,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - export
         $null = New-Item -ItemType Directory -Path $depotRoot -Force
         $null = New-Item -ItemType Directory -Path $shimDirectory -Force
         Write-TestJsonDocument -Path $definitionLocalPath -Document (New-TestVSCodeDefinitionDocument -Releases @(
-                New-TestPackageRelease -Id 'vsCode-win-x64-stable' -Version '1.0.0' -Architecture 'x64' -Flavor 'win32-x64'
+                New-TestPackageRelease -Id 'vsCode-win-x64-stable' -Version '1.0.0' -Architecture 'x64' -ArtifactDistributionVariant 'win32-x64'
             ))
         Write-TestJsonDocument -Path $sourceInventoryPath -Document @{ inventoryVersion = 1; global = @{}; sites = @{} }
 
@@ -176,7 +176,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - export
             definitionFileName = 'VSCodeRuntime.json'
             definitionLocalPath = $definitionLocalPath
             releaseTrack     = 'stable'
-            flavor           = 'win32-x64'
+            artifactDistributionVariant = 'win32-x64'
             currentReleaseId = 'vscode-test'
             currentVersion   = '1.0.0'
             installDirectory = $installDirectory

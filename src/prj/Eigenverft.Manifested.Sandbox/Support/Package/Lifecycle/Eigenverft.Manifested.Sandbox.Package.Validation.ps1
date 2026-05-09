@@ -2,13 +2,13 @@
     Eigenverft.Manifested.Sandbox.Package.Validation
 #>
 
-function Get-PackageValidationEntryPointDefinition {
+function Get-PackageReadinessEntryPointDefinition {
 <#
 .SYNOPSIS
-Returns an entry-point definition by name.
+Returns a readiness entry-point definition by name.
 
 .DESCRIPTION
-Searches the definition discovery collections and returns the first matching
+Searches the definition presenceDiscovery collections and returns the first matching
 command or app entry by name.
 
 .PARAMETER Definition
@@ -18,7 +18,7 @@ The Package definition object.
 The entry-point name to resolve.
 
 .EXAMPLE
-Get-PackageValidationEntryPointDefinition -Definition $definition -EntryPointName code
+Get-PackageReadinessEntryPointDefinition -Definition $definition -EntryPointName code
 #>
     [CmdletBinding()]
     param(
@@ -30,7 +30,7 @@ Get-PackageValidationEntryPointDefinition -Definition $definition -EntryPointNam
     )
 
     foreach ($toolKind in @('commands', 'apps')) {
-        $entryPoint = Get-PackageDiscoveryEntryPoint -Definition $Definition -ToolKind $toolKind -Name $EntryPointName
+        $entryPoint = Get-PackagePresenceDiscoveryEntryPoint -Definition $Definition -ToolKind $toolKind -Name $EntryPointName
         if ($entryPoint) {
             return $entryPoint
         }
@@ -42,7 +42,7 @@ Get-PackageValidationEntryPointDefinition -Definition $definition -EntryPointNam
 function Get-PackageCommandCheckPath {
 <#
 .SYNOPSIS
-Resolves the command path used for a validation command check.
+Resolves the command path used for a readiness command check.
 
 .DESCRIPTION
 Uses an explicit relative path when provided, otherwise resolves the path from
@@ -52,7 +52,7 @@ the named Package entry point.
 The current Package result object.
 
 .PARAMETER CommandCheck
-The validation command-check definition.
+The readiness command-check definition.
 
 .EXAMPLE
 Get-PackageCommandCheckPath -PackageResult $result -CommandCheck $check
@@ -71,9 +71,9 @@ Get-PackageCommandCheckPath -PackageResult $result -CommandCheck $check
     }
 
     if ($CommandCheck.PSObject.Properties['entryPoint'] -and -not [string]::IsNullOrWhiteSpace([string]$CommandCheck.entryPoint)) {
-        $entryPoint = Get-PackageValidationEntryPointDefinition -Definition $PackageResult.PackageConfig.Definition -EntryPointName ([string]$CommandCheck.entryPoint)
+        $entryPoint = Get-PackageReadinessEntryPointDefinition -Definition $PackageResult.PackageConfig.Definition -EntryPointName ([string]$CommandCheck.entryPoint)
         if (-not $entryPoint -or -not $entryPoint.PSObject.Properties['relativePath']) {
-            throw "Package validation entry point '$($CommandCheck.entryPoint)' was not found in discovery.commands or discovery.apps."
+            throw "Package readiness entry point '$($CommandCheck.entryPoint)' was not found in presenceDiscovery.commands or presenceDiscovery.apps."
         }
 
         return (Join-Path $PackageResult.InstallDirectory (([string]$entryPoint.relativePath) -replace '/', '\'))
@@ -152,7 +152,7 @@ function Test-PackageValidationValueComparison {
         '>=' { return $actualVersion -ge $expectedVersion }
         '<' { return $actualVersion -lt $expectedVersion }
         '<=' { return $actualVersion -le $expectedVersion }
-        default { throw "Unsupported Package validation comparison operator '$operatorText'." }
+        default { throw "Unsupported Package readiness comparison operator '$operatorText'." }
     }
 }
 
@@ -573,7 +573,7 @@ Test-PackageAssignedReadiness -PackageResult $result
     }
 
     $failedCount = @($allResults | Where-Object { $_.Status -ne 'Ready' }).Count
-    Write-PackageExecutionMessage -Message ("[STATE] Validation completed for '{0}' with accepted='{1}', failedChecks={2}." -f $installDirectory, $accepted, $failedCount)
+    Write-PackageExecutionMessage -Message ("[STATE] Readiness completed for '{0}' with accepted='{1}', failedChecks={2}." -f $installDirectory, $accepted, $failedCount)
     foreach ($failedCheck in @($failedChecks)) {
         $targetText = if (-not [string]::IsNullOrWhiteSpace([string]$failedCheck.RelativePath)) {
             [string]$failedCheck.RelativePath
@@ -584,9 +584,11 @@ Test-PackageAssignedReadiness -PackageResult $result
         else {
             '<none>'
         }
-        Write-PackageExecutionMessage -Level 'WRN' -Message ('[VALIDATION] {0} failed for ''{1}'' with status=''{2}'', actual="{3}", expected="{4}".' -f $failedCheck.Kind, $targetText, $failedCheck.Status, $failedCheck.Actual, $failedCheck.Expected)
+        Write-PackageExecutionMessage -Level 'WRN' -Message ('[READINESS] {0} failed for ''{1}'' with status=''{2}'', actual="{3}", expected="{4}".' -f $failedCheck.Kind, $targetText, $failedCheck.Status, $failedCheck.Actual, $failedCheck.Expected)
     }
 
     return $PackageResult
 }
+
+
 

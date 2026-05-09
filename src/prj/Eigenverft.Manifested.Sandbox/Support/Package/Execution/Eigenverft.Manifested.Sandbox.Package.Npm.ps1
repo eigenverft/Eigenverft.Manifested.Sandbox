@@ -27,7 +27,7 @@ function New-PackageNpmCacheDirectory {
         [string]$PackageResult.DefinitionId
         [string]$PackageResult.Package.releaseTrack
         [string]$PackageResult.Package.version
-        [string]$PackageResult.Package.flavor
+        if ($PackageResult.Package.PSObject.Properties['artifactDistributionVariant']) { [string]$PackageResult.Package.artifactDistributionVariant } else { [string]$PackageResult.Package.flavor }
     ) | ForEach-Object {
         ([string]$_).Trim() -replace '[\\/:\*\?"<>\|]', '-'
     }

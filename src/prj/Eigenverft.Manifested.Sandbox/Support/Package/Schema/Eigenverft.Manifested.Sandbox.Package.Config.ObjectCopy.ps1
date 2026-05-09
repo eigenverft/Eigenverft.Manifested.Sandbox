@@ -147,7 +147,30 @@ function Get-PackageEffectiveReleaseAssignedBlock {
         return $null
     }
     if ($Release.PSObject.Properties['assigned'] -and $null -ne $Release.assigned) {
-        return $Release.assigned
+        $assigned = $Release.assigned
+        if (-not ($assigned -is [psobject])) {
+            return $assigned
+        }
+
+        $install = if ($assigned.PSObject.Properties['install']) { $assigned.install } else { $null }
+        if ($null -eq $install) {
+            return $assigned
+        }
+
+        if (-not ($install -is [psobject])) {
+            return $assigned
+        }
+
+        $flattenedAssigned = [ordered]@{}
+        foreach ($property in @($assigned.PSObject.Properties)) {
+            $flattenedAssigned[$property.Name] = $property.Value
+        }
+        foreach ($property in @($install.PSObject.Properties)) {
+            if (-not $flattenedAssigned.Contains($property.Name)) {
+                $flattenedAssigned[$property.Name] = $property.Value
+            }
+        }
+        return [pscustomobject]$flattenedAssigned
     }
     return $null
 }

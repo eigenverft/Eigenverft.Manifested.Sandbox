@@ -15,7 +15,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
         $globalInfo.Document.package.PSObject.Properties.Name | Should -Contain 'shimDirectory'
         $globalInfo.Document.package.shimDirectory | Should -Be '{applicationRootDirectory}/Shims'
         $globalInfo.Document.package.PSObject.Properties.Name | Should -Contain 'layout'
-        $globalInfo.Document.package.layout.packageDepotRelativePath | Should -Be '{definitionId}/{releaseTrack}/{version}/{flavor}'
+        $globalInfo.Document.package.layout.packageDepotRelativePath | Should -Be '{definitionId}/{releaseTrack}/{version}/{artifactDistributionVariant}'
         $globalInfo.Document.package.layout.packageWorkSlotDirectory | Should -Be '{definitionId}-{slotHash}'
         $globalInfo.Document.package.PSObject.Properties.Name | Should -Contain 'packageState'
         $globalInfo.Document.package.acquisitionEnvironment.stores.PSObject.Properties.Name | Should -Contain 'packageFileStagingDirectory'
@@ -82,7 +82,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
         $applicationRootPath = Join-Path $rootPath 'AppRoot'
         $globalDocument = New-TestPackageGlobalDocument -ApplicationRootDirectory $applicationRootPath
         $definitionDocument = New-TestVSCodeDefinitionDocument -Releases @(
-            New-TestPackageRelease -Id 'vsCode-win-x64-stable' -Version '2.0.0' -Architecture 'x64' -Flavor 'win32-x64' -FileName 'VSCode-win32-x64-2.0.0.zip' -AcquisitionCandidates @(
+            New-TestPackageRelease -Id 'vsCode-win-x64-stable' -Version '2.0.0' -Architecture 'x64' -ArtifactDistributionVariant 'win32-x64' -FileName 'VSCode-win32-x64-2.0.0.zip' -AcquisitionCandidates @(
                 @{
                     kind        = 'packageDepot'
                     searchOrder = 10
@@ -127,7 +127,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
         $absoluteInstallStagingPath = Join-Path $rootPath 'AbsoluteInstallStaging'
         $globalDocument = New-TestPackageGlobalDocument -ApplicationRootDirectory $applicationRootPath -PreferredTargetInstallDirectory $absoluteInstallPath -PackageFileStagingDirectory $absoluteFileStagingPath -PackageInstallStageDirectory $absoluteInstallStagingPath
         $definitionDocument = New-TestVSCodeDefinitionDocument -Releases @(
-            New-TestPackageRelease -Id 'vsCode-win-x64-stable' -Version '2.0.0' -Architecture 'x64' -Flavor 'win32-x64' -FileName 'VSCode-win32-x64-2.0.0.zip' -AcquisitionCandidates @(
+            New-TestPackageRelease -Id 'vsCode-win-x64-stable' -Version '2.0.0' -Architecture 'x64' -ArtifactDistributionVariant 'win32-x64' -FileName 'VSCode-win32-x64-2.0.0.zip' -AcquisitionCandidates @(
                 @{
                     kind        = 'packageDepot'
                     searchOrder = 10
@@ -192,7 +192,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
             }
         }
         $definitionDocument = New-TestVSCodeDefinitionDocument -Releases @(
-            New-TestPackageRelease -Id 'vsCode-win-x64-stable' -Version '2.0.0' -Architecture 'x64' -Flavor 'win32-x64' -FileName 'VSCode-win32-x64-2.0.0.zip' -AcquisitionCandidates @(
+            New-TestPackageRelease -Id 'vsCode-win-x64-stable' -Version '2.0.0' -Architecture 'x64' -ArtifactDistributionVariant 'win32-x64' -FileName 'VSCode-win32-x64-2.0.0.zip' -AcquisitionCandidates @(
                 @{
                     kind        = 'packageDepot'
                     searchOrder = 10
@@ -244,7 +244,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
         }
         $globalDocument = New-TestPackageGlobalDocument -ApplicationRootDirectory $applicationRootPath
         $definitionDocument = New-TestVSCodeDefinitionDocument -Releases @(
-            New-TestPackageRelease -Id 'vsCode-win-x64-stable' -Version '2.0.0' -Architecture 'x64' -Flavor 'win32-x64' -FileName 'VSCode-win32-x64-2.0.0.zip' -AcquisitionCandidates @(
+            New-TestPackageRelease -Id 'vsCode-win-x64-stable' -Version '2.0.0' -Architecture 'x64' -ArtifactDistributionVariant 'win32-x64' -FileName 'VSCode-win32-x64-2.0.0.zip' -AcquisitionCandidates @(
                 @{
                     kind        = 'packageDepot'
                     searchOrder = 10
@@ -274,7 +274,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
         $rootPath = Join-Path $TestDrive 'local-environment-command-failure'
         $globalDocument = New-TestPackageGlobalDocument -ApplicationRootDirectory (Join-Path $rootPath 'AppRoot')
         $definitionDocument = New-TestVSCodeDefinitionDocument -Releases @(
-            New-TestPackageRelease -Id 'vsCode-win-x64-stable' -Version '2.0.0' -Architecture 'x64' -Flavor 'win32-x64' -FileName 'VSCode-win32-x64-2.0.0.zip' -AcquisitionCandidates @(
+            New-TestPackageRelease -Id 'vsCode-win-x64-stable' -Version '2.0.0' -Architecture 'x64' -ArtifactDistributionVariant 'win32-x64' -FileName 'VSCode-win32-x64-2.0.0.zip' -AcquisitionCandidates @(
                 @{
                     kind        = 'packageDepot'
                     searchOrder = 10
@@ -407,7 +407,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
         $rootPath = Join-Path $TestDrive 'removed-state-not-implemented'
         $globalDocument = New-TestPackageGlobalDocument -ApplicationRootDirectory (Join-Path $rootPath 'AppRoot')
         $definitionDocument = New-TestVSCodeDefinitionDocument -Releases @(
-            New-TestPackageRelease -Id 'vsCode-win-x64-stable' -Version '2.0.0' -Architecture 'x64' -Flavor 'win32-x64' -FileName 'VSCode-win32-x64-2.0.0.zip' -AcquisitionCandidates @(
+            New-TestPackageRelease -Id 'vsCode-win-x64-stable' -Version '2.0.0' -Architecture 'x64' -ArtifactDistributionVariant 'win32-x64' -FileName 'VSCode-win32-x64-2.0.0.zip' -AcquisitionCandidates @(
                 @{
                     kind        = 'packageDepot'
                     searchOrder = 10
@@ -544,8 +544,8 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
         $result.Package.releaseTag | Should -Be 'b8863'
         $result.Package.packageFile.fileName | Should -Be 'llama-b8863-bin-win-cpu-x64.zip'
         $result.Package.assigned.pathRegistration.source.kind | Should -Be 'shim'
-        $result.Package.assigned.pathRegistration.source.use | Should -Be 'discovery.commands'
-        @($config.Definition.discovery.commands.name) | Should -Be @('llama-cli', 'llama-server', 'llama-quantize', 'llama-bench', 'llama-tokenize')
+        $result.Package.assigned.pathRegistration.source.use | Should -Be 'presenceDiscovery.commands'
+        @($config.Definition.presenceDiscovery.commands.name) | Should -Be @('llama-cli', 'llama-server', 'llama-quantize', 'llama-bench', 'llama-tokenize')
     }
 
     It 'loads the shipped GitRuntime definition and selects the fixed GitHub-backed release' {
@@ -578,8 +578,8 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
         $result.Package.packageFile.fileName | Should -Be $expectedFileName
         $result.Package.packageFile.contentHash.value | Should -Be $expectedSha256
         $result.Package.assigned.pathRegistration.source.kind | Should -Be 'shim'
-        $result.Package.assigned.pathRegistration.source.use | Should -Be 'discovery.commands'
-        $config.Definition.discovery.commands[0].name | Should -Be 'git'
+        $result.Package.assigned.pathRegistration.source.use | Should -Be 'presenceDiscovery.commands'
+        $config.Definition.presenceDiscovery.commands[0].name | Should -Be 'git'
     }
 
     It 'loads the shipped NotepadPlusPlus definition and selects the fixed NSIS installer release' {
@@ -609,8 +609,8 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
         $result.Package.version | Should -Be '8.9.4'
         $result.Package.assigned.kind | Should -Be 'nsisInstaller'
         $result.Package.assigned.targetDirectoryArgument.prefix | Should -Be '/D='
-        $result.Package.stateDiscovery.installed.searchLocations[0].kind | Should -Be 'windowsUninstallRegistryKey'
-        $result.Package.stateDiscovery.installed.searchLocations[0].installDirectorySource | Should -Be 'displayIconDirectory'
+        $result.Package.existingInstallDiscovery.searchLocations[0].kind | Should -Be 'windowsUninstallRegistryKey'
+        $result.Package.existingInstallDiscovery.searchLocations[0].installDirectorySource | Should -Be 'displayIconDirectory'
         $result.Package.packageFile.fileName | Should -Be $expectedFileName
         $result.Package.packageFile.contentHash.value | Should -Be $expectedSha256
     }
@@ -644,8 +644,8 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
         $result.Package.packageFile.fileName | Should -Be $expectedFileName
         $result.Package.packageFile.contentHash.value | Should -Be $expectedSha256
         $result.Package.assigned.pathRegistration.source.kind | Should -Be 'shim'
-        $result.Package.assigned.pathRegistration.source.use | Should -Be 'discovery.commands'
-        @($config.Definition.discovery.commands.name) | Should -Be @('node', 'npm', 'npx')
+        $result.Package.assigned.pathRegistration.source.use | Should -Be 'presenceDiscovery.commands'
+        @($config.Definition.presenceDiscovery.commands.name) | Should -Be @('node', 'npm', 'npx')
     }
 
     It 'loads the shipped npm-backed CLI runtime definitions without package-file acquisition' {
@@ -669,9 +669,9 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
             $result.Package.assigned.installerCommand | Should -Be 'npm'
             $result.Package.assigned.packageSpec | Should -Be $case.PackageSpec
             $result.Package.assigned.pathRegistration.source.kind | Should -Be 'shim'
-            $result.Package.assigned.pathRegistration.source.use | Should -Be 'discovery.commands'
-            $config.Definition.discovery.commands[0].name | Should -Be $case.Command
-            $config.Definition.discovery.commands[0].relativePath | Should -Be $case.RelativePath
+            $result.Package.assigned.pathRegistration.source.use | Should -Be 'presenceDiscovery.commands'
+            $config.Definition.presenceDiscovery.commands[0].name | Should -Be $case.Command
+            $config.Definition.presenceDiscovery.commands[0].relativePath | Should -Be $case.RelativePath
             if ($case.DefinitionId -eq 'CodexCli') {
                 @($config.Definition.dependencies.definitionId) | Should -Be @('VisualCppRedistributable', 'NodeRuntime')
                 @($config.Definition.dependencies.repositoryId) | Should -Be @('EigenverftModule', 'EigenverftModule')
@@ -779,8 +779,8 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
         $result.Package.packageFile.contentHash.value | Should -Be $expectedSha256
         $result.Package.assigned.expandedRoot | Should -Be 'tools'
         $result.Package.assigned.pathRegistration.source.kind | Should -Be 'shim'
-        $result.Package.assigned.pathRegistration.source.use | Should -Be 'discovery.commands'
-        $config.Definition.discovery.commands[0].name | Should -Be 'python'
+        $result.Package.assigned.pathRegistration.source.use | Should -Be 'presenceDiscovery.commands'
+        $config.Definition.presenceDiscovery.commands[0].name | Should -Be 'python'
         $result.Package.validation.commandChecks[1].arguments | Should -Be @('-m', 'pip', '--version')
     }
 
@@ -814,8 +814,8 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
         $result.Package.packageFile.fileName | Should -Be $expectedFileName
         $result.Package.packageFile.contentHash.value | Should -Be $expectedSha256
         $result.Package.assigned.pathRegistration.source.kind | Should -Be 'shim'
-        $result.Package.assigned.pathRegistration.source.use | Should -Be 'discovery.commands'
-        $config.Definition.discovery.commands[0].name | Should -Be 'pwsh'
+        $result.Package.assigned.pathRegistration.source.use | Should -Be 'presenceDiscovery.commands'
+        $config.Definition.presenceDiscovery.commands[0].name | Should -Be 'pwsh'
     }
 
     It 'loads the shipped VisualCppRedistributable definition as an elevated machine prerequisite' {
@@ -876,7 +876,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
 
     It 'fails clearly when a definition still uses requireManagedOwnership' {
         $rootPath = Join-Path $TestDrive 'retired-require-managed-ownership'
-        $release = New-TestPackageRelease -Id 'vsCode-win-x64-stable' -Version '2.0.0' -Architecture 'x64' -Flavor 'win32-x64' -Install @{ kind = 'reuseExisting' } -Validation (New-TestValidation -Version '2.0.0')
+        $release = New-TestPackageRelease -Id 'vsCode-win-x64-stable' -Version '2.0.0' -Architecture 'x64' -ArtifactDistributionVariant 'win32-x64' -Install @{ kind = 'reuseExisting' } -Validation (New-TestValidation -Version '2.0.0')
         $definitionDocument = New-TestVSCodeDefinitionDocument -Releases @($release) -SharedValidation (New-TestValidation -Version '2.0.0') -SharedOwnershipPolicy @{
             allowAdoptExternal    = $false
             upgradeAdoptedInstall = $false
@@ -889,7 +889,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
     }
 
     It 'fails clearly when npm install definitions use retired managerDependency fields' {
-        $release = New-TestPackageRelease -Id 'cli-win-x64-stable' -Version '1.0.0' -Architecture 'x64' -Flavor 'win32-x64' -Install @{
+        $release = New-TestPackageRelease -Id 'cli-win-x64-stable' -Version '1.0.0' -Architecture 'x64' -ArtifactDistributionVariant 'win32-x64' -Install @{
             kind              = 'npmGlobalPackage'
             installerCommand  = 'npm'
             packageSpec       = 'example@{version}'
@@ -909,7 +909,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
 
     It 'fails clearly when a definition is missing schemaVersion' {
         $rootPath = Join-Path $TestDrive 'missing-schema-version'
-        $release = New-TestPackageRelease -Id 'vsCode-win-x64-stable' -Version '2.0.0' -Architecture 'x64' -Flavor 'win32-x64' -Install @{ kind = 'reuseExisting' } -Validation (New-TestValidation -Version '2.0.0')
+        $release = New-TestPackageRelease -Id 'vsCode-win-x64-stable' -Version '2.0.0' -Architecture 'x64' -ArtifactDistributionVariant 'win32-x64' -Install @{ kind = 'reuseExisting' } -Validation (New-TestValidation -Version '2.0.0')
         $definitionDocument = New-TestVSCodeDefinitionDocument -Releases @($release)
         $null = $definitionDocument.Remove('schemaVersion')
         $documents = Write-TestPackageDocuments -RootPath $rootPath -GlobalDocument (New-TestPackageGlobalDocument) -DefinitionDocument $definitionDocument
@@ -920,7 +920,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
 
     It 'fails clearly when a definition still uses shared.requirements' {
         $rootPath = Join-Path $TestDrive 'retired-requirements-packages'
-        $release = New-TestPackageRelease -Id 'vsCode-win-x64-stable' -Version '2.0.0' -Architecture 'x64' -Flavor 'win32-x64' -Install @{ kind = 'reuseExisting' } -Validation (New-TestValidation -Version '2.0.0')
+        $release = New-TestPackageRelease -Id 'vsCode-win-x64-stable' -Version '2.0.0' -Architecture 'x64' -ArtifactDistributionVariant 'win32-x64' -Install @{ kind = 'reuseExisting' } -Validation (New-TestValidation -Version '2.0.0')
         $definitionDocument = New-TestVSCodeDefinitionDocument -Releases @($release)
         $definitionDocument.shared = @{
             requirements = @{
@@ -933,8 +933,47 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
         { Assert-PackageDefinitionSchema -DefinitionDocumentInfo $definitionInfo -DefinitionId 'VSCodeRuntime' } | Should -Throw '*shared*'
     }
 
+    It 'fails clearly when a definition still uses retired root packageTargets' {
+        $release = New-TestPackageRelease -Id 'vsCode-win-x64-stable' -Version '2.0.0' -Architecture 'x64' -ArtifactDistributionVariant 'win32-x64' -Install @{ kind = 'reuseExisting' } -Validation (New-TestValidation -Version '2.0.0')
+        $definitionDocument = New-TestVSCodeDefinitionDocument -Releases @($release)
+        $definitionDocument.packageTargets = @()
+
+        $definitionInfo = [pscustomobject]@{
+            Path     = Join-Path $TestDrive 'VSCodeRuntime.json'
+            Document = ConvertTo-TestPsObject -InputObject $definitionDocument
+        }
+
+        { Assert-PackageDefinitionSchema -DefinitionDocumentInfo $definitionInfo -DefinitionId 'VSCodeRuntime' } | Should -Throw '*packageTargets*'
+    }
+
+    It 'fails clearly when a definition still uses retired root versionCatalog' {
+        $release = New-TestPackageRelease -Id 'vsCode-win-x64-stable' -Version '2.0.0' -Architecture 'x64' -ArtifactDistributionVariant 'win32-x64' -Install @{ kind = 'reuseExisting' } -Validation (New-TestValidation -Version '2.0.0')
+        $definitionDocument = New-TestVSCodeDefinitionDocument -Releases @($release)
+        $definitionDocument.versionCatalog = @()
+
+        $definitionInfo = [pscustomobject]@{
+            Path     = Join-Path $TestDrive 'VSCodeRuntime.json'
+            Document = ConvertTo-TestPsObject -InputObject $definitionDocument
+        }
+
+        { Assert-PackageDefinitionSchema -DefinitionDocumentInfo $definitionInfo -DefinitionId 'VSCodeRuntime' } | Should -Throw '*versionCatalog*'
+    }
+
+    It 'fails clearly when a release still uses retired artifactsByTarget' {
+        $release = New-TestPackageRelease -Id 'vsCode-win-x64-stable' -Version '2.0.0' -Architecture 'x64' -ArtifactDistributionVariant 'win32-x64' -Install @{ kind = 'reuseExisting' } -Validation (New-TestValidation -Version '2.0.0')
+        $definitionDocument = New-TestVSCodeDefinitionDocument -Releases @($release)
+        $definitionDocument.artifacts.releases[0].artifactsByTarget = @{}
+
+        $definitionInfo = [pscustomobject]@{
+            Path     = Join-Path $TestDrive 'VSCodeRuntime.json'
+            Document = ConvertTo-TestPsObject -InputObject $definitionDocument
+        }
+
+        { Assert-PackageDefinitionSchema -DefinitionDocumentInfo $definitionInfo -DefinitionId 'VSCodeRuntime' } | Should -Throw '*artifactsByTarget*'
+    }
+
     It 'fails clearly when an acquisition candidate still uses retired priority' {
-        $release = New-TestPackageRelease -Id 'vsCode-win-x64-stable' -Version '2.0.0' -Architecture 'x64' -Flavor 'win32-x64' -FileName 'VSCode-win32-x64-2.0.0.zip' -AcquisitionCandidates @(
+        $release = New-TestPackageRelease -Id 'vsCode-win-x64-stable' -Version '2.0.0' -Architecture 'x64' -ArtifactDistributionVariant 'win32-x64' -FileName 'VSCode-win32-x64-2.0.0.zip' -AcquisitionCandidates @(
             @{
                 kind         = 'packageDepot'
                 priority     = 100
@@ -951,7 +990,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
     }
 
     It 'fails clearly when packageFile still uses retired raw-file trust properties' {
-        $release = New-TestPackageRelease -Id 'vsCode-win-x64-stable' -Version '2.0.0' -Architecture 'x64' -Flavor 'win32-x64' -FileName 'VSCode-win32-x64-2.0.0.zip' -AcquisitionCandidates @(
+        $release = New-TestPackageRelease -Id 'vsCode-win-x64-stable' -Version '2.0.0' -Architecture 'x64' -ArtifactDistributionVariant 'win32-x64' -FileName 'VSCode-win32-x64-2.0.0.zip' -AcquisitionCandidates @(
             @{
                 kind         = 'packageDepot'
                 searchOrder  = 100
@@ -967,7 +1006,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
         }
         $release.packageFile | Add-Member -NotePropertyName autoUpdateSupported -NotePropertyValue $false
         $definitionDocument = New-TestVSCodeDefinitionDocument -Releases @($release)
-        $artifact = $definitionDocument.versionCatalog[0].artifactsByTarget['vsCode-win-x64-stable']
+        $artifact = $definitionDocument.artifacts.releases[0].targetArtifacts['vsCode-win-x64-stable']
         $definitionInfo = [pscustomobject]@{
             Path     = Join-Path $TestDrive 'VSCodeRuntime.json'
             Document = ConvertTo-TestPsObject -InputObject $definitionDocument
@@ -983,7 +1022,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
     }
 
     It 'rejects incomplete packageFile.contentHash and publisherSignature metadata' {
-        $release = New-TestPackageRelease -Id 'vsCode-win-x64-stable' -Version '2.0.0' -Architecture 'x64' -Flavor 'win32-x64' -FileName 'VSCode-win32-x64-2.0.0.zip' -AcquisitionCandidates @(
+        $release = New-TestPackageRelease -Id 'vsCode-win-x64-stable' -Version '2.0.0' -Architecture 'x64' -ArtifactDistributionVariant 'win32-x64' -FileName 'VSCode-win32-x64-2.0.0.zip' -AcquisitionCandidates @(
             @{
                 kind         = 'packageDepot'
                 searchOrder  = 100
@@ -994,7 +1033,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
             algorithm = 'sha256'
         }
         $definitionDocument = New-TestVSCodeDefinitionDocument -Releases @($release)
-        $artifact = $definitionDocument.versionCatalog[0].artifactsByTarget['vsCode-win-x64-stable']
+        $artifact = $definitionDocument.artifacts.releases[0].targetArtifacts['vsCode-win-x64-stable']
         $definitionInfo = [pscustomobject]@{
             Path     = Join-Path $TestDrive 'VSCodeRuntime.json'
             Document = ConvertTo-TestPsObject -InputObject $definitionDocument
@@ -1028,7 +1067,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
     It 'loads source inventory from the env-var path and applies the inventory global overlay when no site code is set' {
         $rootPath = Join-Path $TestDrive 'inventory-global'
         $documents = Write-TestPackageDocuments -RootPath $rootPath -GlobalDocument (New-TestPackageGlobalDocument) -DefinitionDocument (New-TestVSCodeDefinitionDocument -Releases @(
-                New-TestPackageRelease -Id 'vsCode-win-x64-stable' -Version '2.0.0' -Architecture 'x64' -Flavor 'win32-x64' -FileName 'VSCode-win32-x64-2.0.0.zip' -AcquisitionCandidates @(
+                New-TestPackageRelease -Id 'vsCode-win-x64-stable' -Version '2.0.0' -Architecture 'x64' -ArtifactDistributionVariant 'win32-x64' -FileName 'VSCode-win32-x64-2.0.0.zip' -AcquisitionCandidates @(
                     @{
                         kind        = 'packageDepot'
                         searchOrder    = 100
@@ -1058,7 +1097,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
     It 'applies the site overlay on top of the inventory global overlay when site code is present' {
         $rootPath = Join-Path $TestDrive 'inventory-site'
         $documents = Write-TestPackageDocuments -RootPath $rootPath -GlobalDocument (New-TestPackageGlobalDocument) -DefinitionDocument (New-TestVSCodeDefinitionDocument -Releases @(
-                New-TestPackageRelease -Id 'vsCode-win-x64-stable' -Version '2.0.0' -Architecture 'x64' -Flavor 'win32-x64' -FileName 'VSCode-win32-x64-2.0.0.zip' -AcquisitionCandidates @(
+                New-TestPackageRelease -Id 'vsCode-win-x64-stable' -Version '2.0.0' -Architecture 'x64' -ArtifactDistributionVariant 'win32-x64' -FileName 'VSCode-win32-x64-2.0.0.zip' -AcquisitionCandidates @(
                     @{
                         kind        = 'packageDepot'
                         searchOrder    = 100
@@ -1121,7 +1160,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
             }
         }
         $documents = Write-TestPackageDocuments -RootPath $rootPath -GlobalDocument (New-TestPackageGlobalDocument) -DepotInventoryDocument $depotInventory -DefinitionDocument (New-TestVSCodeDefinitionDocument -Releases @(
-                New-TestPackageRelease -Id 'vsCode-win-x64-stable' -Version '2.0.0' -Architecture 'x64' -Flavor 'win32-x64' -FileName 'VSCode-win32-x64-2.0.0.zip' -AcquisitionCandidates @(
+                New-TestPackageRelease -Id 'vsCode-win-x64-stable' -Version '2.0.0' -Architecture 'x64' -ArtifactDistributionVariant 'win32-x64' -FileName 'VSCode-win32-x64-2.0.0.zip' -AcquisitionCandidates @(
                     @{
                         kind        = 'packageDepot'
                         searchOrder    = 100
@@ -1151,7 +1190,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
 
     It 'rejects a selected release when compatibility.checks are not satisfied with onFail fail' {
         $rootPath = Join-Path $TestDrive 'requirements-checks-fail'
-        $release = New-TestPackageRelease -Id 'vsCode-win-x64-stable' -Version '2.0.0' -Architecture 'x64' -Flavor 'win32-x64' -Install @{ kind = 'reuseExisting' } -Compatibility @{
+        $release = New-TestPackageRelease -Id 'vsCode-win-x64-stable' -Version '2.0.0' -Architecture 'x64' -ArtifactDistributionVariant 'win32-x64' -Install @{ kind = 'reuseExisting' } -Compatibility @{
             checks = @(
                 @{
                     kind    = 'osFamily'
@@ -1174,7 +1213,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
     It 'resolves environment and definition source refs from the effective acquisition environment and upstream sources' {
         $rootPath = Join-Path $TestDrive 'source-resolution'
         $documents = Write-TestPackageDocuments -RootPath $rootPath -GlobalDocument (New-TestPackageGlobalDocument) -DefinitionDocument (New-TestVSCodeDefinitionDocument -Releases @(
-                New-TestPackageRelease -Id 'vsCode-win-x64-stable' -Version '2.0.0' -Architecture 'x64' -Flavor 'win32-x64' -Install @{ kind = 'reuseExisting' } -Validation (New-TestValidation -Version '2.0.0')
+                New-TestPackageRelease -Id 'vsCode-win-x64-stable' -Version '2.0.0' -Architecture 'x64' -ArtifactDistributionVariant 'win32-x64' -Install @{ kind = 'reuseExisting' } -Validation (New-TestValidation -Version '2.0.0')
             ) -UpstreamBaseUri 'https://example.invalid/vscode/') -SourceInventoryDocument (New-TestSourceInventoryDocument -GlobalEnvironmentSources @{
                 remotePackageDepot = @{
                     kind        = 'filesystem'
@@ -1199,7 +1238,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
 
     It 'loads GitHub release upstream sources and keeps releaseTag separate from version' {
         $rootPath = Join-Path $TestDrive 'github-release-source'
-        $release = New-TestPackageRelease -Id 'llama-cpu-x64-stable' -Version '0.0.1' -ReleaseTag 'b8863' -Architecture 'x64' -Flavor 'win-cpu-x64' -FileName 'llama-b8863-bin-win-cpu-x64.zip' -AcquisitionCandidates @(
+        $release = New-TestPackageRelease -Id 'llama-cpu-x64-stable' -Version '0.0.1' -ReleaseTag 'b8863' -Architecture 'x64' -ArtifactDistributionVariant 'win-cpu-x64' -FileName 'llama-b8863-bin-win-cpu-x64.zip' -AcquisitionCandidates @(
             @{
                 kind         = 'download'
                 sourceId     = 'llamaCppGitHub'
@@ -1233,7 +1272,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
 
     It 'requires releaseTag for GitHub-backed releases' {
         $rootPath = Join-Path $TestDrive 'github-release-tag-required'
-        $release = New-TestPackageRelease -Id 'llama-cpu-x64-stable' -Version '0.0.1' -Architecture 'x64' -Flavor 'win-cpu-x64' -FileName 'llama-b8863-bin-win-cpu-x64.zip' -AcquisitionCandidates @(
+        $release = New-TestPackageRelease -Id 'llama-cpu-x64-stable' -Version '0.0.1' -Architecture 'x64' -ArtifactDistributionVariant 'win-cpu-x64' -FileName 'llama-b8863-bin-win-cpu-x64.zip' -AcquisitionCandidates @(
             @{
                 kind         = 'download'
                 sourceId     = 'llamaCppGitHub'
@@ -1258,7 +1297,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
 
     It 'resolves a GitHub release asset URL from releaseTag and packageFile.fileName' {
         $rootPath = Join-Path $TestDrive 'github-release-resolve'
-        $release = New-TestPackageRelease -Id 'llama-cpu-x64-stable' -Version '0.0.1' -ReleaseTag 'b8863' -Architecture 'x64' -Flavor 'win-cpu-x64' -FileName 'llama-b8863-bin-win-cpu-x64.zip' -AcquisitionCandidates @(
+        $release = New-TestPackageRelease -Id 'llama-cpu-x64-stable' -Version '0.0.1' -ReleaseTag 'b8863' -Architecture 'x64' -ArtifactDistributionVariant 'win-cpu-x64' -FileName 'llama-b8863-bin-win-cpu-x64.zip' -AcquisitionCandidates @(
             @{
                 kind         = 'download'
                 sourceId     = 'llamaCppGitHub'
@@ -1390,7 +1429,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
     It 'builds an effective release from shared defaults and uses ReleaseTrack in path resolution' {
         $rootPath = Join-Path $TestDrive 'effective-release'
         $packageArchive = New-TestPackageArchiveInfo -RootPath (Join-Path $rootPath 'archive') -Version '2.0.0'
-        $release = New-TestPackageRelease -Id 'vsCode-win-x64-stable' -Version '2.0.0' -Architecture 'x64' -Flavor 'win32-x64' -FileName 'VSCode-win32-x64-2.0.0.zip' -AcquisitionCandidates @(
+        $release = New-TestPackageRelease -Id 'vsCode-win-x64-stable' -Version '2.0.0' -Architecture 'x64' -ArtifactDistributionVariant 'win32-x64' -FileName 'VSCode-win32-x64-2.0.0.zip' -AcquisitionCandidates @(
             @{
                 kind        = 'packageDepot'
                 searchOrder    = 10
@@ -1421,7 +1460,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
 
     It 'writes resolved paths as separate console lines' {
         $rootPath = Join-Path $TestDrive 'resolved-path-lines'
-        $release = New-TestPackageRelease -Id 'vsCode-win-x64-stable' -Version '2.0.0' -Architecture 'x64' -Flavor 'win32-x64' -FileName 'VSCode-win32-x64-2.0.0.zip' -AcquisitionCandidates @(
+        $release = New-TestPackageRelease -Id 'vsCode-win-x64-stable' -Version '2.0.0' -Architecture 'x64' -ArtifactDistributionVariant 'win32-x64' -FileName 'VSCode-win32-x64-2.0.0.zip' -AcquisitionCandidates @(
             @{
                 kind         = 'packageDepot'
                 searchOrder     = 10
@@ -1454,3 +1493,4 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
     }
 
 }
+

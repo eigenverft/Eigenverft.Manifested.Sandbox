@@ -35,14 +35,14 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - acquis
             )
         }
 
-        (Resolve-PackageExistingInstallRoot -InstalledStateDiscovery $discovery -CandidatePath $codeCmdPath) | Should -Be $installRoot
-        (Resolve-PackageExistingInstallRoot -InstalledStateDiscovery $discovery -CandidatePath $codeExePath) | Should -Be $installRoot
+        (Resolve-PackageExistingInstallRoot -ExistingInstallDiscovery $discovery -CandidatePath $codeCmdPath) | Should -Be $installRoot
+        (Resolve-PackageExistingInstallRoot -ExistingInstallDiscovery $discovery -CandidatePath $codeExePath) | Should -Be $installRoot
     }
 
     It 'keeps packageFileStaging and defaultPackageDepot distinct in the resolved paths' {
         $rootPath = Join-Path $TestDrive 'distinct-roots'
         $packageArchive = New-TestPackageArchiveInfo -RootPath (Join-Path $rootPath 'archive') -Version '2.0.0'
-        $release = New-TestPackageRelease -Id 'vsCode-win-x64-stable' -Version '2.0.0' -Architecture 'x64' -Flavor 'win32-x64' -FileName 'VSCode-win32-x64-2.0.0.zip' -AcquisitionCandidates @(
+        $release = New-TestPackageRelease -Id 'vsCode-win-x64-stable' -Version '2.0.0' -Architecture 'x64' -ArtifactDistributionVariant 'win32-x64' -FileName 'VSCode-win32-x64-2.0.0.zip' -AcquisitionCandidates @(
             @{
                 kind        = 'packageDepot'
                 searchOrder    = 10
@@ -72,7 +72,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - acquis
         $rootPath = Join-Path $TestDrive 'default-depot-hydration'
         $packageArchive = New-TestPackageArchiveInfo -RootPath (Join-Path $rootPath 'archive') -Version '2.0.0' -ArchiveFileName 'VSCode-win32-x64-2.0.0.zip'
         $globalDocument = New-TestPackageGlobalDocument -PackageFileStagingDirectory (Join-Path $rootPath 'workspace') -DefaultPackageDepotDirectory (Join-Path $rootPath 'default-depot')
-        $release = New-TestPackageRelease -Id 'vsCode-win-x64-stable' -Version '2.0.0' -Architecture 'x64' -Flavor 'win32-x64' -FileName 'VSCode-win32-x64-2.0.0.zip' -AcquisitionCandidates @(
+        $release = New-TestPackageRelease -Id 'vsCode-win-x64-stable' -Version '2.0.0' -Architecture 'x64' -ArtifactDistributionVariant 'win32-x64' -FileName 'VSCode-win32-x64-2.0.0.zip' -AcquisitionCandidates @(
             @{
                 kind        = 'packageDepot'
                 searchOrder    = 10
@@ -102,7 +102,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - acquis
         $null = New-Item -ItemType Directory -Path (Split-Path -Parent $result.DefaultPackageDepotFilePath) -Force
         Copy-Item -LiteralPath $packageArchive.ZipPath -Destination $result.DefaultPackageDepotFilePath -Force
 
-        $result = Prepare-PackageInstallFile -PackageResult $result
+        $result = Resolve-PackageInstallFile -PackageResult $result
 
         $result.PackageFilePreparation.Success | Should -BeTrue
         $result.PackageFilePreparation.Status | Should -Be 'HydratedFromDefaultPackageDepot'
@@ -120,7 +120,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - acquis
         $depotInventoryDocument.acquisitionEnvironment.environmentSources.defaultPackageDepot.writable = $false
         $depotInventoryDocument.acquisitionEnvironment.environmentSources.defaultPackageDepot.mirrorTarget = $false
         $depotInventoryDocument.acquisitionEnvironment.environmentSources.defaultPackageDepot.ensureExists = $false
-        $release = New-TestPackageRelease -Id 'vsCode-win-x64-stable' -Version '2.0.0' -Architecture 'x64' -Flavor 'win32-x64' -FileName 'VSCode-win32-x64-2.0.0.zip' -AcquisitionCandidates @(
+        $release = New-TestPackageRelease -Id 'vsCode-win-x64-stable' -Version '2.0.0' -Architecture 'x64' -ArtifactDistributionVariant 'win32-x64' -FileName 'VSCode-win32-x64-2.0.0.zip' -AcquisitionCandidates @(
             @{
                 kind         = 'packageDepot'
                 searchOrder  = 10
@@ -151,7 +151,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - acquis
         $null = New-Item -ItemType Directory -Path (Split-Path -Parent $result.DefaultPackageDepotFilePath) -Force
         Copy-Item -LiteralPath $packageArchive.ZipPath -Destination $result.DefaultPackageDepotFilePath -Force
 
-        $result = Prepare-PackageInstallFile -PackageResult $result
+        $result = Resolve-PackageInstallFile -PackageResult $result
 
         $result.PackageFilePreparation.Success | Should -BeTrue
         $result.PackageFilePreparation.Status | Should -Be 'HydratedFromDefaultPackageDepot'
@@ -163,7 +163,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - acquis
         $rootPath = Join-Path $TestDrive 'packagefile-contenthash'
         $packageArchive = New-TestPackageArchiveInfo -RootPath (Join-Path $rootPath 'archive') -Version '2.0.0' -ArchiveFileName 'VSCode-win32-x64-2.0.0.zip'
         $globalDocument = New-TestPackageGlobalDocument -PackageFileStagingDirectory (Join-Path $rootPath 'workspace') -DefaultPackageDepotDirectory (Join-Path $rootPath 'default-depot')
-        $release = New-TestPackageRelease -Id 'vsCode-win-x64-stable' -Version '2.0.0' -Architecture 'x64' -Flavor 'win32-x64' -FileName 'VSCode-win32-x64-2.0.0.zip' -PackageFileSha256 $packageArchive.Sha256 -AcquisitionCandidates @(
+        $release = New-TestPackageRelease -Id 'vsCode-win-x64-stable' -Version '2.0.0' -Architecture 'x64' -ArtifactDistributionVariant 'win32-x64' -FileName 'VSCode-win32-x64-2.0.0.zip' -PackageFileSha256 $packageArchive.Sha256 -AcquisitionCandidates @(
             @{
                 kind         = 'packageDepot'
                 searchOrder     = 10
@@ -185,7 +185,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - acquis
         $null = New-Item -ItemType Directory -Path (Split-Path -Parent $result.DefaultPackageDepotFilePath) -Force
         Copy-Item -LiteralPath $packageArchive.ZipPath -Destination $result.DefaultPackageDepotFilePath -Force
 
-        $result = Prepare-PackageInstallFile -PackageResult $result
+        $result = Resolve-PackageInstallFile -PackageResult $result
 
         $result.PackageFilePreparation.Success | Should -BeTrue
         $result.PackageFilePreparation.Verification.Status | Should -Be 'VerificationPassed'
@@ -205,7 +205,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - acquis
         ) -InstallRootRules @()
         $policy = New-TestOwnershipPolicy -AllowAdoptExternal $true
         $validation = New-TestValidation -Version '2.0.0' -Directories @()
-        $release = New-TestPackageRelease -Id 'vsCode-win-x64-stable' -Version '2.0.0' -Architecture 'x64' -Flavor 'win32-x64' -Install @{ kind = 'reuseExisting' } -StateDiscovery $discovery -OwnershipPolicy $policy -Validation $validation
+        $release = New-TestPackageRelease -Id 'vsCode-win-x64-stable' -Version '2.0.0' -Architecture 'x64' -ArtifactDistributionVariant 'win32-x64' -Install @{ kind = 'reuseExisting' } -ExistingInstallDiscovery $discovery -OwnershipPolicy $policy -Validation $validation
         $documents = Write-TestPackageDocuments -RootPath $rootPath -GlobalDocument (New-TestPackageGlobalDocument -PackageInventoryFilePath (Join-Path $rootPath 'package-inventory.json')) -DefinitionDocument (New-TestVSCodeDefinitionDocument -Releases @($release) -SharedValidation $validation)
 
         [Environment]::SetEnvironmentVariable($script:SourceInventoryEnvVarName, (Join-Path $TestDrive 'missing-inventory.json'), 'Process')
@@ -217,7 +217,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - acquis
         $result = Resolve-PackagePackage -PackageResult $result
         $result = Resolve-PackagePaths -PackageResult $result
         $result = Find-PackageExistingPackage -PackageResult $result
-        $result = Classify-PackageExistingPackage -PackageResult $result
+        $result = Set-PackageExistingPackage -PackageResult $result
         $result = Resolve-PackageExistingPackageDecision -PackageResult $result
 
         $result.ExistingPackage.Decision | Should -Be 'AdoptExternal'
@@ -237,7 +237,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - acquis
         ) -InstallRootRules @()
         $policy = New-TestOwnershipPolicy -AllowAdoptExternal $true -RequirePackageOwnership $true
         $validation = New-TestValidation -Version '2.0.0' -Directories @()
-        $release = New-TestPackageRelease -Id 'vsCode-win-x64-stable' -Version '2.0.0' -Architecture 'x64' -Flavor 'win32-x64' -Install @{ kind = 'reuseExisting' } -StateDiscovery $discovery -OwnershipPolicy $policy -Validation $validation
+        $release = New-TestPackageRelease -Id 'vsCode-win-x64-stable' -Version '2.0.0' -Architecture 'x64' -ArtifactDistributionVariant 'win32-x64' -Install @{ kind = 'reuseExisting' } -ExistingInstallDiscovery $discovery -OwnershipPolicy $policy -Validation $validation
         $documents = Write-TestPackageDocuments -RootPath $rootPath -GlobalDocument (New-TestPackageGlobalDocument -PackageInventoryFilePath (Join-Path $rootPath 'package-inventory.json')) -DefinitionDocument (New-TestVSCodeDefinitionDocument -Releases @($release) -SharedValidation $validation)
 
         [Environment]::SetEnvironmentVariable($script:SourceInventoryEnvVarName, (Join-Path $TestDrive 'missing-inventory.json'), 'Process')
@@ -249,7 +249,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - acquis
         $result = Resolve-PackagePackage -PackageResult $result
         $result = Resolve-PackagePaths -PackageResult $result
         $result = Find-PackageExistingPackage -PackageResult $result
-        $result = Classify-PackageExistingPackage -PackageResult $result
+        $result = Set-PackageExistingPackage -PackageResult $result
         $result = Resolve-PackageExistingPackageDecision -PackageResult $result
 
         $result.ExistingPackage.Decision | Should -Be 'ExternalIgnored'
@@ -270,7 +270,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - acquis
                     installSlotId    = 'VSCodeRuntime:stable:win32-x64'
                     definitionId     = 'VSCodeRuntime'
                     releaseTrack     = 'stable'
-                    flavor           = 'win32-x64'
+                    artifactDistributionVariant           = 'win32-x64'
                     currentReleaseId = 'vsCode-win-x64-stable'
                     currentVersion   = '2.0.0'
                     installDirectory = $installRoot
@@ -285,7 +285,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - acquis
         ) -InstallRootRules @()
         $policy = New-TestOwnershipPolicy -AllowAdoptExternal $true
         $validation = New-TestValidation -Version '2.0.0' -Directories @()
-        $release = New-TestPackageRelease -Id 'vsCode-win-x64-stable' -Version '2.0.0' -Architecture 'x64' -Flavor 'win32-x64' -Install @{ kind = 'reuseExisting' } -StateDiscovery $discovery -OwnershipPolicy $policy -Validation $validation
+        $release = New-TestPackageRelease -Id 'vsCode-win-x64-stable' -Version '2.0.0' -Architecture 'x64' -ArtifactDistributionVariant 'win32-x64' -Install @{ kind = 'reuseExisting' } -ExistingInstallDiscovery $discovery -OwnershipPolicy $policy -Validation $validation
         $documents = Write-TestPackageDocuments -RootPath $rootPath -GlobalDocument (New-TestPackageGlobalDocument -PackageInventoryFilePath $packageStateIndexPath) -DefinitionDocument (New-TestVSCodeDefinitionDocument -Releases @($release) -SharedValidation $validation)
 
         [Environment]::SetEnvironmentVariable($script:SourceInventoryEnvVarName, (Join-Path $TestDrive 'missing-inventory.json'), 'Process')
@@ -297,7 +297,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - acquis
         $result = Resolve-PackagePackage -PackageResult $result
         $result = Resolve-PackagePaths -PackageResult $result
         $result = Find-PackageExistingPackage -PackageResult $result
-        $result = Classify-PackageExistingPackage -PackageResult $result
+        $result = Set-PackageExistingPackage -PackageResult $result
         $result = Resolve-PackageExistingPackageDecision -PackageResult $result
 
         $result.ExistingPackage.Decision | Should -Be 'ReusePackageOwned'
@@ -313,10 +313,10 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - acquis
         Write-TestTextFile -Path (Join-Path $binDirectory 'code.cmd') -Content "@echo off`r`necho 2.0.0`r`n"
 
         $validation = New-TestValidation -Version '2.0.0' -Directories @()
-        $release = New-TestPackageRelease -Id 'vsCode-win-x64-stable' -Version '2.0.0' -Architecture 'x64' -Flavor 'win32-x64' -Install @{
+        $release = New-TestPackageRelease -Id 'vsCode-win-x64-stable' -Version '2.0.0' -Architecture 'x64' -ArtifactDistributionVariant 'win32-x64' -Install @{
             kind             = 'reuseExisting'
             installDirectory = $installRoot
-        } -StateDiscovery (New-TestInstalledStateDiscovery -EnableDetection $true -SearchLocations @()) -OwnershipPolicy (New-TestOwnershipPolicy -AllowAdoptExternal $true) -Validation $validation
+        } -ExistingInstallDiscovery (New-TestInstalledStateDiscovery -EnableDetection $true -SearchLocations @()) -OwnershipPolicy (New-TestOwnershipPolicy -AllowAdoptExternal $true) -Validation $validation
         $documents = Write-TestPackageDocuments -RootPath $rootPath -GlobalDocument (New-TestPackageGlobalDocument -PreferredTargetInstallDirectory (Join-Path $rootPath 'managed-root') -PackageInventoryFilePath (Join-Path $rootPath 'package-inventory.json')) -DefinitionDocument (New-TestVSCodeDefinitionDocument -Releases @($release) -SharedValidation $validation)
 
         [Environment]::SetEnvironmentVariable($script:SourceInventoryEnvVarName, (Join-Path $TestDrive 'missing-inventory.json'), 'Process')
@@ -328,7 +328,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - acquis
         $result = Resolve-PackagePackage -PackageResult $result
         $result = Resolve-PackagePaths -PackageResult $result
         $result = Find-PackageExistingPackage -PackageResult $result
-        $result = Classify-PackageExistingPackage -PackageResult $result
+        $result = Set-PackageExistingPackage -PackageResult $result
         $result = Resolve-PackageExistingPackageDecision -PackageResult $result
         $result = Set-PackageAssignedState -PackageResult $result
 
@@ -342,7 +342,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - acquis
         $rootPath = Join-Path $TestDrive 'repair-managed'
         $packageArchive = New-TestPackageArchiveInfo -RootPath (Join-Path $rootPath 'archive') -Version '2.0.0' -ArchiveFileName 'VSCode-win32-x64-2.0.0.zip'
         $globalDocument = New-TestPackageGlobalDocument -PackageFileStagingDirectory (Join-Path $rootPath 'workspace') -DefaultPackageDepotDirectory (Join-Path $rootPath 'default-depot') -PreferredTargetInstallDirectory (Join-Path $rootPath 'installs')
-        $release = New-TestPackageRelease -Id 'vsCode-win-x64-stable' -Version '2.0.0' -Architecture 'x64' -Flavor 'win32-x64' -FileName 'VSCode-win32-x64-2.0.0.zip' -Install @{
+        $release = New-TestPackageRelease -Id 'vsCode-win-x64-stable' -Version '2.0.0' -Architecture 'x64' -ArtifactDistributionVariant 'win32-x64' -FileName 'VSCode-win32-x64-2.0.0.zip' -Install @{
             kind             = 'expandArchive'
             installDirectory = 'vscode-runtime/stable/2.0.0/win32-x64'
             expandedRoot     = 'auto'
@@ -368,7 +368,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - acquis
 
         $null = New-Item -ItemType Directory -Path (Split-Path -Parent $result.DefaultPackageDepotFilePath) -Force
         Copy-Item -LiteralPath $packageArchive.ZipPath -Destination $result.DefaultPackageDepotFilePath -Force
-        $result = Prepare-PackageInstallFile -PackageResult $result
+        $result = Resolve-PackageInstallFile -PackageResult $result
         $result = Set-PackageAssignedState -PackageResult $result
 
         Remove-Item -LiteralPath (Join-Path $result.InstallDirectory 'data') -Recurse -Force
@@ -378,9 +378,9 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - acquis
         $rerun = Resolve-PackagePaths -PackageResult $rerun
         $rerun = Build-PackageAcquisitionPlan -PackageResult $rerun
         $rerun = Find-PackageExistingPackage -PackageResult $rerun
-        $rerun = Classify-PackageExistingPackage -PackageResult $rerun
+        $rerun = Set-PackageExistingPackage -PackageResult $rerun
         $rerun = Resolve-PackageExistingPackageDecision -PackageResult $rerun
-        $rerun = Prepare-PackageInstallFile -PackageResult $rerun
+        $rerun = Resolve-PackageInstallFile -PackageResult $rerun
         $rerun = Set-PackageAssignedState -PackageResult $rerun
 
         $rerun.ExistingPackage.SearchKind | Should -Be 'packageTargetInstallPath'

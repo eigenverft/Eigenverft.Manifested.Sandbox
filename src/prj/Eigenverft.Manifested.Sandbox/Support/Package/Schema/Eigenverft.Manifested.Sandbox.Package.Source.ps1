@@ -9,7 +9,7 @@ Returns a resolved Package source definition by sourceRef.
 
 .DESCRIPTION
 Looks up an acquisition source from the effective acquisition environment or
-from definition-local upstream sources and returns the normalized source
+from definition-local artifact sources and returns the normalized source
 definition with scope and id metadata.
 
 .PARAMETER PackageConfig
@@ -48,7 +48,7 @@ Get-PackageSourceDefinition -PackageConfig $config -SourceRef $candidate.sourceR
             }
         }
         'definition' {
-            foreach ($property in @($PackageConfig.DefinitionUpstreamSources.PSObject.Properties)) {
+            foreach ($property in @($PackageConfig.DefinitionSources.PSObject.Properties)) {
                 if ([string]::Equals([string]$property.Name, $id, [System.StringComparison]::OrdinalIgnoreCase)) {
                     $sourceObject = $property.Value
                     $id = $property.Name
@@ -70,8 +70,8 @@ Get-PackageSourceDefinition -PackageConfig $config -SourceRef $candidate.sourceR
         Kind            = if ($sourceObject.PSObject.Properties['kind']) { [string]$sourceObject.kind } else { $null }
         BaseUri         = if ($sourceObject.PSObject.Properties['baseUri']) { [string]$sourceObject.baseUri } else { $null }
         BasePath        = if ($sourceObject.PSObject.Properties['basePath']) { [string]$sourceObject.basePath } else { $null }
-        RepositoryOwner = if ($sourceObject.PSObject.Properties['repositoryOwner']) { [string]$sourceObject.repositoryOwner } else { $null }
-        RepositoryName  = if ($sourceObject.PSObject.Properties['repositoryName']) { [string]$sourceObject.repositoryName } else { $null }
+        RepositoryOwner = if ($sourceObject.PSObject.Properties['githubOwner']) { [string]$sourceObject.githubOwner } elseif ($sourceObject.PSObject.Properties['repositoryOwner']) { [string]$sourceObject.repositoryOwner } else { $null }
+        RepositoryName  = if ($sourceObject.PSObject.Properties['githubRepository']) { [string]$sourceObject.githubRepository } elseif ($sourceObject.PSObject.Properties['repositoryName']) { [string]$sourceObject.repositoryName } else { $null }
     }
 }
 
@@ -783,7 +783,7 @@ Build-PackageAcquisitionPlan -PackageResult $result
                         searchOrder     = if ($candidate.PSObject.Properties['searchOrder']) { [int]$candidate.searchOrder } else { [int]::MaxValue }
                         sourceSearchOrder = 1000
                         sourceRef    = if ($candidate.PSObject.Properties['sourceId'] -and -not [string]::IsNullOrWhiteSpace([string]$candidate.sourceId)) {
-                            [pscustomobject]@{
+    [pscustomobject]@{
                                 scope = 'environment'
                                 id    = [string]$candidate.sourceId
                             }
@@ -832,7 +832,7 @@ Build-PackageAcquisitionPlan -PackageResult $result
     return $PackageResult
 }
 
-function Prepare-PackageInstallFile {
+function Resolve-PackageInstallFile {
 <#
 .SYNOPSIS
 Ensures the selected package file is present in the package file staging.
@@ -846,7 +846,7 @@ candidate in searchOrder order until one succeeds or all candidates fail.
 The Package result object to enrich.
 
 .EXAMPLE
-Prepare-PackageInstallFile -PackageResult $result
+Resolve-PackageInstallFile -PackageResult $result
 #>
     [CmdletBinding()]
     param(
@@ -858,7 +858,7 @@ Prepare-PackageInstallFile -PackageResult $result
     $packageConfig = $PackageResult.PackageConfig
 
     if (-not $package -or -not (Get-PackageEffectiveReleaseAssignedBlock -Release $package)) {
-        throw 'Prepare-PackageInstallFile requires a selected release with assigned settings.'
+        throw 'Resolve-PackageInstallFile requires a selected release with assigned settings.'
     }
 
     if ($PackageResult.ExistingPackage -and

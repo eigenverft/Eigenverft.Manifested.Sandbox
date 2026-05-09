@@ -512,7 +512,7 @@ function Invoke-WebRequestEx {
             }
         }
         if(-not $caller){$caller=[pscustomobject]@{ScriptName=$PSCommandPath;FunctionName=$null}}
-        $lineNumber=$null ; 
+        $lineNumber=$null ;
         $p=$caller.PSObject.Properties['ScriptLineNumber'];if($p -and $p.Value){$lineNumber=[string]$p.Value}
         if(-not $lineNumber){
             $p=$caller.PSObject.Properties['Position']
@@ -2569,7 +2569,6 @@ public static class CertificateValidationHelper
             [switch]$ClearProfile
         )
 
-        $acceptAllCallback = $null
 
         try {
             try {
@@ -2583,9 +2582,6 @@ public static class CertificateValidationHelper
             catch {
             }
 
-            if ($effectiveSkipCertificateCheck -or $automaticCertificateFallbackAllowed) {
-                $acceptAllCallback = _GetAcceptAllCertificateValidationCallback
-            }
 
             $isInteractive = [System.Environment]::UserInteractive
 

@@ -8,8 +8,8 @@ function Get-PackageInstallSlotId {
 Builds the logical Package install-slot id for a result.
 
 .DESCRIPTION
-Combines the definition id, release track, and flavor into the stable install
-slot identity used by the package inventory.
+Combines the definition id, release track, and artifact distribution variant
+into the stable install slot identity used by the package inventory.
 
 .PARAMETER PackageResult
 The current Package result object.
@@ -25,8 +25,8 @@ Get-PackageInstallSlotId -PackageResult $result
 
     $definitionId = [string]$PackageResult.DefinitionId
     $releaseTrack = if ($PackageResult.Package -and $PackageResult.Package.PSObject.Properties['releaseTrack']) { [string]$PackageResult.Package.releaseTrack } else { [string]$PackageResult.ReleaseTrack }
-    $flavor = if ($PackageResult.Package -and $PackageResult.Package.PSObject.Properties['flavor']) { [string]$PackageResult.Package.flavor } else { 'default' }
-    return ('{0}:{1}:{2}' -f $definitionId, $releaseTrack, $flavor)
+    $artifactDistributionVariant = if ($PackageResult.Package -and $PackageResult.Package.PSObject.Properties['artifactDistributionVariant']) { [string]$PackageResult.Package.artifactDistributionVariant } else { 'default' }
+    return ('{0}:{1}:{2}' -f $definitionId, $releaseTrack, $artifactDistributionVariant)
 }
 
 function Get-PackageInventory {
@@ -225,7 +225,7 @@ function Resolve-PackageOwnershipKindText {
     }
 }
 
-function Classify-PackageExistingPackage {
+function Set-PackageExistingPackage {
 <#
 .SYNOPSIS
 Classifies a discovered existing install against the package inventory.
@@ -239,7 +239,7 @@ Package-owned, adopted, or external.
 The Package result object to enrich.
 
 .EXAMPLE
-Classify-PackageExistingPackage -PackageResult $result
+Set-PackageExistingPackage -PackageResult $result
 #>
     [CmdletBinding()]
     param(
@@ -362,7 +362,7 @@ Update-PackageInventoryRecord -PackageResult $result
         definitionSourcePath = $definitionCopy.SourcePath
         definitionLocalPath = $definitionCopy.LocalPath
         releaseTrack    = if ($PackageResult.Package -and $PackageResult.Package.PSObject.Properties['releaseTrack']) { [string]$PackageResult.Package.releaseTrack } else { [string]$PackageResult.ReleaseTrack }
-        flavor          = if ($PackageResult.Package -and $PackageResult.Package.PSObject.Properties['flavor']) { [string]$PackageResult.Package.flavor } else { $null }
+        artifactDistributionVariant = if ($PackageResult.Package -and $PackageResult.Package.PSObject.Properties['artifactDistributionVariant']) { [string]$PackageResult.Package.artifactDistributionVariant } else { if ($PackageResult.Package -and $PackageResult.Package.PSObject.Properties['flavor']) { [string]$PackageResult.Package.flavor } else { $null } }
         currentReleaseId = $PackageResult.PackageId
         currentVersion  = $PackageResult.PackageVersion
         installDirectory = $normalizedInstallDirectory

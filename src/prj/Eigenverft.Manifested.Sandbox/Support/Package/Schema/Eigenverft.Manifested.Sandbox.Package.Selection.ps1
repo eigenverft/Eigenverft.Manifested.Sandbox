@@ -316,8 +316,8 @@ function Resolve-PackagePackage {
 Attaches the selected release to a Package result.
 
 .DESCRIPTION
-Selects a schemaVersion 1.2 packageTarget and versionCatalog entry for the
-resolved Package config, projects that target/catalog/artifact into the runtime
+Selects a schemaVersion 1.3 artifact target and release entry for the
+resolved Package config, projects that artifact target/release into the runtime
 assigned package object, and attaches it to the result.
 
 .PARAMETER PackageResult
@@ -339,7 +339,7 @@ Resolve-PackagePackage -PackageResult $result
         throw "Unsupported Package selection strategy '$($packageConfig.SelectionStrategy)'."
     }
 
-    $selectedPackage = Resolve-PackageEffectivePackage_1_2 -PackageConfig $packageConfig
+    $selectedPackage = Resolve-PackageEffectivePackage_1_3 -PackageConfig $packageConfig
 
     $PackageResult.Package = $selectedPackage
     $PackageResult.EffectiveRelease = $selectedPackage
@@ -358,8 +358,8 @@ Resolve-PackagePackage -PackageResult $result
         throw "Package release '$($selectedPackage.id)' does not satisfy compatibility.checks. $failedCompatibilityText"
     }
 
-    $selectedPlatformTarget = if ($selectedPackage.PSObject.Properties['platformTarget']) { [string]$selectedPackage.platformTarget } else { 'default' }
-    Write-PackageExecutionMessage -Message ("[STATE] Selected package target '{0}' release '{1}' version '{2}' for platform '{3}', architecture '{4}', channel '{5}', platformTarget '{6}'." -f [string]$selectedPackage.packageTargetId, $PackageResult.PackageId, $PackageResult.PackageVersion, $packageConfig.Platform, $packageConfig.Architecture, $effectiveReleaseTrack, $selectedPlatformTarget)
+    $selectedArtifactDistributionVariant = if ($selectedPackage.PSObject.Properties['artifactDistributionVariant']) { [string]$selectedPackage.artifactDistributionVariant } else { 'default' }
+    Write-PackageExecutionMessage -Message ("[STATE] Selected package artifact target '{0}' release '{1}' version '{2}' for platform '{3}', architecture '{4}', releaseTrack '{5}', artifactDistributionVariant '{6}'." -f [string]$selectedPackage.artifactTargetId, $PackageResult.PackageId, $PackageResult.PackageVersion, $packageConfig.Platform, $packageConfig.Architecture, $effectiveReleaseTrack, $selectedArtifactDistributionVariant)
     if (@($compatibilityEvaluation.Checks).Count -gt 0) {
         $compatibilitySummary = @(
             foreach ($checkResult in @($compatibilityEvaluation.Checks)) {

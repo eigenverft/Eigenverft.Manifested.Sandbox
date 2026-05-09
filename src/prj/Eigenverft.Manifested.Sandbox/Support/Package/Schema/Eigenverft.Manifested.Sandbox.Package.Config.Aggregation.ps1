@@ -330,7 +330,7 @@ Get-PackageConfig -DefinitionId VSCodeRuntime
         Resolve-PackageConfiguredPath -PathValue 'Shims' -ApplicationRootDirectory $applicationRootDirectory
     }
 
-    $packageDepotRelativePathTemplate = '{definitionId}/{releaseTrack}/{version}/{flavor}'
+    $packageDepotRelativePathTemplate = '{definitionId}/{releaseTrack}/{version}/{artifactDistributionVariant}'
     $packageWorkSlotDirectoryTemplate = '{definitionId}-{slotHash}'
     if ($packageGlobalConfig.PSObject.Properties['layout'] -and $packageGlobalConfig.layout) {
         if ($packageGlobalConfig.layout.PSObject.Properties['packageDepotRelativePath'] -and
@@ -368,7 +368,7 @@ Get-PackageConfig -DefinitionId VSCodeRuntime
         DefinitionId                       = [string]$definition.id
         DefinitionRepositoryId             = $definitionRepositoryId
         DefinitionFileName                 = $definitionFileName
-        DefinitionUpstreamSources          = $definition.upstreamSources
+        DefinitionSources                  = $definition.artifacts.sources
         Display                            = $display
         SchemaVersion                      = [string]$definition.schemaVersion
         Platform                           = $runtimeContext.Platform

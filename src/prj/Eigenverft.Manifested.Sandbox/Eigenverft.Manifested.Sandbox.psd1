@@ -130,7 +130,7 @@ FileList = @(
     'Support\Package\Schema\Eigenverft.Manifested.Sandbox.Package.Config.ObjectCopy.ps1',
     'Support\Package\Schema\Eigenverft.Manifested.Sandbox.Package.Config.InventoryAndSchema.ps1',
     'Support\Package\Schema\Eigenverft.Manifested.Sandbox.Package.Config.Aggregation.ps1',
-    'Support\Package\Schema\Eigenverft.Manifested.Sandbox.Package.DefinitionSchema.Wire1_2.ps1',
+    'Support\Package\Schema\Eigenverft.Manifested.Sandbox.Package.DefinitionSchema.Wire1_3.ps1',
     'Support\Package\Schema\Eigenverft.Manifested.Sandbox.Package.DefinitionSchema.ps1',
     'Support\Package\Execution\Eigenverft.Manifested.Sandbox.Package.LocalEnvironment.ps1',
     'Support\Package\Schema\Eigenverft.Manifested.Sandbox.Package.Selection.ps1',

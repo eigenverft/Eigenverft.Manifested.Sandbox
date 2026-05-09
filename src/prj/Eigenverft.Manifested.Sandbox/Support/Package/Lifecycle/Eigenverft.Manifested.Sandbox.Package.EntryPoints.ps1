@@ -25,7 +25,7 @@ Resolve-PackageEntryPoints -PackageResult $result
 
     $definition = $PackageResult.PackageConfig.Definition
     $commands = @(
-        foreach ($entryPoint in @(Get-PackageDiscoveryEntryPoints -Definition $definition -ToolKind 'commands' -ExposedOnly)) {
+        foreach ($entryPoint in @(Get-PackagePresenceDiscoveryEntryPoints -Definition $definition -ToolKind 'commands' -ExposedOnly)) {
             $path = Resolve-PackageDiscoveredToolEntryPointPath -EntryPoint $entryPoint -InstallDirectory $PackageResult.InstallDirectory
             [pscustomobject]@{
                 Name   = $entryPoint.name
@@ -36,7 +36,7 @@ Resolve-PackageEntryPoints -PackageResult $result
     )
 
     $apps = @(
-        foreach ($entryPoint in @(Get-PackageDiscoveryEntryPoints -Definition $definition -ToolKind 'apps' -ExposedOnly)) {
+        foreach ($entryPoint in @(Get-PackagePresenceDiscoveryEntryPoints -Definition $definition -ToolKind 'apps' -ExposedOnly)) {
             $path = Resolve-PackageDiscoveredToolEntryPointPath -EntryPoint $entryPoint -InstallDirectory $PackageResult.InstallDirectory
             [pscustomobject]@{
                 Name   = $entryPoint.name

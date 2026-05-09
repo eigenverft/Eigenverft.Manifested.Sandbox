@@ -9,9 +9,9 @@ function Resolve-PackageTemplateText {
 Resolves simple Package template tokens in text.
 
 .DESCRIPTION
-Replaces package-aware tokens such as `{channel}`, `{version}`, and
-`{platformTarget}` with the current values from the resolved Package config
-and selected package.
+Replaces package-aware tokens such as `{releaseTrack}`, `{version}`, and
+`{artifactDistributionVariant}` with the current values from the resolved
+Package config and selected package.
 
 .PARAMETER Text
 The text that contains optional Package tokens.
@@ -26,7 +26,7 @@ The selected release object.
 Optional extra tokens to merge into the standard replacement map.
 
 .EXAMPLE
-Resolve-PackageTemplateText -Text '{releaseTrack}\{version}\{flavor}' -PackageConfig $config -Package $package
+Resolve-PackageTemplateText -Text '{releaseTrack}\{version}\{artifactDistributionVariant}' -PackageConfig $config -Package $package
 #>
     [CmdletBinding()]
     param(
@@ -85,7 +85,6 @@ function Get-PackageTemplateTokenMap {
         $tokens['platform'] = $PackageConfig.Platform
         $tokens['architecture'] = $PackageConfig.Architecture
         $tokens['releaseTrack'] = $PackageConfig.ReleaseTrack
-        $tokens['channel'] = $PackageConfig.ReleaseTrack
         if ($PackageConfig.PSObject.Properties['ApplicationRootDirectory']) {
             $tokens['applicationRootDirectory'] = $PackageConfig.ApplicationRootDirectory
         }
@@ -106,11 +105,12 @@ function Get-PackageTemplateTokenMap {
         $tokens['packageId'] = if ($Package.PSObject.Properties['id']) { [string]$Package.id } else { $null }
         $tokens['releaseId'] = if ($Package.PSObject.Properties['id']) { [string]$Package.id } else { $null }
         $tokens['releaseTrack'] = if ($Package.PSObject.Properties['releaseTrack']) { [string]$Package.releaseTrack } else { $tokens['releaseTrack'] }
-        $tokens['channel'] = if ($Package.PSObject.Properties['channel']) { [string]$Package.channel } else { $tokens['releaseTrack'] }
         $tokens['version'] = if ($Package.PSObject.Properties['version']) { [string]$Package.version } else { $null }
-        $tokens['flavor'] = if ($Package.PSObject.Properties['flavor']) { [string]$Package.flavor } else { $null }
-        $tokens['platformTarget'] = if ($Package.PSObject.Properties['platformTarget']) { [string]$Package.platformTarget } else { $tokens['flavor'] }
-        $tokens['packageTargetId'] = if ($Package.PSObject.Properties['packageTargetId']) { [string]$Package.packageTargetId } else { $null }
+        $tokens['artifactDistributionVariant'] = if ($Package.PSObject.Properties['artifactDistributionVariant']) { [string]$Package.artifactDistributionVariant } else { if ($Package.PSObject.Properties['flavor']) { [string]$Package.flavor } else { $null } }
+        $tokens['artifactTargetId'] = if ($Package.PSObject.Properties['artifactTargetId']) { [string]$Package.artifactTargetId } else { $null }
+        $tokens['channel'] = $tokens['releaseTrack']
+        $tokens['flavor'] = $tokens['artifactDistributionVariant']
+        $tokens['platformTarget'] = $tokens['artifactDistributionVariant']
     }
     foreach ($key in @($ExtraTokens.Keys)) {
         $tokens[$key] = $ExtraTokens[$key]
@@ -191,7 +191,7 @@ Get-PackagePackageDepotRelativeDirectory -PackageConfig $config -Package $packag
         [string]$PackageConfig.PackageDepotRelativePathTemplate
     }
     else {
-        '{definitionId}/{releaseTrack}/{version}/{flavor}'
+        '{definitionId}/{releaseTrack}/{version}/{artifactDistributionVariant}'
     }
 
     return Resolve-PackageLayoutRelativeDirectory -Template $template -PackageConfig $PackageConfig -Package $Package
@@ -210,14 +210,14 @@ function Get-PackagePackageWorkSlotDirectory {
     $definitionId = [string]$PackageConfig.DefinitionId
     $releaseTrack = if ($Package.PSObject.Properties['releaseTrack']) { [string]$Package.releaseTrack } else { [string]$PackageConfig.ReleaseTrack }
     $version = if ($Package.PSObject.Properties['version']) { [string]$Package.version } else { $null }
-    $flavor = if ($Package.PSObject.Properties['flavor']) { [string]$Package.flavor } else { $null }
-    foreach ($requiredValue in @($definitionId, $releaseTrack, $version, $flavor)) {
+    $artifactDistributionVariant = if ($Package.PSObject.Properties['artifactDistributionVariant']) { [string]$Package.artifactDistributionVariant } else { if ($Package.PSObject.Properties['flavor']) { [string]$Package.flavor } else { $null } }
+    foreach ($requiredValue in @($definitionId, $releaseTrack, $version, $artifactDistributionVariant)) {
         if ([string]::IsNullOrWhiteSpace($requiredValue)) {
-            throw 'Package work slot derivation requires definition id, releaseTrack, version, and flavor.'
+            throw 'Package work slot derivation requires definition id, releaseTrack, version, and artifactDistributionVariant.'
         }
     }
 
-    $slotIdentity = '{0}|{1}|{2}|{3}' -f $definitionId, $releaseTrack, $version, $flavor
+    $slotIdentity = '{0}|{1}|{2}|{3}' -f $definitionId, $releaseTrack, $version, $artifactDistributionVariant
     $slotHash = Get-StableShortHash -InputText $slotIdentity -Length 8
     $template = if ($PackageConfig.PSObject.Properties['PackageWorkSlotDirectoryTemplate'] -and
         -not [string]::IsNullOrWhiteSpace([string]$PackageConfig.PackageWorkSlotDirectoryTemplate)) {

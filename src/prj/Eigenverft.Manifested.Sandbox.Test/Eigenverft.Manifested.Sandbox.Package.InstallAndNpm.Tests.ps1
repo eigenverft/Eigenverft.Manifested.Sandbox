@@ -97,7 +97,7 @@ exit /b 0
                 id           = 'codex-runtime-win32-x64-stable'
                 version      = '0.125.0'
                 releaseTrack = 'stable'
-                flavor       = 'win32-x64'
+                artifactDistributionVariant       = 'win32-x64'
                 assigned     = [pscustomobject]@{
                     kind              = 'npmGlobalPackage'
                     installerCommand  = 'npm'
@@ -155,7 +155,7 @@ exit /b 0
                 id           = 'codex-runtime-win32-x64-stable'
                 version      = '0.125.0'
                 releaseTrack = 'stable'
-                flavor       = 'win32-x64'
+                artifactDistributionVariant       = 'win32-x64'
                 assigned     = [pscustomobject]@{
                     kind              = 'npmGlobalPackage'
                     installerCommand  = 'npm'
@@ -191,7 +191,7 @@ exit /b 0
                 id           = 'codex-runtime-win32-x64-stable'
                 version      = '0.125.0'
                 releaseTrack = 'stable'
-                flavor       = 'win32-x64'
+                artifactDistributionVariant       = 'win32-x64'
                 assigned     = [pscustomobject]@{
                     kind              = 'npmGlobalPackage'
                     installerCommand  = 'npm'
@@ -354,11 +354,10 @@ exit /b 0
 
         $packageResult = [pscustomobject]@{
             InstallDirectory = $null
-            Package          = [pscustomobject]@{
-                id = 'notepad-plus-plus-8.9.4-win-x64'
-                stateDiscovery = [pscustomobject]@{
-                    installed = [pscustomobject]@{
-                        enableDetection = $true
+            PackageConfig = ConvertTo-TestPsObject @{
+                Definition = @{
+                    existingInstallDiscovery = @{
+                        enabled = $true
                         searchLocations = @(
                             [pscustomobject]@{
                                 kind = 'windowsUninstallRegistryKey'
@@ -366,9 +365,20 @@ exit /b 0
                                 installDirectorySource = 'displayIconDirectory'
                             }
                         )
-                        installRootRules = @()
+                        installRootRules = @(
+                            [pscustomobject]@{
+                                match = @{
+                                    kind  = 'fileName'
+                                    value = 'notepad++'
+                                }
+                                installRootRelativePath = '..'
+                            }
+                        )
                     }
                 }
+            }
+            Package          = [pscustomobject]@{
+                id = 'notepad-plus-plus-8.9.4-win-x64'
             }
             ExistingPackage  = $null
         }
@@ -589,7 +599,7 @@ exit /b 0
         $preferredTargetInstallDirectory = Join-Path $rootPath 'installs'
         $packageStateIndexFilePath = Join-Path $rootPath 'package-inventory.json'
         $definitionDocument = @{
-            schemaVersion = '1.2'
+            schemaVersion = '1.3'
             id = 'Qwen35_9B_Q6_K_Model'
             display = @{
                 default = @{
@@ -599,21 +609,22 @@ exit /b 0
                     summary = 'Quantized GGUF model resource'
                 }
             }
-            packageTargets = @(
-                @{
-                    id = 'Qwen35_9B_Q6_K_Model-q6-k-stable'
-                    channel = 'stable'
-                    platformTarget = 'q8-0'
-                    constraints = @{
-                        os = @('windows')
-                        cpu = @('x64')
-                    }
-                    versionSelection = @{
-                        strategy = 'latestByVersion'
-                        allowPrerelease = $false
-                    }
-                    artifactDefaults = @{
-                        artifactSources = @(
+            dependencies = @()
+            artifacts = @{
+                targets = @(
+                    @{
+                        id = 'Qwen35_9B_Q6_K_Model-q6-k-stable'
+                        releaseTrack = 'stable'
+                        artifactDistributionVariant = 'q8-0'
+                        constraints = @{
+                            os = @('windows')
+                            cpu = @('x64')
+                        }
+                        versionSelection = @{
+                            strategy = 'latestByVersion'
+                            allowPrerelease = $false
+                        }
+                        acquisitionCandidates = @(
                             @{
                                 kind = 'packageDepot'
                                 searchOrder = 250
@@ -623,21 +634,27 @@ exit /b 0
                             }
                         )
                     }
-                }
-            )
-            versionCatalog = @(
-                @{
-                    version = '3.5.0'
-                    channels = @('stable')
-                    artifactsByTarget = @{
-                        'Qwen35_9B_Q6_K_Model-q6-k-stable' = @{
-                            releaseId = 'qwen35-9b-q6-k-stable'
-                            fileName = 'Qwen3.5-9B-Q6_K.gguf'
+                )
+                releases = @(
+                    @{
+                        version = '3.5.0'
+                        releaseTracks = @('stable')
+                        targetArtifacts = @{
+                            'Qwen35_9B_Q6_K_Model-q6-k-stable' = @{
+                                artifactId = 'qwen35-9b-q6-k-stable'
+                                fileName = 'Qwen3.5-9B-Q6_K.gguf'
+                            }
                         }
                     }
+                )
+                sources = @{
+                    huggingFaceDownload = @{
+                        kind = 'download'
+                        baseUri = 'https://huggingface.co/unsloth/Qwen3.5-2B-GGUF/resolve/main/'
+                    }
                 }
-            )
-            discovery = @{
+            }
+            presenceDiscovery = @{
                 files = @('Qwen3.5-9B-Q6_K.gguf')
                 directories = [object[]]@()
                 commands = [object[]]@()
@@ -647,21 +664,13 @@ exit /b 0
                 fileDetails = [object[]]@()
                 registry = [object[]]@()
             }
-            stateDiscovery = @{
-                installed = @{
-                    enableDetection = $false
-                    searchLocations = [object[]]@()
-                    installRootRules = [object[]]@()
-                }
-            }
-            upstreamSources = @{
-                huggingFaceDownload = @{
-                    kind = 'download'
-                    baseUri = 'https://huggingface.co/unsloth/Qwen3.5-2B-GGUF/resolve/main/'
-                }
+            existingInstallDiscovery = @{
+                enabled = $false
+                searchLocations = [object[]]@()
+                installRootRules = [object[]]@()
             }
             packageOperations = @{
-                shared = @{
+                policy = @{
                     compatibility = @{
                         checks = @(
                             @{
@@ -679,14 +688,16 @@ exit /b 0
                     }
                 }
                 assigned = @{
-                    kind = 'placePackageFile'
-                    installDirectory = 'qwen35-2b/{channel}/{version}/{platformTarget}'
-                    targetRelativePath = 'Qwen3.5-9B-Q6_K.gguf'
-                    pathRegistration = @{
-                        mode = 'none'
+                    install = @{
+                        kind = 'placePackageFile'
+                        installDirectory = 'qwen35-2b/{releaseTrack}/{version}/{artifactDistributionVariant}'
+                        targetRelativePath = 'Qwen3.5-9B-Q6_K.gguf'
+                        pathRegistration = @{
+                            mode = 'none'
+                        }
                     }
-                    installedStateCheck = @{
-                        use = 'discovery'
+                    readyStateCheck = @{
+                        use = 'presenceDiscovery'
                         require = @{
                             files = $true
                             directories = $false
@@ -700,11 +711,17 @@ exit /b 0
                     }
                 }
                 removed = @{
+                    policy = @{
+                        whenNotInInventory = 'succeed'
+                        allowedInventoryOwnershipKinds = @('PackageInstalled')
+                        allowUntrackedExternalRemoval = $false
+                        removeDependencies = $false
+                    }
                     operation = @{
                         kind = 'none'
                     }
-                    verifyAbsent = @{
-                        use = 'discovery'
+                    absenceVerification = @{
+                        use = 'presenceDiscovery'
                         require = @{
                             files = $true
                             directories = $false
@@ -716,10 +733,10 @@ exit /b 0
                             registry = $false
                         }
                     }
-                    cleanup = @{
-                        inventory = $true
-                        shims = $true
-                        path = $true
+                    postRemoveCleanup = @{
+                        packageInventoryRecord = $true
+                        generatedShims = $true
+                        pathEntries = $true
                         workDirectories = $true
                     }
                 }
@@ -740,7 +757,7 @@ exit /b 0
         $null = New-Item -ItemType Directory -Path (Split-Path -Parent $result.DefaultPackageDepotFilePath) -Force
         Write-TestTextFile -Path $result.DefaultPackageDepotFilePath -Content 'gguf-binary'
 
-        $result = Prepare-PackageInstallFile -PackageResult $result
+        $result = Resolve-PackageInstallFile -PackageResult $result
         $result = Set-PackageAssignedState -PackageResult $result
         $result = Test-PackageAssignedReadiness -PackageResult $result
 
@@ -782,7 +799,7 @@ exit /b 0
         $badValidation = New-TestValidation -Version '2.0.0'
         $badValidation.files = @('missing-after-install.exe')
         $definitionDocument = New-TestVSCodeDefinitionDocument -SharedValidation $badValidation -Releases @(
-            New-TestPackageRelease -Id 'vsCode-win-x64-stable' -Version '2.0.0' -Architecture 'x64' -Flavor 'win32-x64' -FileName 'VSCode-win32-x64-2.0.0.zip' -PackageFileSha256 $archiveInfo.Sha256 -AcquisitionCandidates @(
+            New-TestPackageRelease -Id 'vsCode-win-x64-stable' -Version '2.0.0' -Architecture 'x64' -ArtifactDistributionVariant 'win32-x64' -FileName 'VSCode-win32-x64-2.0.0.zip' -PackageFileSha256 $archiveInfo.Sha256 -AcquisitionCandidates @(
                 @{
                     kind        = 'packageDepot'
                     searchOrder = 10
@@ -834,11 +851,10 @@ exit /b 0
         $packageResult = [pscustomobject]@{
             InstallDirectory = $null
             ExistingPackage  = $null
-            Package          = [pscustomobject]@{
-                id = 'VSCodeRuntime'
-                stateDiscovery = [pscustomobject]@{
-                    installed = [pscustomobject]@{
-                        enableDetection = $true
+            PackageConfig = ConvertTo-TestPsObject @{
+                Definition = @{
+                    existingInstallDiscovery = @{
+                        enabled = $true
                         searchLocations = @(
                             [pscustomobject]@{
                                 kind = 'command'
@@ -847,7 +863,7 @@ exit /b 0
                         )
                         installRootRules = @(
                             [pscustomobject]@{
-                                match = [pscustomobject]@{
+                                match = @{
                                     kind  = 'fileName'
                                     value = 'code.cmd'
                                 }
@@ -856,6 +872,9 @@ exit /b 0
                         )
                     }
                 }
+            }
+            Package          = [pscustomobject]@{
+                id = 'VSCodeRuntime'
             }
         }
 
@@ -883,3 +902,5 @@ exit /b 0
     }
 
 }
+
+

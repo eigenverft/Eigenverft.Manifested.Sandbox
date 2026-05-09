@@ -12,19 +12,19 @@ Resolves an install directory from a discovered existing-install candidate path.
 Uses the existing-install root rules to turn a discovered file path such as
 `code.cmd` into the install directory that owns that file.
 
-.PARAMETER InstalledStateDiscovery
-The stateDiscovery.installed definition object.
+.PARAMETER ExistingInstallDiscovery
+The existingInstallDiscovery definition object.
 
 .PARAMETER CandidatePath
 The discovered file or directory path.
 
 .EXAMPLE
-Resolve-PackageExistingInstallRoot -InstalledStateDiscovery $package.stateDiscovery.installed -CandidatePath $candidatePath
+Resolve-PackageExistingInstallRoot -ExistingInstallDiscovery $packageConfig.Definition.existingInstallDiscovery -CandidatePath $candidatePath
 #>
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true)]
-        [psobject]$InstalledStateDiscovery,
+        [psobject]$ExistingInstallDiscovery,
 
         [Parameter(Mandatory = $true)]
         [string]$CandidatePath
@@ -35,7 +35,7 @@ Resolve-PackageExistingInstallRoot -InstalledStateDiscovery $package.stateDiscov
     }
 
     $leafName = Split-Path -Leaf $CandidatePath
-    foreach ($rule in @($InstalledStateDiscovery.installRootRules)) {
+    foreach ($rule in @($ExistingInstallDiscovery.installRootRules)) {
         if (-not $rule.PSObject.Properties['match'] -or $null -eq $rule.match) {
             continue
         }
@@ -70,10 +70,10 @@ be interpreted as the install directory.
     )
 
     if (-not $SearchLocation.PSObject.Properties['paths'] -or @($SearchLocation.paths).Count -eq 0) {
-        throw "Package stateDiscovery.installed windowsUninstallRegistryKey search is missing paths."
+        throw "Package existingInstallDiscovery windowsUninstallRegistryKey search is missing paths."
     }
     if (-not $SearchLocation.PSObject.Properties['installDirectorySource'] -or [string]::IsNullOrWhiteSpace([string]$SearchLocation.installDirectorySource)) {
-        throw "Package stateDiscovery.installed windowsUninstallRegistryKey search is missing installDirectorySource."
+        throw "Package existingInstallDiscovery windowsUninstallRegistryKey search is missing installDirectorySource."
     }
 
     foreach ($registryPath in @($SearchLocation.paths | ForEach-Object { [string]$_ } | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })) {
@@ -129,7 +129,7 @@ function Find-PackageExistingPackage {
 Finds an existing package install that may be reused or adopted.
 
 .DESCRIPTION
-Searches command, path, and directory candidates from stateDiscovery.installed
+Searches command, path, and directory candidates from existingInstallDiscovery
 and attaches the first matching install
 directory to the Package result.
 
@@ -161,30 +161,30 @@ Find-PackageExistingPackage -PackageResult $result
         return $PackageResult
     }
 
-    $package = $PackageResult.Package
-    if (-not $package -or -not $package.PSObject.Properties['stateDiscovery'] -or
-        -not $package.stateDiscovery.PSObject.Properties['installed'] -or $null -eq $package.stateDiscovery.installed) {
+    $definition = $PackageResult.PackageConfig.Definition
+    if (-not $definition -or -not $definition.PSObject.Properties['existingInstallDiscovery'] -or
+        $null -eq $definition.existingInstallDiscovery) {
         return $PackageResult
     }
 
-    $installedStateDiscovery = $package.stateDiscovery.installed
-    if ($installedStateDiscovery.PSObject.Properties['enableDetection'] -and (-not [bool]$installedStateDiscovery.enableDetection)) {
+    $existingInstallDiscoveryInfo = $definition.existingInstallDiscovery
+    if ($existingInstallDiscoveryInfo.PSObject.Properties['enabled'] -and (-not [bool]$existingInstallDiscoveryInfo.enabled)) {
         return $PackageResult
     }
 
-    foreach ($searchLocation in @(Get-PackageExistingInstallSearchLocations -SearchLocations @($installedStateDiscovery.searchLocations))) {
+    foreach ($searchLocation in @(Get-PackageExistingInstallSearchLocations -SearchLocations @($existingInstallDiscoveryInfo.searchLocations))) {
         $candidatePath = $null
         $discoveryDetails = $null
         switch -Exact ([string]$searchLocation.kind) {
             'command' {
                 if (-not $searchLocation.PSObject.Properties['name'] -or [string]::IsNullOrWhiteSpace([string]$searchLocation.name)) {
-                    throw "Package stateDiscovery.installed search for release '$($package.id)' is missing command name."
+                    throw "Package existingInstallDiscovery search for release '$($package.id)' is missing command name."
                 }
                 $candidatePath = Get-ResolvedApplicationPath -CommandName ([string]$searchLocation.name)
             }
             'path' {
                 if (-not $searchLocation.PSObject.Properties['path'] -or [string]::IsNullOrWhiteSpace([string]$searchLocation.path)) {
-                    throw "Package stateDiscovery.installed search for release '$($package.id)' is missing path."
+                    throw "Package existingInstallDiscovery search for release '$($package.id)' is missing path."
                 }
                 $resolvedPath = Resolve-PackagePathValue -PathValue ([string]$searchLocation.path)
                 if (Test-Path -LiteralPath $resolvedPath) {
@@ -193,7 +193,7 @@ Find-PackageExistingPackage -PackageResult $result
             }
             'directory' {
                 if (-not $searchLocation.PSObject.Properties['path'] -or [string]::IsNullOrWhiteSpace([string]$searchLocation.path)) {
-                    throw "Package stateDiscovery.installed search for release '$($package.id)' is missing directory path."
+                    throw "Package existingInstallDiscovery search for release '$($package.id)' is missing directory path."
                 }
                 $resolvedPath = Resolve-PackagePathValue -PathValue ([string]$searchLocation.path)
                 if (Test-Path -LiteralPath $resolvedPath -PathType Container) {
@@ -208,7 +208,7 @@ Find-PackageExistingPackage -PackageResult $result
                 }
             }
             default {
-                throw "Unsupported Package stateDiscovery.installed search kind '$($searchLocation.kind)'."
+                throw "Unsupported Package existingInstallDiscovery search kind '$($searchLocation.kind)'."
             }
         }
 
@@ -216,7 +216,7 @@ Find-PackageExistingPackage -PackageResult $result
             continue
         }
 
-        $installDirectory = Resolve-PackageExistingInstallRoot -InstalledStateDiscovery $installedStateDiscovery -CandidatePath $candidatePath
+        $installDirectory = Resolve-PackageExistingInstallRoot -ExistingInstallDiscovery $existingInstallDiscoveryInfo -CandidatePath $candidatePath
         if (-not (Test-Path -LiteralPath $installDirectory -PathType Container)) {
             continue
         }
@@ -379,3 +379,5 @@ Resolve-PackageExistingPackageDecision -PackageResult $result
     Write-PackageExecutionMessage -Message ("[STATE] Existing install decision resolved to '{0}'." -f $PackageResult.ExistingPackage.Decision)
     return $PackageResult
 }
+
+

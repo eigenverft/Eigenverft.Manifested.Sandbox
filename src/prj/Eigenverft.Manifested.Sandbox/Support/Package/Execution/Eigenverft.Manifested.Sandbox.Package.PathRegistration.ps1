@@ -37,10 +37,10 @@ function Get-PackagePathRegistrationSourceValues {
     $sourceKind = if ($Source -and $Source.PSObject.Properties['kind']) { [string]$Source.kind } else { $null }
     if ([string]::Equals($sourceKind, 'shim', [System.StringComparison]::OrdinalIgnoreCase)) {
         if (-not $Source.PSObject.Properties['use'] -or
-            -not [string]::Equals([string]$Source.use, 'discovery.commands', [System.StringComparison]::Ordinal)) {
-            throw "Package pathRegistration source kind 'shim' requires source.use = 'discovery.commands'."
+            -not [string]::Equals([string]$Source.use, 'presenceDiscovery.commands', [System.StringComparison]::Ordinal)) {
+            throw "Package pathRegistration source kind 'shim' requires source.use = 'presenceDiscovery.commands'."
         }
-        foreach ($command in @(Get-PackageDiscoveryEntryPoints -Definition $PackageResult.PackageConfig.Definition -ToolKind 'commands' -ExposedOnly)) {
+        foreach ($command in @(Get-PackagePresenceDiscoveryEntryPoints -Definition $PackageResult.PackageConfig.Definition -ToolKind 'commands' -ExposedOnly)) {
             $commandName = ([string]$command.name).Trim()
             if (-not [string]::IsNullOrWhiteSpace($commandName) -and $commandName -notin @($values.ToArray())) {
                 $values.Add($commandName) | Out-Null
@@ -120,7 +120,7 @@ or directory path for the requested install directory.
             if (-not [string]::IsNullOrWhiteSpace($sourcePath)) {
                 return $sourcePath
             }
-            throw "Package pathRegistration source commandEntryPoint '$sourceValue' was not found in discovery.commands."
+            throw "Package pathRegistration source commandEntryPoint '$sourceValue' was not found in presenceDiscovery.commands."
         }
         'appEntryPoint' {
             if ($sourceValues.Count -gt 1) {
@@ -130,7 +130,7 @@ or directory path for the requested install directory.
             if (-not [string]::IsNullOrWhiteSpace($sourcePath)) {
                 return $sourcePath
             }
-            throw "Package pathRegistration source appEntryPoint '$sourceValue' was not found in discovery.apps."
+            throw "Package pathRegistration source appEntryPoint '$sourceValue' was not found in presenceDiscovery.apps."
         }
         'installRelativeDirectory' {
             if ($sourceValues.Count -gt 1) {
@@ -369,4 +369,5 @@ for the same install slot.
 
     return $PackageResult
 }
+
 

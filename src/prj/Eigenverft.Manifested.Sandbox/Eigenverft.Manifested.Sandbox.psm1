@@ -1,4 +1,4 @@
-<#
+﻿<#
     Eigenverft.Manifested.Sandbox root module
 #>
 
@@ -25,7 +25,7 @@
 . "$PSScriptRoot\Support\Package\Execution\Eigenverft.Manifested.Sandbox.Package.Bootstrap.ps1"
 . "$PSScriptRoot\Support\Package\Schema\Eigenverft.Manifested.Sandbox.Package.DefinitionReference.ps1"
 . "$PSScriptRoot\Support\Package\Schema\Eigenverft.Manifested.Sandbox.Package.Config.ps1"
-. "$PSScriptRoot\Support\Package\Schema\Eigenverft.Manifested.Sandbox.Package.DefinitionSchema.Wire1_2.ps1"
+. "$PSScriptRoot\Support\Package\Schema\Eigenverft.Manifested.Sandbox.Package.DefinitionSchema.Wire1_3.ps1"
 . "$PSScriptRoot\Support\Package\Schema\Eigenverft.Manifested.Sandbox.Package.DefinitionSchema.ps1"
 . "$PSScriptRoot\Support\Package\Execution\Eigenverft.Manifested.Sandbox.Package.LocalEnvironment.ps1"
 . "$PSScriptRoot\Support\Package\Schema\Eigenverft.Manifested.Sandbox.Package.Selection.ps1"

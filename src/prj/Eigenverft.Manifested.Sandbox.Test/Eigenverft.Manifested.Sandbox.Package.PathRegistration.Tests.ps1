@@ -11,7 +11,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - path r
         $packageResult = [pscustomobject]@{
             PackageConfig = ConvertTo-TestPsObject @{
                 Definition = @{
-                    discovery = @{
+                    presenceDiscovery = @{
                         commands = @()
                         apps     = @()
                     }
@@ -40,7 +40,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - path r
     It 'resolves discovered command and app tool paths through shared entry-point helpers' {
         $installRoot = Join-Path $TestDrive 'provided-tool-helper'
         $definition = ConvertTo-TestPsObject @{
-            discovery = @{
+            presenceDiscovery = @{
                 commands = @(
                     @{
                         name         = 'code'
@@ -73,7 +73,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - path r
         $packageResult = [pscustomobject]@{
             PackageConfig = ConvertTo-TestPsObject @{
                 Definition = @{
-                    discovery = @{
+                    presenceDiscovery = @{
                         commands = @(
                             @{
                                 name         = 'code'
@@ -331,7 +331,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - path r
         $packageResult = [pscustomobject]@{
             PackageConfig = ConvertTo-TestPsObject @{
                 Definition = @{
-                    discovery = @{
+                    presenceDiscovery = @{
                         commands = @(
                             @{
                                 name         = 'code'
@@ -378,7 +378,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - path r
         $packageResult = [pscustomobject]@{
             PackageConfig = ConvertTo-TestPsObject @{
                 Definition = @{
-                    discovery = @{
+                    presenceDiscovery = @{
                         commands = @(
                             @{
                                 name         = 'code'
@@ -454,7 +454,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - path r
         $packageResult = [pscustomobject]@{
             PackageConfig = ConvertTo-TestPsObject @{
                 Definition = @{
-                    discovery = @{
+                    presenceDiscovery = @{
                         commands = @()
                         apps     = @()
                     }
@@ -512,7 +512,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - path r
                 DefinitionId = 'VSCodeRuntime'
                 ShimDirectory = $shimDirectory
                 Definition = @{
-                    discovery = @{
+                    presenceDiscovery = @{
                         commands = @(
                             @{
                                 name         = 'code'
@@ -529,7 +529,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - path r
                         mode   = 'user'
                         source = @{
                             kind = 'shim'
-                            use  = 'discovery.commands'
+                            use = 'presenceDiscovery.commands'
                         }
                     }
                 }
@@ -568,7 +568,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - path r
                 DefinitionId = 'VSCodeRuntime'
                 ShimDirectory = $shimDirectory
                 Definition = @{
-                    discovery = @{
+                    presenceDiscovery = @{
                         commands = @(
                             @{
                                 name         = 'code'
@@ -585,7 +585,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - path r
                         mode   = 'user'
                         source = @{
                             kind = 'shim'
-                            use  = 'discovery.commands'
+                            use = 'presenceDiscovery.commands'
                         }
                     }
                 }
@@ -620,7 +620,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - path r
                 DefinitionId = 'VSCodeRuntime'
                 ShimDirectory = $shimDirectory
                 Definition = @{
-                    discovery = @{
+                    presenceDiscovery = @{
                         commands = @(
                             @{
                                 name         = 'code'
@@ -637,7 +637,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - path r
                         mode   = 'user'
                         source = @{
                             kind = 'shim'
-                            use  = 'discovery.commands'
+                            use = 'presenceDiscovery.commands'
                         }
                     }
                 }
@@ -675,7 +675,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - path r
                 DefinitionId = 'VSCodeRuntime'
                 ShimDirectory = $shimDirectory
                 Definition = @{
-                    discovery = @{
+                    presenceDiscovery = @{
                         commands = @(
                             @{
                                 name         = 'code'
@@ -692,7 +692,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - path r
                         mode   = 'user'
                         source = @{
                             kind = 'shim'
-                            use  = 'discovery.commands'
+                            use = 'presenceDiscovery.commands'
                         }
                     }
                 }
@@ -736,7 +736,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - path r
                 DefinitionId = 'VSCodeRuntime'
                 ShimDirectory = $shimDirectory
                 Definition = @{
-                    discovery = @{
+                    presenceDiscovery = @{
                         commands = @(
                             @{
                                 name         = 'code'
@@ -753,7 +753,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - path r
                         mode   = 'user'
                         source = @{
                             kind = 'shim'
-                            use  = 'discovery.commands'
+                            use = 'presenceDiscovery.commands'
                         }
                     }
                 }
@@ -784,7 +784,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - path r
                 DefinitionId = 'CodexCli'
                 ShimDirectory = $shimDirectory
                 Definition = @{
-                    discovery = @{
+                    presenceDiscovery = @{
                         commands = @(
                             @{
                                 name         = 'codex'
@@ -801,7 +801,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - path r
                         mode   = 'user'
                         source = @{
                             kind = 'shim'
-                            use  = 'discovery.commands'
+                            use = 'presenceDiscovery.commands'
                         }
                     }
                 }
@@ -839,3 +839,4 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - path r
     }
 
 }
+

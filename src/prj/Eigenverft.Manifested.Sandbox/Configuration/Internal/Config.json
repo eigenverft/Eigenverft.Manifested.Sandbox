@@ -11,7 +11,7 @@
     "localRepositoryRoot": "{applicationRootDirectory}/PackageRepositories",
     "shimDirectory": "{applicationRootDirectory}/Shims",
     "layout": {
-      "packageDepotRelativePath": "{definitionId}/{releaseTrack}/{version}/{flavor}",
+      "packageDepotRelativePath": "{definitionId}/{releaseTrack}/{version}/{artifactDistributionVariant}",
       "packageWorkSlotDirectory": "{definitionId}-{slotHash}"
     },
     "acquisitionEnvironment": {

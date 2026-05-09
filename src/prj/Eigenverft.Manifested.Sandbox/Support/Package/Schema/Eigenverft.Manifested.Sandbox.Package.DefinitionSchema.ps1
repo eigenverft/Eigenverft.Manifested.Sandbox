@@ -1,14 +1,14 @@
 <#
     Eigenverft.Manifested.Sandbox.Package.DefinitionSchema
-    Package definition JSON validation for the mandatory schemaVersion 1.2 wire model.
+    Package definition JSON validation for the mandatory schemaVersion 1.3 wire model.
 
-    Runtime validation is PowerShell-only (this module + DefinitionSchema.Wire1_2.ps1). The JSON schema file
+    Runtime validation is PowerShell-only (this module + DefinitionSchema.Wire1_3.ps1). The JSON schema file
     is the editor/contract; keep it aligned with these asserts.
 #>
 
 # Mandatory schemaVersion for package definitions.
 $script:PackageDefinitionSupportedSchemaVersions = @(
-    '1.2'
+    '1.3'
 )
 
 function Assert-PackageDefinitionSchemaVersionSupported {
@@ -28,7 +28,7 @@ function Assert-PackageDefinitionSchemaVersionSupported {
     }
 
     $supportedList = ($script:PackageDefinitionSupportedSchemaVersions | ForEach-Object { "'$_'" }) -join ', '
-    throw "Package definition '$DefinitionDocumentPath' uses unsupported schemaVersion '$SchemaVersionText'. The mandatory package definition schemaVersion is '1.2'. Supported schemaVersion values are $supportedList."
+    throw "Package definition '$DefinitionDocumentPath' uses unsupported schemaVersion '$SchemaVersionText'. The mandatory package definition schemaVersion is '1.3'. Supported schemaVersion values are $supportedList."
 }
 
 function Assert-PackageDefinitionSchema {
@@ -36,9 +36,9 @@ function Assert-PackageDefinitionSchema {
 .SYNOPSIS
 Validates the Package definition schema for this package pass.
 
-.DESCRIPTION
-Rejects retired top-level names, requires schemaVersion 1.2 fields, then
-validates target/catalog/discovery/packageOperations references.
+    .DESCRIPTION
+Rejects retired top-level names, requires schemaVersion 1.3 fields, then
+validates dependencies/artifacts/presenceDiscovery/existingInstallDiscovery/packageOperations references.
 
 .PARAMETER DefinitionDocumentInfo
 The loaded Package definition document info.
@@ -61,7 +61,19 @@ Assert-PackageDefinitionSchema -DefinitionDocumentInfo $definitionInfo -Definiti
     )
 
     $definition = $DefinitionDocumentInfo.Document
-    foreach ($retiredProperty in @('classification', 'target', 'origins', 'interfaces', 'packageType', 'paths', 'sources', 'packages', 'entryPoints', 'packageFamily', 'managedPaths')) {
+    foreach ($retiredProperty in @(
+            'classification',
+            'target',
+            'origins',
+            'interfaces',
+            'packageType',
+            'paths',
+            'sources',
+            'packages',
+            'entryPoints',
+            'packageFamily',
+            'managedPaths'
+        )) {
         if ($definition.PSObject.Properties[$retiredProperty]) {
             throw "Package definition '$($DefinitionDocumentInfo.Path)' still uses retired property '$retiredProperty'."
         }
@@ -73,20 +85,30 @@ Assert-PackageDefinitionSchema -DefinitionDocumentInfo $definitionInfo -Definiti
     }
     Assert-PackageDefinitionSchemaVersionSupported -SchemaVersionText $schemaVersionText -DefinitionDocumentPath $DefinitionDocumentInfo.Path
 
-    foreach ($requiredProperty in @('schemaVersion', 'id', 'display', 'packageTargets', 'versionCatalog', 'discovery', 'stateDiscovery', 'upstreamSources', 'packageOperations')) {
+    foreach ($requiredProperty in @('schemaVersion', 'id', 'display', 'dependencies', 'artifacts', 'presenceDiscovery', 'existingInstallDiscovery', 'packageOperations')) {
         if (-not $definition.PSObject.Properties[$requiredProperty]) {
             throw "Package definition '$($DefinitionDocumentInfo.Path)' is missing required property '$requiredProperty'."
         }
     }
-    foreach ($retiredProperty in @('releases', 'providedTools', 'shared', 'releaseDefaults', 'existingInstallDiscovery', 'existingInstallPolicy')) {
+    foreach ($retiredProperty in @(
+            'packageTargets',
+            'versionCatalog',
+            'upstreamSources',
+            'discovery',
+            'stateDiscovery',
+            'installedStateCheck',
+            'providedTools',
+            'releaseDefaults',
+            'existingInstallPolicy'
+        )) {
         if ($definition.PSObject.Properties[$retiredProperty]) {
-            throw "Package definition '$($DefinitionDocumentInfo.Path)' still uses retired schemaVersion 1.1 property '$retiredProperty'. Use schemaVersion 1.2 packageTargets, versionCatalog, discovery, stateDiscovery, and packageOperations."
+            throw "Package definition '$($DefinitionDocumentInfo.Path)' still uses retired schemaVersion 1.2 property '$retiredProperty'."
         }
     }
 
     switch -Exact ($schemaVersionText) {
-        '1.2' {
-            Assert-PackageDefinitionSchema_1_2 -DefinitionDocumentInfo $DefinitionDocumentInfo -DefinitionId $DefinitionId -DefinitionRepositoryId $DefinitionRepositoryId
+        '1.3' {
+            Assert-PackageDefinitionSchema_1_3 -DefinitionDocumentInfo $DefinitionDocumentInfo -DefinitionId $DefinitionId -DefinitionRepositoryId $DefinitionRepositoryId
             return
         }
         default {

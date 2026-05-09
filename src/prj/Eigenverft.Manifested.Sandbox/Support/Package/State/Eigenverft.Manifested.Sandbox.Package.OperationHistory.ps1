@@ -124,7 +124,7 @@ Creates one operation-history record from a finalized Package result.
         packageId                     = [string]$PackageResult.PackageId
         packageVersion                = [string]$PackageResult.PackageVersion
         releaseTrack                  = [string]$PackageResult.ReleaseTrack
-        flavor                        = if ($PackageResult.Package -and $PackageResult.Package.PSObject.Properties['flavor']) { [string]$PackageResult.Package.flavor } else { $null }
+        artifactDistributionVariant    = if ($PackageResult.Package -and $PackageResult.Package.PSObject.Properties['artifactDistributionVariant']) { [string]$PackageResult.Package.artifactDistributionVariant } else { if ($PackageResult.Package -and $PackageResult.Package.PSObject.Properties['flavor']) { [string]$PackageResult.Package.flavor } else { $null } }
         installOrigin                 = [string]$PackageResult.InstallOrigin
         installStatus                 = $installStatus
         installDirectory              = [string]$PackageResult.InstallDirectory
