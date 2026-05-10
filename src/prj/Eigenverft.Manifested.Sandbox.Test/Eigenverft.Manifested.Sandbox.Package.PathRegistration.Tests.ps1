@@ -191,6 +191,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - path r
         $cases = @(
             [pscustomobject]@{ DefinitionId = 'CodexCli'; CommandName = 'codex'; CommandFile = 'codex.cmd' }
             [pscustomobject]@{ DefinitionId = 'OpenCodeCli'; CommandName = 'opencode'; CommandFile = 'opencode.cmd' }
+            [pscustomobject]@{ DefinitionId = 'CursorCli'; CommandName = 'agent'; CommandFile = 'cursor-agent.cmd' }
         )
 
         foreach ($case in $cases) {

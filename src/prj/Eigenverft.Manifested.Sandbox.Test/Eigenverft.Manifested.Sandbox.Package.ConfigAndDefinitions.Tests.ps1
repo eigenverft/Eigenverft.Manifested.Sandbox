@@ -822,6 +822,41 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
         @($config.Definition.presenceDiscovery.commands.name) | Should -Be @('node', 'npm', 'npx')
     }
 
+    It 'loads the shipped CursorCli definition and selects the fixed Cursor lab archive release' {
+        [Environment]::SetEnvironmentVariable($script:SourceInventoryEnvVarName, (Join-Path $TestDrive 'missing-inventory.json'), 'Process')
+
+        $config = Get-PackageConfig -DefinitionId 'CursorCli'
+        $result = New-PackageResult -PackageConfig $config
+        $result = Resolve-PackagePackage -PackageResult $result
+        $sourceDefinition = Get-PackageSourceDefinition -PackageConfig $config -SourceRef ([pscustomobject]@{ scope = 'definition'; id = 'cursorAgentCliLab' })
+
+        $expectedFileName = if ([string]::Equals([string]$config.Architecture, 'arm64', [System.StringComparison]::OrdinalIgnoreCase)) {
+            'agent-cli-package-2026.05.09-0afadcc-win32-arm64.zip'
+        }
+        else {
+            'agent-cli-package-2026.05.09-0afadcc-win32-x64.zip'
+        }
+        $expectedSha256 = if ([string]::Equals([string]$config.Architecture, 'arm64', [System.StringComparison]::OrdinalIgnoreCase)) {
+            '9b622fb0d7f51f8e1bfa5dcb840a5c5eaaf4829fda588e653fc04e3c83dbd1ac'
+        }
+        else {
+            '9acfc6043f021508bb91badc8b8d6c34ef00bd3389907d8930514f1c8b52f03c'
+        }
+
+        $config.DefinitionId | Should -Be 'CursorCli'
+        $sourceDefinition.Kind | Should -Be 'download'
+        $sourceDefinition.BaseUri | Should -Be 'https://downloads.cursor.com/lab/'
+        $result.Package.version | Should -Be '2026.05.09-0afadcc'
+        $result.Package.assigned.install.kind | Should -Be 'expandArchive'
+        $result.Package.assigned.install.expandedRoot | Should -Be 'dist-package'
+        $result.Package.packageFile.fileName | Should -Be $expectedFileName
+        $result.Package.packageFile.contentHash.value | Should -Be $expectedSha256
+        $result.Package.assigned.pathRegistration.source.kind | Should -Be 'shim'
+        $result.Package.assigned.pathRegistration.source.use | Should -Be 'presenceDiscovery.commands'
+        $config.Definition.presenceDiscovery.commands[0].name | Should -Be 'agent'
+        $config.Definition.presenceDiscovery.commands[0].relativePath | Should -Be 'cursor-agent.cmd'
+    }
+
     It 'loads the shipped npm-backed CLI runtime definitions without package-file acquisition' {
         [Environment]::SetEnvironmentVariable($script:SourceInventoryEnvVarName, (Join-Path $TestDrive 'missing-inventory.json'), 'Process')
 
