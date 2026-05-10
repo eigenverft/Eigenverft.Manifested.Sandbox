@@ -22,7 +22,9 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - export
         $null = Import-Module -Name $script:ModuleManifestPath -Force -PassThru
         $text = Get-SandboxVersion
 
-        $text | Should -Match 'Invoke-Package -RepositoryId ''EigenverftModule'' -DefinitionId ''GitRuntime'''
+        $text | Should -Match 'Invoke-Package -DefinitionId ''GitRuntime'''
+        $text | Should -Match 'Invoke-Package -DefinitionId CodexCli,'
+        $text | Should -Not -Match 'VSCodeUser,'
         $text | Should -Match 'Other exported commands:'
     }
 
