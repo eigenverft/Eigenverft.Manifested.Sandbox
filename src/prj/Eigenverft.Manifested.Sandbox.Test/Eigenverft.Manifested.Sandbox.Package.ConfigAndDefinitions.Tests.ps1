@@ -540,6 +540,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
         $result.Status | Should -Be 'Ready'
         $result.Removed.Accepted | Should -Be $true
         Test-Path -LiteralPath $installDir | Should -Be $false
+        Test-Path -LiteralPath (Join-Path $preferredRoot 'vsc-rt') | Should -Be $false
 
         $invAfter = Get-Content -LiteralPath $inventoryPath -Raw | ConvertFrom-Json
         @($invAfter.records).Count | Should -Be 0

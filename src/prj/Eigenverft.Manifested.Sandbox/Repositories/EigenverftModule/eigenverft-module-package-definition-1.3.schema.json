@@ -1327,7 +1327,7 @@
             },
             "pathSource": {
               "const": "inventory.installDirectory",
-              "description": "Delete the install directory tracked in inventory, not a newly computed directory from current config."
+              "description": "Delete the install directory tracked in inventory, not a newly computed directory from current config. After deletion, the engine prunes empty parent directories: up to preferredTargetInstallRootDirectory when the path is under that root, otherwise up to the path's volume or UNC share root (never removing that root; stops at the first non-empty parent)."
             }
           }
         },

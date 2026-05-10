@@ -147,7 +147,11 @@
         }
       },
       "pathRegistration": {
-        "mode": "none"
+        "mode": "user",
+        "source": {
+          "kind": "shim",
+          "use": "presenceDiscovery.commands"
+        }
       },
       "versionUpdatePolicy": {
         "whenAssigned": "trackSelectedVersion",

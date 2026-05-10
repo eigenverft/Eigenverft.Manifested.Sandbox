@@ -143,6 +143,58 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - execut
         (Get-Content -LiteralPath $targetPath -Raw) | Should -Be 'version-b'
     }
 
+    It 'removes empty parent directories up to a ceiling after a leaf directory is deleted' {
+        $ceiling = Join-Path $TestDrive 'parent-prune\Inst'
+        $leaf = Join-Path $ceiling 'vsc-rt\stable\2.0.0\win32-x64'
+        $null = New-Item -ItemType Directory -Path (Join-Path $leaf 'bin') -Force
+        Write-TestTextFile -Path (Join-Path $leaf 'Code.exe') -Content 'x'
+
+        Remove-PathIfExists -Path $leaf | Out-Null
+        Remove-EmptyParentDirectoryChain -DeletedLeafPath $leaf -AncestorCeilingDirectory $ceiling
+
+        Test-Path -LiteralPath $ceiling | Should -BeTrue
+        Test-Path -LiteralPath (Join-Path $ceiling 'vsc-rt') | Should -BeFalse
+    }
+
+    It 'stops pruning when a parent still has content' {
+        $ceiling = Join-Path $TestDrive 'parent-prune-partial\Inst'
+        $keepSibling = Join-Path $ceiling 'vsc-rt\stable\2.0.0\win32-arm64'
+        $removeLeaf = Join-Path $ceiling 'vsc-rt\stable\2.0.0\win32-x64'
+        $null = New-Item -ItemType Directory -Path (Join-Path $removeLeaf 't') -Force
+        $null = New-Item -ItemType Directory -Path (Join-Path $keepSibling 't') -Force
+        Write-TestTextFile -Path (Join-Path $keepSibling 'f.txt') -Content 'y'
+
+        Remove-PathIfExists -Path $removeLeaf | Out-Null
+        Remove-EmptyParentDirectoryChain -DeletedLeafPath $removeLeaf -AncestorCeilingDirectory $ceiling
+
+        Test-Path -LiteralPath $keepSibling | Should -BeTrue
+        Test-Path -LiteralPath (Join-Path $ceiling 'vsc-rt\stable\2.0.0') | Should -BeTrue
+    }
+
+    It 'resolves Inst as prune ceiling when the leaf path is under preferred install root' {
+        $inst = Join-Path $TestDrive 'prune-ceiling\Inst'
+        $leaf = Join-Path $inst 'pkg\ver\leaf'
+        $ceiling = Get-EmptyParentPruneCeilingDirectory -InstallLeafPath $leaf -PreferredInstallRootDirectory $inst
+
+        $ceiling | Should -Be ([System.IO.Path]::GetFullPath($inst))
+    }
+
+    It 'resolves path root as prune ceiling when the leaf is outside preferred install root' {
+        $inst = Join-Path $TestDrive 'prune-ceiling-ext\Inst'
+        $leaf = Join-Path $TestDrive 'prune-ceiling-ext\External\pkg\ver'
+        $ceiling = Get-EmptyParentPruneCeilingDirectory -InstallLeafPath $leaf -PreferredInstallRootDirectory $inst
+        $expectedRoot = [System.IO.Path]::GetFullPath([System.IO.Path]::GetPathRoot([System.IO.Path]::GetFullPath($leaf)))
+
+        $ceiling | Should -Be $expectedRoot
+    }
+
+    It 'uses path root when preferred install root is empty' {
+        $leaf = Join-Path $TestDrive 'prune-ceiling-no-pref\p\v'
+        $ceiling = Get-EmptyParentPruneCeilingDirectory -InstallLeafPath $leaf -PreferredInstallRootDirectory ''
+
+        $ceiling | Should -Be ([System.IO.Path]::GetFullPath([System.IO.Path]::GetPathRoot([System.IO.Path]::GetFullPath($leaf))))
+    }
+
     It 'creates deterministic stable short hashes with the requested length' {
         $firstHash = Get-StableShortHash -InputText 'VSCodeRuntime|stable|1.116.0|win32-x64'
         $secondHash = Get-StableShortHash -InputText 'VSCodeRuntime|stable|1.116.0|win32-x64'

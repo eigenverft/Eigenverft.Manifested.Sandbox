@@ -377,6 +377,15 @@ function Invoke-PackageRemovedOperation {
             else {
                 Write-PackageExecutionMessage -Message ("[STATE] deleteInstallDirectory skipped; path does not exist: '{0}'." -f $target)
             }
+
+            $ceiling = Get-EmptyParentPruneCeilingDirectory -InstallLeafPath $target -PreferredInstallRootDirectory ([string]$PackageResult.PackageConfig.PreferredTargetInstallRootDirectory)
+            if (-not [string]::IsNullOrWhiteSpace($ceiling)) {
+                Remove-EmptyParentDirectoryChain -DeletedLeafPath $target -AncestorCeilingDirectory $ceiling
+                Write-PackageExecutionMessage -Message '[ACTION] Pruned empty parent directories after deleteInstallDirectory (up to Inst root when under Inst, otherwise up to volume or share root).'
+            }
+            else {
+                Write-PackageExecutionMessage -Level 'WRN' -Message '[WARN] Could not resolve empty-parent prune ceiling; skipping prune after deleteInstallDirectory.'
+            }
         }
         { $_ -in @('nsisUninstaller', 'innoSetupUninstaller') } {
             $searchLocation = Get-PackageExistingInstallSearchLocationById -Definition $definition -SearchLocationId ([string]$operation.commandSource.searchLocationId)

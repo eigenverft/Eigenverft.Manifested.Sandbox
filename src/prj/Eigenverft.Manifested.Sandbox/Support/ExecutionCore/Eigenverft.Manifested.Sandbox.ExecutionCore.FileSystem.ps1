@@ -29,6 +29,116 @@ recursively and forcefully, then returns `$true`.
     return $true
 }
 
+function Get-EmptyParentPruneCeilingDirectory {
+<#
+.SYNOPSIS
+Resolves the directory ceiling for empty-parent pruning after deleting an inventory install path.
+
+.DESCRIPTION
+If InstallLeafPath lies under PreferredInstallRootDirectory (Inst), returns that Inst root so pruning
+never leaves empty version folders above the package but stays inside the managed install tree.
+
+If the leaf is outside Inst (for example an adopted path on another drive), returns the volume or
+UNC share root of InstallLeafPath. Remove-EmptyParentDirectoryChain only removes empty directories
+and never removes the ceiling directory itself, so pruning stays on that volume/share and stops at
+the first non-empty parent.
+#>
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$InstallLeafPath,
+
+        [Parameter(Mandatory = $false)]
+        [AllowEmptyString()]
+        [string]$PreferredInstallRootDirectory
+    )
+
+    if ([string]::IsNullOrWhiteSpace($InstallLeafPath)) {
+        return $null
+    }
+
+    $leafFull = [System.IO.Path]::GetFullPath($InstallLeafPath)
+
+    if (-not [string]::IsNullOrWhiteSpace($PreferredInstallRootDirectory)) {
+        $trimmed = $PreferredInstallRootDirectory.TrimEnd(
+            [System.IO.Path]::DirectorySeparatorChar,
+            [System.IO.Path]::AltDirectorySeparatorChar)
+        if (-not [string]::IsNullOrWhiteSpace($trimmed)) {
+            $instFull = [System.IO.Path]::GetFullPath($trimmed)
+            if ([string]::Equals($leafFull, $instFull, [System.StringComparison]::OrdinalIgnoreCase)) {
+                return $instFull
+            }
+            $instPrefix = $instFull + [System.IO.Path]::DirectorySeparatorChar
+            if ($leafFull.StartsWith($instPrefix, [System.StringComparison]::OrdinalIgnoreCase)) {
+                return $instFull
+            }
+        }
+    }
+
+    $root = [System.IO.Path]::GetPathRoot($leafFull)
+    if ([string]::IsNullOrWhiteSpace($root)) {
+        return $null
+    }
+
+    return [System.IO.Path]::GetFullPath($root)
+}
+
+function Remove-EmptyParentDirectoryChain {
+<#
+.SYNOPSIS
+Removes empty parent directories from a deleted path up to a ceiling directory.
+
+.DESCRIPTION
+Walks from the immediate parent of DeletedLeafPath upward. Each directory is removed
+only if it exists, is empty (no child files or directories), and is a strict
+descendant of AncestorCeilingDirectory. The ceiling directory itself is never removed.
+Stops at the first non-empty directory or when the path is no longer under the ceiling.
+#>
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$DeletedLeafPath,
+
+        [Parameter(Mandatory = $true)]
+        [string]$AncestorCeilingDirectory
+    )
+
+    if ([string]::IsNullOrWhiteSpace($DeletedLeafPath) -or [string]::IsNullOrWhiteSpace($AncestorCeilingDirectory)) {
+        return
+    }
+
+    $ceilingFull = [System.IO.Path]::GetFullPath($AncestorCeilingDirectory.TrimEnd(
+            [System.IO.Path]::DirectorySeparatorChar,
+            [System.IO.Path]::AltDirectorySeparatorChar))
+    $resolvedLeaf = [System.IO.Path]::GetFullPath($DeletedLeafPath)
+    $current = Split-Path -Path $resolvedLeaf -Parent
+
+    while (-not [string]::IsNullOrWhiteSpace($current)) {
+        $currentFull = [System.IO.Path]::GetFullPath($current)
+
+        if ([string]::Equals($currentFull, $ceilingFull, [System.StringComparison]::OrdinalIgnoreCase)) {
+            break
+        }
+
+        $ceilingPrefix = $ceilingFull + [System.IO.Path]::DirectorySeparatorChar
+        if (-not $currentFull.StartsWith($ceilingPrefix, [System.StringComparison]::OrdinalIgnoreCase)) {
+            break
+        }
+
+        if (-not (Test-Path -LiteralPath $currentFull -PathType Container)) {
+            break
+        }
+
+        $children = @(Get-ChildItem -LiteralPath $currentFull -Force -ErrorAction SilentlyContinue)
+        if ($children.Count -gt 0) {
+            break
+        }
+
+        Remove-PathIfExists -Path $currentFull | Out-Null
+        $current = Split-Path -Path $currentFull -Parent
+    }
+}
+
 function Copy-FileToPath {
 <#
 .SYNOPSIS

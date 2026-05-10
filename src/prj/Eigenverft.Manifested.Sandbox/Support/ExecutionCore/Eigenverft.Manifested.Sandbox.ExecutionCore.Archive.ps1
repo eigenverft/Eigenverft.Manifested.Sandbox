@@ -1,6 +1,76 @@
 <#
-    Eigenverft.Manifested.Sandbox.ExecutionEngine.Archive
+    Eigenverft.Manifested.Sandbox.ExecutionCore.Archive
+
+    All archive helpers for ExecutionCore live in this one file.
+
+    - Expand-ArchiveToDirectory — what Package and callers use: path checks, destination
+      creation, .nupkg→.zip alias, then extract.
+    - Expand-ZipArchiveFileToDirectory — internal seam: .zip file + existing directory →
+      bytes on disk. Replace its body (Expand-Archive today) with PS 5.1–friendly .NET
+      ZipFile / long-path logic when needed; keep Expand-ArchiveToDirectory unchanged.
+    - New-TemporaryStageDirectory, Get-ExpandedArchiveRoot, Expand-ArchiveToStage —
+      staging and layout heuristics for install flows.
+
+    Rationale: a separate ArchiveExpand.ps1 was only a thin wrapper (~60 lines, one public
+    function). That split cost more mental overhead than it saved; extract backend stays
+    a clearly marked function here until a real alternative implementation warrants a file
+    of its own.
 #>
+
+function Expand-ZipArchiveFileToDirectory {
+<#
+.SYNOPSIS
+Extracts a .zip file into an existing destination directory.
+
+.DESCRIPTION
+Not the main entry point — use Expand-ArchiveToDirectory from outside this module.
+Callers pass a resolved .zip path (.nupkg must already be aliased to .zip by Expand-ArchiveToDirectory).
+This function is the single place to swap Expand-Archive for a .NET-based extractor.
+#>
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$ZipArchivePath,
+
+        [Parameter(Mandatory = $true)]
+        [string]$DestinationDirectory,
+
+        [switch]$Overwrite
+    )
+
+    if ([string]::IsNullOrWhiteSpace($ZipArchivePath)) {
+        throw 'A zip archive path is required.'
+    }
+
+    if ([string]::IsNullOrWhiteSpace($DestinationDirectory)) {
+        throw 'A destination directory is required.'
+    }
+
+    $resolvedZip = [System.IO.Path]::GetFullPath($ZipArchivePath)
+    $resolvedDest = [System.IO.Path]::GetFullPath($DestinationDirectory)
+
+    if (-not (Test-Path -LiteralPath $resolvedZip -PathType Leaf)) {
+        throw "Zip archive '$resolvedZip' was not found."
+    }
+
+    $ext = [System.IO.Path]::GetExtension($resolvedZip)
+    if (-not [string]::Equals($ext, '.zip', [System.StringComparison]::OrdinalIgnoreCase)) {
+        throw "Expand-ZipArchiveFileToDirectory expects a .zip file; got extension '$ext'."
+    }
+
+    if (-not (Test-Path -LiteralPath $resolvedDest -PathType Container)) {
+        throw "Destination directory '$resolvedDest' must exist before extraction."
+    }
+
+    if ($Overwrite) {
+        $null = Expand-Archive -LiteralPath $resolvedZip -DestinationPath $resolvedDest -Force
+    }
+    else {
+        $null = Expand-Archive -LiteralPath $resolvedZip -DestinationPath $resolvedDest
+    }
+
+    return $resolvedDest
+}
 
 function Expand-ArchiveToDirectory {
 <#
@@ -8,9 +78,8 @@ function Expand-ArchiveToDirectory {
 Expands an archive into a destination directory.
 
 .DESCRIPTION
-Ensures the destination directory exists, then extracts the archive into that
-directory. Overwrite behavior is controlled through the Overwrite switch so the
-archive backend can be replaced later without touching Package flows.
+Ensures the destination directory exists, normalizes .nupkg to a temporary .zip
+when needed, then calls Expand-ZipArchiveFileToDirectory for the actual extract.
 #>
     [CmdletBinding()]
     param(
@@ -48,12 +117,7 @@ archive backend can be replaced later without touching Package flows.
     }
 
     try {
-        if ($Overwrite) {
-            Expand-Archive -LiteralPath $archivePathForExpansion -DestinationPath $resolvedDestinationDirectory -Force
-        }
-        else {
-            Expand-Archive -LiteralPath $archivePathForExpansion -DestinationPath $resolvedDestinationDirectory
-        }
+        $null = Expand-ZipArchiveFileToDirectory -ZipArchivePath $archivePathForExpansion -DestinationDirectory $resolvedDestinationDirectory -Overwrite:$Overwrite
     }
     finally {
         if ($archiveAliasPath -and (Test-Path -LiteralPath $archiveAliasPath)) {
@@ -152,4 +216,3 @@ both the stage path and the effective expanded root.
         ExpandedRoot = (Get-ExpandedArchiveRoot -StagePath $stagePath)
     }
 }
-
