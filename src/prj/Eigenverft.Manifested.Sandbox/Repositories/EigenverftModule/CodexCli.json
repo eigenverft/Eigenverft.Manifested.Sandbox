@@ -59,7 +59,7 @@
     ],
     "releases": [
       {
-        "version": "0.125.0",
+        "version": "0.130.0",
         "releaseTracks": [
           "stable"
         ],

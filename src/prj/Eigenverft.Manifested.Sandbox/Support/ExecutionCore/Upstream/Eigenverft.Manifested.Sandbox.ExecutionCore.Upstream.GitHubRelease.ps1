@@ -23,7 +23,7 @@ The GitHub repository name.
 The GitHub release tag name to resolve.
 
 .EXAMPLE
-Get-GitHubRelease -RepositoryOwner ggml-org -RepositoryName llama.cpp -ReleaseTag b8863
+Get-GitHubRelease -RepositoryOwner ggml-org -RepositoryName llama.cpp -ReleaseTag b9094
 #>
     [CmdletBinding()]
     param(

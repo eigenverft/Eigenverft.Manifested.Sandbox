@@ -37,13 +37,13 @@ Expand-ArchiveToDirectory (same entry point as the package install path) instead
 When greater than 0, prints that many longest combined paths after the summary.
 
 .EXAMPLE
-./Test-ZipLongPathProbe.ps1 -ZipPath 'D:\dl\VSCode-win32-x64-1.116.0.zip'
+./Test-ZipLongPathProbe.ps1 -ZipPath 'D:\dl\VSCode-win32-x64-1.119.0.zip'
 
 .EXAMPLE
-./Test-ZipLongPathProbe.ps1 -ZipPath '...\VSCode-win32-x64-1.116.0.zip' -Materialize -MaterializeDestination 'D:\tmp\vscode-probe'
+./Test-ZipLongPathProbe.ps1 -ZipPath '...\VSCode-win32-x64-1.119.0.zip' -Materialize -MaterializeDestination 'D:\tmp\vscode-probe'
 
 .EXAMPLE
-./Test-ZipLongPathProbe.ps1 -ZipPath '...\VSCode-win32-x64-1.116.0.zip' -Materialize -UseModuleExpandArchive
+./Test-ZipLongPathProbe.ps1 -ZipPath '...\VSCode-win32-x64-1.119.0.zip' -Materialize -UseModuleExpandArchive
 #>
 [CmdletBinding()]
 param(
@@ -51,7 +51,7 @@ param(
     [string]$ZipPath,
 
     [Parameter(Mandatory = $false)]
-    [string]$InstallDirectoryPrefix = 'C:\Users\WDAGUtilityAccount\AppData\Local\Programs\Evf.Sandbox\Inst\vsc-rt\stable\1.116.0\win32-x64',
+    [string]$InstallDirectoryPrefix = 'C:\Users\WDAGUtilityAccount\AppData\Local\Programs\Evf.Sandbox\Inst\vsc-rt\stable\1.119.0\win32-x64',
 
     [ValidateSet('Auto', 'StripSingleRoot', 'Full')]
     [string]$InstallLayout = 'Auto',

@@ -45,7 +45,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - instal
         $fakeNpmPath = Join-Path $rootPath 'node\npm.cmd'
         $installDirectory = Join-Path $rootPath 'install'
         $workspaceDirectory = Join-Path $rootPath 'workspace'
-        $stageDirectory = Join-Path $rootPath 'PackageInstallStage\packages\CodexCli\stable\0.125.0\win32-x64'
+        $stageDirectory = Join-Path $rootPath 'PackageInstallStage\packages\CodexCli\stable\0.130.0\win32-x64'
         $packageStateIndexPath = Join-Path (Join-Path $rootPath 'State') 'package-inventory.json'
         Write-TestTextFile -Path $fakeNpmPath -Content @"
 @echo off
@@ -97,7 +97,7 @@ exit /b 0
             )
             Package                = [pscustomobject]@{
                 id           = 'codex-runtime-win32-x64-stable'
-                version      = '0.125.0'
+                version      = '0.130.0'
                 releaseTrack = 'stable'
                 artifactDistributionVariant       = 'win32-x64'
                 assigned     = [pscustomobject]@{
@@ -115,7 +115,7 @@ exit /b 0
         $installResult.InstallKind | Should -Be 'npmGlobalPackage'
         $installResult.InstallerCommand | Should -Be 'npm'
         $installResult.InstallerCommandPath | Should -Be ([System.IO.Path]::GetFullPath($fakeNpmPath))
-        $installResult.PackageSpec | Should -Be '@openai/codex@0.125.0'
+        $installResult.PackageSpec | Should -Be '@openai/codex@0.130.0'
         $installResult.CacheDirectory | Should -Match '\\Caches\\npm\\'
         $installResult.GlobalConfigPath | Should -Match 'Configuration\\External\\npm\\npmrc$'
         Test-Path -LiteralPath (Join-Path $installDirectory 'codex.cmd') -PathType Leaf | Should -BeTrue
@@ -128,7 +128,7 @@ exit /b 0
         $fakeNpmPath = Join-Path $rootPath 'node\npm.cmd'
         $installDirectory = Join-Path $rootPath 'install'
         $workspaceDirectory = Join-Path $rootPath 'workspace'
-        $stageDirectory = Join-Path $rootPath 'PackageInstallStage\packages\CodexCli\stable\0.125.0\win32-x64'
+        $stageDirectory = Join-Path $rootPath 'PackageInstallStage\packages\CodexCli\stable\0.130.0\win32-x64'
         $packageStateIndexPath = Join-Path (Join-Path $rootPath 'State') 'package-inventory.json'
         Write-TestTextFile -Path $fakeNpmPath -Content "@echo off`r`nexit /b 7`r`n"
         Write-TestTextFile -Path (Join-Path $installDirectory 'sentinel.txt') -Content 'keep-me'
@@ -157,7 +157,7 @@ exit /b 0
             )
             Package                = [pscustomobject]@{
                 id           = 'codex-runtime-win32-x64-stable'
-                version      = '0.125.0'
+                version      = '0.130.0'
                 releaseTrack = 'stable'
                 artifactDistributionVariant       = 'win32-x64'
                 assigned     = [pscustomobject]@{
@@ -195,7 +195,7 @@ exit /b 0
             )
             Package                = [pscustomobject]@{
                 id           = 'codex-runtime-win32-x64-stable'
-                version      = '0.125.0'
+                version      = '0.130.0'
                 releaseTrack = 'stable'
                 artifactDistributionVariant       = 'win32-x64'
                 assigned     = [pscustomobject]@{
@@ -788,7 +788,7 @@ exit /b 0
         $rootPath = Join-Path $TestDrive 'install-preparation-cleanup'
         $preparationDirectory = Join-Path $rootPath 'PackageFileStaging\packages\VSCodeRuntime\stable\2.0.0\win32-x64'
         $installStageDirectory = Join-Path $rootPath 'PackageInstallStage\packages\VSCodeRuntime\stable\2.0.0\win32-x64'
-        $npmCacheDirectory = Join-Path $rootPath 'Caches\npm\CodexCli\stable\0.125.0\win32-x64'
+        $npmCacheDirectory = Join-Path $rootPath 'Caches\npm\CodexCli\stable\0.130.0\win32-x64'
         Write-TestTextFile -Path (Join-Path $preparationDirectory 'package.zip') -Content 'package'
         Write-TestTextFile -Path (Join-Path $installStageDirectory 'expanded\Code.exe') -Content 'binary'
         Write-TestTextFile -Path (Join-Path $npmCacheDirectory 'cache-entry') -Content 'cache'

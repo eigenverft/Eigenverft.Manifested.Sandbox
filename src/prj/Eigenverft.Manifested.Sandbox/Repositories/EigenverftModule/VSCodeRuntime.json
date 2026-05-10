@@ -88,7 +88,7 @@
     ],
     "releases": [
       {
-        "version": "1.116.0",
+        "version": "1.119.0",
         "releaseTracks": [
           "stable"
         ],
@@ -97,14 +97,14 @@
             "artifactId": "vsCode-win-x64-stable",
             "contentHash": {
               "algorithm": "sha256",
-              "value": "365c3d275deb3a1c0a1aa626f274824b8db15ee150d567a7323b8dbce2cdfa8f"
+              "value": "fea13bf400c6770dd14eeabc0e47757ffe2703f1a3f2a258faa22bce3bdd21af"
             }
           },
           "VSCodeRuntime-win32-arm64-stable": {
             "artifactId": "vsCode-win-arm64-stable",
             "contentHash": {
               "algorithm": "sha256",
-              "value": "6712506c9541823e2c9a52aec6efcfb2f95df4247606eaa9fbade2b08df84fe7"
+              "value": "7e40617507cb917fdaa7b7f6312c3202352e2f2db102e80d28b80d2fee99e2ed"
             }
           }
         }

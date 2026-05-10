@@ -196,9 +196,9 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - execut
     }
 
     It 'creates deterministic stable short hashes with the requested length' {
-        $firstHash = Get-StableShortHash -InputText 'VSCodeRuntime|stable|1.116.0|win32-x64'
-        $secondHash = Get-StableShortHash -InputText 'VSCodeRuntime|stable|1.116.0|win32-x64'
-        $shortHash = Get-StableShortHash -InputText 'VSCodeRuntime|stable|1.116.0|win32-x64' -Length 6
+        $firstHash = Get-StableShortHash -InputText 'VSCodeRuntime|stable|1.119.0|win32-x64'
+        $secondHash = Get-StableShortHash -InputText 'VSCodeRuntime|stable|1.119.0|win32-x64'
+        $shortHash = Get-StableShortHash -InputText 'VSCodeRuntime|stable|1.119.0|win32-x64' -Length 6
 
         $firstHash | Should -Be $secondHash
         $firstHash | Should -Match '^[0-9a-f]{8}$'

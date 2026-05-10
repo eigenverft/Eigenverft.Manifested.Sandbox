@@ -56,20 +56,20 @@
     ],
     "releases": [
       {
-        "version": "8863",
+        "version": "9094",
         "releaseTracks": [
           "stable"
         ],
         "upstreamRelease": {
           "sourceId": "llamaCppGitHub",
-          "releaseTag": "b8863"
+          "releaseTag": "b9094"
         },
         "targetArtifacts": {
           "LlamaCppRuntime-win-cpu-x64-stable": {
             "artifactId": "llama-cpp-win-cpu-x64-stable",
             "contentHash": {
               "algorithm": "sha256",
-              "value": "5a0c3bbd25c29185116ca24a10e9f124c5e4fc170822be82634bd543d8e91c0e"
+              "value": "5c788e2c59bc64fae603c57e5f6d73be50600418763f11d5cdc7be175dc9075a"
             }
           }
         }

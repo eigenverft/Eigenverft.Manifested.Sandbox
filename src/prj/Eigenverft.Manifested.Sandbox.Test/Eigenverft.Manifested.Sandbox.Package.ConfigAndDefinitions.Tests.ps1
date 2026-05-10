@@ -566,7 +566,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
                 releaseTrack                 = 'stable'
                 artifactDistributionVariant  = 'win32-x64'
                 currentReleaseId             = 'CodexCli-win32-x64-stable'
-                currentVersion               = '0.125.0'
+                currentVersion               = '0.130.0'
                 installDirectory             = $codexDir
                 ownershipKind                = 'PackageInstalled'
                 pathRegistration             = $null
@@ -714,9 +714,9 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
         $sourceDefinition.GitHubOwner | Should -Be 'ggml-org'
         $sourceDefinition.GitHubRepository | Should -Be 'llama.cpp'
         $result.PackageId | Should -Be 'llama-cpp-win-cpu-x64-stable'
-        $result.Package.version | Should -Be '8863'
-        $result.Package.releaseTag | Should -Be 'b8863'
-        $result.Package.packageFile.fileName | Should -Be 'llama-b8863-bin-win-cpu-x64.zip'
+        $result.Package.version | Should -Be '9094'
+        $result.Package.releaseTag | Should -Be 'b9094'
+        $result.Package.packageFile.fileName | Should -Be 'llama-b9094-bin-win-cpu-x64.zip'
         $result.Package.assigned.pathRegistration.source.kind | Should -Be 'shim'
         $result.Package.assigned.pathRegistration.source.use | Should -Be 'presenceDiscovery.commands'
         @($config.Definition.presenceDiscovery.commands.name) | Should -Be @('llama-cli', 'llama-server', 'llama-quantize', 'llama-bench', 'llama-tokenize')
@@ -861,8 +861,8 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
         [Environment]::SetEnvironmentVariable($script:SourceInventoryEnvVarName, (Join-Path $TestDrive 'missing-inventory.json'), 'Process')
 
         $cases = @(
-            [pscustomobject]@{ DefinitionId = 'CodexCli'; PackageSpec = '@openai/codex@{version}'; Version = '0.125.0'; Command = 'codex'; RelativePath = 'codex.cmd' }
-            [pscustomobject]@{ DefinitionId = 'OpenCodeCli'; PackageSpec = 'opencode-ai@{version}'; Version = '1.14.24'; Command = 'opencode'; RelativePath = 'opencode.cmd' }
+            [pscustomobject]@{ DefinitionId = 'CodexCli'; PackageSpec = '@openai/codex@{version}'; Version = '0.130.0'; Command = 'codex'; RelativePath = 'codex.cmd' }
+            [pscustomobject]@{ DefinitionId = 'OpenCodeCli'; PackageSpec = 'opencode-ai@{version}'; Version = '1.14.46'; Command = 'opencode'; RelativePath = 'opencode.cmd' }
         )
 
         foreach ($case in $cases) {

@@ -15,7 +15,7 @@ version entries by semantic-like version ordering.
 The version string to convert.
 
 .EXAMPLE
-ConvertTo-PackageVersion -VersionText '1.116.0'
+ConvertTo-PackageVersion -VersionText '1.119.0'
 #>
     [CmdletBinding()]
     param(
