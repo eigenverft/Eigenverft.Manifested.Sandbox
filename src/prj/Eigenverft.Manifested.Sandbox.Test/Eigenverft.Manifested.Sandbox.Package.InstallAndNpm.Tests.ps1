@@ -235,10 +235,10 @@ exit /b 0
         $registryPath = 'HKLM:\SOFTWARE\Microsoft\VisualStudio\14.0\VC\Runtimes\x64'
         $packageResult = [pscustomobject]@{
             InstallDirectory = $null
-            Validation = $null
+            Readiness = $null
             PackageConfig = [pscustomobject]@{}
             Package = [pscustomobject]@{
-                validation = [pscustomobject]@{
+                readiness = [pscustomobject]@{
                     files = @()
                     directories = @()
                     commandChecks = @()
@@ -272,8 +272,8 @@ exit /b 0
 
         $packageResult = Test-PackageAssignedReadiness -PackageResult $packageResult
 
-        $packageResult.Validation.Accepted | Should -BeTrue
-        @($packageResult.Validation.Registry | ForEach-Object { $_.Status }) | Should -Be @('Ready', 'Ready')
+        $packageResult.Readiness.Accepted | Should -BeTrue
+        @($packageResult.Readiness.Registry | ForEach-Object { $_.Status }) | Should -Be @('Ready', 'Ready')
     }
 
     It 'resolves registry values through the generic execution-engine helper' {
@@ -395,7 +395,7 @@ exit /b 0
         $packageResult = [pscustomobject]@{
             InstallOrigin = $null
             Assigned      = $null
-            Validation    = $null
+            Readiness    = $null
             Package       = [pscustomobject]@{
                 assigned = [pscustomobject]@{
                     kind       = 'runInstaller'
@@ -406,7 +406,7 @@ exit /b 0
 
         Mock Test-PackageAssignedReadiness {
             param([psobject]$PackageResult)
-            $PackageResult.Validation = [pscustomobject]@{
+            $PackageResult.Readiness = [pscustomobject]@{
                 Accepted      = $true
                 Files         = @()
                 Directories   = @()
@@ -765,7 +765,7 @@ exit /b 0
         $result.Assigned.InstallKind | Should -Be 'placePackageFile'
         $result.Assigned.InstalledFilePath | Should -Be (Join-Path $result.InstallDirectory 'Qwen3.5-9B-Q6_K.gguf')
         Test-Path -LiteralPath $result.Assigned.InstalledFilePath -PathType Leaf | Should -BeTrue
-        $result.Validation.Accepted | Should -BeTrue
+        $result.Readiness.Accepted | Should -BeTrue
     }
 
     It 'cleans package-specific staging directories after a successful run' {
@@ -788,17 +788,17 @@ exit /b 0
         Test-Path -LiteralPath $npmCacheDirectory -PathType Container | Should -BeTrue
     }
 
-    It 'fails before ownership and cleanup when installed package validation fails' {
-        $rootPath = Join-Path $TestDrive 'validation-failure-preserves-staging'
+    It 'fails before ownership and cleanup when installed package readiness fails' {
+        $rootPath = Join-Path $TestDrive 'readiness-failure-preserves-staging'
         $archiveInfo = New-TestPackageArchiveInfo -RootPath $rootPath -Version '2.0.0' -ArchiveFileName 'VSCode-win32-x64-2.0.0.zip'
         $packageFileStagingDirectory = Join-Path $rootPath 'FileStage'
         $packageInstallStageDirectory = Join-Path $rootPath 'InstStage'
         $defaultPackageDepotDirectory = Join-Path $rootPath 'DefaultPackageDepot'
         $packageStateIndexFilePath = Join-Path $rootPath 'State\package-inventory.json'
         $operationHistoryFilePath = Join-Path $rootPath 'State\package-operation-history.json'
-        $badValidation = New-TestValidation -Version '2.0.0'
-        $badValidation.files = @('missing-after-install.exe')
-        $definitionDocument = New-TestVSCodeDefinitionDocument -SharedValidation $badValidation -Releases @(
+        $badReadiness = New-TestReadiness -Version '2.0.0'
+        $badReadiness.files = @('missing-after-install.exe')
+        $definitionDocument = New-TestVSCodeDefinitionDocument -SharedReadiness $badReadiness -Releases @(
             New-TestPackageRelease -Id 'vsCode-win-x64-stable' -Version '2.0.0' -Architecture 'x64' -ArtifactDistributionVariant 'win32-x64' -FileName 'VSCode-win32-x64-2.0.0.zip' -PackageFileSha256 $archiveInfo.Sha256 -AcquisitionCandidates @(
                 @{
                     kind        = 'packageDepot'
@@ -822,10 +822,10 @@ exit /b 0
         $result = Invoke-PackageDefinitionCommandCore -DefinitionId 'VSCodeRuntime'
 
         $result.Status | Should -Be 'Failed'
-        $result.FailureReason | Should -Be 'AssignedPackageValidationFailed'
-        $result.ErrorMessage | Should -Match 'Package validation failed'
-        @($result.Validation.FailedChecks).Count | Should -Be 1
-        $result.Validation.FailedChecks[0].Kind | Should -Be 'files'
+        $result.FailureReason | Should -Be 'AssignedPackageReadinessFailed'
+        $result.ErrorMessage | Should -Match 'Package readiness failed'
+        @($result.Readiness.FailedChecks).Count | Should -Be 1
+        $result.Readiness.FailedChecks[0].Kind | Should -Be 'files'
         Test-Path -LiteralPath $result.PackageFileStagingDirectory -PathType Container | Should -BeTrue
         Test-Path -LiteralPath $result.PackageFilePath -PathType Leaf | Should -BeTrue
         Test-Path -LiteralPath $result.PackageInstallStageDirectory -PathType Container | Should -BeTrue
@@ -834,8 +834,8 @@ exit /b 0
         $historyDocument = Read-PackageJsonDocument -Path $operationHistoryFilePath
         @($historyDocument.Document.records).Count | Should -Be 1
         $historyDocument.Document.records[0].status | Should -Be 'Failed'
-        $historyDocument.Document.records[0].failureReason | Should -Be 'AssignedPackageValidationFailed'
-        $historyDocument.Document.records[0].failedStep | Should -Be 'ValidateAssignedPackage'
+        $historyDocument.Document.records[0].failureReason | Should -Be 'AssignedPackageReadinessFailed'
+        $historyDocument.Document.records[0].failedStep | Should -Be 'CheckAssignedReadiness'
         $historyDocument.Document.records[0].packageFilePreparation.status | Should -Be 'HydratedFromDefaultPackageDepot'
         $historyDocument.Document.records[0].packageFilePreparation.packageFilePath | Should -Be $result.PackageFilePath
     }

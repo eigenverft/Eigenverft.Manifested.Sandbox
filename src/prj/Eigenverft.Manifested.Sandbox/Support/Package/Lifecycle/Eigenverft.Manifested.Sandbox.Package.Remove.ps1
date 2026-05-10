@@ -279,7 +279,7 @@ function Resolve-PackageRemovalInstallContext {
         CandidatePath    = $normalizedInstallDirectory
         InstallDirectory = $normalizedInstallDirectory
         Decision         = 'Pending'
-        Validation       = $null
+        Readiness       = $null
         Classification   = 'PackageTarget'
         OwnershipRecord  = $record
     }

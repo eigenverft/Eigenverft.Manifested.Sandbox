@@ -1,4 +1,4 @@
-﻿<#
+<#
     Eigenverft.Manifested.Sandbox.Package.Install — installer process/NSIS helpers (shared execution mechanics).
     Dot-sourced from Eigenverft.Manifested.Sandbox.psm1 (mirrored in TestImports.ps1) before Package.Install.ps1.
 #>
@@ -150,7 +150,7 @@ Invoke-PackageInstallerProcess -PackageResult $result
         [psobject]$PackageResult
     )
 
-    $install = Get-PackageEffectiveReleaseAssignedBlock -Release $PackageResult.Package
+    $install = Get-PackageAssignedOperation -Release $PackageResult.Package
     if (-not $install) {
         throw "Package installer for '$($PackageResult.PackageId)' requires an assigned block on the selected release."
     }
@@ -238,7 +238,7 @@ Runs an NSIS installer package through the isolated package install stage.
         [psobject]$PackageResult
     )
 
-    $install = Get-PackageEffectiveReleaseAssignedBlock -Release $PackageResult.Package
+    $install = Get-PackageAssignedOperation -Release $PackageResult.Package
     if (-not $install) {
         throw "Package nsisInstaller for '$($PackageResult.PackageId)' requires an assigned block on the selected release."
     }

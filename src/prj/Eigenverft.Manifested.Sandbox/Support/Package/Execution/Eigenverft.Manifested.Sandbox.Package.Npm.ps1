@@ -27,7 +27,7 @@ function New-PackageNpmCacheDirectory {
         [string]$PackageResult.DefinitionId
         [string]$PackageResult.Package.releaseTrack
         [string]$PackageResult.Package.version
-        if ($PackageResult.Package.PSObject.Properties['artifactDistributionVariant']) { [string]$PackageResult.Package.artifactDistributionVariant } else { [string]$PackageResult.Package.flavor }
+        [string]$PackageResult.Package.artifactDistributionVariant
     ) | ForEach-Object {
         ([string]$_).Trim() -replace '[\\/:\*\?"<>\|]', '-'
     }
@@ -64,7 +64,7 @@ function Resolve-PackageNpmInstallerCommand {
         [psobject]$PackageResult
     )
 
-    $install = Get-PackageEffectiveReleaseAssignedBlock -Release $PackageResult.Package
+    $install = Get-PackageAssignedOperation -Release $PackageResult.Package
     if (-not $install) {
         throw "Package npm global package install for '$($PackageResult.PackageId)' requires an assigned block on the selected release."
     }
@@ -90,7 +90,7 @@ Installs an exact npm package spec into a staged Package-owned prefix.
         [psobject]$PackageResult
     )
 
-    $install = Get-PackageEffectiveReleaseAssignedBlock -Release $PackageResult.Package
+    $install = Get-PackageAssignedOperation -Release $PackageResult.Package
     if (-not $install) {
         throw "Package npm global package install for '$($PackageResult.PackageId)' requires an assigned block on the selected release."
     }
@@ -167,5 +167,4 @@ Installs an exact npm package spec into a staged Package-owned prefix.
         ExitCode         = $exitCode
     }
 }
-
 

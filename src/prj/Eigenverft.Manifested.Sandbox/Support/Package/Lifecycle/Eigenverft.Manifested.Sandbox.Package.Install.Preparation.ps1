@@ -1,4 +1,4 @@
-﻿<#
+<#
     Eigenverft.Manifested.Sandbox.Package.Install — install-target metadata, elevation plan, machine-prerequisite short-circuit.
     Dot-sourced from Eigenverft.Manifested.Sandbox.psm1 (mirrored in TestImports.ps1) before Package.Install.ps1.
 #>
@@ -12,7 +12,7 @@ function Get-PackageOwnedInstallStatus {
 
     if ($PackageResult.ExistingPackage) {
         switch -Exact ([string]$PackageResult.ExistingPackage.Decision) {
-            'ExistingInstallValidationFailed' {
+            'ExistingInstallReadinessFailed' {
                 if ([string]::Equals([string]$PackageResult.ExistingPackage.SearchKind, 'packageTargetInstallPath', [System.StringComparison]::OrdinalIgnoreCase)) {
                     return 'RepairedPackageOwnedInstall'
                 }
@@ -32,7 +32,7 @@ function Get-PackageInstallTargetKind {
         [psobject]$Package
     )
 
-    $assigned = Get-PackageEffectiveReleaseAssignedBlock -Release $Package
+    $assigned = Get-PackageAssignedOperation -Release $Package
     if ($assigned -and $assigned.PSObject.Properties['targetKind'] -and
         -not [string]::IsNullOrWhiteSpace([string]$assigned.targetKind)) {
         return [string]$assigned.targetKind
@@ -55,7 +55,7 @@ function Get-PackageInstallerElevationPlan {
         $mode = ([string]$ElevationMode).ToLowerInvariant()
     }
     else {
-        $install = Get-PackageEffectiveReleaseAssignedBlock -Release $PackageResult.Package
+        $install = Get-PackageAssignedOperation -Release $PackageResult.Package
         if (-not $install) {
             throw 'Get-PackageInstallerElevationPlan requires a selected release with an assigned block.'
         }
@@ -82,8 +82,8 @@ function Resolve-PackagePreAssignmentSatisfaction {
 Checks whether a machine-prerequisite package is already satisfied.
 
 .DESCRIPTION
-Runs validation before acquisition/assign for prerequisite-style packages that
-do not own an install directory. When validation succeeds, later acquisition
+Runs readiness before acquisition/assign for prerequisite-style packages that
+do not own an install directory. When readiness succeeds, later acquisition
 and installer steps are skipped.
 
 .PARAMETER PackageResult
@@ -99,7 +99,7 @@ Resolve-PackagePreAssignmentSatisfaction -PackageResult $result
     )
 
     $package = $PackageResult.Package
-    $assignedBlock = Get-PackageEffectiveReleaseAssignedBlock -Release $package
+    $assignedBlock = Get-PackageAssignedOperation -Release $package
     if (-not $package -or -not $assignedBlock) {
         return $PackageResult
     }
@@ -112,7 +112,7 @@ Resolve-PackagePreAssignmentSatisfaction -PackageResult $result
     }
 
     $PackageResult = Test-PackageAssignedReadiness -PackageResult $PackageResult
-    if ($PackageResult.Validation -and $PackageResult.Validation.Accepted) {
+    if ($PackageResult.Readiness -and $PackageResult.Readiness.Accepted) {
         $PackageResult.InstallOrigin = 'AlreadySatisfied'
         $PackageResult.Assigned = [pscustomobject]@{
             Status           = 'AlreadySatisfied'
@@ -124,15 +124,15 @@ Resolve-PackagePreAssignmentSatisfaction -PackageResult $result
         Write-PackageExecutionMessage -Message "[DECISION] Machine prerequisite is already satisfied; skipping acquisition and installer execution."
     }
     else {
-        $failedCount = if ($PackageResult.Validation) {
+        $failedCount = if ($PackageResult.Readiness) {
             @(
-                @($PackageResult.Validation.Files) +
-                @($PackageResult.Validation.Directories) +
-                @($PackageResult.Validation.Commands) +
-                @($PackageResult.Validation.MetadataFiles) +
-                @($PackageResult.Validation.Signatures) +
-                @($PackageResult.Validation.FileDetails) +
-                @($PackageResult.Validation.Registry) |
+                @($PackageResult.Readiness.Files) +
+                @($PackageResult.Readiness.Directories) +
+                @($PackageResult.Readiness.Commands) +
+                @($PackageResult.Readiness.MetadataFiles) +
+                @($PackageResult.Readiness.Signatures) +
+                @($PackageResult.Readiness.FileDetails) +
+                @($PackageResult.Readiness.Registry) |
                     Where-Object { $_.Status -ne 'Ready' }
             ).Count
         }
@@ -140,7 +140,7 @@ Resolve-PackagePreAssignmentSatisfaction -PackageResult $result
             0
         }
         Write-PackageExecutionMessage -Message ("[STATE] Machine prerequisite is not satisfied yet; failedChecks={0}." -f $failedCount)
-        $PackageResult.Validation = $null
+        $PackageResult.Readiness = $null
     }
 
     return $PackageResult

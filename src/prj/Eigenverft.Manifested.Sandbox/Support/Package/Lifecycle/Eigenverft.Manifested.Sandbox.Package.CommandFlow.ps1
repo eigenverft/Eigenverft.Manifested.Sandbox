@@ -81,7 +81,7 @@ function Get-PackageCommandFailureReason {
         'ResolveExistingPackageDecision' { return 'ExistingPackageDecisionFailed' }
         'PreparePackageAssignedFile' { return 'PackageFilePreparationFailed' }
         'AssignPackage' { return 'PackageAssignFailed' }
-        'ValidateAssignedPackage' { return 'AssignedPackageValidationFailed' }
+        'CheckAssignedReadiness' { return 'AssignedPackageReadinessFailed' }
         'RegisterPath' { return 'PathRegistrationFailed' }
         'ResolveEntryPoints' { return 'EntryPointResolutionFailed' }
         'UpdateInventory' { return 'PackageInventoryUpdateFailed' }
@@ -148,8 +148,8 @@ function Invoke-PackageAssignedFlow {
         [pscustomobject]@{ Name = 'ClassifyExistingPackage'; Message = '[STEP] Classifying install ownership.'; Action = { param($r) Set-PackageExistingPackage -PackageResult $r } },
         [pscustomobject]@{ Name = 'ResolveExistingPackageDecision'; Message = '[STEP] Deciding reuse, adoption, or replacement.'; Action = { param($r) Resolve-PackageExistingPackageDecision -PackageResult $r } },
         [pscustomobject]@{ Name = 'PreparePackageAssignedFile'; Message = '[STEP] Ensuring package file is available.'; Action = { param($r) Resolve-PackageInstallFile -PackageResult $r } },
-        [pscustomobject]@{ Name = 'AssignPackage'; Message = '[STEP] Assigning the package (install or reuse per assigned.kind).'; Action = { param($r) Set-PackageAssignedState -PackageResult $r } },
-        [pscustomobject]@{ Name = 'ValidateAssignedPackage'; Message = '[STEP] Validating assigned package state.'; Action = { param($r) Test-PackageAssignedReadiness -PackageResult $r } },
+        [pscustomobject]@{ Name = 'AssignPackage'; Message = '[STEP] Assigning the package (install or reuse per assigned install operation).'; Action = { param($r) Set-PackageAssignedState -PackageResult $r } },
+        [pscustomobject]@{ Name = 'CheckAssignedReadiness'; Message = '[STEP] Checking assigned package readiness.'; Action = { param($r) Test-PackageAssignedReadiness -PackageResult $r } },
         [pscustomobject]@{ Name = 'RegisterPath'; Message = '[STEP] Applying PATH registration.'; Action = { param($r) Register-PackagePath -PackageResult $r } },
         [pscustomobject]@{ Name = 'ResolveEntryPoints'; Message = '[STEP] Resolving entry points.'; Action = { param($r) Resolve-PackageEntryPoints -PackageResult $r } },
         [pscustomobject]@{ Name = 'UpdateInventory'; Message = '[STEP] Updating package inventory.'; Action = { param($r) Update-PackageInventoryRecord -PackageResult $r } },
@@ -172,9 +172,9 @@ function Invoke-PackageAssignedFlow {
             $PackageResult.CurrentStep = $step.Name
             Write-PackageExecutionMessage -Message $step.Message
             $PackageResult = & $step.Action $PackageResult
-            if ($step.Name -eq 'ValidateAssignedPackage' -and (-not $PackageResult.Validation -or -not $PackageResult.Validation.Accepted)) {
-                $failedCount = if ($PackageResult.Validation -and $PackageResult.Validation.PSObject.Properties['FailedChecks']) { @($PackageResult.Validation.FailedChecks).Count } else { 0 }
-                throw ("Package validation failed for '{0}' with {1} failed check(s)." -f $PackageResult.PackageId, $failedCount)
+            if ($step.Name -eq 'CheckAssignedReadiness' -and (-not $PackageResult.Readiness -or -not $PackageResult.Readiness.Accepted)) {
+                $failedCount = if ($PackageResult.Readiness -and $PackageResult.Readiness.PSObject.Properties['FailedChecks']) { @($PackageResult.Readiness.FailedChecks).Count } else { 0 }
+                throw ("Package readiness failed for '{0}' with {1} failed check(s)." -f $PackageResult.PackageId, $failedCount)
             }
         }
         Write-PackageExecutionMessage -Message (Get-PackageOutcomeSummary -PackageResult $PackageResult)

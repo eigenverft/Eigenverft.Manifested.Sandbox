@@ -1,5 +1,5 @@
 <#
-    Eigenverft.Manifested.Sandbox.Package.Validation
+    Eigenverft.Manifested.Sandbox.Package.Readiness
 #>
 
 function Get-PackageReadinessEntryPointDefinition {
@@ -121,7 +121,7 @@ Get-PackageJsonValue -InputObject $document -PropertyPath version
     return $current
 }
 
-function Test-PackageValidationValueComparison {
+function Test-PackageReadinessValueComparison {
     [CmdletBinding()]
     [OutputType([bool])]
     param(
@@ -156,7 +156,7 @@ function Test-PackageValidationValueComparison {
     }
 }
 
-function New-PackageValidationFailedCheckRecord {
+function New-PackageReadinessFailedCheckRecord {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true)]
@@ -205,7 +205,7 @@ Validates assigned package state against its Package rules.
 
 .DESCRIPTION
 Runs file, directory, command, metadata, signature, file-details, and registry
-checks for the current install directory and attaches the validation result to
+checks for the current install directory and attaches the readiness result to
 the Package result object.
 
 .PARAMETER PackageResult
@@ -221,8 +221,8 @@ Test-PackageAssignedReadiness -PackageResult $result
     )
 
     $package = $PackageResult.Package
-    if (-not $package -or -not $package.PSObject.Properties['validation'] -or $null -eq $package.validation) {
-        $PackageResult.Validation = [pscustomobject]@{
+    if (-not $package -or -not $package.PSObject.Properties['readiness'] -or $null -eq $package.readiness) {
+        $PackageResult.Readiness = [pscustomobject]@{
             Status       = 'Ready'
             Accepted     = $true
             InstallDirectory = $PackageResult.InstallDirectory
@@ -238,15 +238,15 @@ Test-PackageAssignedReadiness -PackageResult $result
     }
 
     $installDirectory = $PackageResult.InstallDirectory
-    $validation = $package.validation
-    $requiresInstallDirectory = (@($validation.files).Count -gt 0) -or
-        (@($validation.directories).Count -gt 0) -or
-        (@($validation.commandChecks).Count -gt 0) -or
-        (@($validation.metadataFiles).Count -gt 0) -or
-        (@($validation.signatures).Count -gt 0) -or
-        (@($validation.fileDetails).Count -gt 0)
+    $readiness = $package.readiness
+    $requiresInstallDirectory = (@($readiness.files).Count -gt 0) -or
+        (@($readiness.directories).Count -gt 0) -or
+        (@($readiness.commandChecks).Count -gt 0) -or
+        (@($readiness.metadataFiles).Count -gt 0) -or
+        (@($readiness.signatures).Count -gt 0) -or
+        (@($readiness.fileDetails).Count -gt 0)
     if ($requiresInstallDirectory -and ([string]::IsNullOrWhiteSpace($installDirectory) -or -not (Test-Path -LiteralPath $installDirectory))) {
-        $PackageResult.Validation = [pscustomobject]@{
+        $PackageResult.Readiness = [pscustomobject]@{
             Status           = 'Failed'
             Accepted         = $false
             FailureReason    = 'InstallDirectoryMissing'
@@ -263,7 +263,7 @@ Test-PackageAssignedReadiness -PackageResult $result
     }
 
     $fileResults = New-Object System.Collections.Generic.List[object]
-    foreach ($relativePath in @($validation.files)) {
+    foreach ($relativePath in @($readiness.files)) {
         if ($null -eq $relativePath) {
             continue
         }
@@ -277,7 +277,7 @@ Test-PackageAssignedReadiness -PackageResult $result
     }
 
     $directoryResults = New-Object System.Collections.Generic.List[object]
-    foreach ($relativePath in @($validation.directories)) {
+    foreach ($relativePath in @($readiness.directories)) {
         if ($null -eq $relativePath) {
             continue
         }
@@ -291,7 +291,7 @@ Test-PackageAssignedReadiness -PackageResult $result
     }
 
     $commandResults = New-Object System.Collections.Generic.List[object]
-    foreach ($commandCheck in @($validation.commandChecks)) {
+    foreach ($commandCheck in @($readiness.commandChecks)) {
         if ($null -eq $commandCheck) {
             continue
         }
@@ -350,7 +350,7 @@ Test-PackageAssignedReadiness -PackageResult $result
     }
 
     $metadataResults = New-Object System.Collections.Generic.List[object]
-    foreach ($metadataCheck in @($validation.metadataFiles)) {
+    foreach ($metadataCheck in @($readiness.metadataFiles)) {
         if ($null -eq $metadataCheck) {
             continue
         }
@@ -386,7 +386,7 @@ Test-PackageAssignedReadiness -PackageResult $result
     }
 
     $signatureResults = New-Object System.Collections.Generic.List[object]
-    foreach ($signatureCheck in @($validation.signatures)) {
+    foreach ($signatureCheck in @($readiness.signatures)) {
         if ($null -eq $signatureCheck) {
             continue
         }
@@ -432,7 +432,7 @@ Test-PackageAssignedReadiness -PackageResult $result
     }
 
     $fileDetailResults = New-Object System.Collections.Generic.List[object]
-    foreach ($detailCheck in @($validation.fileDetails)) {
+    foreach ($detailCheck in @($readiness.fileDetails)) {
         if ($null -eq $detailCheck) {
             continue
         }
@@ -497,7 +497,7 @@ Test-PackageAssignedReadiness -PackageResult $result
     }
 
     $registryResults = New-Object System.Collections.Generic.List[object]
-    foreach ($registryCheck in @($validation.registryChecks)) {
+    foreach ($registryCheck in @($readiness.registryChecks)) {
         if ($null -eq $registryCheck) {
             continue
         }
@@ -531,7 +531,7 @@ Test-PackageAssignedReadiness -PackageResult $result
         $registryResolution = Resolve-RegistryValueFromPaths -Paths $registryPaths -ValueName $valueName
         $status = [string]$registryResolution.Status
         if ($status -eq 'Ready' -and $registryCheck.PSObject.Properties['expectedValue']) {
-            $status = if (Test-PackageValidationValueComparison -ActualValue $registryResolution.ActualValue -ExpectedValue $expectedValue -Operator $operator) { 'Ready' } else { 'Failed' }
+            $status = if (Test-PackageReadinessValueComparison -ActualValue $registryResolution.ActualValue -ExpectedValue $expectedValue -Operator $operator) { 'Ready' } else { 'Failed' }
         }
 
         $registryResults.Add([pscustomobject]@{
@@ -548,19 +548,19 @@ Test-PackageAssignedReadiness -PackageResult $result
     $allResults = @($fileResults.ToArray()) + @($directoryResults.ToArray()) + @($commandResults.ToArray()) + @($metadataResults.ToArray()) + @($signatureResults.ToArray()) + @($fileDetailResults.ToArray()) + @($registryResults.ToArray())
     $accepted = (@($allResults | Where-Object { $_.Status -ne 'Ready' }).Count -eq 0)
     $failedChecks = @(
-        foreach ($item in @($fileResults.ToArray() | Where-Object { $_.Status -ne 'Ready' })) { New-PackageValidationFailedCheckRecord -Kind 'files' -Check $item }
-        foreach ($item in @($directoryResults.ToArray() | Where-Object { $_.Status -ne 'Ready' })) { New-PackageValidationFailedCheckRecord -Kind 'directories' -Check $item }
-        foreach ($item in @($commandResults.ToArray() | Where-Object { $_.Status -ne 'Ready' })) { New-PackageValidationFailedCheckRecord -Kind 'commands' -Check $item }
-        foreach ($item in @($metadataResults.ToArray() | Where-Object { $_.Status -ne 'Ready' })) { New-PackageValidationFailedCheckRecord -Kind 'metadataFiles' -Check $item }
-        foreach ($item in @($signatureResults.ToArray() | Where-Object { $_.Status -ne 'Ready' })) { New-PackageValidationFailedCheckRecord -Kind 'signatures' -Check $item }
-        foreach ($item in @($fileDetailResults.ToArray() | Where-Object { $_.Status -ne 'Ready' })) { New-PackageValidationFailedCheckRecord -Kind 'fileDetails' -Check $item }
-        foreach ($item in @($registryResults.ToArray() | Where-Object { $_.Status -ne 'Ready' })) { New-PackageValidationFailedCheckRecord -Kind 'registryChecks' -Check $item }
+        foreach ($item in @($fileResults.ToArray() | Where-Object { $_.Status -ne 'Ready' })) { New-PackageReadinessFailedCheckRecord -Kind 'files' -Check $item }
+        foreach ($item in @($directoryResults.ToArray() | Where-Object { $_.Status -ne 'Ready' })) { New-PackageReadinessFailedCheckRecord -Kind 'directories' -Check $item }
+        foreach ($item in @($commandResults.ToArray() | Where-Object { $_.Status -ne 'Ready' })) { New-PackageReadinessFailedCheckRecord -Kind 'commands' -Check $item }
+        foreach ($item in @($metadataResults.ToArray() | Where-Object { $_.Status -ne 'Ready' })) { New-PackageReadinessFailedCheckRecord -Kind 'metadataFiles' -Check $item }
+        foreach ($item in @($signatureResults.ToArray() | Where-Object { $_.Status -ne 'Ready' })) { New-PackageReadinessFailedCheckRecord -Kind 'signatures' -Check $item }
+        foreach ($item in @($fileDetailResults.ToArray() | Where-Object { $_.Status -ne 'Ready' })) { New-PackageReadinessFailedCheckRecord -Kind 'fileDetails' -Check $item }
+        foreach ($item in @($registryResults.ToArray() | Where-Object { $_.Status -ne 'Ready' })) { New-PackageReadinessFailedCheckRecord -Kind 'registryChecks' -Check $item }
     )
 
-    $PackageResult.Validation = [pscustomobject]@{
+    $PackageResult.Readiness = [pscustomobject]@{
         Status           = if ($accepted) { 'Ready' } else { 'Failed' }
         Accepted         = $accepted
-        FailureReason    = if ($accepted) { $null } else { 'AssignedPackageValidationFailed' }
+        FailureReason    = if ($accepted) { $null } else { 'AssignedPackageReadinessFailed' }
         InstallDirectory = $installDirectory
         Files            = @($fileResults.ToArray())
         Directories      = @($directoryResults.ToArray())
@@ -622,25 +622,25 @@ requires that substantive checks do not report full readiness success.
         (@($readinessModel.registryChecks).Count -gt 0)
 
     $package = $PackageResult.Package
-    $oldValidation = $null
-    if ($package.PSObject.Properties['validation']) {
-        $oldValidation = $package.validation
+    $oldReadiness = $null
+    if ($package.PSObject.Properties['readiness']) {
+        $oldReadiness = $package.readiness
     }
 
-    $null = $package | Add-Member -Force -MemberType NoteProperty -Name 'validation' -Value $readinessModel
+    $null = $package | Add-Member -Force -MemberType NoteProperty -Name 'readiness' -Value $readinessModel
     try {
         $null = Test-PackageAssignedReadiness -PackageResult $PackageResult
     }
     finally {
-        if ($null -ne $oldValidation) {
-            $null = $package | Add-Member -Force -MemberType NoteProperty -Name 'validation' -Value $oldValidation
+        if ($null -ne $oldReadiness) {
+            $null = $package | Add-Member -Force -MemberType NoteProperty -Name 'readiness' -Value $oldReadiness
         }
         else {
-            $null = $package.PSObject.Properties.Remove('validation')
+            $null = $package.PSObject.Properties.Remove('readiness')
         }
     }
 
-    $assignAccepted = $PackageResult.Validation.Accepted
+    $assignAccepted = $PackageResult.Readiness.Accepted
     $absenceAccepted = if (-not $hadChecks) { $true } else { -not $assignAccepted }
 
     $PackageResult.Removed = [pscustomobject]@{
@@ -653,7 +653,7 @@ requires that substantive checks do not report full readiness success.
         throw "Package absence verification failed: presenceDiscovery still reports readiness for removed definition '$($PackageResult.DefinitionId)'."
     }
 
-    $PackageResult.Validation = $null
+    $PackageResult.Readiness = $null
 
     Write-PackageExecutionMessage -Message ("[STATE] Absence verification completed for '{0}' with accepted='{1}'." -f $PackageResult.InstallDirectory, $absenceAccepted)
 

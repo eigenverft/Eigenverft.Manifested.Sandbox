@@ -1,4 +1,4 @@
-﻿<#
+<#
     Eigenverft.Manifested.Sandbox.Package.Config — environment resolution, Get-PackageConfig, path resolution, New-PackageResult.
     Loaded by Eigenverft.Manifested.Sandbox.Package.Config.ps1.
 #>
@@ -420,7 +420,7 @@ Resolve-PackagePaths -PackageResult $result
     if (-not $package) {
         throw 'Resolve-PackagePaths requires a selected release.'
     }
-    $assignedBlock = Get-PackageEffectiveReleaseAssignedBlock -Release $package
+    $assignedBlock = Get-PackageAssignedOperation -Release $package
     $installKind = if ($assignedBlock -and $assignedBlock.PSObject.Properties['kind']) {
         [string]$assignedBlock.kind
     }
@@ -512,7 +512,7 @@ Creates the initial Package result object.
 
 .DESCRIPTION
 Creates the result object that later Package stage helpers enrich with
-release selection, package file, assigned-state, ownership, validation, and entry-point data.
+artifact selection, package file, assigned-state, ownership, readiness, and entry-point data.
 
 .PARAMETER PackageConfig
 The resolved Package config object for the command.
@@ -577,10 +577,9 @@ New-PackageResult -PackageConfig $config
         Dependencies                     = @()
         Assigned                         = $null
         Removed                          = $null
-        Validation                       = $null
+        Readiness                       = $null
         EntryPoints                      = $null
         PathRegistration                 = $null
         PackageConfig               = $PackageConfig
     }
 }
-

@@ -86,7 +86,7 @@ or directory path for the requested install directory.
         [string]$InstallDirectoryOverride
     )
 
-    $install = Get-PackageEffectiveReleaseAssignedBlock -Release $PackageResult.Package
+    $install = Get-PackageAssignedOperation -Release $PackageResult.Package
     if (-not $install -or -not $install.PSObject.Properties['pathRegistration'] -or $null -eq $install.pathRegistration) {
         return $null
     }
@@ -116,7 +116,7 @@ or directory path for the requested install directory.
             if ($sourceValues.Count -gt 1) {
                 throw "Package pathRegistration source kind 'commandEntryPoint' supports only one source value."
             }
-            $sourcePath = Resolve-PackageDiscoveredToolPath -Definition $PackageResult.PackageConfig.Definition -ToolKind 'commands' -Name $sourceValue -InstallDirectory $baseInstallDirectory
+            $sourcePath = Resolve-PackagePresenceToolPath -Definition $PackageResult.PackageConfig.Definition -ToolKind 'commands' -Name $sourceValue -InstallDirectory $baseInstallDirectory
             if (-not [string]::IsNullOrWhiteSpace($sourcePath)) {
                 return $sourcePath
             }
@@ -126,7 +126,7 @@ or directory path for the requested install directory.
             if ($sourceValues.Count -gt 1) {
                 throw "Package pathRegistration source kind 'appEntryPoint' supports only one source value."
             }
-            $sourcePath = Resolve-PackageDiscoveredToolPath -Definition $PackageResult.PackageConfig.Definition -ToolKind 'apps' -Name $sourceValue -InstallDirectory $baseInstallDirectory
+            $sourcePath = Resolve-PackagePresenceToolPath -Definition $PackageResult.PackageConfig.Definition -ToolKind 'apps' -Name $sourceValue -InstallDirectory $baseInstallDirectory
             if (-not [string]::IsNullOrWhiteSpace($sourcePath)) {
                 return $sourcePath
             }
@@ -176,7 +176,7 @@ function Get-PackagePathRegistrationCleanupDirectories {
     $currentInstallDirectory = Get-NormalizedPathEntry -PathEntry ([string]$PackageResult.InstallDirectory)
     $cleanupDirectories = New-Object System.Collections.Generic.List[string]
     $candidateInstallDirectories = New-Object System.Collections.Generic.List[string]
-    $assignedForPath = Get-PackageEffectiveReleaseAssignedBlock -Release $PackageResult.Package
+    $assignedForPath = Get-PackageAssignedOperation -Release $PackageResult.Package
     if (-not $assignedForPath -or -not $assignedForPath.PSObject.Properties['pathRegistration'] -or $null -eq $assignedForPath.pathRegistration) {
         return @()
     }
@@ -237,7 +237,7 @@ function Get-PackagePathRegistrationCleanupDirectories {
 
         foreach ($candidateInstallDirectory in @($directCleanupInstallDirectories.ToArray())) {
             foreach ($currentSourceValue in $currentSourceValues) {
-                $directCommandPath = Resolve-PackageDiscoveredToolPath -Definition $PackageResult.PackageConfig.Definition -ToolKind 'commands' -Name $currentSourceValue -InstallDirectory $candidateInstallDirectory
+                $directCommandPath = Resolve-PackagePresenceToolPath -Definition $PackageResult.PackageConfig.Definition -ToolKind 'commands' -Name $currentSourceValue -InstallDirectory $candidateInstallDirectory
                 if ([string]::IsNullOrWhiteSpace($directCommandPath)) {
                     continue
                 }
@@ -268,7 +268,7 @@ for the same install slot.
         [psobject]$PackageResult
     )
 
-    $install = Get-PackageEffectiveReleaseAssignedBlock -Release $PackageResult.Package
+    $install = Get-PackageAssignedOperation -Release $PackageResult.Package
     $pathRegistration = if ($install -and $install.PSObject.Properties['pathRegistration']) { $install.pathRegistration } else { $null }
     $mode = if ($pathRegistration -and $pathRegistration.PSObject.Properties['mode'] -and -not [string]::IsNullOrWhiteSpace([string]$pathRegistration.mode)) {
         ([string]$pathRegistration.mode).ToLowerInvariant()

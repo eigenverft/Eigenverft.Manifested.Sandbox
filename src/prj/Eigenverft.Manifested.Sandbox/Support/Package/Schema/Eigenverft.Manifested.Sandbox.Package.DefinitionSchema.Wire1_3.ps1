@@ -52,14 +52,21 @@ function Get-PackagePresenceDiscoveryEntryPoints {
         return @()
     }
 
+    $exposedPropertyName = if ([string]::Equals($ToolKind, 'commands', [System.StringComparison]::Ordinal)) {
+        'exposeCommand'
+    }
+    else {
+        'exposeApp'
+    }
+
     return @(
         foreach ($entryPoint in @($Definition.presenceDiscovery.$ToolKind)) {
             if ($null -eq $entryPoint) {
                 continue
             }
-            if ($ExposedOnly -and
-                $entryPoint.PSObject.Properties['exposed'] -and
-                -not [bool]$entryPoint.exposed) {
+            if ($ExposedOnly -and (
+                    -not $entryPoint.PSObject.Properties[$exposedPropertyName] -or
+                    -not [bool]$entryPoint.$exposedPropertyName)) {
                 continue
             }
             $entryPoint
@@ -92,7 +99,7 @@ function Get-PackagePresenceDiscoveryEntryPoint {
     return $null
 }
 
-function Resolve-PackageDiscoveredToolEntryPointPath {
+function Resolve-PackagePresenceEntryPointPath {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true)]
@@ -105,7 +112,7 @@ function Resolve-PackageDiscoveredToolEntryPointPath {
     return (Join-Path $InstallDirectory (([string]$EntryPoint.relativePath) -replace '/', '\'))
 }
 
-function Resolve-PackageDiscoveredToolPath {
+function Resolve-PackagePresenceToolPath {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true)]
@@ -127,10 +134,10 @@ function Resolve-PackageDiscoveredToolPath {
         return $null
     }
 
-    return (Resolve-PackageDiscoveredToolEntryPointPath -EntryPoint $entryPoint -InstallDirectory $InstallDirectory)
+    return (Resolve-PackagePresenceEntryPointPath -EntryPoint $entryPoint -InstallDirectory $InstallDirectory)
 }
 
-function Assert-PackageDefinitionNoRetiredNestedProperty_1_2 {
+function Assert-PackageDefinitionNoRetiredNestedProperty_1_3 {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true)]
@@ -154,7 +161,7 @@ function Assert-PackageDefinitionNoRetiredNestedProperty_1_2 {
     }
 }
 
-function Assert-PackageArtifactTrustMetadata_1_2 {
+function Assert-PackageArtifactTrustMetadata_1_3 {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true)]
@@ -430,14 +437,14 @@ function Assert-PackageDefinitionSchema_1_3 {
 
     $sharedOperation = if ($definition.packageOperations.PSObject.Properties['policy']) { $definition.packageOperations.policy } else { $null }
     $ownershipPolicy = if ($sharedOperation -and $sharedOperation.PSObject.Properties['ownershipPolicy']) { $sharedOperation.ownershipPolicy } else { $null }
-    Assert-PackageDefinitionNoRetiredNestedProperty_1_2 -DefinitionId $DefinitionId -InputObject $ownershipPolicy -PropertyName 'requireManagedOwnership' -PropertyPath 'packageOperations.policy.ownershipPolicy.requireManagedOwnership' -ReplacementPath 'packageOperations.policy.ownershipPolicy.requirePackageOwnership'
+    Assert-PackageDefinitionNoRetiredNestedProperty_1_3 -DefinitionId $DefinitionId -InputObject $ownershipPolicy -PropertyName 'requireManagedOwnership' -PropertyPath 'packageOperations.policy.ownershipPolicy.requireManagedOwnership' -ReplacementPath 'packageOperations.policy.ownershipPolicy.requirePackageOwnership'
 
     $assignedOperation = if ($definition.packageOperations.PSObject.Properties['assigned']) { $definition.packageOperations.assigned } else { $null }
     $assignedInstall = if ($assignedOperation -and $assignedOperation.PSObject.Properties['install']) { $assignedOperation.install } else { $null }
-    Assert-PackageDefinitionNoRetiredNestedProperty_1_2 -DefinitionId $DefinitionId -InputObject $assignedOperation -PropertyName 'managerDependency' -PropertyPath 'packageOperations.assigned.managerDependency' -ReplacementPath 'dependencies plus packageOperations.assigned.installerCommand'
-    Assert-PackageDefinitionNoRetiredNestedProperty_1_2 -DefinitionId $DefinitionId -InputObject $assignedInstall -PropertyName 'managerDependency' -PropertyPath 'packageOperations.assigned.managerDependency' -ReplacementPath 'dependencies plus packageOperations.assigned.installerCommand'
-    Assert-PackageDefinitionNoRetiredNestedProperty_1_2 -DefinitionId $DefinitionId -InputObject $assignedOperation -PropertyName 'managerKind' -PropertyPath 'packageOperations.assigned.managerKind' -ReplacementPath 'packageOperations.assigned.kind = npmGlobalPackage'
-    Assert-PackageDefinitionNoRetiredNestedProperty_1_2 -DefinitionId $DefinitionId -InputObject $assignedInstall -PropertyName 'managerKind' -PropertyPath 'packageOperations.assigned.managerKind' -ReplacementPath 'packageOperations.assigned.kind = npmGlobalPackage'
+    Assert-PackageDefinitionNoRetiredNestedProperty_1_3 -DefinitionId $DefinitionId -InputObject $assignedOperation -PropertyName 'managerDependency' -PropertyPath 'packageOperations.assigned.managerDependency' -ReplacementPath 'dependencies plus packageOperations.assigned.installerCommand'
+    Assert-PackageDefinitionNoRetiredNestedProperty_1_3 -DefinitionId $DefinitionId -InputObject $assignedInstall -PropertyName 'managerDependency' -PropertyPath 'packageOperations.assigned.managerDependency' -ReplacementPath 'dependencies plus packageOperations.assigned.installerCommand'
+    Assert-PackageDefinitionNoRetiredNestedProperty_1_3 -DefinitionId $DefinitionId -InputObject $assignedOperation -PropertyName 'managerKind' -PropertyPath 'packageOperations.assigned.managerKind' -ReplacementPath 'packageOperations.assigned.kind = npmGlobalPackage'
+    Assert-PackageDefinitionNoRetiredNestedProperty_1_3 -DefinitionId $DefinitionId -InputObject $assignedInstall -PropertyName 'managerKind' -PropertyPath 'packageOperations.assigned.managerKind' -ReplacementPath 'packageOperations.assigned.kind = npmGlobalPackage'
     if (-not $definition.packageOperations.PSObject.Properties['removed']) {
         throw "Package definition '$DefinitionId' is missing required packageOperations.removed."
     }
@@ -458,7 +465,7 @@ function Assert-PackageDefinitionSchema_1_3 {
         if ($versionEntry.PSObject.Properties['artifactsByTarget']) {
             throw "Package definition '$DefinitionId' release '$($versionEntry.version)' still uses retired property 'artifactsByTarget'."
         }
-        Assert-PackageDefinitionNoRetiredNestedProperty_1_2 -DefinitionId $DefinitionId -InputObject $versionEntry -PropertyName 'artifactsByTarget' -PropertyPath 'artifacts.releases[].artifactsByTarget' -ReplacementPath 'targetArtifacts'
+        Assert-PackageDefinitionNoRetiredNestedProperty_1_3 -DefinitionId $DefinitionId -InputObject $versionEntry -PropertyName 'artifactsByTarget' -PropertyPath 'artifacts.releases[].artifactsByTarget' -ReplacementPath 'targetArtifacts'
         if (-not $versionEntry.PSObject.Properties['version'] -or [string]::IsNullOrWhiteSpace([string]$versionEntry.version)) {
             throw "Package definition '$DefinitionId' has release entry without version."
         }
@@ -481,7 +488,7 @@ function Assert-PackageDefinitionSchema_1_3 {
                 throw "Package definition '$DefinitionId' release '$($versionEntry.version)' artifact '$($artifactProperty.Name)' is missing artifactId."
             }
 
-            Assert-PackageArtifactTrustMetadata_1_2 -DefinitionId $DefinitionId -Version ([string]$versionEntry.version) -TargetId ([string]$artifactProperty.Name) -Artifact $artifact
+            Assert-PackageArtifactTrustMetadata_1_3 -DefinitionId $DefinitionId -Version ([string]$versionEntry.version) -TargetId ([string]$artifactProperty.Name) -Artifact $artifact
 
             $artifactAcquisitionCandidates = if ($artifact.PSObject.Properties['acquisitionCandidates']) { @($artifact.acquisitionCandidates) } else { @() }
             if (-not $artifactAcquisitionCandidates -and $targetsById[[string]$artifactProperty.Name] -and $targetsById[[string]$artifactProperty.Name].PSObject.Properties['acquisitionCandidates']) {
@@ -756,7 +763,6 @@ function Resolve-PackageEffectivePackage_1_3 {
         ownershipPolicy         = ConvertTo-PackageObject -InputObject $definition.packageOperations.policy.ownershipPolicy
         assigned                = $assigned
         removed                 = ConvertTo-PackageObject -InputObject $definition.packageOperations.removed
-        validation              = New-PackageReadinessFromPresenceDiscovery -Definition $definition -Assigned $assigned
+        readiness               = New-PackageReadinessFromPresenceDiscovery -Definition $definition -Assigned $assigned
     }
 }
-

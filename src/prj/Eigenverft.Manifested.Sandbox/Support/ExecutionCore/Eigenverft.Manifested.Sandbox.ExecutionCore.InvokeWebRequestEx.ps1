@@ -606,13 +606,13 @@ function Invoke-WebRequestEx {
         return $null
     }
 
-    function local:_GetAcceptAllCertificateValidationCallback {
-        if (-not ('CertificateValidationHelper' -as [type])) {
+    function local:_GetAcceptAllCertificateReadinessCallback {
+        if (-not ('CertificateReadinessHelper' -as [type])) {
             Add-Type -TypeDefinition @'
 using System.Net.Security;
 using System.Security.Cryptography.X509Certificates;
 
-public static class CertificateValidationHelper
+public static class CertificateReadinessHelper
 {
     public static bool AcceptAll(
         object sender,
@@ -630,20 +630,20 @@ public static class CertificateValidationHelper
             [System.Reflection.BindingFlags]::Public -bor
             [System.Reflection.BindingFlags]::Static
 
-        $methodInfo = [CertificateValidationHelper].GetMethod('AcceptAll', $bindingFlags)
+        $methodInfo = [CertificateReadinessHelper].GetMethod('AcceptAll', $bindingFlags)
         if ($null -eq $methodInfo) {
-            throw "Failed to resolve CertificateValidationHelper.AcceptAll."
+            throw "Failed to resolve CertificateReadinessHelper.AcceptAll."
         }
 
-        return [System.Net.Security.RemoteCertificateValidationCallback](
+        return [System.Net.Security.RemoteCertificateReadinessCallback](
             [System.Delegate]::CreateDelegate(
-                [System.Net.Security.RemoteCertificateValidationCallback],
+                [System.Net.Security.RemoteCertificateReadinessCallback],
                 $methodInfo
             )
         )
     }
 
-    function local:_TestIsCertificateValidationFailureFromException {
+    function local:_TestIsCertificateReadinessFailureFromException {
         param(
             [Parameter(Mandatory = $true)]
             [System.Exception]$Exception
@@ -694,7 +694,7 @@ public static class CertificateValidationHelper
         return $null
     }
 
-    function local:_TestIsCertificateValidationFailure {
+    function local:_TestIsCertificateReadinessFailure {
         param(
             [Parameter(Mandatory = $true)]
             [System.Management.Automation.ErrorRecord]$ErrorRecord
@@ -704,7 +704,7 @@ public static class CertificateValidationHelper
             return $false
         }
 
-        return (_TestIsCertificateValidationFailureFromException -Exception $ErrorRecord.Exception)
+        return (_TestIsCertificateReadinessFailureFromException -Exception $ErrorRecord.Exception)
     }
 
     function local:_GetWwwAuthenticateValuesFromErrorRecord {
@@ -1334,7 +1334,7 @@ public static class CertificateValidationHelper
             [System.Net.IWebProxy]$ProxyObject
         )
 
-        $certificateValidationBypassActiveForProbe = [bool]$effectiveSkipCertificateCheck
+        $certificateReadinessBypassActiveForProbe = [bool]$effectiveSkipCertificateCheck
 
         while ($true) {
             $response = $null
@@ -1348,8 +1348,8 @@ public static class CertificateValidationHelper
                 $request.Proxy = $ProxyObject
         $request.UserAgent = 'PowerShell Invoke-WebRequestEx ProxyProfileProbe'
 
-                if ($certificateValidationBypassActiveForProbe -and $null -ne $acceptAllCallback) {
-                    $request.ServerCertificateValidationCallback = $acceptAllCallback
+                if ($certificateReadinessBypassActiveForProbe -and $null -ne $acceptAllCallback) {
+                    $request.ServerCertificateReadinessCallback = $acceptAllCallback
                 }
 
                 $response = [System.Net.HttpWebResponse]$request.GetResponse()
@@ -1358,7 +1358,7 @@ public static class CertificateValidationHelper
                     Success = $true
                     StatusCode = [int]$response.StatusCode
                     ErrorMessage = $null
-                    IsCertificateValidationFailure = $false
+                    IsCertificateReadinessFailure = $false
                 }
             }
             catch [System.Net.WebException] {
@@ -1373,11 +1373,11 @@ public static class CertificateValidationHelper
                     $response = $null
                 }
 
-                $isCertificateValidationFailure = _TestIsCertificateValidationFailureFromException -Exception $_.Exception
+                $isCertificateReadinessFailure = _TestIsCertificateReadinessFailureFromException -Exception $_.Exception
                 if (
-                    -not $certificateValidationBypassActiveForProbe -and
+                    -not $certificateReadinessBypassActiveForProbe -and
                     $automaticCertificateFallbackAllowed -and
-                    $isCertificateValidationFailure -and
+                    $isCertificateReadinessFailure -and
                     $null -ne $acceptAllCallback
                 ) {
                     _Write-StandardMessage -Message (
@@ -1385,7 +1385,7 @@ public static class CertificateValidationHelper
                         $TargetUri.AbsoluteUri
                     ) -Level WRN
 
-                    $certificateValidationBypassActiveForProbe = $true
+                    $certificateReadinessBypassActiveForProbe = $true
                     continue
                 }
 
@@ -1398,7 +1398,7 @@ public static class CertificateValidationHelper
                         Success = -not $isProxyAuthenticationRequired
                         StatusCode = $statusCode
                         ErrorMessage = if ($isProxyAuthenticationRequired) { $_.Exception.Message } else { $null }
-                        IsCertificateValidationFailure = $false
+                        IsCertificateReadinessFailure = $false
                     }
                 }
 
@@ -1406,15 +1406,15 @@ public static class CertificateValidationHelper
                     Success = $false
                     StatusCode = $null
                     ErrorMessage = $_.Exception.Message
-                    IsCertificateValidationFailure = $isCertificateValidationFailure
+                    IsCertificateReadinessFailure = $isCertificateReadinessFailure
                 }
             }
             catch {
-                $isCertificateValidationFailure = _TestIsCertificateValidationFailureFromException -Exception $_.Exception
+                $isCertificateReadinessFailure = _TestIsCertificateReadinessFailureFromException -Exception $_.Exception
                 if (
-                    -not $certificateValidationBypassActiveForProbe -and
+                    -not $certificateReadinessBypassActiveForProbe -and
                     $automaticCertificateFallbackAllowed -and
-                    $isCertificateValidationFailure -and
+                    $isCertificateReadinessFailure -and
                     $null -ne $acceptAllCallback
                 ) {
                     _Write-StandardMessage -Message (
@@ -1422,7 +1422,7 @@ public static class CertificateValidationHelper
                         $TargetUri.AbsoluteUri
                     ) -Level WRN
 
-                    $certificateValidationBypassActiveForProbe = $true
+                    $certificateReadinessBypassActiveForProbe = $true
                     continue
                 }
 
@@ -1430,7 +1430,7 @@ public static class CertificateValidationHelper
                     Success = $false
                     StatusCode = $null
                     ErrorMessage = $_.Exception.Message
-                    IsCertificateValidationFailure = $isCertificateValidationFailure
+                    IsCertificateReadinessFailure = $isCertificateReadinessFailure
                 }
             }
             finally {
@@ -1902,7 +1902,7 @@ public static class CertificateValidationHelper
             [pscustomobject]$StoredProfile,
 
             [Parameter(Mandatory = $true)]
-            [uri]$ValidationUri,
+            [uri]$ReadinessUri,
 
             [Parameter(Mandatory = $true)]
             [int]$ProbeTimeoutSec
@@ -1914,7 +1914,7 @@ public static class CertificateValidationHelper
         switch ($mode) {
             'Direct' {
                 $noProxy = [System.Net.GlobalProxySelection]::GetEmptyWebProxy()
-                $direct = _TestProxyProfileAccess -TargetUri $ValidationUri -ProbeTimeoutSec $ProbeTimeoutSec -ProxyObject $noProxy
+                $direct = _TestProxyProfileAccess -TargetUri $ReadinessUri -ProbeTimeoutSec $ProbeTimeoutSec -ProxyObject $noProxy
 
                 if ($direct.Success) {
                     [void]$diagnostics.Add("Persisted direct profile validation succeeded with status code $($direct.StatusCode).")
@@ -1975,7 +1975,7 @@ public static class CertificateValidationHelper
                         $environmentProxy.Credentials = $proxyCredential.GetNetworkCredential()
                     }
 
-                    $result = _TestProxyProfileAccess -TargetUri $ValidationUri -ProbeTimeoutSec $ProbeTimeoutSec -ProxyObject $environmentProxy
+                    $result = _TestProxyProfileAccess -TargetUri $ReadinessUri -ProbeTimeoutSec $ProbeTimeoutSec -ProxyObject $environmentProxy
 
                     if ($result.Success) {
                         [void]$diagnostics.Add("Persisted environment proxy validation succeeded with status code $($result.StatusCode) via '$($proxyUri.AbsoluteUri)'.")
@@ -2027,7 +2027,7 @@ public static class CertificateValidationHelper
 
                 try {
                     $proxyObject = New-Object System.Net.WebProxy($proxyUri.AbsoluteUri, $true)
-                    $result = _TestProxyProfileAccess -TargetUri $ValidationUri -ProbeTimeoutSec $ProbeTimeoutSec -ProxyObject $proxyObject
+                    $result = _TestProxyProfileAccess -TargetUri $ReadinessUri -ProbeTimeoutSec $ProbeTimeoutSec -ProxyObject $proxyObject
 
                     if ($result.Success) {
                         [void]$diagnostics.Add("Persisted local relay proxy validation succeeded with status code $($result.StatusCode) via '$($proxyUri.AbsoluteUri)'.")
@@ -2052,11 +2052,11 @@ public static class CertificateValidationHelper
             'SystemProxyDefaultCredentials' {
                 try {
                     $systemProxy = [System.Net.WebRequest]::GetSystemWebProxy()
-                    $resolvedProxy = $systemProxy.GetProxy($ValidationUri)
+                    $resolvedProxy = $systemProxy.GetProxy($ReadinessUri)
 
-                    if ($systemProxy.IsBypassed($ValidationUri) -or
+                    if ($systemProxy.IsBypassed($ReadinessUri) -or
                         -not $resolvedProxy -or
-                        $resolvedProxy.AbsoluteUri -eq $ValidationUri.AbsoluteUri) {
+                        $resolvedProxy.AbsoluteUri -eq $ReadinessUri.AbsoluteUri) {
                         [void]$diagnostics.Add('Persisted system proxy profile validation found no distinct system proxy for the current test URI.')
                         return [pscustomobject]@{
                             Success = $false
@@ -2065,7 +2065,7 @@ public static class CertificateValidationHelper
                     }
 
                     $systemProxy.Credentials = [System.Net.CredentialCache]::DefaultCredentials
-                    $result = _TestProxyProfileAccess -TargetUri $ValidationUri -ProbeTimeoutSec $ProbeTimeoutSec -ProxyObject $systemProxy
+                    $result = _TestProxyProfileAccess -TargetUri $ReadinessUri -ProbeTimeoutSec $ProbeTimeoutSec -ProxyObject $systemProxy
 
                     if ($result.Success) {
                         [void]$diagnostics.Add("Persisted system proxy validation succeeded with status code $($result.StatusCode) via '$($resolvedProxy.AbsoluteUri)'.")
@@ -2134,7 +2134,7 @@ public static class CertificateValidationHelper
                     $manualProxy = New-Object System.Net.WebProxy($proxyUri.AbsoluteUri, $true)
                     $manualProxy.Credentials = $proxyCredential.GetNetworkCredential()
 
-                    $result = _TestProxyProfileAccess -TargetUri $ValidationUri -ProbeTimeoutSec $ProbeTimeoutSec -ProxyObject $manualProxy
+                    $result = _TestProxyProfileAccess -TargetUri $ReadinessUri -ProbeTimeoutSec $ProbeTimeoutSec -ProxyObject $manualProxy
 
                     if ($result.Success) {
                         [void]$diagnostics.Add("Persisted manual proxy validation succeeded with status code $($result.StatusCode) via '$($proxyUri.AbsoluteUri)'.")
@@ -2591,7 +2591,7 @@ public static class CertificateValidationHelper
 
             _EnsurePersistedProxyProfileDirectory -ProfilePath $ProfilePath
 
-            $persistedProfileValidationDiagnostics = @()
+            $persistedProfileReadinessDiagnostics = @()
 
             if (-not $ForceRefresh) {
                 $processCached = _GetProcessProxyProfileState -ProfilePath $ProfilePath
@@ -2602,21 +2602,21 @@ public static class CertificateValidationHelper
 
                 $storedProfile = _LoadPersistedProxyProfile -ProfilePath $ProfilePath
                 if ($null -ne $storedProfile) {
-                    $persistedValidation = _TestPersistedProxyProfile `
+                    $persistedReadiness = _TestPersistedProxyProfile `
                         -StoredProfile $storedProfile `
-                        -ValidationUri $TargetUri `
+                        -ReadinessUri $TargetUri `
                         -ProbeTimeoutSec $ProbeTimeoutSec
 
-                    if ($persistedValidation.Success) {
+                    if ($persistedReadiness.Success) {
                         $runtimeState = _BuildRuntimeProxyProfileState -StoredProfile $storedProfile -ProfileSource 'ProfileFile'
                         $runtimeState = _EnsurePreparedRuntimeProxyProfileState -RuntimeState $runtimeState -SkipSessionPreparation:$SkipSessionPreparation
                         _SetProcessProxyProfileState -ProfilePath $ProfilePath -RuntimeState $runtimeState
                         return $runtimeState
                     }
 
-                    $persistedProfileValidationDiagnostics = @($persistedValidation.Diagnostics)
+                    $persistedProfileReadinessDiagnostics = @($persistedReadiness.Diagnostics)
 
-                    foreach ($message in $persistedProfileValidationDiagnostics) {
+                    foreach ($message in $persistedProfileReadinessDiagnostics) {
                         _Write-StandardMessage -Message (
                             "[WRN] {0}" -f $message
                         ) -Level WRN
@@ -2631,7 +2631,7 @@ public static class CertificateValidationHelper
             }
 
             $diagnostics = New-Object System.Collections.Generic.List[string]
-            foreach ($message in $persistedProfileValidationDiagnostics) {
+            foreach ($message in $persistedProfileReadinessDiagnostics) {
                 [void]$diagnostics.Add($message)
             }
 
@@ -2967,11 +2967,11 @@ public static class CertificateValidationHelper
         -BypassEnabled:$certificateBypassActive `
         -NativeSupportsSkipCertificateCheck:$nativeSupportsSkipCertificateCheck
 
-    $streamingHashValidationRequested =
+    $streamingHashReadinessRequested =
         $PSBoundParameters.ContainsKey('RequiredStreamingHashType') -or
         $PSBoundParameters.ContainsKey('RequiredStreamingHash')
 
-    if ($streamingHashValidationRequested) {
+    if ($streamingHashReadinessRequested) {
         if (-not $PSBoundParameters.ContainsKey('RequiredStreamingHashType') -or [string]::IsNullOrWhiteSpace($RequiredStreamingHashType)) {
             _Write-StandardMessage -Message ("[ERR] Parameter 'RequiredStreamingHashType' is required when 'RequiredStreamingHash' is supplied.") -Level ERR
             throw "RequiredStreamingHashType is required when RequiredStreamingHash is supplied."
@@ -3097,7 +3097,7 @@ public static class CertificateValidationHelper
         }
     }
 
-    if ($streamingHashValidationRequested -and -not $useStreamingEngine) {
+    if ($streamingHashReadinessRequested -and -not $useStreamingEngine) {
         _Write-StandardMessage -Message ("[ERR] Required streaming hash validation is only supported for the streaming download path (GET + OutFile compatible requests).") -Level ERR
         throw "Required streaming hash validation is only supported for the streaming download path."
     }
@@ -3179,7 +3179,7 @@ public static class CertificateValidationHelper
     }
 
     if ($certificateBypassActive -or $automaticCertificateFallbackAllowed) {
-        $acceptAllCallback = _GetAcceptAllCertificateValidationCallback
+        $acceptAllCallback = _GetAcceptAllCertificateReadinessCallback
     }
 
     try {
@@ -3326,7 +3326,7 @@ public static class CertificateValidationHelper
                                 }
 
                                 if ($certificateBypassActive -and $null -ne $acceptAllCallback) {
-                                    $request.ServerCertificateValidationCallback = $acceptAllCallback
+                                    $request.ServerCertificateReadinessCallback = $acceptAllCallback
                                 }
 
                                 $request.Method = 'GET'
@@ -3654,7 +3654,7 @@ public static class CertificateValidationHelper
                                     _Write-StandardMessage -Message ("[DL] Complete, total {0} MB from '{1}'." -f $finalMbText, $uriDisplay) -Level INF
                                 }
 
-                                if ($streamingHashValidationRequested) {
+                                if ($streamingHashReadinessRequested) {
                                     _Write-StandardMessage -Message ("[STATUS] Verifying {0} for '{1}'." -f $RequiredStreamingHashType, $OutFile) -Level INF
                                     $actualStreamingHash = _GetFileHashHex -Path $OutFile -Algorithm $RequiredStreamingHashType
 
@@ -3692,8 +3692,8 @@ public static class CertificateValidationHelper
                     else {
                         $previousDefaultWebProxy = $null
                         $defaultWebProxyOverridden = $false
-                        $previousCertificateValidationCallback = $null
-                        $certificateValidationCallbackOverridden = $false
+                        $previousCertificateReadinessCallback = $null
+                        $certificateReadinessCallbackOverridden = $false
 
                         try {
                             if ($resolvedProfileForcesNoProxy -and -not $nativeSupportsNoProxy) {
@@ -3703,21 +3703,21 @@ public static class CertificateValidationHelper
                             }
 
                             if ($certificateBypassActive -and -not $nativeSupportsSkipCertificateCheck -and $null -ne $acceptAllCallback) {
-                                $previousCertificateValidationCallback = [System.Net.ServicePointManager]::ServerCertificateValidationCallback
-                                [System.Net.ServicePointManager]::ServerCertificateValidationCallback = $acceptAllCallback
-                                $certificateValidationCallbackOverridden = $true
+                                $previousCertificateReadinessCallback = [System.Net.ServicePointManager]::ServerCertificateReadinessCallback
+                                [System.Net.ServicePointManager]::ServerCertificateReadinessCallback = $acceptAllCallback
+                                $certificateReadinessCallbackOverridden = $true
                             }
 
                             $result = Invoke-WebRequest @callParams
                         }
                         finally {
-                            if ($certificateValidationCallbackOverridden) {
-                                if ($null -eq $previousCertificateValidationCallback) {
-                                    [System.Net.ServicePointManager]::ServerCertificateValidationCallback =
-                                        [System.Net.Security.RemoteCertificateValidationCallback]$null
+                            if ($certificateReadinessCallbackOverridden) {
+                                if ($null -eq $previousCertificateReadinessCallback) {
+                                    [System.Net.ServicePointManager]::ServerCertificateReadinessCallback =
+                                        [System.Net.Security.RemoteCertificateReadinessCallback]$null
                                 }
                                 else {
-                                    [System.Net.ServicePointManager]::ServerCertificateValidationCallback = $previousCertificateValidationCallback
+                                    [System.Net.ServicePointManager]::ServerCertificateReadinessCallback = $previousCertificateReadinessCallback
                                 }
                             }
 
@@ -3739,13 +3739,13 @@ public static class CertificateValidationHelper
                     $statusCode = _GetHttpStatusCodeFromErrorRecord -ErrorRecord $caughtError
                     $wwwAuthenticateValues = _GetWwwAuthenticateValuesFromErrorRecord -ErrorRecord $caughtError
                     $hasWwwAuthenticateChallenge = $wwwAuthenticateValues.Count -gt 0
-                    $isCertificateValidationFailure = _TestIsCertificateValidationFailure -ErrorRecord $caughtError
+                    $isCertificateReadinessFailure = _TestIsCertificateReadinessFailure -ErrorRecord $caughtError
                     $isLikelyProxyAuthenticationFailure = _TestIsLikelyProxyAuthenticationFailure -ErrorRecord $caughtError -StatusCode $statusCode
 
                     if (
                         -not $certificateBypassActive -and
                         $automaticCertificateFallbackAllowed -and
-                        $isCertificateValidationFailure
+                        $isCertificateReadinessFailure
                     ) {
                         $certificateBypassActive = $true
                         if (
@@ -3779,7 +3779,7 @@ public static class CertificateValidationHelper
                                             _RemoveFileIfExists -Path $resumeMetadataPath
                                         }
 
-                                        if ($streamingHashValidationRequested) {
+                                        if ($streamingHashReadinessRequested) {
                                             _Write-StandardMessage -Message ("[STATUS] Verifying {0} for '{1}'." -f $RequiredStreamingHashType, $OutFile) -Level INF
                                             $actualStreamingHashOn416 = _GetFileHashHex -Path $OutFile -Algorithm $RequiredStreamingHashType
                                             if ($actualStreamingHashOn416 -ne $RequiredStreamingHash) {

@@ -92,7 +92,7 @@ function Select-PackageStateOwnershipRecord {
         DefinitionLocalPath    = $Record.definitionLocalPath
         DefinitionLocalExists  = Test-PackageStateLeafPath -Path ([string]$Record.definitionLocalPath)
         ReleaseTrack           = $Record.releaseTrack
-        ArtifactDistributionVariant = if ($Record.PSObject.Properties['artifactDistributionVariant']) { $Record.artifactDistributionVariant } else { $Record.flavor }
+        ArtifactDistributionVariant = $Record.artifactDistributionVariant
         CurrentReleaseId       = $Record.currentReleaseId
         CurrentVersion         = $Record.currentVersion
         InstallDirectory       = $installDirectory
@@ -245,4 +245,3 @@ function Get-PackageState {
         Directories               = $directories
     }
 }
-

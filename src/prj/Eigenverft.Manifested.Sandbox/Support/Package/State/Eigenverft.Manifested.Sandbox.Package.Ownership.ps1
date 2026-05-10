@@ -340,7 +340,7 @@ Update-PackageInventoryRecord -PackageResult $result
         [psobject]$PackageResult
     )
 
-    if (-not $PackageResult.Validation -or -not $PackageResult.Validation.Accepted) {
+    if (-not $PackageResult.Readiness -or -not $PackageResult.Readiness.Accepted) {
         return $PackageResult
     }
 
@@ -407,7 +407,7 @@ Update-PackageInventoryRecord -PackageResult $result
         definitionSourcePath = $definitionCopy.SourcePath
         definitionLocalPath = $definitionCopy.LocalPath
         releaseTrack    = if ($PackageResult.Package -and $PackageResult.Package.PSObject.Properties['releaseTrack']) { [string]$PackageResult.Package.releaseTrack } else { [string]$PackageResult.ReleaseTrack }
-        artifactDistributionVariant = if ($PackageResult.Package -and $PackageResult.Package.PSObject.Properties['artifactDistributionVariant']) { [string]$PackageResult.Package.artifactDistributionVariant } else { if ($PackageResult.Package -and $PackageResult.Package.PSObject.Properties['flavor']) { [string]$PackageResult.Package.flavor } else { $null } }
+        artifactDistributionVariant = if ($PackageResult.Package -and $PackageResult.Package.PSObject.Properties['artifactDistributionVariant']) { [string]$PackageResult.Package.artifactDistributionVariant } else { $null }
         currentReleaseId = $PackageResult.PackageId
         currentVersion  = $PackageResult.PackageVersion
         installDirectory = $normalizedInstallDirectory
@@ -472,4 +472,3 @@ normalized install directory when present), and persists the document.
 
     return $PackageResult
 }
-

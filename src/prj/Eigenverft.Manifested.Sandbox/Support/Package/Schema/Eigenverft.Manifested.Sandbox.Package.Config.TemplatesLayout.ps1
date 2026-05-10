@@ -106,11 +106,8 @@ function Get-PackageTemplateTokenMap {
         $tokens['releaseId'] = if ($Package.PSObject.Properties['id']) { [string]$Package.id } else { $null }
         $tokens['releaseTrack'] = if ($Package.PSObject.Properties['releaseTrack']) { [string]$Package.releaseTrack } else { $tokens['releaseTrack'] }
         $tokens['version'] = if ($Package.PSObject.Properties['version']) { [string]$Package.version } else { $null }
-        $tokens['artifactDistributionVariant'] = if ($Package.PSObject.Properties['artifactDistributionVariant']) { [string]$Package.artifactDistributionVariant } else { if ($Package.PSObject.Properties['flavor']) { [string]$Package.flavor } else { $null } }
+        $tokens['artifactDistributionVariant'] = if ($Package.PSObject.Properties['artifactDistributionVariant']) { [string]$Package.artifactDistributionVariant } else { $null }
         $tokens['artifactTargetId'] = if ($Package.PSObject.Properties['artifactTargetId']) { [string]$Package.artifactTargetId } else { $null }
-        $tokens['channel'] = $tokens['releaseTrack']
-        $tokens['flavor'] = $tokens['artifactDistributionVariant']
-        $tokens['platformTarget'] = $tokens['artifactDistributionVariant']
     }
     foreach ($key in @($ExtraTokens.Keys)) {
         $tokens[$key] = $ExtraTokens[$key]
@@ -210,7 +207,7 @@ function Get-PackagePackageWorkSlotDirectory {
     $definitionId = [string]$PackageConfig.DefinitionId
     $releaseTrack = if ($Package.PSObject.Properties['releaseTrack']) { [string]$Package.releaseTrack } else { [string]$PackageConfig.ReleaseTrack }
     $version = if ($Package.PSObject.Properties['version']) { [string]$Package.version } else { $null }
-    $artifactDistributionVariant = if ($Package.PSObject.Properties['artifactDistributionVariant']) { [string]$Package.artifactDistributionVariant } else { if ($Package.PSObject.Properties['flavor']) { [string]$Package.flavor } else { $null } }
+    $artifactDistributionVariant = if ($Package.PSObject.Properties['artifactDistributionVariant']) { [string]$Package.artifactDistributionVariant } else { $null }
     foreach ($requiredValue in @($definitionId, $releaseTrack, $version, $artifactDistributionVariant)) {
         if ([string]::IsNullOrWhiteSpace($requiredValue)) {
             throw 'Package work slot derivation requires definition id, releaseTrack, version, and artifactDistributionVariant.'

@@ -139,7 +139,7 @@ FileList = @(
     'Support\Package\State\Eigenverft.Manifested.Sandbox.Package.Ownership.ps1',
     'Support\Package\State\Eigenverft.Manifested.Sandbox.Package.OperationHistory.ps1',
     'Support\Package\State\Eigenverft.Manifested.Sandbox.Package.State.ps1',
-    'Support\Package\Lifecycle\Eigenverft.Manifested.Sandbox.Package.Validation.ps1',
+    'Support\Package\Lifecycle\Eigenverft.Manifested.Sandbox.Package.Readiness.ps1',
     'Support\Package\Execution\Eigenverft.Manifested.Sandbox.Package.Npm.ps1',
     'Support\Package\Lifecycle\Eigenverft.Manifested.Sandbox.Package.Install.ps1',
     'Support\Package\Lifecycle\Eigenverft.Manifested.Sandbox.Package.Install.Existing.ps1',

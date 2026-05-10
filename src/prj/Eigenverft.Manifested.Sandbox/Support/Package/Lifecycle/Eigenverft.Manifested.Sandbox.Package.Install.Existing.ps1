@@ -1,4 +1,4 @@
-﻿<#
+<#
     Eigenverft.Manifested.Sandbox.Package.Install — existing-install discovery, registry probe, and reuse/adopt decisions.
     Dot-sourced from Eigenverft.Manifested.Sandbox.psm1 (mirrored in TestImports.ps1) before Package.Install.ps1.
 #>
@@ -153,7 +153,7 @@ Find-PackageExistingPackage -PackageResult $result
             CandidatePath    = $resolvedPackageOwnedInstallDirectory
             InstallDirectory = $resolvedPackageOwnedInstallDirectory
             Decision         = 'Pending'
-            Validation       = $null
+            Readiness       = $null
             Classification   = $null
             OwnershipRecord  = $null
         }
@@ -226,7 +226,7 @@ Find-PackageExistingPackage -PackageResult $result
             CandidatePath    = $candidatePath
             InstallDirectory = $installDirectory
             Decision         = 'Pending'
-            Validation       = $null
+            Readiness       = $null
             Classification   = $null
             OwnershipRecord  = $null
             DiscoveryDetails = $discoveryDetails
@@ -269,12 +269,12 @@ Resolve-PackageExistingPackageDecision -PackageResult $result
     $originalInstallDirectory = $PackageResult.InstallDirectory
     $PackageResult.InstallDirectory = $PackageResult.ExistingPackage.InstallDirectory
     $PackageResult = Test-PackageAssignedReadiness -PackageResult $PackageResult
-    $PackageResult.ExistingPackage.Validation = $PackageResult.Validation
+    $PackageResult.ExistingPackage.Readiness = $PackageResult.Readiness
 
-    if (-not $PackageResult.Validation.Accepted) {
-        $PackageResult.ExistingPackage.Decision = 'ExistingInstallValidationFailed'
+    if (-not $PackageResult.Readiness.Accepted) {
+        $PackageResult.ExistingPackage.Decision = 'ExistingInstallReadinessFailed'
         $PackageResult.InstallDirectory = $originalInstallDirectory
-        $PackageResult.Validation = $null
+        $PackageResult.Readiness = $null
         return $PackageResult
     }
 
@@ -333,7 +333,7 @@ Resolve-PackageExistingPackageDecision -PackageResult $result
 
             $PackageResult.ExistingPackage.Decision = 'UpgradeAdoptedInstall'
             $PackageResult.InstallDirectory = $originalInstallDirectory
-            $PackageResult.Validation = $null
+            $PackageResult.Readiness = $null
             Write-PackageExecutionMessage -Level 'WRN' -Message ("[DECISION] Replacing adopted install at '{0}' with a Package-owned install." -f $PackageResult.ExistingPackage.InstallDirectory)
             Write-PackageExecutionMessage -Message ("[STATE] Existing install decision resolved to '{0}'." -f $PackageResult.ExistingPackage.Decision)
             return $PackageResult
@@ -349,7 +349,7 @@ Resolve-PackageExistingPackageDecision -PackageResult $result
 
         $PackageResult.ExistingPackage.Decision = 'ReplacePackageOwnedInstall'
         $PackageResult.InstallDirectory = $originalInstallDirectory
-        $PackageResult.Validation = $null
+        $PackageResult.Readiness = $null
         Write-PackageExecutionMessage -Level 'WRN' -Message ("[DECISION] Replacing outdated Package-owned install at '{0}'." -f $PackageResult.ExistingPackage.InstallDirectory)
         Write-PackageExecutionMessage -Message ("[STATE] Existing install decision resolved to '{0}'." -f $PackageResult.ExistingPackage.Decision)
         return $PackageResult
@@ -358,7 +358,7 @@ Resolve-PackageExistingPackageDecision -PackageResult $result
     if ($requirePackageOwnership) {
         $PackageResult.ExistingPackage.Decision = 'ExternalIgnored'
         $PackageResult.InstallDirectory = $originalInstallDirectory
-        $PackageResult.Validation = $null
+        $PackageResult.Readiness = $null
         Write-PackageExecutionMessage -Level 'WRN' -Message ("[DECISION] Ignoring external install '{0}' because Package ownership is required." -f $PackageResult.ExistingPackage.InstallDirectory)
         Write-PackageExecutionMessage -Message ("[STATE] Existing install decision resolved to '{0}'." -f $PackageResult.ExistingPackage.Decision)
         return $PackageResult
@@ -374,7 +374,7 @@ Resolve-PackageExistingPackageDecision -PackageResult $result
 
     $PackageResult.ExistingPackage.Decision = 'ExternalIgnored'
     $PackageResult.InstallDirectory = $originalInstallDirectory
-    $PackageResult.Validation = $null
+    $PackageResult.Readiness = $null
     Write-PackageExecutionMessage -Level 'WRN' -Message ("[DECISION] Ignoring external install '{0}'." -f $PackageResult.ExistingPackage.InstallDirectory)
     Write-PackageExecutionMessage -Message ("[STATE] Existing install decision resolved to '{0}'." -f $PackageResult.ExistingPackage.Decision)
     return $PackageResult

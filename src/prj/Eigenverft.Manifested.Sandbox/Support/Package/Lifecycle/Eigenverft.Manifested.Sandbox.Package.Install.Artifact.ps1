@@ -1,4 +1,4 @@
-﻿<#
+<#
     Eigenverft.Manifested.Sandbox.Package.Install — archive expansion and single-file package placement.
     Dot-sourced from Eigenverft.Manifested.Sandbox.psm1 (mirrored in TestImports.ps1) before Package.Install.ps1.
 #>
@@ -29,7 +29,7 @@ Install-PackageArchive -PackageResult $result
         throw "Package archive install for '$($PackageResult.PackageId)' requires a saved package file."
     }
 
-    $install = Get-PackageEffectiveReleaseAssignedBlock -Release $PackageResult.Package
+    $install = Get-PackageAssignedOperation -Release $PackageResult.Package
     if (-not $install) {
         throw "Package archive install for '$($PackageResult.PackageId)' requires an assigned block on the selected release."
     }
@@ -90,7 +90,7 @@ simple install model.
         [psobject]$PackageResult
     )
 
-    $install = Get-PackageEffectiveReleaseAssignedBlock -Release $PackageResult.Package
+    $install = Get-PackageAssignedOperation -Release $PackageResult.Package
     if (-not $install) {
         throw "Package single-file install for '$($PackageResult.PackageId)' requires an assigned block on the selected release."
     }

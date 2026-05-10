@@ -26,7 +26,7 @@ Resolve-PackageEntryPoints -PackageResult $result
     $definition = $PackageResult.PackageConfig.Definition
     $commands = @(
         foreach ($entryPoint in @(Get-PackagePresenceDiscoveryEntryPoints -Definition $definition -ToolKind 'commands' -ExposedOnly)) {
-            $path = Resolve-PackageDiscoveredToolEntryPointPath -EntryPoint $entryPoint -InstallDirectory $PackageResult.InstallDirectory
+            $path = Resolve-PackagePresenceEntryPointPath -EntryPoint $entryPoint -InstallDirectory $PackageResult.InstallDirectory
             [pscustomobject]@{
                 Name   = $entryPoint.name
                 Path   = $path
@@ -37,7 +37,7 @@ Resolve-PackageEntryPoints -PackageResult $result
 
     $apps = @(
         foreach ($entryPoint in @(Get-PackagePresenceDiscoveryEntryPoints -Definition $definition -ToolKind 'apps' -ExposedOnly)) {
-            $path = Resolve-PackageDiscoveredToolEntryPointPath -EntryPoint $entryPoint -InstallDirectory $PackageResult.InstallDirectory
+            $path = Resolve-PackagePresenceEntryPointPath -EntryPoint $entryPoint -InstallDirectory $PackageResult.InstallDirectory
             [pscustomobject]@{
                 Name   = $entryPoint.name
                 Path   = $path
@@ -101,13 +101,13 @@ Complete-PackageResult -PackageResult $result
         $PackageResult.Removed -and $PackageResult.Removed.PSObject.Properties['Accepted'] -and [bool]$PackageResult.Removed.Accepted) {
         $PackageResult.Status = 'Ready'
     }
-    elseif ($PackageResult.Validation -and $PackageResult.Validation.Accepted) {
+    elseif ($PackageResult.Readiness -and $PackageResult.Readiness.Accepted) {
         $PackageResult.Status = 'Ready'
     }
     else {
         $PackageResult.Status = 'Failed'
         if ([string]::IsNullOrWhiteSpace($PackageResult.FailureReason)) {
-            $PackageResult.FailureReason = 'AssignedPackageValidationFailed'
+            $PackageResult.FailureReason = 'AssignedPackageReadinessFailed'
         }
     }
 

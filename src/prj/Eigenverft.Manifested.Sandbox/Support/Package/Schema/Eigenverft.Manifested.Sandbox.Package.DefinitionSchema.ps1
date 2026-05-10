@@ -3,7 +3,7 @@
     Package definition JSON validation for the mandatory schemaVersion 1.3 wire model.
 
     Runtime validation is PowerShell-only (this module + DefinitionSchema.Wire1_3.ps1). The JSON schema file
-    is the editor/contract; keep it aligned with these asserts.
+    is the editor/human contract (canonical conforming examples live as *.json next to the schema); keep schema and asserts aligned. Schema root may include x-eigenverftAgentHint for LLM task disambiguation—runtime ignores it.
 #>
 
 # Mandatory schemaVersion for package definitions.

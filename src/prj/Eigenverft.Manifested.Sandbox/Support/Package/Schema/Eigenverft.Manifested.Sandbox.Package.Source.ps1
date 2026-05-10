@@ -459,7 +459,7 @@ Test-PackagePackageFileAcquisitionRequired -Package $package
         [psobject]$Package
     )
 
-    $assigned = Get-PackageEffectiveReleaseAssignedBlock -Release $Package
+    $assigned = Get-PackageAssignedOperation -Release $Package
     $installKind = if ($assigned -and $assigned.PSObject.Properties['kind']) {
         [string]$assigned.kind
     }
@@ -857,7 +857,7 @@ Resolve-PackageInstallFile -PackageResult $result
     $package = $PackageResult.Package
     $packageConfig = $PackageResult.PackageConfig
 
-    if (-not $package -or -not (Get-PackageEffectiveReleaseAssignedBlock -Release $package)) {
+    if (-not $package -or -not (Get-PackageAssignedOperation -Release $package)) {
         throw 'Resolve-PackageInstallFile requires a selected release with assigned settings.'
     }
 

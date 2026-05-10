@@ -56,11 +56,11 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - path r
             }
         }
 
-        Resolve-PackageDiscoveredToolPath -Definition $definition -ToolKind 'commands' -Name 'CODE' -InstallDirectory $installRoot |
+        Resolve-PackagePresenceToolPath -Definition $definition -ToolKind 'commands' -Name 'CODE' -InstallDirectory $installRoot |
             Should -Be (Join-Path $installRoot 'bin\code.cmd')
-        Resolve-PackageDiscoveredToolPath -Definition $definition -ToolKind 'apps' -Name 'code' -InstallDirectory $installRoot |
+        Resolve-PackagePresenceToolPath -Definition $definition -ToolKind 'apps' -Name 'code' -InstallDirectory $installRoot |
             Should -Be (Join-Path $installRoot 'Code.exe')
-        Resolve-PackageDiscoveredToolPath -Definition $definition -ToolKind 'commands' -Name 'missing' -InstallDirectory $installRoot |
+        Resolve-PackagePresenceToolPath -Definition $definition -ToolKind 'commands' -Name 'missing' -InstallDirectory $installRoot |
             Should -BeNullOrEmpty
     }
 

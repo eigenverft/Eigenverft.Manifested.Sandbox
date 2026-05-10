@@ -1,4 +1,4 @@
-﻿<#
+<#
     Eigenverft.Manifested.Sandbox.Package.Config — deep copy and merge utilities for config objects.
     Loaded by Eigenverft.Manifested.Sandbox.Package.Config.ps1.
 #>
@@ -135,7 +135,7 @@ function ConvertTo-PackageObject {
     return $InputObject
 }
 
-function Get-PackageEffectiveReleaseAssignedBlock {
+function Get-PackageAssignedOperation {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $false)]
@@ -175,7 +175,7 @@ function Get-PackageEffectiveReleaseAssignedBlock {
     return $null
 }
 
-function Get-PackageEffectiveReleaseRemovedBlock {
+function Get-PackageRemovedOperation {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $false)]

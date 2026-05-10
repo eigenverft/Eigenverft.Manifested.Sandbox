@@ -8,7 +8,7 @@
 function Set-PackageAssignedState {
 <#
 .SYNOPSIS
-Assigns the selected package (install or reuse per assigned.kind).
+Assigns the selected package using packageOperations.assigned.install.
 
 .DESCRIPTION
 Reuses or adopts a valid existing install when the earlier ownership/policy
@@ -28,9 +28,9 @@ Set-PackageAssignedState -PackageResult $result
     )
 
     $package = $PackageResult.Package
-    $install = Get-PackageEffectiveReleaseAssignedBlock -Release $package
+    $install = Get-PackageAssignedOperation -Release $package
     if (-not $install -or -not $install.PSObject.Properties['kind']) {
-        throw "Package release '$($package.id)' does not define assigned.kind."
+        throw "Package release '$($package.id)' does not define packageOperations.assigned.install.kind."
     }
 
     if ([string]::Equals([string]$PackageResult.InstallOrigin, 'AlreadySatisfied', [System.StringComparison]::OrdinalIgnoreCase)) {
@@ -48,7 +48,7 @@ Set-PackageAssignedState -PackageResult $result
             ReusedExisting   = $true
             CandidatePath    = $PackageResult.ExistingPackage.CandidatePath
         }
-        $PackageResult.Validation = $PackageResult.ExistingPackage.Validation
+        $PackageResult.Readiness = $PackageResult.ExistingPackage.Readiness
         Write-PackageExecutionMessage -Message ("[ACTION] Reused Package-owned install '{0}'." -f $PackageResult.ExistingPackage.InstallDirectory)
         return $PackageResult
     }
@@ -63,13 +63,13 @@ Set-PackageAssignedState -PackageResult $result
             ReusedExisting   = $true
             CandidatePath    = $PackageResult.ExistingPackage.CandidatePath
         }
-        $PackageResult.Validation = $PackageResult.ExistingPackage.Validation
+        $PackageResult.Readiness = $PackageResult.ExistingPackage.Readiness
         Write-PackageExecutionMessage -Message ("[ACTION] Adopted external install '{0}'." -f $PackageResult.ExistingPackage.InstallDirectory)
         return $PackageResult
     }
 
     if ([string]::Equals([string]$install.kind, 'reuseExisting', [System.StringComparison]::OrdinalIgnoreCase)) {
-        throw "Package release '$($package.id)' requires an existing install, but no reusable install passed validation."
+        throw "Package release '$($package.id)' requires an existing install, but no reusable install passed readiness."
     }
 
     if ($PackageResult.PackageFilePreparation -and -not $PackageResult.PackageFilePreparation.Success) {
@@ -116,7 +116,7 @@ Set-PackageAssignedState -PackageResult $result
             $PackageResult.Assigned = Install-PackageNpmPackage -PackageResult $PackageResult
         }
         default {
-            throw "Unsupported Package assigned.kind '$($install.kind)'."
+            throw "Unsupported packageOperations.assigned.install.kind '$($install.kind)'."
         }
     }
 
