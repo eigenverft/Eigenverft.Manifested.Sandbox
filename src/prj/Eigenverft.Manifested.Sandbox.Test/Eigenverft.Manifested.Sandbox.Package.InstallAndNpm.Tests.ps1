@@ -510,7 +510,7 @@ exit /b 0
         $rootPath = Join-Path $TestDrive 'nsis installer path with space'
         $packageFilePath = Join-Path $rootPath 'file-stage\npp.8.9.4.Installer.x64.exe'
         $installStageDirectory = Join-Path $rootPath 'install-stage'
-        $installDirectory = Join-Path $rootPath 'Installed\Notepad++ Target'
+        $installDirectory = Join-Path $rootPath 'Inst\Notepad++ Target'
         Write-TestTextFile -Path $packageFilePath -Content 'installer'
 
         $process = [pscustomobject]@{

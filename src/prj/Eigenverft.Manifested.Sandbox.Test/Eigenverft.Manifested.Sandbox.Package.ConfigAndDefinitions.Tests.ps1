@@ -98,7 +98,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
         $config = Get-PackageConfig -DefinitionId 'VSCodeRuntime'
 
         $config.ApplicationRootDirectory | Should -Be ([System.IO.Path]::GetFullPath($applicationRootPath))
-        $config.PreferredTargetInstallRootDirectory | Should -Be ([System.IO.Path]::GetFullPath((Join-Path $applicationRootPath 'Installed')))
+        $config.PreferredTargetInstallRootDirectory | Should -Be ([System.IO.Path]::GetFullPath((Join-Path $applicationRootPath 'Inst')))
         $config.PackageFileStagingRootDirectory | Should -Be ([System.IO.Path]::GetFullPath((Join-Path $applicationRootPath 'FileStage')))
         $config.PackageInstallStageRootDirectory | Should -Be ([System.IO.Path]::GetFullPath((Join-Path $applicationRootPath 'InstStage')))
         $config.DefaultPackageDepotDirectory | Should -Be ([System.IO.Path]::GetFullPath((Join-Path $applicationRootPath 'DefaultPackageDepot')))
@@ -220,7 +220,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
         Test-Path -LiteralPath $localConfigDirectory -PathType Container | Should -BeTrue
         Test-Path -LiteralPath $localDepotInventoryDirectory -PathType Container | Should -BeTrue
         Test-Path -LiteralPath (Join-Path (Join-Path $applicationRootPath 'Configuration') 'External') -PathType Container | Should -BeTrue
-        Test-Path -LiteralPath (Join-Path $applicationRootPath 'Installed') -PathType Container | Should -BeTrue
+        Test-Path -LiteralPath (Join-Path $applicationRootPath 'Inst') -PathType Container | Should -BeTrue
         Test-Path -LiteralPath (Join-Path $applicationRootPath 'FileStage') -PathType Container | Should -BeTrue
         Test-Path -LiteralPath (Join-Path $applicationRootPath 'InstStage') -PathType Container | Should -BeTrue
         Test-Path -LiteralPath (Join-Path $applicationRootPath 'PackageRepositories') -PathType Container | Should -BeTrue
@@ -504,8 +504,8 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
         $documents = Write-TestPackageDocuments -RootPath $rootPath -GlobalDocument $globalDocument -DefinitionDocument $definitionDocument
 
         $appRoot = Join-Path $rootPath 'AppRoot'
-        $preferredRoot = Join-Path $appRoot 'Installed'
-        $installDir = Join-Path $preferredRoot 'vscode-runtime\stable\2.0.0\win32-x64'
+        $preferredRoot = Join-Path $appRoot 'Inst'
+        $installDir = Join-Path $preferredRoot 'vsc-rt\stable\2.0.0\win32-x64'
         $null = New-Item -ItemType Directory -Path (Join-Path $installDir 'bin') -Force
         Write-TestTextFile -Path (Join-Path $installDir 'Code.exe') -Content 'x'
         Write-TestTextFile -Path (Join-Path $installDir 'bin\code.cmd') -Content '@echo off'
@@ -568,8 +568,8 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
         Mock Get-PackageDefinitionPath { param($DefinitionId) Join-Path $defDir ("$DefinitionId.json") }
 
         $appRoot = Join-Path $rootPath 'AppRoot'
-        $codexDir = Join-Path $appRoot 'Installed\codex-cli'
-        $nodeDir = Join-Path $appRoot 'Installed\node'
+        $codexDir = Join-Path $appRoot 'Inst\codex-cli'
+        $nodeDir = Join-Path $appRoot 'Inst\node'
         $null = New-Item -ItemType Directory -Path $codexDir -Force
         $null = New-Item -ItemType Directory -Path $nodeDir -Force
 

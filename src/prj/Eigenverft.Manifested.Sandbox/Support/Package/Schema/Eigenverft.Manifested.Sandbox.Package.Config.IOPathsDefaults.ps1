@@ -246,7 +246,7 @@ Get-PackageDefaultPreferredTargetInstallDirectory
     [CmdletBinding()]
     param()
 
-    return [System.IO.Path]::GetFullPath((Join-Path (Get-PackageDefaultApplicationRootDirectory) 'Installed'))
+    return [System.IO.Path]::GetFullPath((Join-Path (Get-PackageDefaultApplicationRootDirectory) 'Inst'))
 }
 
 function Get-PackageDefaultPackageInventoryFilePath {

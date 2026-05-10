@@ -201,7 +201,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - acquis
         Write-TestTextFile -Path (Join-Path $binDirectory 'code.cmd') -Content "@echo off`r`necho 2.0.0`r`n"
 
         $existingInstallDiscovery = New-TestExistingInstallDiscovery -Enabled $true -SearchLocations @(
-            @{ kind = 'directory'; path = $installRoot }
+            @{ id = 'testAdoptExternalDir'; kind = 'directory'; searchOrder = 100; path = $installRoot }
         ) -InstallRootRules @()
         $policy = New-TestOwnershipPolicy -AllowAdoptExternal $true
         $readiness = New-TestReadiness -Version '2.0.0' -Directories @()
@@ -233,7 +233,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - acquis
         Write-TestTextFile -Path (Join-Path $binDirectory 'code.cmd') -Content "@echo off`r`necho 2.0.0`r`n"
 
         $existingInstallDiscovery = New-TestExistingInstallDiscovery -Enabled $true -SearchLocations @(
-            @{ kind = 'directory'; path = $installRoot }
+            @{ id = 'testIgnoreExternalDir'; kind = 'directory'; searchOrder = 100; path = $installRoot }
         ) -InstallRootRules @()
         $policy = New-TestOwnershipPolicy -AllowAdoptExternal $true -RequirePackageOwnership $true
         $readiness = New-TestReadiness -Version '2.0.0' -Directories @()
@@ -281,7 +281,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - acquis
         }
 
         $existingInstallDiscovery = New-TestExistingInstallDiscovery -Enabled $true -SearchLocations @(
-            @{ kind = 'directory'; path = $installRoot }
+            @{ id = 'testReuseManagedDir'; kind = 'directory'; searchOrder = 100; path = $installRoot }
         ) -InstallRootRules @()
         $policy = New-TestOwnershipPolicy -AllowAdoptExternal $true
         $readiness = New-TestReadiness -Version '2.0.0' -Directories @()
@@ -344,7 +344,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - acquis
         $globalDocument = New-TestPackageGlobalDocument -PackageFileStagingDirectory (Join-Path $rootPath 'workspace') -DefaultPackageDepotDirectory (Join-Path $rootPath 'default-depot') -PreferredTargetInstallDirectory (Join-Path $rootPath 'installs')
         $release = New-TestPackageRelease -Id 'vsCode-win-x64-stable' -Version '2.0.0' -Architecture 'x64' -ArtifactDistributionVariant 'win32-x64' -FileName 'VSCode-win32-x64-2.0.0.zip' -Install @{
             kind             = 'expandArchive'
-            installDirectory = 'vscode-runtime/stable/2.0.0/win32-x64'
+            installDirectory = 'vsc-rt/stable/2.0.0/win32-x64'
             expandedRoot     = 'auto'
             createDirectories = @('data')
         } -AcquisitionCandidates @(

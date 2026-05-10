@@ -122,7 +122,7 @@ function Get-PackageStateConfig {
         Resolve-PackageConfiguredPath -PathValue ([string]$packageGlobalConfig.preferredTargetInstallDirectory) -ApplicationRootDirectory $applicationRootDirectory
     }
     else {
-        Resolve-PackageConfiguredPath -PathValue 'Installed' -ApplicationRootDirectory $applicationRootDirectory
+        Resolve-PackageConfiguredPath -PathValue 'Inst' -ApplicationRootDirectory $applicationRootDirectory
     }
 
     $packageInventoryFilePath = if ($packageGlobalConfig.packageState.PSObject.Properties['inventoryFilePath'] -and

@@ -180,7 +180,7 @@ function global:New-TestPackageGlobalDocument {
     return @{
         package = @{
             applicationRootDirectory = if ($PSBoundParameters.ContainsKey('ApplicationRootDirectory')) { $ApplicationRootDirectory } else { '%LOCALAPPDATA%/Programs/Evf.Sandbox' }
-            preferredTargetInstallDirectory = if ($PSBoundParameters.ContainsKey('PreferredTargetInstallDirectory')) { $PreferredTargetInstallDirectory } else { '{applicationRootDirectory}/Installed' }
+            preferredTargetInstallDirectory = if ($PSBoundParameters.ContainsKey('PreferredTargetInstallDirectory')) { $PreferredTargetInstallDirectory } else { '{applicationRootDirectory}/Inst' }
             repositorySources = @{
                 EigenverftModule = @{
                     kind = 'moduleLocal'
@@ -490,7 +490,7 @@ function global:New-TestVSCodeDefinitionDocument {
         $SharedInstall = @{
             install = @{
                 kind             = 'expandArchive'
-                installDirectory = 'vscode-runtime/{releaseTrack}/{version}/{artifactDistributionVariant}'
+                installDirectory = 'vsc-rt/{releaseTrack}/{version}/{artifactDistributionVariant}'
                 expandedRoot     = 'auto'
                 createDirectories = @('data')
             }

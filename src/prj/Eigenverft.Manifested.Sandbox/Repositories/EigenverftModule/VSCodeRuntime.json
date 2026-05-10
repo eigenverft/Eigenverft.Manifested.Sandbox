@@ -232,7 +232,7 @@
     "assigned": {
       "install": {
         "kind": "expandArchive",
-        "installDirectory": "vscode-runtime/{releaseTrack}/{version}/{artifactDistributionVariant}",
+        "installDirectory": "vsc-rt/{releaseTrack}/{version}/{artifactDistributionVariant}",
         "expandedRoot": "auto",
         "createDirectories": [
           "data"

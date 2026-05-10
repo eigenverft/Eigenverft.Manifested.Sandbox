@@ -72,7 +72,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - export
         $root = Join-Path $TestDrive 'empty-package-state'
         $config = [pscustomobject]@{
             LocalConfigurationPath              = Join-Path $root 'Configuration\Internal\Config.json'
-            PreferredTargetInstallRootDirectory = Join-Path $root 'Installed'
+            PreferredTargetInstallRootDirectory = Join-Path $root 'Inst'
             PackageFileStagingRootDirectory       = Join-Path $root 'PackageFileStaging'
             PackageInstallStageRootDirectory    = Join-Path $root 'PackageInstallStage'
             DefaultPackageDepotDirectory        = Join-Path $root 'DefaultPackageDepot'
@@ -112,7 +112,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - export
         $root = Join-Path $TestDrive 'definition-free-package-state'
         $config = [pscustomobject]@{
             LocalConfigurationPath              = Join-Path $root 'Configuration\Internal\Config.json'
-            PreferredTargetInstallRootDirectory = Join-Path $root 'Installed'
+            PreferredTargetInstallRootDirectory = Join-Path $root 'Inst'
             PackageFileStagingRootDirectory       = Join-Path $root 'PackageFileStaging'
             PackageInstallStageRootDirectory    = Join-Path $root 'PackageInstallStage'
             DefaultPackageDepotDirectory        = Join-Path $root 'DefaultPackageDepot'
@@ -135,13 +135,13 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - export
 
     It 'summarizes package inventory records, operation records, and local directory state' {
         $root = Join-Path $TestDrive 'populated-package-state'
-        $installRoot = Join-Path $root 'Installed'
+        $installRoot = Join-Path $root 'Inst'
         $workspaceRoot = Join-Path $root 'PackageFileStaging'
         $installStageRoot = Join-Path $root 'PackageInstallStage'
         $depotRoot = Join-Path $root 'DefaultPackageDepot'
         $localRepositoryRoot = Join-Path $root 'PackageRepositories'
         $shimDirectory = Join-Path $root 'Shims'
-        $installDirectory = Join-Path $installRoot 'vscode-runtime\stable\1.0.0\win32-x64'
+        $installDirectory = Join-Path $installRoot 'vsc-rt\stable\1.0.0\win32-x64'
         $definitionLocalPath = Join-Path $localRepositoryRoot 'EigenverftModule\VSCodeRuntime.json'
         $sourceInventoryPath = Join-Path (Join-Path $root 'Configuration\External') 'SourceInventory.json'
 
@@ -235,7 +235,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - export
         $root = Join-Path $TestDrive 'raw-package-state'
         $config = [pscustomobject]@{
             LocalConfigurationPath              = Join-Path $root 'Configuration\Internal\Config.json'
-            PreferredTargetInstallRootDirectory = Join-Path $root 'Installed'
+            PreferredTargetInstallRootDirectory = Join-Path $root 'Inst'
             PackageFileStagingRootDirectory       = Join-Path $root 'PackageFileStaging'
             PackageInstallStageRootDirectory    = Join-Path $root 'PackageInstallStage'
             DefaultPackageDepotDirectory        = Join-Path $root 'DefaultPackageDepot'
