@@ -102,7 +102,7 @@ Assert-PackageDefinitionSchema -DefinitionDocumentInfo $definitionInfo -Definiti
             'existingInstallPolicy'
         )) {
         if ($definition.PSObject.Properties[$retiredProperty]) {
-            throw "Package definition '$($DefinitionDocumentInfo.Path)' still uses retired schemaVersion 1.2 property '$retiredProperty'."
+            throw "Package definition '$($DefinitionDocumentInfo.Path)' still uses retired pre-1.3 property '$retiredProperty'."
         }
     }
 
