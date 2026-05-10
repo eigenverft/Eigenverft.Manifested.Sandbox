@@ -1,5 +1,5 @@
 <#
-    Eigenverft.Manifested.Sandbox.Package.Install — archive expansion and single-file package placement.
+    Eigenverft.Manifested.Sandbox.Package.Install - archive expansion and single-file package placement.
     Dot-sourced from Eigenverft.Manifested.Sandbox.psm1 (mirrored in TestImports.ps1) before Package.Install.ps1.
 #>
 

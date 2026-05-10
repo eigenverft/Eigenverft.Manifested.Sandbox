@@ -1,5 +1,5 @@
 <#
-    Eigenverft.Manifested.Sandbox.Package.Install — install-target metadata, elevation plan, machine-prerequisite short-circuit.
+    Eigenverft.Manifested.Sandbox.Package.Install - install-target metadata, elevation plan, machine-prerequisite short-circuit.
     Dot-sourced from Eigenverft.Manifested.Sandbox.psm1 (mirrored in TestImports.ps1) before Package.Install.ps1.
 #>
 

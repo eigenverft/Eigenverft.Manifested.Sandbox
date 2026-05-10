@@ -16,11 +16,11 @@ $ErrorActionPreference     = 'Stop'   # errors become terminating
 $Global:ConsoleLogMinLevel = 'INF'    # gate: TRC/DBG/INF/WRN/ERR/FTL
 
 # Keep this script compatible with PowerShell 5.1 and PowerShell 7+
-# Lean, pipeline-friendly style—simple, readable, and easy to modify, failfast on errors.
+# Lean, pipeline-friendly style - simple, readable, and easy to modify, failfast on errors.
 Write-Output "Powershell script $(Split-Path -Leaf $PSCommandPath) has started."
 
 # Provides lightweight reachability guards for external services.
-# Detection only—no installs, imports, network changes, or pushes. (e.g Test-PSGalleryConnectivity)
+# Detection only - no installs, imports, network changes, or pushes. (e.g Test-PSGalleryConnectivity)
 # Designed to short-circuit local and CI/CD workflows when dependencies are offline (e.g., skip a push if the Git host is unreachable).
 . "$PSScriptRoot\cicd.bootstrap.ps1"
 

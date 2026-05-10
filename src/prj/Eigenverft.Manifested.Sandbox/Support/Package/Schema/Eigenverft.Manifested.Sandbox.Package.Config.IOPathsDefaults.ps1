@@ -1,5 +1,5 @@
-﻿<#
-    Eigenverft.Manifested.Sandbox.Package.Config — paths, defaults, runtime context, inventory path helpers.
+<#
+    Eigenverft.Manifested.Sandbox.Package.Config - paths, defaults, runtime context, inventory path helpers.
     Loaded by Eigenverft.Manifested.Sandbox.Package.Config.ps1 (do not dot-source directly from the module root).
 #>
 

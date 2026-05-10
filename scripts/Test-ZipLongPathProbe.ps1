@@ -5,7 +5,7 @@ Reports the longest path(s) inside a .zip and the combined length after a typica
 .DESCRIPTION
 Use on a dev machine with long paths enabled to fully expand archives that exceed classic MAX_PATH
 when placed under a long prefix (e.g. Evf.Sandbox install layout). On a machine without long-path
-support, expansion may fail or omit entries—use this script to see predicted lengths first.
+support, expansion may fail or omit entries - use this script to see predicted lengths first.
 
 .PARAMETER ZipPath
 Path to the archive (e.g. VSCode-win32-x64-*.zip).

@@ -101,13 +101,13 @@ Displays module information, per-definition Invoke-Package examples, and other e
 
     if ($definitionIds.Count -gt 0) {
         $outputLines += @(
-            ('Shipped package definitions (repository ''{0}'', example assign; default repository—omit -RepositoryId):' -f $defaultRepo)
+            ('Shipped package definitions (repository ''{0}'', example assign; default repository - omit -RepositoryId):' -f $defaultRepo)
             ($definitionIds | ForEach-Object { "- Invoke-Package -DefinitionId '{0}'" -f $_ })
             'Use -DesiredState Removed to uninstall a package-owned install when the definition supports it.'
         )
         $bulkIds = @($definitionIds | Where-Object { $_ -ne 'VSCodeUser' })
         if ($bulkIds.Count -gt 0) {
-            $outputLines += 'Assign many at once (comma-separated; VSCodeUser omitted here—use VSCodeRuntime for the portable layout or invoke VSCodeUser separately):'
+            $outputLines += 'Assign many at once (comma-separated; VSCodeUser omitted here - use VSCodeRuntime for the portable layout or invoke VSCodeUser separately):'
             $outputLines += ("- Invoke-Package -DefinitionId {0}" -f ($bulkIds -join ','))
         }
         $outputLines += ''

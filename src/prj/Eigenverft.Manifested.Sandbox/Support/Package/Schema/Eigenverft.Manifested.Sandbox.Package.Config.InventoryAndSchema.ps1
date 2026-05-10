@@ -1,5 +1,5 @@
-﻿<#
-    Eigenverft.Manifested.Sandbox.Package.Config — depot/source inventory and global config schema assertions.
+<#
+    Eigenverft.Manifested.Sandbox.Package.Config - depot/source inventory and global config schema assertions.
     Loaded by Eigenverft.Manifested.Sandbox.Package.Config.ps1.
 #>
 

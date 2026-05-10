@@ -1,5 +1,5 @@
 <#
-    Eigenverft.Manifested.Sandbox.Package.Config — environment resolution, Get-PackageConfig, path resolution, New-PackageResult.
+    Eigenverft.Manifested.Sandbox.Package.Config - environment resolution, Get-PackageConfig, path resolution, New-PackageResult.
     Loaded by Eigenverft.Manifested.Sandbox.Package.Config.ps1.
 #>
 

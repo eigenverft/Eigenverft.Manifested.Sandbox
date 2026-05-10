@@ -1,5 +1,5 @@
-﻿<#
-    Eigenverft.Manifested.Sandbox.Package.Config — template resolution and depot/work-slot layout helpers.
+<#
+    Eigenverft.Manifested.Sandbox.Package.Config - template resolution and depot/work-slot layout helpers.
     Loaded by Eigenverft.Manifested.Sandbox.Package.Config.ps1.
 #>
 

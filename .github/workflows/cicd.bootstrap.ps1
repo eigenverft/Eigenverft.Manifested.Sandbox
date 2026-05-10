@@ -1,11 +1,11 @@
 function Test-PSGalleryConnectivity {
 <#
 .SYNOPSIS
-Fast connectivity test to PowerShell Gallery with HEAD→GET fallback.
+Fast connectivity test to PowerShell Gallery with HEAD->GET fallback.
 .DESCRIPTION
 Attempts a HEAD request to https://www.powershellgallery.com/api/v2/.
 If the server returns 405 (Method Not Allowed), retries with GET.
-Considers HTTP 200–399 as reachable. Writes status and returns $true/$false.
+Considers HTTP 200-399 as reachable. Writes status and returns $true/$false.
 .EXAMPLE
 Test-PSGalleryConnectivity
 .OUTPUTS
@@ -28,7 +28,7 @@ System.Boolean
             $req.AllowAutoRedirect = $true
             $req.UserAgent         = 'WindowsPowerShell/5.1 PSGalleryConnectivityCheck'
 
-            # NOTE: No proxy credential munging here—use system defaults.
+            # NOTE: No proxy credential munging here - use system defaults.
             $res = $req.GetResponse()
             $status = [int]$res.StatusCode
             $res.Close()
@@ -66,7 +66,7 @@ System.Boolean
     $headResult = Invoke-WebCheck -Method 'HEAD'
     if ($headResult -eq $true) { return $true }
     if ($null -eq $headResult) {
-        # 405 from HEAD → retry with GET
+        # 405 from HEAD -> retry with GET
         $getResult = Invoke-WebCheck -Method 'GET'
         return [bool]$getResult
     }

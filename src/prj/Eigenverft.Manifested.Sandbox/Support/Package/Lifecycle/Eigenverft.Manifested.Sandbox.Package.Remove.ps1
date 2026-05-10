@@ -1,5 +1,5 @@
 <#
-    Eigenverft.Manifested.Sandbox.Package.Remove — DesiredState Removed orchestration.
+    Eigenverft.Manifested.Sandbox.Package.Remove - DesiredState Removed orchestration.
     Dot-sourced from Eigenverft.Manifested.Sandbox.psm1 after Package.CommandFlow.ps1.
 
     Removal safety: other inventory rows are scanned by loading each row's definition and

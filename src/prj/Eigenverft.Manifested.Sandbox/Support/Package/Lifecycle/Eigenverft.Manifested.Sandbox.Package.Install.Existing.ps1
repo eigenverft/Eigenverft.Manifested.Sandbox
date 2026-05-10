@@ -1,5 +1,5 @@
 <#
-    Eigenverft.Manifested.Sandbox.Package.Install — existing-install discovery, registry probe, and reuse/adopt decisions.
+    Eigenverft.Manifested.Sandbox.Package.Install - existing-install discovery, registry probe, and reuse/adopt decisions.
     Dot-sourced from Eigenverft.Manifested.Sandbox.psm1 (mirrored in TestImports.ps1) before Package.Install.ps1.
 #>
 

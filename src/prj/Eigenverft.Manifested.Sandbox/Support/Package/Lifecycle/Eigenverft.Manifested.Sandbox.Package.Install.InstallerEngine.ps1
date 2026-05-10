@@ -1,5 +1,5 @@
 <#
-    Eigenverft.Manifested.Sandbox.Package.Install — installer process/NSIS helpers (shared execution mechanics).
+    Eigenverft.Manifested.Sandbox.Package.Install - installer process/NSIS helpers (shared execution mechanics).
     Dot-sourced from Eigenverft.Manifested.Sandbox.psm1 (mirrored in TestImports.ps1) before Package.Install.ps1.
 #>
 

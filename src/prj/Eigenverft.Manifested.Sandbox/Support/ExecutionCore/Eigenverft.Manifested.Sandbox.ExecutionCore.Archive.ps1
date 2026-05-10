@@ -3,12 +3,12 @@
 
     All archive helpers for ExecutionCore live in this one file.
 
-    - Expand-ArchiveToDirectory — what Package and callers use: path checks, destination
-      creation, .nupkg→.zip alias, then extract.
-    - Expand-ZipArchiveFileToDirectory — internal seam: .zip file + existing directory →
-      bytes on disk. Replace its body (Expand-Archive today) with PS 5.1–friendly .NET
+    - Expand-ArchiveToDirectory - what Package and callers use: path checks, destination
+      creation, .nupkg->.zip alias, then extract.
+    - Expand-ZipArchiveFileToDirectory - internal seam: .zip file + existing directory ->
+      bytes on disk. Replace its body (Expand-Archive today) with PS 5.1-friendly .NET
       ZipFile / long-path logic when needed; keep Expand-ArchiveToDirectory unchanged.
-    - New-TemporaryStageDirectory, Get-ExpandedArchiveRoot, Expand-ArchiveToStage —
+    - New-TemporaryStageDirectory, Get-ExpandedArchiveRoot, Expand-ArchiveToStage  - 
       staging and layout heuristics for install flows.
 
     Rationale: a separate ArchiveExpand.ps1 was only a thin wrapper (~60 lines, one public
@@ -23,7 +23,7 @@ function Expand-ZipArchiveFileToDirectory {
 Extracts a .zip file into an existing destination directory.
 
 .DESCRIPTION
-Not the main entry point — use Expand-ArchiveToDirectory from outside this module.
+Not the main entry point - use Expand-ArchiveToDirectory from outside this module.
 Callers pass a resolved .zip path (.nupkg must already be aliased to .zip by Expand-ArchiveToDirectory).
 This function is the single place to swap Expand-Archive for a .NET-based extractor.
 #>

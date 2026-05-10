@@ -1,5 +1,5 @@
 <#
-    Eigenverft.Manifested.Sandbox.Package.Config — deep copy and merge utilities for config objects.
+    Eigenverft.Manifested.Sandbox.Package.Config - deep copy and merge utilities for config objects.
     Loaded by Eigenverft.Manifested.Sandbox.Package.Config.ps1.
 #>
 
