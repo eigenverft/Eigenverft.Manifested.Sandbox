@@ -11,6 +11,7 @@
       "summary": "VS Code Windows user installer (per-user under LocalAppData, no admin elevation). Preferred Windows install path per Microsoft documentation."
     }
   },
+  "dependencies": [],
   "artifacts": {
     "targets": [
       {
