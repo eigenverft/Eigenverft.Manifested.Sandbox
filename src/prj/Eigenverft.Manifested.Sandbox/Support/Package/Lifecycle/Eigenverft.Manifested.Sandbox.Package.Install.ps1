@@ -111,6 +111,18 @@ Set-PackageAssignedState -PackageResult $result
                 Installer        = $installerResult
             }
         }
+        'innoSetupInstaller' {
+            Write-PackageExecutionMessage -Message ("[ACTION] Running Inno Setup installer for target '{0}'." -f $PackageResult.InstallDirectory)
+            $installerResult = Invoke-PackageInnoSetupInstallerProcess -PackageResult $PackageResult
+            $PackageResult.Assigned = [pscustomobject]@{
+                Status           = Get-PackageOwnedInstallStatus -PackageResult $PackageResult
+                InstallKind      = 'innoSetupInstaller'
+                TargetKind       = Get-PackageInstallTargetKind -Package $package
+                InstallDirectory = $PackageResult.InstallDirectory
+                ReusedExisting   = $false
+                Installer        = $installerResult
+            }
+        }
         'npmGlobalPackage' {
             Write-PackageExecutionMessage -Message ("[ACTION] Installing npm global package into '{0}'." -f $PackageResult.InstallDirectory)
             $PackageResult.Assigned = Install-PackageNpmPackage -PackageResult $PackageResult

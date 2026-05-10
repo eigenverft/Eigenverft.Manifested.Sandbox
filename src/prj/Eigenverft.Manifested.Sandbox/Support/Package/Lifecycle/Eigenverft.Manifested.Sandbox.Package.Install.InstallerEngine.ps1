@@ -245,6 +245,11 @@ Runs an NSIS installer package through the isolated package install stage.
     if ([string]::IsNullOrWhiteSpace([string]$PackageResult.InstallDirectory)) {
         throw "Package nsisInstaller for '$($PackageResult.PackageId)' requires an install directory."
     }
+    if ($install.PSObject.Properties['installerKind'] -and
+        -not [string]::IsNullOrWhiteSpace([string]$install.installerKind) -and
+        -not [string]::Equals([string]$install.installerKind, 'nsis', [System.StringComparison]::OrdinalIgnoreCase)) {
+        throw "Package nsisInstaller for '$($PackageResult.PackageId)' cannot use installerKind '$($install.installerKind)'. Use innoSetupInstaller for Inno Setup packages."
+    }
 
     $commandPath = Copy-PackageInstallerToInstallStage -PackageResult $PackageResult
     $commandArguments = @()
@@ -281,4 +286,66 @@ Runs an NSIS installer package through the isolated package install stage.
     $uiMode = if ($install.PSObject.Properties['uiMode'] -and -not [string]::IsNullOrWhiteSpace([string]$install.uiMode)) { [string]$install.uiMode } else { 'silent' }
 
     return (Invoke-PackageInstallerCommand -PackageResult $PackageResult -CommandPath $commandPath -CommandArguments @($commandArguments) -WorkingDirectory $PackageResult.PackageInstallStageDirectory -TimeoutSec $timeoutSec -SuccessExitCodes @($successExitCodes) -RestartExitCodes @($restartExitCodes) -TargetKind $targetKind -InstallerKind $installerKind -UiMode $uiMode -LogPath $null)
+}
+
+function Invoke-PackageInnoSetupInstallerProcess {
+<#
+.SYNOPSIS
+Runs an Inno Setup installer package through the isolated package install stage.
+#>
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [psobject]$PackageResult
+    )
+
+    $install = Get-PackageAssignedInstallOperation -Release $PackageResult.Package
+    if (-not $install) {
+        throw "Package innoSetupInstaller for '$($PackageResult.PackageId)' requires an assigned block on the selected release."
+    }
+    if ([string]::IsNullOrWhiteSpace([string]$PackageResult.InstallDirectory)) {
+        throw "Package innoSetupInstaller for '$($PackageResult.PackageId)' requires an install directory."
+    }
+
+    $commandPath = Copy-PackageInstallerToInstallStage -PackageResult $PackageResult
+    $commandArguments = @()
+    foreach ($argument in @($install.commandArguments)) {
+        $resolvedArgument = Resolve-PackageTemplateText -Text ([string]$argument) -PackageConfig $PackageResult.PackageConfig -Package $PackageResult.Package -ExtraTokens @{
+                packageFilePath = $PackageResult.PackageFilePath
+                installDirectory = $PackageResult.InstallDirectory
+                packageFileStagingDirectory = $PackageResult.PackageFileStagingDirectory
+                packageInstallStageDirectory = $PackageResult.PackageInstallStageDirectory
+                downloadDirectory = $PackageResult.PackageFileStagingDirectory
+            }
+        $commandArguments += (Format-PackageProcessArgument -Value $resolvedArgument)
+    }
+
+    if ($install.PSObject.Properties['targetDirectoryArgument'] -and $null -ne $install.targetDirectoryArgument) {
+        $targetDirectoryArgument = $install.targetDirectoryArgument
+        $targetDirectoryArgumentEnabled = $targetDirectoryArgument.PSObject.Properties['enabled'] -and [bool]$targetDirectoryArgument.enabled
+        if ($targetDirectoryArgumentEnabled) {
+            $prefix = if ($targetDirectoryArgument.PSObject.Properties['prefix'] -and -not [string]::IsNullOrWhiteSpace([string]$targetDirectoryArgument.prefix)) {
+                [string]$targetDirectoryArgument.prefix
+            }
+            else {
+                '/DIR='
+            }
+            $quoteValue = (-not $targetDirectoryArgument.PSObject.Properties['quoteValue']) -or [bool]$targetDirectoryArgument.quoteValue
+            $targetValue = [string]$PackageResult.InstallDirectory
+            $commandArguments += if ($quoteValue) {
+                '{0}"{1}"' -f $prefix, ($targetValue -replace '"', '\"')
+            }
+            else {
+                $prefix + $targetValue
+            }
+        }
+    }
+
+    $timeoutSec = if ($install.PSObject.Properties['timeoutSec']) { [int]$install.timeoutSec } else { 300 }
+    $successExitCodes = if ($install.PSObject.Properties['successExitCodes']) { @($install.successExitCodes | ForEach-Object { [int]$_ }) } else { @(0) }
+    $restartExitCodes = if ($install.PSObject.Properties['restartExitCodes']) { @($install.restartExitCodes | ForEach-Object { [int]$_ }) } else { @() }
+    $targetKind = Get-PackageInstallTargetKind -Package $PackageResult.Package
+    $uiMode = if ($install.PSObject.Properties['uiMode'] -and -not [string]::IsNullOrWhiteSpace([string]$install.uiMode)) { [string]$install.uiMode } else { 'silent' }
+
+    return (Invoke-PackageInstallerCommand -PackageResult $PackageResult -CommandPath $commandPath -CommandArguments @($commandArguments) -WorkingDirectory $PackageResult.PackageInstallStageDirectory -TimeoutSec $timeoutSec -SuccessExitCodes @($successExitCodes) -RestartExitCodes @($restartExitCodes) -TargetKind $targetKind -InstallerKind 'innoSetup' -UiMode $uiMode -LogPath $null)
 }

@@ -378,11 +378,11 @@ function Invoke-PackageRemovedOperation {
                 Write-PackageExecutionMessage -Message ("[STATE] deleteInstallDirectory skipped; path does not exist: '{0}'." -f $target)
             }
         }
-        'nsisUninstaller' {
+        { $_ -in @('nsisUninstaller', 'innoSetupUninstaller') } {
             $searchLocation = Get-PackageExistingInstallSearchLocationById -Definition $definition -SearchLocationId ([string]$operation.commandSource.searchLocationId)
             $resolved = Resolve-PackageExistingUninstallRegistryCandidate -SearchLocation $searchLocation
             if (-not $resolved -or -not $resolved.RegistryEntry) {
-                throw "Package nsisUninstaller removal could not resolve a Windows uninstall registry entry for searchLocationId '$($operation.commandSource.searchLocationId)'."
+                throw "Package $kind removal could not resolve a Windows uninstall registry entry for searchLocationId '$($operation.commandSource.searchLocationId)'."
             }
 
             $entry = $resolved.RegistryEntry
@@ -405,12 +405,12 @@ function Invoke-PackageRemovedOperation {
             }
 
             if ([string]::IsNullOrWhiteSpace($chosenText)) {
-                throw 'Package nsisUninstaller removal did not find a usable QuietUninstallString or UninstallString in the resolved registry entry.'
+                throw "Package $kind removal did not find a usable QuietUninstallString or UninstallString in the resolved registry entry."
             }
 
             $parsed = Get-PackageUninstallExecutableAndArgumentTail -RawText $chosenText
             if ([string]::IsNullOrWhiteSpace($parsed.Executable) -or -not (Test-Path -LiteralPath $parsed.Executable -PathType Leaf)) {
-                throw "Package nsisUninstaller removal resolved uninstall executable '$($parsed.Executable)' but it does not exist."
+                throw "Package $kind removal resolved uninstall executable '$($parsed.Executable)' but it does not exist."
             }
 
             $commandArguments = New-Object System.Collections.Generic.List[string]
@@ -450,8 +450,9 @@ function Invoke-PackageRemovedOperation {
                 $null
             }
 
-            $null = Invoke-PackageInstallerCommand -PackageResult $PackageResult -CommandPath $parsed.Executable -CommandArguments @($commandArguments.ToArray()) -WorkingDirectory $workingDirectory -TimeoutSec $timeoutSec -SuccessExitCodes @($successExitCodes) -RestartExitCodes @($restartExitCodes) -TargetKind 'directory' -InstallerKind 'nsis' -UiMode $uiMode -LogPath $null -ElevationMode $elevationMode
-            Write-PackageExecutionMessage -Message '[ACTION] Completed nsisUninstaller removal operation.'
+            $installerKind = if ([string]::Equals($kind, 'innoSetupUninstaller', [System.StringComparison]::OrdinalIgnoreCase)) { 'innoSetup' } else { 'nsis' }
+            $null = Invoke-PackageInstallerCommand -PackageResult $PackageResult -CommandPath $parsed.Executable -CommandArguments @($commandArguments.ToArray()) -WorkingDirectory $workingDirectory -TimeoutSec $timeoutSec -SuccessExitCodes @($successExitCodes) -RestartExitCodes @($restartExitCodes) -TargetKind 'directory' -InstallerKind $installerKind -UiMode $uiMode -LogPath $null -ElevationMode $elevationMode
+            Write-PackageExecutionMessage -Message ("[ACTION] Completed {0} removal operation." -f $kind)
         }
         default {
             throw "Unsupported removed.operation.kind '$kind'."

@@ -112,13 +112,19 @@ Resolve-PackageSource -SourceDefinition $source -AcquisitionCandidate $candidate
 
     switch -Exact ([string]$SourceDefinition.Kind) {
         'download' {
-            if ([string]::IsNullOrWhiteSpace([string]$SourceDefinition.BaseUri)) {
-                throw "Package download source '$($SourceDefinition.Id)' does not define baseUri."
-            }
-            if (-not $AcquisitionCandidate.PSObject.Properties['sourcePath'] -or [string]::IsNullOrWhiteSpace([string]$AcquisitionCandidate.sourcePath)) {
-                throw "Package acquisition candidate for '$($SourceDefinition.Id)' does not define sourcePath."
+            if ($AcquisitionCandidate.PSObject.Properties['url'] -and -not [string]::IsNullOrWhiteSpace([string]$AcquisitionCandidate.url)) {
+                return [pscustomobject]@{
+                    Kind           = 'download'
+                    ResolvedSource = [string]$AcquisitionCandidate.url
+                }
             }
 
+            if ([string]::IsNullOrWhiteSpace([string]$SourceDefinition.BaseUri)) {
+                throw "Package download source '$($SourceDefinition.Id)' does not define baseUri. Use sourcePath with sourceId, or use acquisitionCandidate.url/urlTemplate for direct downloads."
+            }
+            if (-not $AcquisitionCandidate.PSObject.Properties['sourcePath'] -or [string]::IsNullOrWhiteSpace([string]$AcquisitionCandidate.sourcePath)) {
+                throw "Package acquisition candidate for '$($SourceDefinition.Id)' does not define sourcePath. Use sourcePath, artifact sourcePath, url, or urlTemplate."
+            }
             $baseUriText = ([string]$SourceDefinition.BaseUri).TrimEnd('/') + '/'
             $resolvedUri = [System.Uri]::new([System.Uri]$baseUriText, [string]$AcquisitionCandidate.sourcePath)
             return [pscustomobject]@{
@@ -471,6 +477,7 @@ Test-PackagePackageFileAcquisitionRequired -Package $package
         'expandArchive' { return $true }
         'placePackageFile' { return $true }
         'nsisInstaller' { return $true }
+        'innoSetupInstaller' { return $true }
         'runInstaller' {
             return (-not $assignedInstall.PSObject.Properties['commandPath'] -or [string]::IsNullOrWhiteSpace([string]$assignedInstall.commandPath))
         }
@@ -765,15 +772,22 @@ Build-PackageAcquisitionPlan -PackageResult $result
                     }
                 }
                 'download' {
+                    $directUrl = if ($candidate.PSObject.Properties['url']) { [string]$candidate.url } else { $null }
                     $orderedCandidates.Add([pscustomobject]@{
                         kind         = 'download'
                         searchOrder     = if ($candidate.PSObject.Properties['searchOrder']) { [int]$candidate.searchOrder } else { [int]::MaxValue }
                         sourceSearchOrder = 1000
-                        sourceRef    = [pscustomobject]@{
-                            scope = 'definition'
-                            id    = [string]$candidate.sourceId
+                        sourceRef    = if ($candidate.PSObject.Properties['sourceId'] -and -not [string]::IsNullOrWhiteSpace([string]$candidate.sourceId)) {
+                            [pscustomobject]@{
+                                scope = 'definition'
+                                id    = [string]$candidate.sourceId
+                            }
+                        }
+                        else {
+                            $null
                         }
                         sourcePath   = [string]$candidate.sourcePath
+                        url          = $directUrl
                         verification = $resolvedVerification
                     }) | Out-Null
                 }
@@ -954,6 +968,19 @@ Resolve-PackageInstallFile -PackageResult $result
         try {
             if ($candidate.sourceRef) {
                 $sourceDefinition = Get-PackageSourceDefinition -PackageConfig $packageConfig -SourceRef $candidate.sourceRef
+            }
+            elseif ([string]::Equals([string]$candidate.kind, 'download', [System.StringComparison]::OrdinalIgnoreCase) -and
+                $candidate.PSObject.Properties['url'] -and
+                -not [string]::IsNullOrWhiteSpace([string]$candidate.url)) {
+                $sourceDefinition = [pscustomobject]@{
+                    Scope            = 'direct'
+                    Id               = 'directDownload'
+                    Kind             = 'download'
+                    BaseUri          = $null
+                    BasePath         = $null
+                    GitHubOwner      = $null
+                    GitHubRepository = $null
+                }
             }
             elseif ([string]::Equals([string]$candidate.kind, 'filesystem', [System.StringComparison]::OrdinalIgnoreCase)) {
                 $sourceDefinition = [pscustomobject]@{

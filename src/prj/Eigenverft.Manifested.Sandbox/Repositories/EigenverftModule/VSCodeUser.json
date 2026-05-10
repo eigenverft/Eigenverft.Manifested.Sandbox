@@ -34,6 +34,7 @@
           {
             "kind": "download",
             "sourceId": "vscodeStableUserX64",
+            "sourcePath": "VSCodeUserSetup-x64-{version}.exe",
             "searchOrder": 0,
             "verification": {
               "mode": "required"
@@ -113,9 +114,8 @@
     },
     "assigned": {
       "install": {
-        "kind": "nsisInstaller",
+        "kind": "innoSetupInstaller",
         "installDirectory": "%LOCALAPPDATA%\\Programs\\Microsoft VS Code",
-        "installerKind": "innoSetup",
         "uiMode": "silent",
         "elevation": "none",
         "timeoutSec": 1200,
@@ -125,7 +125,11 @@
           "/SUPPRESSMSGBOXES",
           "/MERGETASKS=!runcode"
         ],
-        "targetDirectoryArgument": {}
+        "targetDirectoryArgument": {
+          "enabled": true,
+          "prefix": "/DIR=",
+          "quoteValue": true
+        }
       },
       "readyStateCheck": {
         "use": "presenceDiscovery",

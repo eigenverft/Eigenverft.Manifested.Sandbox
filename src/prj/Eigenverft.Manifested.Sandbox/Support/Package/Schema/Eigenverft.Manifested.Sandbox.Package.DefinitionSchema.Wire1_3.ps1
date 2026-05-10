@@ -245,6 +245,155 @@ function Assert-PackagePresenceRequirementFlags_1_3 {
     }
 }
 
+function Test-PackageDefinitionTextPropertyPresent_1_3 {
+    [CmdletBinding()]
+    [OutputType([bool])]
+    param(
+        [AllowNull()]
+        [psobject]$InputObject,
+
+        [Parameter(Mandatory = $true)]
+        [string]$PropertyName
+    )
+
+    return ($InputObject -and
+        $InputObject.PSObject.Properties[$PropertyName] -and
+        -not [string]::IsNullOrWhiteSpace([string]$InputObject.$PropertyName))
+}
+
+function Assert-PackageExistingInstallDiscovery_1_3 {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$DefinitionId,
+
+        [Parameter(Mandatory = $true)]
+        [psobject]$ExistingInstallDiscovery
+    )
+
+    foreach ($required in @('enabled', 'searchLocations', 'installRootRules')) {
+        if (-not $ExistingInstallDiscovery.PSObject.Properties[$required]) {
+            throw "Package definition '$DefinitionId' is missing existingInstallDiscovery.$required."
+        }
+    }
+
+    $searchLocationIds = New-Object 'System.Collections.Generic.HashSet[string]' ([System.StringComparer]::OrdinalIgnoreCase)
+    foreach ($location in @($ExistingInstallDiscovery.searchLocations)) {
+        foreach ($required in @('id', 'kind', 'searchOrder')) {
+            if (-not $location.PSObject.Properties[$required] -or [string]::IsNullOrWhiteSpace([string]$location.$required)) {
+                throw "Package definition '$DefinitionId' existingInstallDiscovery.searchLocations entry is missing '$required'."
+            }
+        }
+        if (-not $searchLocationIds.Add([string]$location.id)) {
+            throw "Package definition '$DefinitionId' has duplicate existingInstallDiscovery.searchLocations id '$($location.id)'."
+        }
+        switch -Exact ([string]$location.kind) {
+            'command' {
+                if (-not (Test-PackageDefinitionTextPropertyPresent_1_3 -InputObject $location -PropertyName 'name')) {
+                    throw "Package definition '$DefinitionId' existingInstallDiscovery search '$($location.id)' kind command requires name."
+                }
+            }
+            'path' {
+                if (-not (Test-PackageDefinitionTextPropertyPresent_1_3 -InputObject $location -PropertyName 'path')) {
+                    throw "Package definition '$DefinitionId' existingInstallDiscovery search '$($location.id)' kind path requires path."
+                }
+            }
+            'directory' {
+                if (-not (Test-PackageDefinitionTextPropertyPresent_1_3 -InputObject $location -PropertyName 'path')) {
+                    throw "Package definition '$DefinitionId' existingInstallDiscovery search '$($location.id)' kind directory requires path."
+                }
+            }
+            'windowsUninstallRegistryKey' {
+                if (-not $location.PSObject.Properties['paths'] -or @($location.paths).Count -eq 0) {
+                    throw "Package definition '$DefinitionId' existingInstallDiscovery search '$($location.id)' kind windowsUninstallRegistryKey requires paths."
+                }
+                foreach ($path in @($location.paths)) {
+                    if ([string]::IsNullOrWhiteSpace([string]$path)) {
+                        throw "Package definition '$DefinitionId' existingInstallDiscovery search '$($location.id)' has an empty registry path."
+                    }
+                }
+                if (-not (Test-PackageDefinitionTextPropertyPresent_1_3 -InputObject $location -PropertyName 'installDirectorySource')) {
+                    throw "Package definition '$DefinitionId' existingInstallDiscovery search '$($location.id)' kind windowsUninstallRegistryKey requires installDirectorySource."
+                }
+                if ([string]$location.installDirectorySource -notin @('installLocation', 'displayIcon', 'displayIconDirectory', 'uninstallString', 'uninstallStringDirectory')) {
+                    throw "Package definition '$DefinitionId' existingInstallDiscovery search '$($location.id)' uses unsupported installDirectorySource '$($location.installDirectorySource)'."
+                }
+            }
+            default {
+                throw "Package definition '$DefinitionId' existingInstallDiscovery search '$($location.id)' uses unsupported kind '$($location.kind)'."
+            }
+        }
+    }
+
+    foreach ($rule in @($ExistingInstallDiscovery.installRootRules)) {
+        if (-not $rule.PSObject.Properties['match'] -or -not $rule.match) {
+            throw "Package definition '$DefinitionId' installRootRules entry requires match."
+        }
+        if (-not $rule.match.PSObject.Properties['kind'] -or -not [string]::Equals([string]$rule.match.kind, 'fileName', [System.StringComparison]::OrdinalIgnoreCase)) {
+            throw "Package definition '$DefinitionId' installRootRules.match currently supports only kind 'fileName'."
+        }
+        if (-not (Test-PackageDefinitionTextPropertyPresent_1_3 -InputObject $rule.match -PropertyName 'value')) {
+            throw "Package definition '$DefinitionId' installRootRules.match kind fileName requires value."
+        }
+        if (-not (Test-PackageDefinitionTextPropertyPresent_1_3 -InputObject $rule -PropertyName 'installRootRelativePath')) {
+            throw "Package definition '$DefinitionId' installRootRules entry requires installRootRelativePath."
+        }
+    }
+}
+
+function Assert-PackageAssignedInstallOperation_1_3 {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$DefinitionId,
+
+        [Parameter(Mandatory = $true)]
+        [psobject]$AssignedInstall
+    )
+
+    if (-not (Test-PackageDefinitionTextPropertyPresent_1_3 -InputObject $AssignedInstall -PropertyName 'kind')) {
+        throw "Package definition '$DefinitionId' is missing packageOperations.assigned.install.kind."
+    }
+
+    switch -Exact ([string]$AssignedInstall.kind) {
+        'nsisInstaller' {
+            if ($AssignedInstall.PSObject.Properties['installerKind'] -and
+                -not [string]::Equals([string]$AssignedInstall.installerKind, 'nsis', [System.StringComparison]::OrdinalIgnoreCase)) {
+                throw "Package definition '$DefinitionId' nsisInstaller cannot use installerKind '$($AssignedInstall.installerKind)'. Use innoSetupInstaller for Inno Setup packages."
+            }
+            if (-not $AssignedInstall.PSObject.Properties['targetDirectoryArgument'] -or -not $AssignedInstall.targetDirectoryArgument) {
+                throw "Package definition '$DefinitionId' nsisInstaller requires targetDirectoryArgument."
+            }
+            $targetArgument = $AssignedInstall.targetDirectoryArgument
+            if (-not $targetArgument.PSObject.Properties['enabled'] -or $targetArgument.enabled -isnot [bool]) {
+                throw "Package definition '$DefinitionId' nsisInstaller targetDirectoryArgument.enabled must be boolean."
+            }
+            if (-not (Test-PackageDefinitionTextPropertyPresent_1_3 -InputObject $targetArgument -PropertyName 'prefix')) {
+                throw "Package definition '$DefinitionId' nsisInstaller targetDirectoryArgument.prefix must not be empty."
+            }
+        }
+        'innoSetupInstaller' {
+            foreach ($required in @('installDirectory', 'commandArguments', 'targetDirectoryArgument')) {
+                if (-not $AssignedInstall.PSObject.Properties[$required]) {
+                    throw "Package definition '$DefinitionId' innoSetupInstaller requires $required."
+                }
+            }
+            $targetArgument = $AssignedInstall.targetDirectoryArgument
+            if (-not $targetArgument.PSObject.Properties['enabled'] -or $targetArgument.enabled -isnot [bool]) {
+                throw "Package definition '$DefinitionId' innoSetupInstaller targetDirectoryArgument.enabled must be boolean."
+            }
+            if ($targetArgument.enabled) {
+                if (-not (Test-PackageDefinitionTextPropertyPresent_1_3 -InputObject $targetArgument -PropertyName 'prefix')) {
+                    throw "Package definition '$DefinitionId' innoSetupInstaller targetDirectoryArgument.prefix is required when enabled."
+                }
+                if (-not $targetArgument.PSObject.Properties['quoteValue'] -or $targetArgument.quoteValue -isnot [bool]) {
+                    throw "Package definition '$DefinitionId' innoSetupInstaller targetDirectoryArgument.quoteValue must be boolean."
+                }
+            }
+        }
+    }
+}
+
 function Assert-PackageRemovedOperation_1_3 {
     [CmdletBinding()]
     param(
@@ -307,7 +456,7 @@ function Assert-PackageRemovedOperation_1_3 {
                 throw "Package definition '$DefinitionId' removed.operation.kind 'deleteInstallDirectory' requires pathSource = 'inventory.installDirectory'."
             }
         }
-        'nsisUninstaller' {
+        { $_ -in @('nsisUninstaller', 'innoSetupUninstaller') } {
             foreach ($required in @('commandSource', 'commandArguments', 'elevation', 'timeoutSec', 'successExitCodes', 'restartExitCodes', 'uiMode')) {
                 if (-not $operation.PSObject.Properties[$required]) {
                     throw "Package definition '$DefinitionId' missing packageOperations.removed.operation.$required."
@@ -401,6 +550,7 @@ function Assert-PackageDefinitionSchema_1_3 {
     if (-not $definition.artifacts.PSObject.Properties['releases']) {
         throw "Package definition '$DefinitionId' is missing required artifacts.releases array."
     }
+    Assert-PackageExistingInstallDiscovery_1_3 -DefinitionId $DefinitionId -ExistingInstallDiscovery $definition.existingInstallDiscovery
 
     $targetIds = New-Object 'System.Collections.Generic.HashSet[string]' ([System.StringComparer]::OrdinalIgnoreCase)
     $targetsById = @{}
@@ -445,6 +595,10 @@ function Assert-PackageDefinitionSchema_1_3 {
     Assert-PackageDefinitionNoRetiredNestedProperty_1_3 -DefinitionId $DefinitionId -InputObject $assignedInstall -PropertyName 'managerDependency' -PropertyPath 'packageOperations.assigned.install.managerDependency' -ReplacementPath 'dependencies plus packageOperations.assigned.install.installerCommand'
     Assert-PackageDefinitionNoRetiredNestedProperty_1_3 -DefinitionId $DefinitionId -InputObject $assignedOperation -PropertyName 'managerKind' -PropertyPath 'packageOperations.assigned.managerKind' -ReplacementPath 'packageOperations.assigned.install.kind = npmGlobalPackage'
     Assert-PackageDefinitionNoRetiredNestedProperty_1_3 -DefinitionId $DefinitionId -InputObject $assignedInstall -PropertyName 'managerKind' -PropertyPath 'packageOperations.assigned.install.managerKind' -ReplacementPath 'packageOperations.assigned.install.kind = npmGlobalPackage'
+    if (-not $assignedInstall) {
+        throw "Package definition '$DefinitionId' is missing packageOperations.assigned.install."
+    }
+    Assert-PackageAssignedInstallOperation_1_3 -DefinitionId $DefinitionId -AssignedInstall $assignedInstall
     if (-not $definition.packageOperations.PSObject.Properties['removed']) {
         throw "Package definition '$DefinitionId' is missing required packageOperations.removed."
     }
@@ -503,6 +657,32 @@ function Assert-PackageDefinitionSchema_1_3 {
                     continue
                 }
 
+                $hasSourceId = Test-PackageDefinitionTextPropertyPresent_1_3 -InputObject $candidate -PropertyName 'sourceId'
+                $hasCandidateSourcePath = Test-PackageDefinitionTextPropertyPresent_1_3 -InputObject $candidate -PropertyName 'sourcePath'
+                $hasArtifactSourcePath = Test-PackageDefinitionTextPropertyPresent_1_3 -InputObject $artifact -PropertyName 'sourcePath'
+                $hasCandidateUrl = Test-PackageDefinitionTextPropertyPresent_1_3 -InputObject $candidate -PropertyName 'url'
+                $hasCandidateUrlTemplate = Test-PackageDefinitionTextPropertyPresent_1_3 -InputObject $candidate -PropertyName 'urlTemplate'
+                $hasArtifactUrl = Test-PackageDefinitionTextPropertyPresent_1_3 -InputObject $artifact -PropertyName 'url'
+                $hasArtifactUrlTemplate = Test-PackageDefinitionTextPropertyPresent_1_3 -InputObject $artifact -PropertyName 'urlTemplate'
+                $directDownloadCount = 0
+                foreach ($hasDirectDownload in @($hasCandidateUrl, $hasCandidateUrlTemplate, $hasArtifactUrl, $hasArtifactUrlTemplate)) {
+                    if ($hasDirectDownload) {
+                        $directDownloadCount++
+                    }
+                }
+
+                if ($directDownloadCount -gt 1) {
+                    throw "Package definition '$DefinitionId' release '$($versionEntry.version)' artifact '$($artifactProperty.Name)' download candidate must define only one direct url/urlTemplate location."
+                }
+                if ($directDownloadCount -gt 0 -and ($hasSourceId -or $hasCandidateSourcePath -or $hasArtifactSourcePath)) {
+                    throw "Package definition '$DefinitionId' release '$($versionEntry.version)' artifact '$($artifactProperty.Name)' download candidate must use either direct url/urlTemplate or sourceId with sourcePath, not both."
+                }
+                if ($directDownloadCount -gt 0) {
+                    continue
+                }
+                if (-not $hasSourceId) {
+                    throw "Package definition '$DefinitionId' release '$($versionEntry.version)' artifact '$($artifactProperty.Name)' download candidate requires sourceId, direct url, or urlTemplate."
+                }
                 if (-not (Test-PackageObjectHasProperty -InputObject $definition.artifacts.sources -Name ([string]$candidate.sourceId))) {
                     throw "Package definition '$DefinitionId' release '$($versionEntry.version)' artifact '$($artifactProperty.Name)' references unknown artifacts source '$($candidate.sourceId)'."
                 }
@@ -514,6 +694,11 @@ function Assert-PackageDefinitionSchema_1_3 {
                         -not $releaseUpstream.PSObject.Properties['releaseTag'] -or [string]::IsNullOrWhiteSpace([string]$releaseUpstream.releaseTag)) {
                         throw "Package definition '$DefinitionId' release '$($versionEntry.version)' artifact '$($artifactProperty.Name)' requires releaseTag because candidate '$($candidate.sourceId)' uses GitHub release."
                     }
+                    continue
+                }
+
+                if (-not ($hasCandidateSourcePath -or $hasArtifactSourcePath)) {
+                    throw "Package definition '$DefinitionId' release '$($versionEntry.version)' artifact '$($artifactProperty.Name)' download candidate requires sourcePath, artifact sourcePath, url, or urlTemplate."
                 }
             }
         }
@@ -709,11 +894,29 @@ function Resolve-PackageEffectivePackage_1_3 {
     else {
         $null
     }
+    $artifactUrl = if ($artifact.PSObject.Properties['urlTemplate'] -and -not [string]::IsNullOrWhiteSpace([string]$artifact.urlTemplate)) {
+        Resolve-PackageTargetArtifactText -Text ([string]$artifact.urlTemplate) -ArtifactTarget $target -VersionEntry $versionEntry -UpstreamRelease $upstreamRelease
+    }
+    elseif ($artifact.PSObject.Properties['url'] -and -not [string]::IsNullOrWhiteSpace([string]$artifact.url)) {
+        Resolve-PackageTargetArtifactText -Text ([string]$artifact.url) -ArtifactTarget $target -VersionEntry $versionEntry -UpstreamRelease $upstreamRelease
+    }
+    else {
+        $null
+    }
     $acquisitionCandidates = @(
         foreach ($source in @($artifactAcquisitionCandidates)) {
             $candidate = ConvertTo-PackageObject -InputObject $source
             if ([string]::Equals([string]$candidate.kind, 'download', [System.StringComparison]::OrdinalIgnoreCase)) {
-                if ($candidate.PSObject.Properties['sourcePath'] -and -not [string]::IsNullOrWhiteSpace([string]$candidate.sourcePath)) {
+                if ($candidate.PSObject.Properties['urlTemplate'] -and -not [string]::IsNullOrWhiteSpace([string]$candidate.urlTemplate)) {
+                    $candidate | Add-Member -MemberType NoteProperty -Name 'url' -Value (Resolve-PackageTargetArtifactText -Text ([string]$candidate.urlTemplate) -ArtifactTarget $target -VersionEntry $versionEntry -UpstreamRelease $upstreamRelease) -Force
+                }
+                elseif ($candidate.PSObject.Properties['url'] -and -not [string]::IsNullOrWhiteSpace([string]$candidate.url)) {
+                    $candidate.url = Resolve-PackageTargetArtifactText -Text ([string]$candidate.url) -ArtifactTarget $target -VersionEntry $versionEntry -UpstreamRelease $upstreamRelease
+                }
+                elseif (-not [string]::IsNullOrWhiteSpace($artifactUrl)) {
+                    $candidate | Add-Member -MemberType NoteProperty -Name 'url' -Value $artifactUrl -Force
+                }
+                elseif ($candidate.PSObject.Properties['sourcePath'] -and -not [string]::IsNullOrWhiteSpace([string]$candidate.sourcePath)) {
                     $candidate.sourcePath = Resolve-PackageTargetArtifactText -Text ([string]$candidate.sourcePath) -ArtifactTarget $target -VersionEntry $versionEntry -UpstreamRelease $upstreamRelease
                 }
                 elseif (-not [string]::IsNullOrWhiteSpace($artifactSourcePath)) {

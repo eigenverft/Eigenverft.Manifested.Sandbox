@@ -3,7 +3,7 @@
   "$id": "https://eigenverft.local/schemas/eigenverft-module-package-definition-1.3.schema.json",
   "title": "Eigenverft module package definition document (wire format 1.3)",
   "$comment": "META: This file is the JSON Schema for INSTANCE documents (one package definition per file, e.g. MyRuntime.json). It is not itself a package definition. Agents: read x-eigenverftAgentHint next for task disambiguation. Design rationale: artifacts groups targets, releases, and sources so maintainers edit acquisition together; presenceDiscovery vs existingInstallDiscovery separates post-install proof from external/adopted install discovery. Runtime: Eigenverft.Manifested.Sandbox validates instances with PowerShell (DefinitionSchema.Wire1_3.ps1), not this schema file—align both when the wire format changes. Paths: env vars expanded; non-rooted installDirectory templates join package global preferredTargetInstallRootDirectory; slashes normalized. Target constraints.os/cpu match runtime Platform/Architecture (e.g. windows, x64) case-insensitively. Full examples: sibling *.json in this folder; no embedded examples array (too large). PS 5.1 parses this schema as JSON only for repo tests.",
-  "description": "AUTHOR TASK — You are producing or editing ONE complete package-definition JSON object for the Eigenverft.Manifested.Sandbox module. It drives Invoke-PackageDefinitionCommand (Assigned = install/reuse, Removed = uninstall policy). Output must satisfy every required property, additionalProperties:false everywhere enforced, and schemaVersion exactly 1.3.\n\nWHAT TO EMIT: A single JSON file, conventionally named {id}.json (same folder as this schema in the shipped module), containing id, display, dependencies (use [] if none), artifacts, presenceDiscovery, existingInstallDiscovery, and packageOperations. Optional top-level $comment (string) and $schema (URI string pointing at ./eigenverft-module-package-definition-1.3.schema.json) are allowed for editors.\n\nSECTION MEANING: artifacts — which platforms get which files, version catalog, hashes, download sources; presenceDiscovery — files, dirs, commands, registry checks proving the install works (and removal absence where used); existingInstallDiscovery — how to find pre-existing installs (often enabled:false with empty arrays); packageOperations — compatibility policy, how to install (assigned.install oneOf), PATH/shims, how to remove.\n\nSUGGESTED BUILD ORDER: (1) id + display.default; (2) artifacts.targets with constraints.os/cpu per machine or artifact distribution variant; (3) artifacts.releases + targetArtifacts + upstreamRelease as needed; (4) artifacts.sources for download kinds; (5) packageOperations.assigned.install + installDirectory template + pathRegistration consistent with presenceDiscovery paths; (6) presenceDiscovery matching real layout after expand/install; (7) packageOperations.removed mirroring inventory and cleanup.\n\nWHEN UNSURE: Clone the shape of an existing sibling definition (e.g. PythonRuntime.json, VSCodeRuntime.json) and only change deltas. If Wire1_3 rejects a document, the runtime assert is authoritative—fix the JSON to match the engine, then update this schema if the wire format truly changed.",
+  "description": "AUTHOR TASK — You are producing or editing ONE complete package-definition JSON object for the Eigenverft.Manifested.Sandbox module. It drives Invoke-PackageDefinitionCommand (Assigned = install/reuse, Removed = uninstall policy). Output must satisfy every required property, additionalProperties:false everywhere enforced, and schemaVersion exactly 1.3.\n\nWHAT TO EMIT: A single JSON file, conventionally named {id}.json (same folder as this schema in the shipped module), containing id, display, dependencies (use [] if none), artifacts, presenceDiscovery, existingInstallDiscovery, and packageOperations. Optional top-level $comment (string) and $schema (URI string pointing at ./eigenverft-module-package-definition-1.3.schema.json) are allowed for editors.\n\nSECTION MEANING: artifacts — which platforms get which files, version catalog, hashes, download sources; presenceDiscovery — files, dirs, commands, registry checks proving the install works (and removal absence where used); existingInstallDiscovery — how to find pre-existing installs (often enabled:false with empty arrays); packageOperations — compatibility policy, how to install (assigned.install oneOf), PATH/shims, how to remove.\n\nSUGGESTED BUILD ORDER: (1) id + display.default; (2) artifacts.targets with constraints.os/cpu per machine or artifact distribution variant; (3) artifacts.releases + targetArtifacts + upstreamRelease as needed; (4) artifacts.sources for download kinds; (5) packageOperations.assigned.install + installDirectory template + pathRegistration consistent with presenceDiscovery paths; (6) presenceDiscovery matching real layout after expand/install; (7) packageOperations.removed mirroring inventory and cleanup.\n\nCOMMON TRAPS: download candidates need sourceId+sourcePath (or artifact sourcePath) OR direct url/urlTemplate; GitHub release sources require real release assets and releaseTag; NSIS and Inno Setup are different install kinds; installer-owned PATH and package-managed shims should be chosen deliberately, not mixed accidentally.\n\nWHEN UNSURE: Clone the shape of an existing sibling definition (e.g. PythonRuntime.json, VSCodeRuntime.json) and only change deltas. If Wire1_3 rejects a document, the runtime assert is authoritative—fix the JSON to match the engine, then update this schema if the wire format truly changed.",
   "x-eigenverftAgentHint": "If you are an LLM or autonomous coding agent: your likely task is to create or edit a single package-definition INSTANCE JSON file (e.g. MyRuntime.json) that conforms to this schema and to DefinitionSchema.Wire1_3.ps1—not to edit this schema file, VS Code/Cursor settings.json, or package global Config.json unless the user explicitly asks for those. Default intent when the user mentions packages, assign, install, remove, inventory, or shims in this repo: Eigenverft.Manifested.Sandbox Invoke-PackageDefinitionCommand / packageOperations, not editor configuration. Practical workflow: duplicate the closest sibling *.json in this folder, keep id aligned with the filename, bump artifacts.releases as needed, keep presenceDiscovery consistent with assigned.install paths, then sanity-check removed against inventory cleanup. If instructions are ambiguous, prefer a minimal delta to a known-good definition over inventing new object shapes.",
   "type": "object",
   "additionalProperties": false,
@@ -346,6 +346,14 @@
           "$ref": "#/$defs/acquisitionCandidates",
           "description": "Optional acquisition candidate override for this release/target."
         },
+        "url": {
+          "type": "string",
+          "description": "Optional direct artifact URL template. Prefer candidate.urlTemplate for per-source policy; use this only when the artifact itself owns the full URL."
+        },
+        "urlTemplate": {
+          "type": "string",
+          "description": "Optional direct artifact URL template using tokens such as {version}, {releaseTag}, {releaseTrack}, and {artifactDistributionVariant}."
+        },
         "contentHash": {
           "$ref": "#/$defs/contentHash",
           "description": "Trust boundary for fixed package files."
@@ -392,7 +400,6 @@
           "additionalProperties": false,
           "required": [
             "kind",
-            "sourceId",
             "searchOrder",
             "verification"
           ],
@@ -401,10 +408,20 @@
               "const": "download"
             },
             "sourceId": {
-              "$ref": "#/$defs/identifier"
+              "$ref": "#/$defs/identifier",
+              "description": "Required when resolving through artifacts.sources + sourcePath. Omit for direct url/urlTemplate downloads."
             },
             "sourcePath": {
-              "type": "string"
+              "type": "string",
+              "description": "Source-relative path appended to artifacts.sources[sourceId].baseUri. May also be supplied by targetArtifacts[].sourcePath."
+            },
+            "url": {
+              "type": "string",
+              "description": "Direct absolute download URL. Mutually exclusive with sourceId/sourcePath."
+            },
+            "urlTemplate": {
+              "type": "string",
+              "description": "Direct absolute download URL template with {version}, {releaseTag}, {releaseTrack}, and {artifactDistributionVariant}. Mutually exclusive with sourceId/sourcePath."
             },
             "searchOrder": {
               "type": "integer",
@@ -775,54 +792,62 @@
       }
     },
     "existingInstallSearchLocation": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": [
-        "id",
-        "kind",
-        "searchOrder"
-      ],
-      "properties": {
-        "id": {
-          "$ref": "#/$defs/identifier",
-          "description": "Stable id so packageOperations.removed.operation.commandSource can reference this discovery source."
-        },
-        "kind": {
-          "type": "string",
-          "enum": [
-            "command",
-            "path",
-            "directory",
-            "windowsUninstallRegistryKey"
-          ]
-        },
-        "searchOrder": {
-          "type": "integer",
-          "minimum": 0
-        },
-        "name": {
-          "type": "string"
-        },
-        "path": {
-          "type": "string"
-        },
-        "paths": {
-          "type": "array",
-          "items": {
-            "type": "string"
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [ "id", "kind", "searchOrder", "name" ],
+          "properties": {
+            "id": { "$ref": "#/$defs/identifier" },
+            "kind": { "const": "command" },
+            "searchOrder": { "type": "integer", "minimum": 0 },
+            "name": { "type": "string", "minLength": 1, "description": "Executable command name resolved as an application from PATH." }
           }
         },
-        "installDirectorySource": {
-          "type": "string",
-          "enum": [
-            "installLocation",
-            "displayIcon",
-            "displayIconDirectory",
-            "uninstallString",
-            "uninstallStringDirectory"
-          ]
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [ "id", "kind", "searchOrder", "path" ],
+          "properties": {
+            "id": { "$ref": "#/$defs/identifier" },
+            "kind": { "const": "path" },
+            "searchOrder": { "type": "integer", "minimum": 0 },
+            "path": { "type": "string", "minLength": 1, "description": "Concrete file path to probe." }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [ "id", "kind", "searchOrder", "path" ],
+          "properties": {
+            "id": { "$ref": "#/$defs/identifier" },
+            "kind": { "const": "directory" },
+            "searchOrder": { "type": "integer", "minimum": 0 },
+            "path": { "type": "string", "minLength": 1, "description": "Concrete install directory path to probe." }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [ "id", "kind", "searchOrder", "paths", "installDirectorySource" ],
+          "properties": {
+            "id": { "$ref": "#/$defs/identifier", "description": "Stable id so removal can reference this uninstall-registry source." },
+            "kind": { "const": "windowsUninstallRegistryKey" },
+            "searchOrder": { "type": "integer", "minimum": 0 },
+            "paths": {
+              "type": "array",
+              "minItems": 1,
+              "items": { "type": "string", "minLength": 1 },
+              "description": "Direct registry key paths such as HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\Example."
+            },
+            "installDirectorySource": {
+              "type": "string",
+              "enum": [ "installLocation", "displayIcon", "displayIconDirectory", "uninstallString", "uninstallStringDirectory" ]
+            }
+          }
         }
-      }
+      ],
+      "description": "Existing install search location. Use command/path/directory for portable tools, windowsUninstallRegistryKey for installer-owned applications."
     },
     "installRootRule": {
       "type": "object",
@@ -835,7 +860,13 @@
       "properties": {
         "match": {
           "type": "object",
-          "description": "Discriminator object; supported shape in Wire1_3: { \"kind\": \"fileName\", \"value\": \"example.exe\" }."
+          "additionalProperties": false,
+          "required": [ "kind", "value" ],
+          "properties": {
+            "kind": { "const": "fileName" },
+            "value": { "type": "string", "minLength": 1 }
+          },
+          "description": "Supported shape in Wire1_3: { \"kind\": \"fileName\", \"value\": \"example.exe\" }."
         },
         "installRootRelativePath": {
           "type": "string",
@@ -845,7 +876,7 @@
     },
     "packageOperations": {
       "type": "object",
-      "$comment": "AUTHOR FOCUS: assigned chooses install engine (expandArchive, npmGlobalPackage, nsisInstaller, runInstaller, placePackageFile) and must agree with presenceDiscovery paths. removed must undo ownership safely (inventory row, shims, delete directory). policy sets compatibility and ownership rules before install.",
+      "$comment": "AUTHOR FOCUS: assigned chooses install engine (expandArchive, npmGlobalPackage, nsisInstaller, innoSetupInstaller, runInstaller, placePackageFile) and must agree with presenceDiscovery paths. removed must undo ownership safely (inventory row, shims, delete directory). policy sets compatibility and ownership rules before install.",
       "additionalProperties": false,
       "required": [
         "policy",
@@ -924,6 +955,9 @@
         },
         {
           "$ref": "#/$defs/assignNsisInstaller"
+        },
+        {
+          "$ref": "#/$defs/assignInnoSetupInstaller"
         },
         {
           "$ref": "#/$defs/assignRunInstaller"
@@ -1010,7 +1044,7 @@
     "assignNsisInstaller": {
       "type": "object",
       "additionalProperties": false,
-      "$comment": "NSIS-style installers: targetDirectoryArgument is intentionally open (additionalProperties true) because different installers use different argument shapes; mirror a working definition (for example NotepadPlusPlus.json) until a stricter schema is introduced.",
+      "$comment": "NSIS-only installer adapter. NSIS requires the target directory argument last and unquoted, usually /D=<installDirectory>. Do not use this for Inno Setup; use innoSetupInstaller.",
       "required": [
         "kind",
         "installDirectory",
@@ -1025,6 +1059,57 @@
           "type": "string"
         },
         "installerKind": {
+          "const": "nsis"
+        },
+        "uiMode": {
+          "type": "string"
+        },
+        "elevation": {
+          "$ref": "#/$defs/elevationMode"
+        },
+        "timeoutSec": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "commandArguments": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "targetDirectoryArgument": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [ "enabled", "prefix" ],
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "prefix": { "type": "string", "minLength": 1, "description": "Usually /D=. The engine appends the install directory unquoted and last." }
+          },
+          "description": "NSIS target directory argument. If enabled, the engine appends {prefix}{installDirectory} as the final argument without quotes."
+        },
+        "successExitCodes": {
+          "$ref": "#/$defs/exitCodes"
+        },
+        "restartExitCodes": {
+          "$ref": "#/$defs/exitCodes"
+        }
+      }
+    },
+    "assignInnoSetupInstaller": {
+      "type": "object",
+      "additionalProperties": false,
+      "$comment": "Inno Setup installer adapter. Common silent args are /VERYSILENT /NORESTART /SUPPRESSMSGBOXES and optional /MERGETASKS=... . Target directory is passed as /DIR=\"<installDirectory>\" when targetDirectoryArgument.enabled=true.",
+      "required": [
+        "kind",
+        "installDirectory",
+        "commandArguments",
+        "targetDirectoryArgument"
+      ],
+      "properties": {
+        "kind": {
+          "const": "innoSetupInstaller"
+        },
+        "installDirectory": {
           "type": "string"
         },
         "uiMode": {
@@ -1045,8 +1130,13 @@
         },
         "targetDirectoryArgument": {
           "type": "object",
-          "additionalProperties": true,
-          "description": "Structured mapping consumed by the installer engine (keys depend on installerKind). Undocumented keys are ignored until Wire1_3 understands them."
+          "additionalProperties": false,
+          "required": [ "enabled", "prefix", "quoteValue" ],
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "prefix": { "type": "string", "minLength": 1, "description": "Usually /DIR=." },
+            "quoteValue": { "type": "boolean", "description": "Usually true for Inno Setup because install paths commonly contain spaces." }
+          }
         },
         "successExitCodes": {
           "$ref": "#/$defs/exitCodes"
@@ -1255,7 +1345,8 @@
           ],
           "properties": {
             "kind": {
-              "const": "nsisUninstaller"
+              "type": "string",
+              "enum": [ "nsisUninstaller", "innoSetupUninstaller" ]
             },
             "commandSource": {
               "$ref": "#/$defs/uninstallCommandSource"
