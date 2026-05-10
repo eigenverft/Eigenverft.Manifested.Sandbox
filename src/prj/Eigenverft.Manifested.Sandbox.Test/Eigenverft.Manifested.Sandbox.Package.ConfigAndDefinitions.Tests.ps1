@@ -730,8 +730,8 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
         @($config.Definition.dependencies.definitionId) | Should -Be @('VisualCppRedistributable')
         @($config.Definition.dependencies.repositoryId) | Should -Be @('EigenverftModule')
         $sourceDefinition.Kind | Should -Be 'githubRelease'
-        $sourceDefinition.RepositoryOwner | Should -Be 'ggml-org'
-        $sourceDefinition.RepositoryName | Should -Be 'llama.cpp'
+        $sourceDefinition.GitHubOwner | Should -Be 'ggml-org'
+        $sourceDefinition.GitHubRepository | Should -Be 'llama.cpp'
         $result.PackageId | Should -Be 'llama-cpp-win-cpu-x64-stable'
         $result.Package.version | Should -Be '8863'
         $result.Package.releaseTag | Should -Be 'b8863'
@@ -764,8 +764,8 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
 
         $config.DefinitionId | Should -Be 'GitRuntime'
         $sourceDefinition.Kind | Should -Be 'githubRelease'
-        $sourceDefinition.RepositoryOwner | Should -Be 'git-for-windows'
-        $sourceDefinition.RepositoryName | Should -Be 'git'
+        $sourceDefinition.GitHubOwner | Should -Be 'git-for-windows'
+        $sourceDefinition.GitHubRepository | Should -Be 'git'
         $result.Package.version | Should -Be '2.54.0'
         $result.Package.releaseTag | Should -Be 'v2.54.0.windows.1'
         $result.Package.packageFile.fileName | Should -Be $expectedFileName
@@ -800,8 +800,8 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
         $sourceDefinition.Kind | Should -Be 'download'
         $sourceDefinition.BaseUri | Should -Be 'https://github.com/notepad-plus-plus/notepad-plus-plus/releases/download/'
         $result.Package.version | Should -Be '8.9.4'
-        $result.Package.assigned.kind | Should -Be 'nsisInstaller'
-        $result.Package.assigned.targetDirectoryArgument.prefix | Should -Be '/D='
+        $result.Package.assigned.install.kind | Should -Be 'nsisInstaller'
+        $result.Package.assigned.install.targetDirectoryArgument.prefix | Should -Be '/D='
         $result.Package.existingInstallDiscovery.searchLocations[0].kind | Should -Be 'windowsUninstallRegistryKey'
         $result.Package.existingInstallDiscovery.searchLocations[0].installDirectorySource | Should -Be 'displayIconDirectory'
         $result.Package.packageFile.fileName | Should -Be $expectedFileName
@@ -858,9 +858,9 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
 
             $config.DefinitionId | Should -Be $case.DefinitionId
             $result.Package.version | Should -Be $case.Version
-            $result.Package.assigned.kind | Should -Be 'npmGlobalPackage'
-            $result.Package.assigned.installerCommand | Should -Be 'npm'
-            $result.Package.assigned.packageSpec | Should -Be $case.PackageSpec
+            $result.Package.assigned.install.kind | Should -Be 'npmGlobalPackage'
+            $result.Package.assigned.install.installerCommand | Should -Be 'npm'
+            $result.Package.assigned.install.packageSpec | Should -Be $case.PackageSpec
             $result.Package.assigned.pathRegistration.source.kind | Should -Be 'shim'
             $result.Package.assigned.pathRegistration.source.use | Should -Be 'presenceDiscovery.commands'
             $config.Definition.presenceDiscovery.commands[0].name | Should -Be $case.Command
@@ -970,7 +970,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
         $result.Package.releaseTag | Should -Be '3.13.13'
         $result.Package.packageFile.fileName | Should -Be $expectedFileName
         $result.Package.packageFile.contentHash.value | Should -Be $expectedSha256
-        $result.Package.assigned.expandedRoot | Should -Be 'tools'
+        $result.Package.assigned.install.expandedRoot | Should -Be 'tools'
         $result.Package.assigned.pathRegistration.source.kind | Should -Be 'shim'
         $result.Package.assigned.pathRegistration.source.use | Should -Be 'presenceDiscovery.commands'
         $config.Definition.presenceDiscovery.commands[0].name | Should -Be 'python'
@@ -1000,8 +1000,8 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
 
         $config.DefinitionId | Should -Be 'PowerShell7'
         $sourceDefinition.Kind | Should -Be 'githubRelease'
-        $sourceDefinition.RepositoryOwner | Should -Be 'PowerShell'
-        $sourceDefinition.RepositoryName | Should -Be 'PowerShell'
+        $sourceDefinition.GitHubOwner | Should -Be 'PowerShell'
+        $sourceDefinition.GitHubRepository | Should -Be 'PowerShell'
         $result.Package.version | Should -Be '7.6.1'
         $result.Package.releaseTag | Should -Be 'v7.6.1'
         $result.Package.packageFile.fileName | Should -Be $expectedFileName
@@ -1023,10 +1023,10 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
         $sourceDefinition.Kind | Should -Be 'download'
         $sourceDefinition.BaseUri | Should -Be 'https://aka.ms/'
         $result.PackageId | Should -Be 'vc-runtime-x64-stable'
-        $result.Package.assigned.kind | Should -Be 'runInstaller'
-        $result.Package.assigned.targetKind | Should -Be 'machinePrerequisite'
-        $result.Package.assigned.elevation | Should -Be 'required'
-        $result.Package.assigned.commandArguments | Should -Be @('/install', '/quiet', '/norestart', '/log', '{logPath}')
+        $result.Package.assigned.install.kind | Should -Be 'runInstaller'
+        $result.Package.assigned.install.targetKind | Should -Be 'machinePrerequisite'
+        $result.Package.assigned.install.elevation | Should -Be 'required'
+        $result.Package.assigned.install.commandArguments | Should -Be @('/install', '/quiet', '/norestart', '/log', '{logPath}')
         $result.Package.packageFile.fileName | Should -Be 'vc_redist.x64.exe'
         $result.Package.packageFile.publisherSignature.subjectContains | Should -Be 'Microsoft Corporation'
     }
@@ -1049,7 +1049,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
         $result.Package.packageFile.fileName | Should -Be 'Qwen3.5-9B-Q6_K.gguf'
         $result.Package.packageFile.contentHash.algorithm | Should -Be 'sha256'
         $result.Package.packageFile.contentHash.value | Should -Be '91898433cf5ce0a8f45516a4cc3e9343b6e01d052d01f684309098c66a326c59'
-        $result.Package.assigned.kind | Should -Be 'placePackageFile'
+        $result.Package.assigned.install.kind | Should -Be 'placePackageFile'
         $result.Compatibility.Count | Should -Be 1
         $result.Compatibility[0].Kind | Should -Be 'physicalOrVideoMemoryGiB'
         $result.Compatibility[0].OnFail | Should -Be 'warn'
@@ -1097,7 +1097,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
             Document = ConvertTo-TestPsObject -InputObject $definitionDocument
         }
 
-        { Assert-PackageDefinitionSchema -DefinitionDocumentInfo $definitionInfo -DefinitionId 'VSCodeRuntime' } | Should -Throw '*assigned.managerDependency*'
+        { Assert-PackageDefinitionSchema -DefinitionDocumentInfo $definitionInfo -DefinitionId 'VSCodeRuntime' } | Should -Throw '*packageOperations.assigned.install.managerDependency*'
     }
 
     It 'fails clearly when a definition is missing schemaVersion' {
@@ -1442,8 +1442,8 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
         $documents = Write-TestPackageDocuments -RootPath $rootPath -GlobalDocument (New-TestPackageGlobalDocument) -DefinitionDocument (New-TestVSCodeDefinitionDocument -Releases @($release) -SharedReadiness (New-TestReadiness -Version '0.0.1') -UpstreamSources @{
             llamaCppGitHub = @{
                 kind            = 'githubRelease'
-                repositoryOwner = 'ggml-org'
-                repositoryName  = 'llama.cpp'
+                githubOwner      = 'ggml-org'
+                githubRepository = 'llama.cpp'
             }
         })
 
@@ -1457,8 +1457,8 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
         $definitionSource = Get-PackageSourceDefinition -PackageConfig $config -SourceRef ([pscustomobject]@{ scope = 'definition'; id = 'llamaCppGitHub' })
 
         $definitionSource.Kind | Should -Be 'githubRelease'
-        $definitionSource.RepositoryOwner | Should -Be 'ggml-org'
-        $definitionSource.RepositoryName | Should -Be 'llama.cpp'
+        $definitionSource.GitHubOwner | Should -Be 'ggml-org'
+        $definitionSource.GitHubRepository | Should -Be 'llama.cpp'
         $result.Package.version | Should -Be '0.0.1'
         $result.Package.releaseTag | Should -Be 'b8863'
     }
@@ -1476,8 +1476,8 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
         $documents = Write-TestPackageDocuments -RootPath $rootPath -GlobalDocument (New-TestPackageGlobalDocument) -DefinitionDocument (New-TestVSCodeDefinitionDocument -Releases @($release) -SharedReadiness (New-TestReadiness -Version '0.0.1') -UpstreamSources @{
             llamaCppGitHub = @{
                 kind            = 'githubRelease'
-                repositoryOwner = 'ggml-org'
-                repositoryName  = 'llama.cpp'
+                githubOwner      = 'ggml-org'
+                githubRepository = 'llama.cpp'
             }
         })
 
@@ -1501,8 +1501,8 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
         $documents = Write-TestPackageDocuments -RootPath $rootPath -GlobalDocument (New-TestPackageGlobalDocument) -DefinitionDocument (New-TestVSCodeDefinitionDocument -Releases @($release) -SharedReadiness (New-TestReadiness -Version '0.0.1') -UpstreamSources @{
             llamaCppGitHub = @{
                 kind            = 'githubRelease'
-                repositoryOwner = 'ggml-org'
-                repositoryName  = 'llama.cpp'
+                githubOwner      = 'ggml-org'
+                githubRepository = 'llama.cpp'
             }
         })
 
@@ -1587,8 +1587,8 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
             Scope           = 'definition'
             Id              = 'llamaCppGitHub'
             Kind            = 'githubRelease'
-            RepositoryOwner = 'ggml-org'
-            RepositoryName  = 'llama.cpp'
+            GitHubOwner      = 'ggml-org'
+            GitHubRepository = 'llama.cpp'
         }
         $package = ConvertTo-TestPsObject @{
             id         = 'llama-cpu-x64-stable'
@@ -1641,7 +1641,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
         $result = Resolve-PackagePaths -PackageResult $result
 
         $result.EffectiveRelease | Should -Not -BeNullOrEmpty
-        $result.Package.assigned.kind | Should -Be 'expandArchive'
+        $result.Package.assigned.install.kind | Should -Be 'expandArchive'
         $result.Package.readiness.commandChecks[0].expectedValue | Should -Be '{version}'
         $result.PackageWorkSlotDirectory | Should -Match '^VSCodeRuntime-[0-9a-f]{8}$'
         $result.PackageFilePath | Should -Match '\\FileStage\\VSCodeRuntime-[0-9a-f]{8}\\'
@@ -1686,4 +1686,3 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
     }
 
 }
-

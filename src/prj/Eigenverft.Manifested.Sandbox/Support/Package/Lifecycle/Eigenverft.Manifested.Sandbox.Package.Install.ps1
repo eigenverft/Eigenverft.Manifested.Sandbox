@@ -28,7 +28,7 @@ Set-PackageAssignedState -PackageResult $result
     )
 
     $package = $PackageResult.Package
-    $install = Get-PackageAssignedOperation -Release $package
+    $install = Get-PackageAssignedInstallOperation -Release $package
     if (-not $install -or -not $install.PSObject.Properties['kind']) {
         throw "Package release '$($package.id)' does not define packageOperations.assigned.install.kind."
     }

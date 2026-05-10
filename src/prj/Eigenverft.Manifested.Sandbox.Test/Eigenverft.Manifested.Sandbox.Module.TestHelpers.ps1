@@ -347,16 +347,15 @@ function global:New-TestReadiness {
     }
 }
 
-function global:New-TestInstalledStateDiscovery {
+function global:New-TestExistingInstallDiscovery {
     param(
-        [bool]$EnableDetection = $false,
+        [bool]$Enabled = $false,
         [array]$SearchLocations = [object[]]@(),
         [array]$InstallRootRules = [object[]]@()
     )
 
     return @{
-        enableDetection = $EnableDetection
-        enabled         = $EnableDetection
+        enabled         = $Enabled
         searchLocations = $SearchLocations
         installRootRules = $InstallRootRules
     }
@@ -401,10 +400,11 @@ function global:New-TestPackageRelease {
 
         [hashtable]$Compatibility = $null,
 
-        [Alias('Install')]
-        [hashtable]$Assigned = $null,
+        [hashtable]$Install = $null,
 
         [hashtable]$ReadyStateCheck = $null,
+
+        [hashtable]$Readiness = $null,
 
         [hashtable]$ExistingInstallDiscovery = $null,
 
@@ -445,11 +445,16 @@ function global:New-TestPackageRelease {
     if ($PSBoundParameters.ContainsKey('Compatibility')) {
         $release.compatibility = $Compatibility
     }
-    if ($PSBoundParameters.ContainsKey('Assigned')) {
-        $release.assigned = $Assigned
+    if ($PSBoundParameters.ContainsKey('Install')) {
+        $release.assigned = @{
+            install = $Install
+        }
     }
     if ($PSBoundParameters.ContainsKey('ReadyStateCheck')) {
         $release.readyStateCheck = $ReadyStateCheck
+    }
+    if ($PSBoundParameters.ContainsKey('Readiness')) {
+        $release.testReadiness = $Readiness
     }
     if ($PSBoundParameters.ContainsKey('ExistingInstallDiscovery')) {
         $release.existingInstallDiscovery = $ExistingInstallDiscovery
@@ -474,7 +479,7 @@ function global:New-TestVSCodeDefinitionDocument {
 
         [hashtable]$SharedReadiness = $null,
 
-        [hashtable]$SharedStateDiscovery = $null,
+        [hashtable]$SharedExistingInstallDiscovery = $null,
 
         [hashtable]$SharedOwnershipPolicy = $null
     )
@@ -486,23 +491,23 @@ function global:New-TestVSCodeDefinitionDocument {
             install = @{
                 kind             = 'expandArchive'
                 installDirectory = 'vscode-runtime/{releaseTrack}/{version}/{artifactDistributionVariant}'
-                pathRegistration = @{
-                    mode   = 'user'
-                    source = @{
-                        kind = 'shim'
-                        use  = 'presenceDiscovery.commands'
-                    }
-                }
                 expandedRoot     = 'auto'
                 createDirectories = @('data')
+            }
+            pathRegistration = @{
+                mode   = 'user'
+                source = @{
+                    kind = 'shim'
+                    use  = 'presenceDiscovery.commands'
+                }
             }
         }
     }
     if ($null -eq $SharedReadiness) {
         $SharedReadiness = New-TestReadiness -Version '0.0.0'
     }
-    if ($null -eq $SharedStateDiscovery) {
-        $SharedStateDiscovery = New-TestInstalledStateDiscovery -EnableDetection $false
+    if ($null -eq $SharedExistingInstallDiscovery) {
+        $SharedExistingInstallDiscovery = New-TestExistingInstallDiscovery -Enabled $false
     }
     if ($null -eq $SharedOwnershipPolicy) {
         $SharedOwnershipPolicy = New-TestOwnershipPolicy
@@ -521,7 +526,7 @@ function global:New-TestVSCodeDefinitionDocument {
         $assigned.install = ConvertTo-TestPsObject $rawAssigned.install
     }
     else {
-        $assigned.install = ConvertTo-TestPsObject $rawAssigned
+        throw "Test definition helper requires assigned.install. Use New-TestPackageRelease -Install or pass an assigned object with an install property."
     }
 
     if ($rawAssigned.PSObject.Properties['pathRegistration']) {
@@ -542,7 +547,12 @@ function global:New-TestVSCodeDefinitionDocument {
     }
     else { $null }
 
-    $readiness = $SharedReadiness
+    $readiness = if ($firstRelease -and $firstRelease.PSObject.Properties['testReadiness']) {
+        $firstRelease.testReadiness
+    }
+    else {
+        $SharedReadiness
+    }
     $readiness = ConvertTo-TestPsObject $readiness
 
     if (-not $readyStateCheck) {
@@ -571,10 +581,6 @@ function global:New-TestVSCodeDefinitionDocument {
     if ($rawAssigned.PSObject.Properties['versionUpdatePolicy']) {
         $assigned.versionUpdatePolicy = ConvertTo-TestPsObject $rawAssigned.versionUpdatePolicy
     }
-    if ($rawAssigned.PSObject.Properties['kind'] -and -not $rawAssigned.PSObject.Properties['install']) {
-        $assigned.install.kind = [string]$rawAssigned.kind
-    }
-
     $compatibility = if ($firstRelease -and $firstRelease.PSObject.Properties['compatibility']) {
         $firstRelease.compatibility
     }
@@ -586,18 +592,13 @@ function global:New-TestVSCodeDefinitionDocument {
         $firstRelease.existingInstallDiscovery
     }
     else {
-        $SharedStateDiscovery
+        $SharedExistingInstallDiscovery
     }
 
-    $discoveryPayload = if ($rawExistingInstallDiscovery.PSObject.Properties['installed']) {
-        ConvertTo-TestPsObject $rawExistingInstallDiscovery.installed
-    }
-    else {
-        ConvertTo-TestPsObject $rawExistingInstallDiscovery
-    }
+    $discoveryPayload = ConvertTo-TestPsObject $rawExistingInstallDiscovery
 
     $existingInstallDiscovery = [ordered]@{
-        enabled         = if ($discoveryPayload.PSObject.Properties['enabled']) { [bool]$discoveryPayload.enabled } elseif ($discoveryPayload.PSObject.Properties['enableDetection']) { [bool]$discoveryPayload.enableDetection } else { $false }
+        enabled         = if ($discoveryPayload.PSObject.Properties['enabled']) { [bool]$discoveryPayload.enabled } else { $false }
         searchLocations = @($discoveryPayload.searchLocations)
         installRootRules = @($discoveryPayload.installRootRules)
     }

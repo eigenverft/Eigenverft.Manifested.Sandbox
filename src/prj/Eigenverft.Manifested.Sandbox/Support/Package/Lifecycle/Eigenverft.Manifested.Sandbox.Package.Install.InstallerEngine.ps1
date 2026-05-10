@@ -150,7 +150,7 @@ Invoke-PackageInstallerProcess -PackageResult $result
         [psobject]$PackageResult
     )
 
-    $install = Get-PackageAssignedOperation -Release $PackageResult.Package
+    $install = Get-PackageAssignedInstallOperation -Release $PackageResult.Package
     if (-not $install) {
         throw "Package installer for '$($PackageResult.PackageId)' requires an assigned block on the selected release."
     }
@@ -238,7 +238,7 @@ Runs an NSIS installer package through the isolated package install stage.
         [psobject]$PackageResult
     )
 
-    $install = Get-PackageAssignedOperation -Release $PackageResult.Package
+    $install = Get-PackageAssignedInstallOperation -Release $PackageResult.Package
     if (-not $install) {
         throw "Package nsisInstaller for '$($PackageResult.PackageId)' requires an assigned block on the selected release."
     }

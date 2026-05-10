@@ -157,7 +157,7 @@ function Assert-PackageDefinitionNoRetiredNestedProperty_1_3 {
     )
 
     if ($InputObject -and $InputObject.PSObject.Properties[$PropertyName]) {
-        throw "Package definition '$DefinitionId' still uses retired schemaVersion 1.1 property '$PropertyPath'. Use '$ReplacementPath'."
+        throw "Package definition '$DefinitionId' still uses retired property '$PropertyPath'. Use '$ReplacementPath'."
     }
 }
 
@@ -381,7 +381,7 @@ function Assert-PackageDefinitionSchema_1_3 {
     $definition = $DefinitionDocumentInfo.Document
     foreach ($retiredProperty in @('releases', 'providedTools', 'shared', 'releaseDefaults', 'installedStateDiscovery', 'installedStateCheck', 'existingInstallPolicy')) {
         if ($definition.PSObject.Properties[$retiredProperty]) {
-            throw "Package definition '$($DefinitionDocumentInfo.Path)' still uses retired schemaVersion 1.1 property '$retiredProperty'."
+            throw "Package definition '$($DefinitionDocumentInfo.Path)' still uses retired property '$retiredProperty'."
         }
     }
 
@@ -441,10 +441,10 @@ function Assert-PackageDefinitionSchema_1_3 {
 
     $assignedOperation = if ($definition.packageOperations.PSObject.Properties['assigned']) { $definition.packageOperations.assigned } else { $null }
     $assignedInstall = if ($assignedOperation -and $assignedOperation.PSObject.Properties['install']) { $assignedOperation.install } else { $null }
-    Assert-PackageDefinitionNoRetiredNestedProperty_1_3 -DefinitionId $DefinitionId -InputObject $assignedOperation -PropertyName 'managerDependency' -PropertyPath 'packageOperations.assigned.managerDependency' -ReplacementPath 'dependencies plus packageOperations.assigned.installerCommand'
-    Assert-PackageDefinitionNoRetiredNestedProperty_1_3 -DefinitionId $DefinitionId -InputObject $assignedInstall -PropertyName 'managerDependency' -PropertyPath 'packageOperations.assigned.managerDependency' -ReplacementPath 'dependencies plus packageOperations.assigned.installerCommand'
-    Assert-PackageDefinitionNoRetiredNestedProperty_1_3 -DefinitionId $DefinitionId -InputObject $assignedOperation -PropertyName 'managerKind' -PropertyPath 'packageOperations.assigned.managerKind' -ReplacementPath 'packageOperations.assigned.kind = npmGlobalPackage'
-    Assert-PackageDefinitionNoRetiredNestedProperty_1_3 -DefinitionId $DefinitionId -InputObject $assignedInstall -PropertyName 'managerKind' -PropertyPath 'packageOperations.assigned.managerKind' -ReplacementPath 'packageOperations.assigned.kind = npmGlobalPackage'
+    Assert-PackageDefinitionNoRetiredNestedProperty_1_3 -DefinitionId $DefinitionId -InputObject $assignedOperation -PropertyName 'managerDependency' -PropertyPath 'packageOperations.assigned.managerDependency' -ReplacementPath 'dependencies plus packageOperations.assigned.install.installerCommand'
+    Assert-PackageDefinitionNoRetiredNestedProperty_1_3 -DefinitionId $DefinitionId -InputObject $assignedInstall -PropertyName 'managerDependency' -PropertyPath 'packageOperations.assigned.install.managerDependency' -ReplacementPath 'dependencies plus packageOperations.assigned.install.installerCommand'
+    Assert-PackageDefinitionNoRetiredNestedProperty_1_3 -DefinitionId $DefinitionId -InputObject $assignedOperation -PropertyName 'managerKind' -PropertyPath 'packageOperations.assigned.managerKind' -ReplacementPath 'packageOperations.assigned.install.kind = npmGlobalPackage'
+    Assert-PackageDefinitionNoRetiredNestedProperty_1_3 -DefinitionId $DefinitionId -InputObject $assignedInstall -PropertyName 'managerKind' -PropertyPath 'packageOperations.assigned.install.managerKind' -ReplacementPath 'packageOperations.assigned.install.kind = npmGlobalPackage'
     if (-not $definition.packageOperations.PSObject.Properties['removed']) {
         throw "Package definition '$DefinitionId' is missing required packageOperations.removed."
     }
@@ -595,11 +595,11 @@ function New-PackageReadinessFromPresenceDiscovery {
     else {
         [pscustomobject]@{}
     }
-    $discovery = $Definition.presenceDiscovery
+    $presenceDiscovery = $Definition.presenceDiscovery
 
     $commandChecks = New-Object System.Collections.Generic.List[object]
     if ($require.PSObject.Properties['commands'] -and [bool]$require.commands) {
-        foreach ($command in @($discovery.commands)) {
+        foreach ($command in @($presenceDiscovery.commands)) {
             foreach ($stateCheck in @($command.stateChecks)) {
                 if ($null -eq $stateCheck) {
                     continue
@@ -612,13 +612,13 @@ function New-PackageReadinessFromPresenceDiscovery {
     }
 
     return [pscustomobject]@{
-        files          = if ($require.PSObject.Properties['files'] -and [bool]$require.files) { @($discovery.files) } else { @() }
-        directories    = if ($require.PSObject.Properties['directories'] -and [bool]$require.directories) { @($discovery.directories) } else { @() }
+        files          = if ($require.PSObject.Properties['files'] -and [bool]$require.files) { @($presenceDiscovery.files) } else { @() }
+        directories    = if ($require.PSObject.Properties['directories'] -and [bool]$require.directories) { @($presenceDiscovery.directories) } else { @() }
         commandChecks  = @($commandChecks.ToArray())
-        metadataFiles  = if ($require.PSObject.Properties['metadataFiles'] -and [bool]$require.metadataFiles) { @($discovery.metadataFiles) } else { @() }
-        signatures     = if ($require.PSObject.Properties['signatures'] -and [bool]$require.signatures) { @($discovery.signatures) } else { @() }
-        fileDetails    = if ($require.PSObject.Properties['fileDetails'] -and [bool]$require.fileDetails) { @($discovery.fileDetails) } else { @() }
-        registryChecks = if ($require.PSObject.Properties['registry'] -and [bool]$require.registry) { @($discovery.registry) } else { @() }
+        metadataFiles  = if ($require.PSObject.Properties['metadataFiles'] -and [bool]$require.metadataFiles) { @($presenceDiscovery.metadataFiles) } else { @() }
+        signatures     = if ($require.PSObject.Properties['signatures'] -and [bool]$require.signatures) { @($presenceDiscovery.signatures) } else { @() }
+        fileDetails    = if ($require.PSObject.Properties['fileDetails'] -and [bool]$require.fileDetails) { @($presenceDiscovery.fileDetails) } else { @() }
+        registryChecks = if ($require.PSObject.Properties['registry'] -and [bool]$require.registry) { @($presenceDiscovery.registry) } else { @() }
     }
 }
 
@@ -676,21 +676,7 @@ function Resolve-PackageEffectivePackage_1_3 {
     $target = $selected.ArtifactTarget
     $versionEntry = $selected.VersionEntry
     $artifact = $selected.Artifact
-    $rawAssigned = ConvertTo-PackageObject -InputObject $definition.packageOperations.assigned
-    $assigned = $rawAssigned
-    $rawAssignedInstall = if ($rawAssigned -is [psobject] -and $rawAssigned.PSObject.Properties['install']) { $rawAssigned.install } else { $null }
-    if ($rawAssignedInstall -is [psobject]) {
-        $flattenedAssigned = [ordered]@{}
-        foreach ($property in @($rawAssigned.PSObject.Properties)) {
-            $flattenedAssigned[$property.Name] = $property.Value
-        }
-        foreach ($property in @($rawAssignedInstall.PSObject.Properties)) {
-            if (-not $flattenedAssigned.Contains($property.Name)) {
-                $flattenedAssigned[$property.Name] = $property.Value
-            }
-        }
-        $assigned = [pscustomobject]$flattenedAssigned
-    }
+    $assigned = ConvertTo-PackageObject -InputObject $definition.packageOperations.assigned
     $upstreamRelease = if ($versionEntry.PSObject.Properties['upstreamRelease']) { $versionEntry.upstreamRelease } else { $null }
 
     $fileName = if ($artifact.PSObject.Properties['fileName'] -and -not [string]::IsNullOrWhiteSpace([string]$artifact.fileName)) {

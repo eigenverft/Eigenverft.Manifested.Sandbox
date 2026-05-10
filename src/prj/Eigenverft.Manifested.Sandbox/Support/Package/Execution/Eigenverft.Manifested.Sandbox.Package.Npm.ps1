@@ -64,12 +64,12 @@ function Resolve-PackageNpmInstallerCommand {
         [psobject]$PackageResult
     )
 
-    $install = Get-PackageAssignedOperation -Release $PackageResult.Package
+    $install = Get-PackageAssignedInstallOperation -Release $PackageResult.Package
     if (-not $install) {
-        throw "Package npm global package install for '$($PackageResult.PackageId)' requires an assigned block on the selected release."
+        throw "Package npm global package install for '$($PackageResult.PackageId)' requires packageOperations.assigned.install on the selected release."
     }
     if (-not $install.PSObject.Properties['installerCommand'] -or [string]::IsNullOrWhiteSpace([string]$install.installerCommand)) {
-        throw "Package npm global package install for '$($PackageResult.PackageId)' requires assigned.installerCommand."
+        throw "Package npm global package install for '$($PackageResult.PackageId)' requires packageOperations.assigned.install.installerCommand."
     }
 
     $installerCommand = [string]$install.installerCommand
@@ -90,12 +90,12 @@ Installs an exact npm package spec into a staged Package-owned prefix.
         [psobject]$PackageResult
     )
 
-    $install = Get-PackageAssignedOperation -Release $PackageResult.Package
+    $install = Get-PackageAssignedInstallOperation -Release $PackageResult.Package
     if (-not $install) {
-        throw "Package npm global package install for '$($PackageResult.PackageId)' requires an assigned block on the selected release."
+        throw "Package npm global package install for '$($PackageResult.PackageId)' requires packageOperations.assigned.install on the selected release."
     }
     if (-not $install.PSObject.Properties['packageSpec'] -or [string]::IsNullOrWhiteSpace([string]$install.packageSpec)) {
-        throw "Package npm global package install for '$($PackageResult.PackageId)' requires assigned.packageSpec."
+        throw "Package npm global package install for '$($PackageResult.PackageId)' requires packageOperations.assigned.install.packageSpec."
     }
 
     $packageSpec = Resolve-PackageTemplateText -Text ([string]$install.packageSpec) -PackageConfig $PackageResult.PackageConfig -Package $PackageResult.Package
@@ -167,4 +167,3 @@ Installs an exact npm package spec into a staged Package-owned prefix.
         ExitCode         = $exitCode
     }
 }
-

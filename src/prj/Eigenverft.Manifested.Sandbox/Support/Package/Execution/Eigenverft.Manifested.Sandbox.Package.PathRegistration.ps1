@@ -86,12 +86,12 @@ or directory path for the requested install directory.
         [string]$InstallDirectoryOverride
     )
 
-    $install = Get-PackageAssignedOperation -Release $PackageResult.Package
-    if (-not $install -or -not $install.PSObject.Properties['pathRegistration'] -or $null -eq $install.pathRegistration) {
+    $assigned = Get-PackageAssignedOperation -Release $PackageResult.Package
+    if (-not $assigned -or -not $assigned.PSObject.Properties['pathRegistration'] -or $null -eq $assigned.pathRegistration) {
         return $null
     }
 
-    $pathRegistration = $install.pathRegistration
+    $pathRegistration = $assigned.pathRegistration
     if (-not $pathRegistration.PSObject.Properties['source'] -or $null -eq $pathRegistration.source) {
         return $null
     }
@@ -268,8 +268,8 @@ for the same install slot.
         [psobject]$PackageResult
     )
 
-    $install = Get-PackageAssignedOperation -Release $PackageResult.Package
-    $pathRegistration = if ($install -and $install.PSObject.Properties['pathRegistration']) { $install.pathRegistration } else { $null }
+    $assigned = Get-PackageAssignedOperation -Release $PackageResult.Package
+    $pathRegistration = if ($assigned -and $assigned.PSObject.Properties['pathRegistration']) { $assigned.pathRegistration } else { $null }
     $mode = if ($pathRegistration -and $pathRegistration.PSObject.Properties['mode'] -and -not [string]::IsNullOrWhiteSpace([string]$pathRegistration.mode)) {
         ([string]$pathRegistration.mode).ToLowerInvariant()
     }
@@ -455,5 +455,4 @@ directories from PATH for the same mode as registration.
 
     return $PackageResult
 }
-
 

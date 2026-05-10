@@ -45,6 +45,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - path r
                     @{
                         name         = 'code'
                         relativePath = 'bin/code.cmd'
+                        exposeCommand = $true
                     }
                 )
                 apps = @(
@@ -78,6 +79,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - path r
                             @{
                                 name         = 'code'
                                 relativePath = 'bin/code.cmd'
+                        exposeCommand = $true
                             }
                         )
                         apps = @()
@@ -336,6 +338,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - path r
                             @{
                                 name         = 'code'
                                 relativePath = 'bin/code.cmd'
+                        exposeCommand = $true
                             }
                         )
                         apps = @()
@@ -383,6 +386,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - path r
                             @{
                                 name         = 'code'
                                 relativePath = 'bin/code.cmd'
+                        exposeCommand = $true
                             }
                         )
                         apps = @()
@@ -517,6 +521,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - path r
                             @{
                                 name         = 'code'
                                 relativePath = 'code.cmd'
+                                exposeCommand = $true
                             }
                         )
                         apps     = @()
@@ -573,6 +578,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - path r
                             @{
                                 name         = 'code'
                                 relativePath = 'code.cmd'
+                                exposeCommand = $true
                             }
                         )
                         apps     = @()
@@ -625,6 +631,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - path r
                             @{
                                 name         = 'code'
                                 relativePath = 'code.cmd'
+                                exposeCommand = $true
                             }
                         )
                         apps     = @()
@@ -680,6 +687,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - path r
                             @{
                                 name         = 'code'
                                 relativePath = 'code.cmd'
+                                exposeCommand = $true
                             }
                         )
                         apps     = @()
@@ -741,6 +749,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - path r
                             @{
                                 name         = 'code'
                                 relativePath = 'code.cmd'
+                                exposeCommand = $true
                             }
                         )
                         apps     = @()
@@ -789,6 +798,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - path r
                             @{
                                 name         = 'codex'
                                 relativePath = 'codex.cmd'
+                                exposeCommand = $true
                             }
                         )
                         apps     = @()
@@ -839,4 +849,3 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - path r
     }
 
 }
-

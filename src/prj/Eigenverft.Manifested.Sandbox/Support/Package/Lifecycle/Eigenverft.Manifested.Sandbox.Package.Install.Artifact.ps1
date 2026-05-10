@@ -29,7 +29,7 @@ Install-PackageArchive -PackageResult $result
         throw "Package archive install for '$($PackageResult.PackageId)' requires a saved package file."
     }
 
-    $install = Get-PackageAssignedOperation -Release $PackageResult.Package
+    $install = Get-PackageAssignedInstallOperation -Release $PackageResult.Package
     if (-not $install) {
         throw "Package archive install for '$($PackageResult.PackageId)' requires an assigned block on the selected release."
     }
@@ -90,7 +90,7 @@ simple install model.
         [psobject]$PackageResult
     )
 
-    $install = Get-PackageAssignedOperation -Release $PackageResult.Package
+    $install = Get-PackageAssignedInstallOperation -Release $PackageResult.Package
     if (-not $install) {
         throw "Package single-file install for '$($PackageResult.PackageId)' requires an assigned block on the selected release."
     }

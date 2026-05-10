@@ -14,8 +14,8 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - acquis
         Write-TestTextFile -Path $codeCmdPath -Content '@echo off'
         Write-TestTextFile -Path $codeExePath -Content 'fake'
 
-        $discovery = ConvertTo-TestPsObject @{
-            enableDetection = $true
+        $existingInstallDiscovery = ConvertTo-TestPsObject @{
+            enabled = $true
             searchLocations = @()
             installRootRules = @(
                 @{
@@ -35,8 +35,8 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - acquis
             )
         }
 
-        (Resolve-PackageExistingInstallRoot -ExistingInstallDiscovery $discovery -CandidatePath $codeCmdPath) | Should -Be $installRoot
-        (Resolve-PackageExistingInstallRoot -ExistingInstallDiscovery $discovery -CandidatePath $codeExePath) | Should -Be $installRoot
+        (Resolve-PackageExistingInstallRoot -ExistingInstallDiscovery $existingInstallDiscovery -CandidatePath $codeCmdPath) | Should -Be $installRoot
+        (Resolve-PackageExistingInstallRoot -ExistingInstallDiscovery $existingInstallDiscovery -CandidatePath $codeExePath) | Should -Be $installRoot
     }
 
     It 'keeps packageFileStaging and defaultPackageDepot distinct in the resolved paths' {
@@ -200,12 +200,12 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - acquis
         Write-TestTextFile -Path (Join-Path $installRoot 'Code.exe') -Content 'fake'
         Write-TestTextFile -Path (Join-Path $binDirectory 'code.cmd') -Content "@echo off`r`necho 2.0.0`r`n"
 
-        $discovery = New-TestInstalledStateDiscovery -EnableDetection $true -SearchLocations @(
+        $existingInstallDiscovery = New-TestExistingInstallDiscovery -Enabled $true -SearchLocations @(
             @{ kind = 'directory'; path = $installRoot }
         ) -InstallRootRules @()
         $policy = New-TestOwnershipPolicy -AllowAdoptExternal $true
         $readiness = New-TestReadiness -Version '2.0.0' -Directories @()
-        $release = New-TestPackageRelease -Id 'vsCode-win-x64-stable' -Version '2.0.0' -Architecture 'x64' -ArtifactDistributionVariant 'win32-x64' -Install @{ kind = 'reuseExisting' } -ExistingInstallDiscovery $discovery -OwnershipPolicy $policy -Readiness $readiness
+        $release = New-TestPackageRelease -Id 'vsCode-win-x64-stable' -Version '2.0.0' -Architecture 'x64' -ArtifactDistributionVariant 'win32-x64' -Install @{ kind = 'reuseExisting' } -ExistingInstallDiscovery $existingInstallDiscovery -OwnershipPolicy $policy -Readiness $readiness
         $documents = Write-TestPackageDocuments -RootPath $rootPath -GlobalDocument (New-TestPackageGlobalDocument -PackageInventoryFilePath (Join-Path $rootPath 'package-inventory.json')) -DefinitionDocument (New-TestVSCodeDefinitionDocument -Releases @($release) -SharedReadiness $readiness)
 
         [Environment]::SetEnvironmentVariable($script:SourceInventoryEnvVarName, (Join-Path $TestDrive 'missing-inventory.json'), 'Process')
@@ -232,12 +232,12 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - acquis
         Write-TestTextFile -Path (Join-Path $installRoot 'Code.exe') -Content 'fake'
         Write-TestTextFile -Path (Join-Path $binDirectory 'code.cmd') -Content "@echo off`r`necho 2.0.0`r`n"
 
-        $discovery = New-TestInstalledStateDiscovery -EnableDetection $true -SearchLocations @(
+        $existingInstallDiscovery = New-TestExistingInstallDiscovery -Enabled $true -SearchLocations @(
             @{ kind = 'directory'; path = $installRoot }
         ) -InstallRootRules @()
         $policy = New-TestOwnershipPolicy -AllowAdoptExternal $true -RequirePackageOwnership $true
         $readiness = New-TestReadiness -Version '2.0.0' -Directories @()
-        $release = New-TestPackageRelease -Id 'vsCode-win-x64-stable' -Version '2.0.0' -Architecture 'x64' -ArtifactDistributionVariant 'win32-x64' -Install @{ kind = 'reuseExisting' } -ExistingInstallDiscovery $discovery -OwnershipPolicy $policy -Readiness $readiness
+        $release = New-TestPackageRelease -Id 'vsCode-win-x64-stable' -Version '2.0.0' -Architecture 'x64' -ArtifactDistributionVariant 'win32-x64' -Install @{ kind = 'reuseExisting' } -ExistingInstallDiscovery $existingInstallDiscovery -OwnershipPolicy $policy -Readiness $readiness
         $documents = Write-TestPackageDocuments -RootPath $rootPath -GlobalDocument (New-TestPackageGlobalDocument -PackageInventoryFilePath (Join-Path $rootPath 'package-inventory.json')) -DefinitionDocument (New-TestVSCodeDefinitionDocument -Releases @($release) -SharedReadiness $readiness)
 
         [Environment]::SetEnvironmentVariable($script:SourceInventoryEnvVarName, (Join-Path $TestDrive 'missing-inventory.json'), 'Process')
@@ -280,12 +280,12 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - acquis
             )
         }
 
-        $discovery = New-TestInstalledStateDiscovery -EnableDetection $true -SearchLocations @(
+        $existingInstallDiscovery = New-TestExistingInstallDiscovery -Enabled $true -SearchLocations @(
             @{ kind = 'directory'; path = $installRoot }
         ) -InstallRootRules @()
         $policy = New-TestOwnershipPolicy -AllowAdoptExternal $true
         $readiness = New-TestReadiness -Version '2.0.0' -Directories @()
-        $release = New-TestPackageRelease -Id 'vsCode-win-x64-stable' -Version '2.0.0' -Architecture 'x64' -ArtifactDistributionVariant 'win32-x64' -Install @{ kind = 'reuseExisting' } -ExistingInstallDiscovery $discovery -OwnershipPolicy $policy -Readiness $readiness
+        $release = New-TestPackageRelease -Id 'vsCode-win-x64-stable' -Version '2.0.0' -Architecture 'x64' -ArtifactDistributionVariant 'win32-x64' -Install @{ kind = 'reuseExisting' } -ExistingInstallDiscovery $existingInstallDiscovery -OwnershipPolicy $policy -Readiness $readiness
         $documents = Write-TestPackageDocuments -RootPath $rootPath -GlobalDocument (New-TestPackageGlobalDocument -PackageInventoryFilePath $packageStateIndexPath) -DefinitionDocument (New-TestVSCodeDefinitionDocument -Releases @($release) -SharedReadiness $readiness)
 
         [Environment]::SetEnvironmentVariable($script:SourceInventoryEnvVarName, (Join-Path $TestDrive 'missing-inventory.json'), 'Process')
@@ -316,7 +316,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - acquis
         $release = New-TestPackageRelease -Id 'vsCode-win-x64-stable' -Version '2.0.0' -Architecture 'x64' -ArtifactDistributionVariant 'win32-x64' -Install @{
             kind             = 'reuseExisting'
             installDirectory = $installRoot
-        } -ExistingInstallDiscovery (New-TestInstalledStateDiscovery -EnableDetection $true -SearchLocations @()) -OwnershipPolicy (New-TestOwnershipPolicy -AllowAdoptExternal $true) -Readiness $readiness
+        } -ExistingInstallDiscovery (New-TestExistingInstallDiscovery -Enabled $true -SearchLocations @()) -OwnershipPolicy (New-TestOwnershipPolicy -AllowAdoptExternal $true) -Readiness $readiness
         $documents = Write-TestPackageDocuments -RootPath $rootPath -GlobalDocument (New-TestPackageGlobalDocument -PreferredTargetInstallDirectory (Join-Path $rootPath 'managed-root') -PackageInventoryFilePath (Join-Path $rootPath 'package-inventory.json')) -DefinitionDocument (New-TestVSCodeDefinitionDocument -Releases @($release) -SharedReadiness $readiness)
 
         [Environment]::SetEnvironmentVariable($script:SourceInventoryEnvVarName, (Join-Path $TestDrive 'missing-inventory.json'), 'Process')

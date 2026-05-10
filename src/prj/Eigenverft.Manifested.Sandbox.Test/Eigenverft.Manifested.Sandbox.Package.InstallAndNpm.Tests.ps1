@@ -22,9 +22,11 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - instal
             InstallDirectory             = $installDirectory
             Package                      = [pscustomobject]@{
                 assigned = [pscustomobject]@{
-                    kind              = 'expandArchive'
-                    expandedRoot      = 'auto'
-                    createDirectories = @('data')
+                    install = [pscustomobject]@{
+                        kind              = 'expandArchive'
+                        expandedRoot      = 'auto'
+                        createDirectories = @('data')
+                    }
                 }
             }
             ExistingPackage = $null
@@ -99,9 +101,11 @@ exit /b 0
                 releaseTrack = 'stable'
                 artifactDistributionVariant       = 'win32-x64'
                 assigned     = [pscustomobject]@{
-                    kind              = 'npmGlobalPackage'
-                    installerCommand  = 'npm'
-                    packageSpec       = '@openai/codex@{version}'
+                    install = [pscustomobject]@{
+                        kind              = 'npmGlobalPackage'
+                        installerCommand  = 'npm'
+                        packageSpec       = '@openai/codex@{version}'
+                    }
                 }
             }
         }
@@ -157,9 +161,11 @@ exit /b 0
                 releaseTrack = 'stable'
                 artifactDistributionVariant       = 'win32-x64'
                 assigned     = [pscustomobject]@{
-                    kind              = 'npmGlobalPackage'
-                    installerCommand  = 'npm'
-                    packageSpec       = '@openai/codex@{version}'
+                    install = [pscustomobject]@{
+                        kind              = 'npmGlobalPackage'
+                        installerCommand  = 'npm'
+                        packageSpec       = '@openai/codex@{version}'
+                    }
                 }
             }
         }
@@ -193,9 +199,11 @@ exit /b 0
                 releaseTrack = 'stable'
                 artifactDistributionVariant       = 'win32-x64'
                 assigned     = [pscustomobject]@{
-                    kind              = 'npmGlobalPackage'
-                    installerCommand  = 'npm'
-                    packageSpec       = '@openai/codex@{version}'
+                    install = [pscustomobject]@{
+                        kind              = 'npmGlobalPackage'
+                        installerCommand  = 'npm'
+                        packageSpec       = '@openai/codex@{version}'
+                    }
                 }
             }
         }
@@ -398,8 +406,10 @@ exit /b 0
             Readiness    = $null
             Package       = [pscustomobject]@{
                 assigned = [pscustomobject]@{
-                    kind       = 'runInstaller'
-                    targetKind = 'machinePrerequisite'
+                    install = [pscustomobject]@{
+                        kind       = 'runInstaller'
+                        targetKind = 'machinePrerequisite'
+                    }
                 }
             }
         }
@@ -469,15 +479,17 @@ exit /b 0
             }
             Package = [pscustomobject]@{
                 assigned = [pscustomobject]@{
-                    kind           = 'runInstaller'
-                    targetKind     = 'machinePrerequisite'
-                    installerKind  = 'burn'
-                    uiMode         = 'quiet'
-                    elevation      = 'required'
-                    logRelativePath = 'visual-cpp-redist/{timestamp}.log'
-                    commandArguments = @('/install', '/quiet', '/norestart', '/log', '{logPath}')
-                    successExitCodes = @(0)
-                    restartExitCodes = @(3010)
+                    install = [pscustomobject]@{
+                        kind           = 'runInstaller'
+                        targetKind     = 'machinePrerequisite'
+                        installerKind  = 'burn'
+                        uiMode         = 'quiet'
+                        elevation      = 'required'
+                        logRelativePath = 'visual-cpp-redist/{timestamp}.log'
+                        commandArguments = @('/install', '/quiet', '/norestart', '/log', '{logPath}')
+                        successExitCodes = @(0)
+                        restartExitCodes = @(3010)
+                    }
                 }
             }
         }
@@ -536,15 +548,17 @@ exit /b 0
             PackageConfig                = [pscustomobject]@{}
             Package                      = [pscustomobject]@{
                 assigned = [pscustomobject]@{
-                    kind = 'nsisInstaller'
-                    elevation = 'none'
-                    commandArguments = @('/S', '/noUpdater', '/closeRunningNpp')
-                    targetDirectoryArgument = [pscustomobject]@{
-                        enabled = $true
-                        prefix  = '/D='
+                    install = [pscustomobject]@{
+                        kind = 'nsisInstaller'
+                        elevation = 'none'
+                        commandArguments = @('/S', '/noUpdater', '/closeRunningNpp')
+                        targetDirectoryArgument = [pscustomobject]@{
+                            enabled = $true
+                            prefix  = '/D='
+                        }
+                        successExitCodes = @(0)
+                        restartExitCodes = @()
                     }
-                    successExitCodes = @(0)
-                    restartExitCodes = @()
                 }
             }
         }
@@ -577,8 +591,10 @@ exit /b 0
                     fileName = 'Qwen3.5-9B-Q6_K.gguf'
                 }
                 assigned = [pscustomobject]@{
-                    kind               = 'placePackageFile'
-                    targetRelativePath = 'models/Qwen3.5-9B-Q6_K.gguf'
+                    install = [pscustomobject]@{
+                        kind               = 'placePackageFile'
+                        targetRelativePath = 'models/Qwen3.5-9B-Q6_K.gguf'
+                    }
                 }
             }
             ExistingPackage = $null
@@ -902,5 +918,4 @@ exit /b 0
     }
 
 }
-
 

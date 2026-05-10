@@ -32,10 +32,10 @@ function Get-PackageInstallTargetKind {
         [psobject]$Package
     )
 
-    $assigned = Get-PackageAssignedOperation -Release $Package
-    if ($assigned -and $assigned.PSObject.Properties['targetKind'] -and
-        -not [string]::IsNullOrWhiteSpace([string]$assigned.targetKind)) {
-        return [string]$assigned.targetKind
+    $assignedInstall = Get-PackageAssignedInstallOperation -Release $Package
+    if ($assignedInstall -and $assignedInstall.PSObject.Properties['targetKind'] -and
+        -not [string]::IsNullOrWhiteSpace([string]$assignedInstall.targetKind)) {
+        return [string]$assignedInstall.targetKind
     }
 
     return 'directory'
@@ -55,7 +55,7 @@ function Get-PackageInstallerElevationPlan {
         $mode = ([string]$ElevationMode).ToLowerInvariant()
     }
     else {
-        $install = Get-PackageAssignedOperation -Release $PackageResult.Package
+        $install = Get-PackageAssignedInstallOperation -Release $PackageResult.Package
         if (-not $install) {
             throw 'Get-PackageInstallerElevationPlan requires a selected release with an assigned block.'
         }
@@ -99,12 +99,12 @@ Resolve-PackagePreAssignmentSatisfaction -PackageResult $result
     )
 
     $package = $PackageResult.Package
-    $assignedBlock = Get-PackageAssignedOperation -Release $package
-    if (-not $package -or -not $assignedBlock) {
+    $assignedInstall = Get-PackageAssignedInstallOperation -Release $package
+    if (-not $package -or -not $assignedInstall) {
         return $PackageResult
     }
 
-    $installKind = if ($assignedBlock.PSObject.Properties['kind']) { [string]$assignedBlock.kind } else { $null }
+    $installKind = if ($assignedInstall.PSObject.Properties['kind']) { [string]$assignedInstall.kind } else { $null }
     $targetKind = Get-PackageInstallTargetKind -Package $package
     if (-not [string]::Equals($installKind, 'runInstaller', [System.StringComparison]::OrdinalIgnoreCase) -or
         -not [string]::Equals($targetKind, 'machinePrerequisite', [System.StringComparison]::OrdinalIgnoreCase)) {

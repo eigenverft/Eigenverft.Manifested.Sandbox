@@ -70,8 +70,8 @@ Get-PackageSourceDefinition -PackageConfig $config -SourceRef $candidate.sourceR
         Kind            = if ($sourceObject.PSObject.Properties['kind']) { [string]$sourceObject.kind } else { $null }
         BaseUri         = if ($sourceObject.PSObject.Properties['baseUri']) { [string]$sourceObject.baseUri } else { $null }
         BasePath        = if ($sourceObject.PSObject.Properties['basePath']) { [string]$sourceObject.basePath } else { $null }
-        RepositoryOwner = if ($sourceObject.PSObject.Properties['githubOwner']) { [string]$sourceObject.githubOwner } elseif ($sourceObject.PSObject.Properties['repositoryOwner']) { [string]$sourceObject.repositoryOwner } else { $null }
-        RepositoryName  = if ($sourceObject.PSObject.Properties['githubRepository']) { [string]$sourceObject.githubRepository } elseif ($sourceObject.PSObject.Properties['repositoryName']) { [string]$sourceObject.repositoryName } else { $null }
+        GitHubOwner      = if ($sourceObject.PSObject.Properties['githubOwner']) { [string]$sourceObject.githubOwner } else { $null }
+        GitHubRepository = if ($sourceObject.PSObject.Properties['githubRepository']) { [string]$sourceObject.githubRepository } else { $null }
     }
 }
 
@@ -130,11 +130,11 @@ Resolve-PackageSource -SourceDefinition $source -AcquisitionCandidate $candidate
             if (-not $Package) {
                 throw "Package GitHub release source '$($SourceDefinition.Id)' requires the selected package release context."
             }
-            if ([string]::IsNullOrWhiteSpace([string]$SourceDefinition.RepositoryOwner)) {
-                throw "Package GitHub release source '$($SourceDefinition.Id)' does not define repositoryOwner."
+            if ([string]::IsNullOrWhiteSpace([string]$SourceDefinition.GitHubOwner)) {
+                throw "Package GitHub release source '$($SourceDefinition.Id)' does not define githubOwner."
             }
-            if ([string]::IsNullOrWhiteSpace([string]$SourceDefinition.RepositoryName)) {
-                throw "Package GitHub release source '$($SourceDefinition.Id)' does not define repositoryName."
+            if ([string]::IsNullOrWhiteSpace([string]$SourceDefinition.GitHubRepository)) {
+                throw "Package GitHub release source '$($SourceDefinition.Id)' does not define githubRepository."
             }
             if (-not $Package.PSObject.Properties['releaseTag'] -or [string]::IsNullOrWhiteSpace([string]$Package.releaseTag)) {
                 throw "Package release '$($Package.id)' requires releaseTag when acquisition uses GitHub release source '$($SourceDefinition.Id)'."
@@ -146,7 +146,7 @@ Resolve-PackageSource -SourceDefinition $source -AcquisitionCandidate $candidate
                 throw "Package release '$($Package.id)' requires packageFile.fileName when acquisition uses GitHub release source '$($SourceDefinition.Id)'."
             }
 
-            $release = Get-GitHubRelease -RepositoryOwner $SourceDefinition.RepositoryOwner -RepositoryName $SourceDefinition.RepositoryName -ReleaseTag ([string]$Package.releaseTag)
+            $release = Get-GitHubRelease -RepositoryOwner $SourceDefinition.GitHubOwner -RepositoryName $SourceDefinition.GitHubRepository -ReleaseTag ([string]$Package.releaseTag)
             $assetName = [string]$Package.packageFile.fileName
             $matchedAsset = @(
                 $release.Assets | Where-Object {
@@ -155,10 +155,10 @@ Resolve-PackageSource -SourceDefinition $source -AcquisitionCandidate $candidate
             ) | Select-Object -First 1
 
             if (-not $matchedAsset) {
-                throw "GitHub release '$($Package.releaseTag)' for '$($SourceDefinition.RepositoryOwner)/$($SourceDefinition.RepositoryName)' does not contain asset '$assetName'."
+                throw "GitHub release '$($Package.releaseTag)' for '$($SourceDefinition.GitHubOwner)/$($SourceDefinition.GitHubRepository)' does not contain asset '$assetName'."
             }
             if ([string]::IsNullOrWhiteSpace([string]$matchedAsset.DownloadUrl)) {
-                throw "GitHub release '$($Package.releaseTag)' asset '$assetName' for '$($SourceDefinition.RepositoryOwner)/$($SourceDefinition.RepositoryName)' does not expose a download URL."
+                throw "GitHub release '$($Package.releaseTag)' asset '$assetName' for '$($SourceDefinition.GitHubOwner)/$($SourceDefinition.GitHubRepository)' does not expose a download URL."
             }
 
             return [pscustomobject]@{
@@ -459,9 +459,9 @@ Test-PackagePackageFileAcquisitionRequired -Package $package
         [psobject]$Package
     )
 
-    $assigned = Get-PackageAssignedOperation -Release $Package
-    $installKind = if ($assigned -and $assigned.PSObject.Properties['kind']) {
-        [string]$assigned.kind
+    $assignedInstall = Get-PackageAssignedInstallOperation -Release $Package
+    $installKind = if ($assignedInstall -and $assignedInstall.PSObject.Properties['kind']) {
+        [string]$assignedInstall.kind
     }
     else {
         $null
@@ -472,7 +472,7 @@ Test-PackagePackageFileAcquisitionRequired -Package $package
         'placePackageFile' { return $true }
         'nsisInstaller' { return $true }
         'runInstaller' {
-            return (-not $assigned.PSObject.Properties['commandPath'] -or [string]::IsNullOrWhiteSpace([string]$assigned.commandPath))
+            return (-not $assignedInstall.PSObject.Properties['commandPath'] -or [string]::IsNullOrWhiteSpace([string]$assignedInstall.commandPath))
         }
         default { return $false }
     }
@@ -1088,5 +1088,3 @@ Resolve-PackageInstallFile -PackageResult $result
 
     return $PackageResult
 }
-
-

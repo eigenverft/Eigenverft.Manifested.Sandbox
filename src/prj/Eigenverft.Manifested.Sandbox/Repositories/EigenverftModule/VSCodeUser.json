@@ -1,0 +1,187 @@
+{
+  "$schema": "./eigenverft-module-package-definition-1.3.schema.json",
+  "$comment": "Schema-first draft for Visual Studio Code Windows user setup (x64). Acquisition URL and sha256 were taken from microsoft/winget-pkgs (Microsoft.VisualStudioCode.installer.yaml, user scope x64) on 2026-05-10; silent-install flags follow https://code.visualstudio.com/docs/setup/windows (Inno Setup + /mergetasks=!runcode). This file is intentionally produced without reading Wire1_3.ps1 or sibling *.json examples.",
+  "schemaVersion": "1.3",
+  "id": "VSCodeUser",
+  "display": {
+    "default": {
+      "name": "Visual Studio Code (User)",
+      "publisher": "Microsoft",
+      "corporation": "Microsoft Corporation",
+      "summary": "VS Code Windows user installer (per-user under LocalAppData, no admin elevation). Preferred Windows install path per Microsoft documentation."
+    }
+  },
+  "artifacts": {
+    "targets": [
+      {
+        "id": "windows_user_x64",
+        "releaseTrack": "stable",
+        "artifactDistributionVariant": "windows_user_amd64",
+        "constraints": {
+          "os": [
+            "windows"
+          ],
+          "cpu": [
+            "x64"
+          ]
+        },
+        "versionSelection": {
+          "strategy": "latestByVersion",
+          "allowPrerelease": false
+        },
+        "fileNameTemplate": "VSCodeUserSetup-x64-{version}.exe",
+        "acquisitionCandidates": [
+          {
+            "kind": "download",
+            "sourceId": "vscodeStableUserX64",
+            "searchOrder": 0,
+            "verification": {
+              "mode": "required"
+            }
+          }
+        ]
+      }
+    ],
+    "releases": [
+      {
+        "version": "1.119.0",
+        "releaseTracks": [
+          "stable"
+        ],
+        "targetArtifacts": {
+          "windows_user_x64": {
+            "artifactId": "vscode-user-x64-1.119.0",
+            "fileName": "VSCodeUserSetup-x64-1.119.0.exe",
+            "contentHash": {
+              "algorithm": "sha256",
+              "value": "8c3cf83d67f27a24ecb95812163f928f7404279a87681ec6fdb594095cc8271d"
+            }
+          }
+        }
+      }
+    ],
+    "sources": {
+      "vscodeStableUserX64": {
+        "kind": "download",
+        "baseUri": "https://vscode.download.prss.microsoft.com/dbazure/download/stable/8b640eef5a6c6089c029249d48efa5c99adf7d51/"
+      }
+    }
+  },
+  "presenceDiscovery": {
+    "files": [
+      "Code.exe"
+    ],
+    "directories": [
+      "bin",
+      "resources"
+    ],
+    "commands": [
+      {
+        "name": "code",
+        "relativePath": "bin\\code.cmd",
+        "requiredForState": true,
+        "exposeCommand": true
+      }
+    ],
+    "apps": [],
+    "metadataFiles": [],
+    "signatures": [
+      {
+        "relativePath": "Code.exe",
+        "requireValid": true,
+        "subjectContains": "Microsoft Corporation"
+      }
+    ],
+    "fileDetails": [],
+    "registry": []
+  },
+  "existingInstallDiscovery": {
+    "enabled": false,
+    "searchLocations": [],
+    "installRootRules": []
+  },
+  "packageOperations": {
+    "policy": {
+      "ownershipPolicy": {
+        "allowAdoptExternal": false,
+        "upgradeAdoptedInstall": false,
+        "requirePackageOwnership": true
+      },
+      "compatibility": {
+        "checks": []
+      }
+    },
+    "assigned": {
+      "install": {
+        "kind": "nsisInstaller",
+        "installDirectory": "%LOCALAPPDATA%\\Programs\\Microsoft VS Code",
+        "installerKind": "innoSetup",
+        "uiMode": "silent",
+        "elevation": "none",
+        "timeoutSec": 1200,
+        "commandArguments": [
+          "/VERYSILENT",
+          "/NORESTART",
+          "/SUPPRESSMSGBOXES",
+          "/MERGETASKS=!runcode"
+        ],
+        "targetDirectoryArgument": {}
+      },
+      "readyStateCheck": {
+        "use": "presenceDiscovery",
+        "expectedVersion": "1.119.0",
+        "require": {
+          "files": true,
+          "directories": false,
+          "commands": true,
+          "apps": false,
+          "metadataFiles": false,
+          "signatures": false,
+          "fileDetails": false,
+          "registry": false
+        }
+      },
+      "pathRegistration": {
+        "mode": "none"
+      },
+      "versionUpdatePolicy": {
+        "whenAssigned": "trackSelectedVersion",
+        "onSameSelectedVersion": "reuseOrRepair",
+        "onNewSelectedVersion": "replacePackageOwnedInstall"
+      }
+    },
+    "removed": {
+      "policy": {
+        "whenNotInInventory": "succeed",
+        "allowedInventoryOwnershipKinds": [
+          "PackageInstalled"
+        ],
+        "allowUntrackedExternalRemoval": false,
+        "removeDependencies": false
+      },
+      "operation": {
+        "kind": "deleteInstallDirectory",
+        "pathSource": "inventory.installDirectory"
+      },
+      "absenceVerification": {
+        "use": "presenceDiscovery",
+        "require": {
+          "files": true,
+          "directories": false,
+          "commands": false,
+          "apps": false,
+          "metadataFiles": false,
+          "signatures": false,
+          "fileDetails": false,
+          "registry": false
+        }
+      },
+      "postRemoveCleanup": {
+        "packageInventoryRecord": true,
+        "generatedShims": true,
+        "pathEntries": true,
+        "workDirectories": true
+      }
+    }
+  }
+}
