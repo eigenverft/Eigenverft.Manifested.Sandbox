@@ -524,7 +524,7 @@ function Invoke-PackageRemovedFlow {
     )
 
     try {
-        Write-PackageExecutionMessage -Message ("[START] Invoke-PackageDefinitionCommand repository='{0}' definition='{1}' desiredState='{2}'." -f $PackageResult.RepositoryId, $PackageResult.DefinitionId, $PackageResult.DesiredState)
+        Write-PackageExecutionMessage -Message ("[START] Invoke-Package repository='{0}' definition='{1}' desiredState='{2}'." -f $PackageResult.RepositoryId, $PackageResult.DefinitionId, $PackageResult.DesiredState)
 
         $PackageResult.CurrentStep = 'InitializeLocalEnvironment'
         Write-PackageExecutionMessage -Message '[STEP] Initializing local package environment.'

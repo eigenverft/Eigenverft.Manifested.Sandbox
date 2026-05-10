@@ -296,27 +296,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
         $result.ErrorMessage | Should -Be 'local environment boom'
     }
 
-    It 'runs the public package definition command with default repository and assigned state' {
-        Mock Invoke-PackageDefinitionCommandCore {
-            [pscustomobject]@{
-                RepositoryId = $RepositoryId
-                DefinitionId = $DefinitionId
-                DesiredState = $DesiredState
-                Status       = 'Ready'
-            }
-        }
-
-        $result = Invoke-PackageDefinitionCommand -DefinitionId 'GitRuntime'
-
-        Assert-MockCalled Invoke-PackageDefinitionCommandCore -Times 1 -ParameterFilter {
-            $RepositoryId -eq 'EigenverftModule' -and
-            $DefinitionId -eq 'GitRuntime' -and
-            $DesiredState -eq 'Assigned'
-        }
-        $result.Status | Should -Be 'Ready'
-    }
-
-    It 'runs the slim public package command with default repository and assigned state' {
+    It 'runs Invoke-Package with default repository and assigned state' {
         Mock Invoke-PackageDefinitionCommandCore {
             [pscustomobject]@{
                 RepositoryId = $RepositoryId
@@ -336,7 +316,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
         $result.Status | Should -Be 'Ready'
     }
 
-    It 'runs public package definition command arrays in listed order' {
+    It 'runs Invoke-Package definition id arrays in listed order' {
         Mock Invoke-PackageDefinitionCommandCore {
             [pscustomobject]@{
                 RepositoryId = $RepositoryId
@@ -346,14 +326,14 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
             }
         }
 
-        $results = @(Invoke-PackageDefinitionCommand -DefinitionId GitRuntime, CodexCli)
+        $results = @(Invoke-Package -DefinitionId GitRuntime, CodexCli)
 
         Assert-MockCalled Invoke-PackageDefinitionCommandCore -Times 1 -ParameterFilter { $DefinitionId -eq 'GitRuntime' }
         Assert-MockCalled Invoke-PackageDefinitionCommandCore -Times 1 -ParameterFilter { $DefinitionId -eq 'CodexCli' }
         @($results.DefinitionId) | Should -Be @('GitRuntime', 'CodexCli')
     }
 
-    It 'continues public package definition command arrays after a failed result by default' {
+    It 'continues Invoke-Package definition id arrays after a failed result by default' {
         Mock Invoke-PackageDefinitionCommandCore {
             [pscustomobject]@{
                 RepositoryId = $RepositoryId
@@ -363,7 +343,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
             }
         }
 
-        $results = @(Invoke-PackageDefinitionCommand -DefinitionId GitRuntime, CodexCli)
+        $results = @(Invoke-Package -DefinitionId GitRuntime, CodexCli)
 
         Assert-MockCalled Invoke-PackageDefinitionCommandCore -Times 1 -ParameterFilter { $DefinitionId -eq 'GitRuntime' }
         Assert-MockCalled Invoke-PackageDefinitionCommandCore -Times 1 -ParameterFilter { $DefinitionId -eq 'CodexCli' }
@@ -372,7 +352,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
         $results[1].Status | Should -Be 'Ready'
     }
 
-    It 'stops public package definition command arrays after the first failed result when FailFast is set' {
+    It 'stops Invoke-Package arrays after the first failed result when FailFast is set' {
         Mock Invoke-PackageDefinitionCommandCore {
             [pscustomobject]@{
                 RepositoryId = $RepositoryId
@@ -382,7 +362,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
             }
         }
 
-        $results = @(Invoke-PackageDefinitionCommand -DefinitionId GitRuntime, CodexCli -FailFast)
+        $results = @(Invoke-Package -DefinitionId GitRuntime, CodexCli -FailFast)
 
         Assert-MockCalled Invoke-PackageDefinitionCommandCore -Times 1 -ParameterFilter { $DefinitionId -eq 'GitRuntime' }
         Assert-MockCalled Invoke-PackageDefinitionCommandCore -Times 0 -ParameterFilter { $DefinitionId -eq 'CodexCli' }
@@ -425,7 +405,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
         Mock Get-PackageDepotInventoryPath { $documents.DepotInventoryPath }
         Mock Get-PackageDefinitionPath { param($DefinitionId) $documents.DefinitionPath }
 
-        $result = Invoke-PackageDefinitionCommand -DefinitionId 'VSCodeRuntime' -DesiredState Removed
+        $result = Invoke-Package -DefinitionId 'VSCodeRuntime' -DesiredState Removed
 
         $result.Status | Should -Be 'Ready'
         $result.Removed.Accepted | Should -Be $true
@@ -454,7 +434,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
         Mock Get-PackageDepotInventoryPath { $documents.DepotInventoryPath }
         Mock Get-PackageDefinitionPath { param($DefinitionId) $documents.DefinitionPath }
 
-        $result = Invoke-PackageDefinitionCommand -DefinitionId 'VSCodeRuntime' -DesiredState Removed
+        $result = Invoke-Package -DefinitionId 'VSCodeRuntime' -DesiredState Removed
 
         $result.Status | Should -Be 'Failed'
         $result.FailureReason | Should -Be 'RemovalInventoryResolutionFailed'
@@ -483,7 +463,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
         Mock Get-PackageDepotInventoryPath { $documents.DepotInventoryPath }
         Mock Get-PackageDefinitionPath { param($DefinitionId) $documents.DefinitionPath }
 
-        $result = Invoke-PackageDefinitionCommand -DefinitionId 'VSCodeRuntime' -DesiredState Removed
+        $result = Invoke-Package -DefinitionId 'VSCodeRuntime' -DesiredState Removed
 
         $result.Status | Should -Be 'Failed'
         $result.FailureReason | Should -Be 'RemovalPolicyRejected'
@@ -535,7 +515,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
         Mock Get-PackageDepotInventoryPath { $documents.DepotInventoryPath }
         Mock Get-PackageDefinitionPath { param($DefinitionId) $documents.DefinitionPath }
 
-        $result = Invoke-PackageDefinitionCommand -DefinitionId 'VSCodeRuntime' -DesiredState Removed
+        $result = Invoke-Package -DefinitionId 'VSCodeRuntime' -DesiredState Removed
 
         $result.Status | Should -Be 'Ready'
         $result.Removed.Accepted | Should -Be $true
@@ -617,7 +597,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
         Mock Get-PackageGlobalConfigPath { $documents.GlobalConfigPath }
         Mock Get-PackageDepotInventoryPath { $documents.DepotInventoryPath }
 
-        $result = Invoke-PackageDefinitionCommand -DefinitionId 'NodeRuntime' -DesiredState Removed
+        $result = Invoke-Package -DefinitionId 'NodeRuntime' -DesiredState Removed
 
         $result.Status | Should -Be 'Failed'
         $result.FailureReason | Should -Be 'RemovalDependencyDependentsBlocked'

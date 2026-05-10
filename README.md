@@ -83,8 +83,8 @@ Use `$c` when you want startup to do more than just show the module version.
 # Simple sanity check after bootstrap
 $c='Get-SandboxVersion'
 
-# Bootstrap, then prepare a fuller sandbox toolset
-$c='Get-SandboxVersion; Invoke-VisualCppRedistributable; Invoke-PythonRuntime; Invoke-PowerShell7; Invoke-GitRuntime; Get-PackageState'
+# Bootstrap, then prepare a fuller sandbox toolset (default repository is EigenverftModule)
+$c='Get-SandboxVersion; Invoke-Package -DefinitionId VisualCppRedistributable,PythonRuntime,PowerShell7,GitRuntime,VSCodeRuntime,NotepadPlusPlus,NodeRuntime,OpenCodeCli,CodexCli,LlamaCppRuntime,Qwen35_9B_Q6_K_Model; Get-PackageState'
 
 # Bootstrap, then download and run another script
 $c='Invoke-WebRequestEx -Uri ''https://example.org/setup.ps1'' -OutFile ""$env:TEMP\setup.ps1""; powershell -ExecutionPolicy Bypass -File ""$env:TEMP\setup.ps1""'
@@ -106,27 +106,11 @@ The startup helpers are compacted and compressed so the Windows Sandbox `LogonCo
 
 ## 📌 Current State
 
-The module currently exports these public commands:
+The module exports a single package dispatcher, **`Invoke-Package`**, plus helpers such as **`Get-PackageState`**, **`Get-SandboxVersion`**, **`Sandbox`**, **`Invoke-WebRequestEx`**, and **`Initialize-ProxyAccessProfile`**.
 
-- `Get-PackageState`
-- `Get-SandboxVersion`
-- `Initialize-ProxyAccessProfile`
-- `Invoke-CodexCli`
-- `Invoke-GitRuntime`
-- `Invoke-LlamaCppRuntime`
-- `Invoke-NodeRuntime`
-- `Invoke-NotepadPlusPlus`
-- `Invoke-OpenCodeCli`
-- `Invoke-PowerShell7`
-- `Invoke-PythonRuntime`
-- `Invoke-Qwen35-9B-Q6-K-Model`
-- `Invoke-VisualCppRedistributable`
-- `Invoke-VSCodeRuntime`
-- `Invoke-WebRequestEx`
+`Invoke-Package` accepts `-RepositoryId` (defaults to the shipped `EigenverftModule` repository), one or more `-DefinitionId` values, `-DesiredState Assigned` or `Removed`, and optional `-FailFast`. It loads the matching JSON package definition under `Repositories\EigenverftModule`, resolves dependencies and acquisition, installs or reuses per policy, validates, and updates inventory.
 
-There is not yet a single unified package operation command. The current model is a set of small package wrapper commands that each load a shipped JSON definition, resolve dependencies and acquisition sources, perform bounded reuse/install/repair work, validate the result, and persist observed package state.
-
-The intended long-term direction is one neutral package dispatcher such as `Invoke-PackageCommand`, with actions like ensure, update, remove, list, and state. The current `Invoke-*` commands are convenient shipped-package wrappers until that dispatcher exists.
+`Get-SandboxVersion` prints the module version, example `Invoke-Package` lines for each shipped definition discovered on disk, and the remaining exported commands.
 
 ---
 
@@ -136,27 +120,16 @@ After the repository's `.wsb` profile opens the new console, run:
 
 ```powershell
 Get-SandboxVersion
-Invoke-VisualCppRedistributable
-Invoke-PythonRuntime
-Invoke-PowerShell7
-Invoke-GitRuntime
-Invoke-VSCodeRuntime
-Invoke-NotepadPlusPlus
-Invoke-NodeRuntime
-Invoke-OpenCodeCli
-Invoke-CodexCli
-Invoke-LlamaCppRuntime
-Invoke-Qwen35-9B-Q6-K-Model
+Invoke-Package -DefinitionId VisualCppRedistributable,PythonRuntime,PowerShell7,GitRuntime,VSCodeRuntime,NotepadPlusPlus,NodeRuntime,OpenCodeCli,CodexCli,LlamaCppRuntime,Qwen35_9B_Q6_K_Model
 Get-PackageState
 ```
 
-- `Get-SandboxVersion` is the quick way to show user-facing module info for the current session, including the resolved module version and the full exported command list in alphabetical order.
+- `Get-SandboxVersion` shows the module version, example `Invoke-Package -DefinitionId '…'` lines for shipped definitions, and other exported commands.
 - `Get-PackageState` reads the local package state and package-file indexes, reports configured directories, and shows whether copied package definition JSON files and install directories still exist.
-- `Invoke-PythonRuntime`, `Invoke-PowerShell7`, `Invoke-GitRuntime`, `Invoke-VSCodeRuntime`, `Invoke-NotepadPlusPlus`, and `Invoke-NodeRuntime` ensure pinned package definitions are ready from the configured depot/download flow.
-- `Invoke-OpenCodeCli` and `Invoke-CodexCli` install pinned npm-backed CLI packages through the package npm backend. They depend on the packaged Node runtime, and Codex also ensures the Visual C++ Redistributable prerequisite.
-- `Invoke-VisualCppRedistributable` is different because the VC runtime is a machine prerequisite rather than a portable package directory. It can report already-satisfied state from registry validation and only runs the Microsoft installer when needed.
-- `Invoke-LlamaCppRuntime` installs the pinned llama.cpp runtime package.
-- `Invoke-Qwen35-9B-Q6-K-Model` places a pinned Qwen 3.5 GGUF model resource for llama.cpp-compatible runtimes.
+- `Invoke-Package` with definition ids such as `PythonRuntime`, `PowerShell7`, `GitRuntime`, `VSCodeRuntime`, `NotepadPlusPlus`, and `NodeRuntime` ensures those pinned definitions reach **Assigned** (reuse, repair, or install per each definition’s policy).
+- `OpenCodeCli` and `CodexCli` are npm-backed; they depend on `NodeRuntime`, and Codex’s definition also depends on `VisualCppRedistributable`.
+- `VisualCppRedistributable` is a machine prerequisite: it can report already-satisfied state from registry validation and only runs the Microsoft installer when needed.
+- `LlamaCppRuntime` and `Qwen35_9B_Q6_K_Model` cover the llama.cpp runtime and pinned GGUF model resource respectively.
 
 ## 📦 Direct Module Usage
 
@@ -171,14 +144,15 @@ Import-Module Eigenverft.Manifested.Sandbox
 
 ## 📝 Usage Tips
 
-- Current package wrapper commands are parameterless and idempotent: rerunning them should reuse, repair, or report already-satisfied state rather than blindly reinstalling.
-- OpenCode, Gemini, Qwen, and Codex are all opt-in in the example command chains; add the specific runtime init commands you want for a given sandbox profile.
+- `Invoke-Package` is idempotent for each definition: rerunning tends to reuse, repair, or report already-satisfied state rather than blindly reinstalling.
+- Pass multiple definition ids in one call (e.g. `-DefinitionId A,B`) or run separate `Invoke-Package` invocations; dependency order is resolved by the engine.
+- OpenCode, Qwen, and Codex are opt-in in the example chains; add or drop `-DefinitionId` values for the sandbox profile you want.
 - The npm-based CLIs share the packaged Node runtime and write npm config under the module's local configuration area, not into a machine-wide npm config.
 - To test another branch, swap `main` in the raw `.wsb` download URL before launching the sandbox.
 - If you are working from a local checkout instead of the raw download, edit the tracked `.wsb` file directly and launch that local copy.
 - Keep `.wsb` files small and let versioned PowerShell own the real startup logic whenever you want a more maintainable sandbox launch path.
 - Run `Get-PackageState` after a bootstrap chain when you want the quickest view of package records, package files, and local repository copies.
-- Run `Invoke-VisualCppRedistributable` in an elevated PowerShell session if the Microsoft Visual C++ Redistributable needs installation or repair.
+- Run `Invoke-Package -DefinitionId VisualCppRedistributable` in an elevated PowerShell session if the Microsoft Visual C++ Redistributable needs installation or repair.
 
 ## 📄 License
 

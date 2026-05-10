@@ -5,9 +5,9 @@
 . "$PSScriptRoot\Eigenverft.Manifested.Sandbox.Module.TestHelpers.ps1"
 
 Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - exports and state' -Body {
-    It 'exports Invoke-PackageDefinitionCommand with generic package parameters' {
+    It 'exports Invoke-Package with generic package parameters' {
         $module = Import-Module -Name $script:ModuleManifestPath -Force -PassThru
-        $command = Get-Command -Name 'Invoke-PackageDefinitionCommand'
+        $command = Get-Command -Name 'Invoke-Package'
 
         $command | Should -Not -BeNullOrEmpty
         $command.Parameters.Keys | Should -Contain 'DefinitionId'
@@ -18,42 +18,12 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - export
         $command.Parameters.Keys | Should -Not -Contain 'DependencyStack'
     }
 
-    It 'exports Invoke-Package as the slim public package command' {
-        $module = Import-Module -Name $script:ModuleManifestPath -Force -PassThru
-        $command = Get-Command -Name 'Invoke-Package'
+    It 'Get-SandboxVersion lists Invoke-Package examples for shipped definitions' {
+        $null = Import-Module -Name $script:ModuleManifestPath -Force -PassThru
+        $text = Get-SandboxVersion
 
-        $command | Should -Not -BeNullOrEmpty
-        $command.Parameters.Keys | Should -Contain 'DefinitionId'
-        $command.Parameters.Keys | Should -Contain 'DesiredState'
-        $command.Parameters.Keys | Should -Contain 'FailFast'
-        $command.Parameters.Keys | Should -Not -Contain 'RepositoryId'
-        $command.Parameters.Keys | Should -Not -Contain 'DependencyStack'
-    }
-
-    It 'exports shipped package wrapper commands and keeps them parameterless' {
-        $module = Import-Module -Name $script:ModuleManifestPath -Force -PassThru
-
-        foreach ($commandName in @(
-                'Invoke-CodexCli'
-                'Invoke-GitRuntime'
-                'Invoke-LlamaCppRuntime'
-                'Invoke-NodeRuntime'
-                'Invoke-NotepadPlusPlus'
-                'Invoke-OpenCodeCli'
-                'Invoke-PowerShell7'
-                'Invoke-PythonRuntime'
-                'Invoke-Qwen35-9B-Q6-K-Model'
-                'Invoke-VisualCppRedistributable'
-                'Invoke-VSCodeRuntime'
-            )) {
-            $command = Get-Command -Name $commandName
-            $command | Should -Not -BeNullOrEmpty
-            $publicParameterNames = @($command.Parameters.Keys | Where-Object {
-                    $_ -notin [System.Management.Automation.PSCmdlet]::CommonParameters -and
-                    $_ -notin [System.Management.Automation.PSCmdlet]::OptionalCommonParameters
-            })
-            $publicParameterNames.Count | Should -Be 0
-        }
+        $text | Should -Match 'Invoke-Package -RepositoryId ''EigenverftModule'' -DefinitionId ''GitRuntime'''
+        $text | Should -Match 'Other exported commands:'
     }
 
     It 'exports Get-PackageState with only the Raw view switch' {
@@ -303,10 +273,14 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - export
         Get-Command -Name 'Invoke-Package-QwenCliRuntime' -Module $module -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
         Get-Command -Name 'Invoke-Package-Qwen35-2B-Q6K' -Module $module -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
         Get-Command -Name 'Invoke-Package-LlamaCppRuntime' -Module $module -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
-        Get-Command -Name 'Invoke-GeminiCli' -Module $module -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
+        Get-Command -Name 'Invoke-PackageDefinitionCommand' -Module $module -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
+        Get-Command -Name 'Invoke-CodexCli' -Module $module -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
+        Get-Command -Name 'Invoke-GitRuntime' -Module $module -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
+        Get-Command -Name 'Invoke-VSCodeRuntime' -Module $module -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
         Get-Command -Name 'Invoke-GitHubCli' -Module $module -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
         Get-Command -Name 'Invoke-Qwen35-2B-Q8-0-Model' -Module $module -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
         Get-Command -Name 'Invoke-QwenCli' -Module $module -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
+        Get-Command -Name 'Invoke-GeminiCli' -Module $module -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
     }
 
 }

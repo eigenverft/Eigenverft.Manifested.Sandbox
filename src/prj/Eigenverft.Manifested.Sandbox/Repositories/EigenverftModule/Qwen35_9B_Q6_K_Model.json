@@ -1,5 +1,5 @@
 {
-  "$schema": "./eigenverft-module-package-definition-1.3.schema.json",
+  "$schema": "../Schema/eigenverft-module-package-definition-1.3.schema.json",
   "schemaVersion": "1.3",
   "id": "Qwen35_9B_Q6_K_Model",
   "display": {

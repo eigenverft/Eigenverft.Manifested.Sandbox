@@ -51,15 +51,3 @@
 # Package definitions
 # Package definitions are JSON-only.
 
-# Package commands
-. "$PSScriptRoot\Commands\Eigenverft.Manifested.Sandbox.Cmd.Qwen35_9B_Q6_K_Model.ps1"
-. "$PSScriptRoot\Commands\Eigenverft.Manifested.Sandbox.Cmd.LlamaCppRuntime.ps1"
-. "$PSScriptRoot\Commands\Eigenverft.Manifested.Sandbox.Cmd.VisualCppRedistributable.ps1"
-. "$PSScriptRoot\Commands\Eigenverft.Manifested.Sandbox.Cmd.PowerShell7.ps1"
-. "$PSScriptRoot\Commands\Eigenverft.Manifested.Sandbox.Cmd.PythonRuntime.ps1"
-. "$PSScriptRoot\Commands\Eigenverft.Manifested.Sandbox.Cmd.NodeRuntime.ps1"
-. "$PSScriptRoot\Commands\Eigenverft.Manifested.Sandbox.Cmd.CodexCli.ps1"
-. "$PSScriptRoot\Commands\Eigenverft.Manifested.Sandbox.Cmd.OpenCodeCli.ps1"
-. "$PSScriptRoot\Commands\Eigenverft.Manifested.Sandbox.Cmd.GitRuntime.ps1"
-. "$PSScriptRoot\Commands\Eigenverft.Manifested.Sandbox.Cmd.NotepadPlusPlus.ps1"
-. "$PSScriptRoot\Commands\Eigenverft.Manifested.Sandbox.Cmd.VSCodeRuntime.ps1"

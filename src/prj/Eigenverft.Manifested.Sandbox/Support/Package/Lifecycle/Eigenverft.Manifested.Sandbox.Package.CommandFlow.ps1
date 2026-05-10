@@ -157,7 +157,7 @@ function Invoke-PackageAssignedFlow {
     )
 
     try {
-        Write-PackageExecutionMessage -Message ("[START] Invoke-PackageDefinitionCommand repository='{0}' definition='{1}' desiredState='{2}'." -f $PackageResult.RepositoryId, $PackageResult.DefinitionId, $PackageResult.DesiredState)
+        Write-PackageExecutionMessage -Message ("[START] Invoke-Package repository='{0}' definition='{1}' desiredState='{2}'." -f $PackageResult.RepositoryId, $PackageResult.DefinitionId, $PackageResult.DesiredState)
         $PackageResult.CurrentStep = 'InitializeLocalEnvironment'
         Write-PackageExecutionMessage -Message '[STEP] Initializing local package environment.'
         $PackageResult.LocalEnvironment = Initialize-PackageLocalEnvironment -PackageConfig $PackageResult.PackageConfig
@@ -231,7 +231,7 @@ function Invoke-PackageDefinitionCommandCore {
     return $completedResult
 }
 
-function Invoke-PackageDefinitionCommand {
+function Invoke-Package {
     <#
     .SYNOPSIS
         Runs package definition lifecycle for one or more definitions.
@@ -262,27 +262,4 @@ function Invoke-PackageDefinitionCommand {
             break
         }
     }
-}
-
-function Invoke-Package {
-    <#
-    .SYNOPSIS
-        Slim entry point for Invoke-PackageDefinitionCommand (default repository).
-
-    .PARAMETER FailFast
-        Passed through; see Invoke-PackageDefinitionCommand.
-    #>
-    [CmdletBinding()]
-    param(
-        [Parameter(Mandatory = $true)]
-        [ValidateNotNullOrEmpty()]
-        [string[]]$DefinitionId,
-
-        [ValidateSet('Assigned', 'Removed')]
-        [string]$DesiredState = 'Assigned',
-
-        [switch]$FailFast
-    )
-
-    Invoke-PackageDefinitionCommand -DefinitionId $DefinitionId -DesiredState $DesiredState -FailFast:$FailFast
 }

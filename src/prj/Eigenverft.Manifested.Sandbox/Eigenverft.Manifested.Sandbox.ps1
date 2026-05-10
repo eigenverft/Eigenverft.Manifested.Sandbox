@@ -6,18 +6,18 @@
 function Get-SandboxVersion {
 <#
 .SYNOPSIS
-Shows the resolved module version and the available exported commands.
+Shows the resolved module version, shipped package-definition examples, and other exported commands.
 
 .DESCRIPTION
-Resolves the highest available or loaded Eigenverft.Manifested.Sandbox module
-version for the current session and appends the exported command names that
-can be called in the current session.
+Resolves the highest available or loaded Eigenverft.Manifested.Sandbox module version, lists
+example Invoke-Package lines for each shipped definition JSON discovered under the default
+repository folder (when package bootstrap commands are available), then lists remaining exported
+commands in alphabetical order.
 
 .EXAMPLE
 Get-SandboxVersion
 
-Displays labeled module information followed by each exported command in a
-user-facing alphabetically ordered list.
+Displays module information, per-definition Invoke-Package examples, and other exported commands.
 #>
     [CmdletBinding()]
     param()
@@ -60,12 +60,61 @@ user-facing alphabetically ordered list.
         )
     }
 
+    $definitionIds = @()
+    $defaultRepo = 'EigenverftModule'
+    if (Get-Command Get-PackageDefaultRepositoryId -ErrorAction SilentlyContinue) {
+        try {
+            $defaultRepo = [string](Get-PackageDefaultRepositoryId)
+        }
+        catch {
+        }
+    }
+
+    if (Get-Command Get-PackageRepositoriesRoot -ErrorAction SilentlyContinue) {
+        try {
+            $repoDir = Join-Path (Get-PackageRepositoriesRoot) $defaultRepo
+            if (Test-Path -LiteralPath $repoDir) {
+                foreach ($jsonFile in Get-ChildItem -LiteralPath $repoDir -Filter *.json -File) {
+                    try {
+                        $doc = Get-Content -LiteralPath $jsonFile.FullName -Raw | ConvertFrom-Json
+                        $sv = if ($doc.PSObject.Properties['schemaVersion']) { [string]$doc.schemaVersion } else { '' }
+                        $id = if ($doc.PSObject.Properties['id']) { [string]$doc.id } else { '' }
+                        if (-not [string]::IsNullOrWhiteSpace($sv) -and -not [string]::IsNullOrWhiteSpace($id) -and $doc.PSObject.Properties['packageOperations']) {
+                            $definitionIds += $id
+                        }
+                    }
+                    catch {
+                    }
+                }
+            }
+        }
+        catch {
+        }
+    }
+
+    $definitionIds = @($definitionIds | Sort-Object -Unique)
+
     $outputLines = @(
         'Module: {0}' -f $moduleName
         'Version: {0}' -f $moduleInfo[0].Version.ToString()
-        'Available Commands:'
     )
 
+    if ($definitionIds.Count -gt 0) {
+        $outputLines += @(
+            ('Shipped package definitions (repository ''{0}'', example assign):' -f $defaultRepo)
+            ($definitionIds | ForEach-Object { "- Invoke-Package -RepositoryId '{0}' -DefinitionId '{1}'" -f $defaultRepo, $_ })
+            'Use -DesiredState Removed to uninstall a package-owned install when the definition supports it.'
+            ''
+        )
+    }
+    else {
+        $outputLines += @(
+            'Shipped package definitions: (none discovered; import the full module to scan Repositories.)'
+            ''
+        )
+    }
+
+    $outputLines += 'Other exported commands:'
     if ($exportedCommandNames) {
         $outputLines += @(
             $exportedCommandNames | ForEach-Object { '- {0}' -f $_ }
@@ -86,7 +135,7 @@ Install or update Eigenverft.Manifested.Sandbox from the PowerShell Gallery, or 
 .DESCRIPTION
 Thin bootstrap surface (similar intent to Eigenverft.Manifested.Drydock). Main switches are mutually exclusive:
 - -Update : Install/update from PSGallery (stable; -Scope). On Windows, Initialize-ProxyAccessProfile (gallery URI) sets session + Global:ProxyParamsInstallModule for Install-Module; manual proxy UI is allowed when automatic resolution cannot reach the gallery. Non-Windows: minimal TLS/proxy only. Requires network.
-- -Version : Print the same summary as Get-SandboxVersion (resolved module version and exported commands).
+- -Version : Print the same summary as Get-SandboxVersion (module version, shipped package examples, and exported commands).
 
 Without a main switch, prints a short usage note.
 
@@ -94,7 +143,7 @@ Without a main switch, prints a short usage note.
 Install or update the module from PSGallery.
 
 .PARAMETER Version
-Show module version and exported command names (delegates to Get-SandboxVersion).
+Show module version, shipped Invoke-Package examples, and exported command names (delegates to Get-SandboxVersion).
 
 .PARAMETER Scope
 With -Update, CurrentUser (default) or AllUsers (elevation required).
@@ -128,7 +177,7 @@ Sandbox -Version
             "  Example : Sandbox -Update -Scope CurrentUser"
             "  -Scope  : CurrentUser (default) or AllUsers (elevation)."
             ""
-            "-Version  : Show module version and exported commands (same as Get-SandboxVersion)."
+            "-Version  : Show module version, shipped package Invoke-Package examples, and exported commands (same as Get-SandboxVersion)."
             "  Example : Sandbox -Version"
         ) | ForEach-Object { Write-Output $_ }
     }
