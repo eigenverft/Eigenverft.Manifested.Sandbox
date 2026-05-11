@@ -73,10 +73,20 @@ PowerShellVersion = '5.1'
 FunctionsToExport = @(
     'Get-SandboxVersion',
     'Sandbox',
+    'Add-PackageDepot',
+    'Add-TeamPackageDepot',
+    'Add-PackageRepository',
+    'Add-TeamPackageRepository',
+    'Get-PackageDepot',
+    'Get-PackageRepository',
     'Get-PackageState',
     'Invoke-Package',
     'Invoke-WebRequestEx',
-    'Initialize-ProxyAccessProfile'
+    'Remove-PackageDepot',
+    'Remove-PackageRepository',
+    'Set-PackageDepot',
+    'Set-PackageRepository',
+    'Trust-PackageRepository'
 )
 
 # Cmdlets to export from this module, for best performance, do not use wildcards and do not delete the entry, use an empty array if there are no cmdlets to export.

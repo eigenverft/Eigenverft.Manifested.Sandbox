@@ -146,10 +146,14 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - resour
         $record.installSlotId | Should -Be 'VSCodeRuntime:stable:win32-x64'
         $record.definitionRepositoryId | Should -Be 'EigenverftModule'
         $record.definitionFileName | Should -Be 'VSCodeRuntime.json'
+        $record.definitionSourceKind | Should -Be 'moduleLocal'
         $record.definitionSourcePath | Should -Be ([System.IO.Path]::GetFullPath($documents.DefinitionPath))
-        $record.definitionLocalPath | Should -Not -BeNullOrEmpty
-        Test-Path -LiteralPath $record.definitionLocalPath -PathType Leaf | Should -BeTrue
-        (Read-PackageJsonDocument -Path $record.definitionLocalPath).Document.id | Should -Be 'VSCodeRuntime'
+        $record.definitionSourceHash | Should -Not -BeNullOrEmpty
+        $record.definitionSnapshotPath | Should -Not -BeNullOrEmpty
+        $record.definitionSnapshotHash | Should -Not -BeNullOrEmpty
+        $record.definitionResolvedAtUtc | Should -Not -BeNullOrEmpty
+        Test-Path -LiteralPath $record.definitionSnapshotPath -PathType Leaf | Should -BeTrue
+        (Read-PackageJsonDocument -Path $record.definitionSnapshotPath).Document.id | Should -Be 'VSCodeRuntime'
         $record.currentReleaseId | Should -Be 'vsCode-win-x64-stable'
         $record.currentVersion | Should -Be '3.0.0'
         $record.installDirectory | Should -Be $installRoot

@@ -181,12 +181,6 @@ function global:New-TestPackageGlobalDocument {
         package = @{
             applicationRootDirectory = if ($PSBoundParameters.ContainsKey('ApplicationRootDirectory')) { $ApplicationRootDirectory } else { '%LOCALAPPDATA%/Programs/Evf.Sandbox' }
             preferredTargetInstallDirectory = if ($PSBoundParameters.ContainsKey('PreferredTargetInstallDirectory')) { $PreferredTargetInstallDirectory } else { '{applicationRootDirectory}/Inst' }
-            repositorySources = @{
-                EigenverftModule = @{
-                    kind = 'moduleLocal'
-                    definitionRoot = 'Repositories/EigenverftModule'
-                }
-            }
             localRepositoryRoot = if ($PSBoundParameters.ContainsKey('LocalRepositoryRoot')) { $LocalRepositoryRoot } else { '{applicationRootDirectory}/PackageRepositories' }
             shimDirectory = if ($PSBoundParameters.ContainsKey('ShimDirectory')) { $ShimDirectory } else { '{applicationRootDirectory}/Shims' }
             layout = @{
@@ -203,6 +197,32 @@ function global:New-TestPackageGlobalDocument {
                 strategy     = $Strategy
             }
         }
+    }
+}
+
+function global:New-TestRepositoryInventoryDocument {
+    param(
+        [hashtable]$RepositorySources = @{}
+    )
+
+    $sources = @{
+        EigenverftModule = @{
+            kind           = 'moduleLocal'
+            enabled        = $true
+            searchOrder    = 100
+            definitionRoot = 'Repositories/EigenverftModule'
+            trusted        = $true
+            trustMode      = 'moduleShipped'
+        }
+    }
+
+    foreach ($key in @($RepositorySources.Keys)) {
+        $sources[$key] = $RepositorySources[$key]
+    }
+
+    return @{
+        inventoryVersion = 1
+        repositorySources = $sources
     }
 }
 
@@ -819,17 +839,25 @@ function global:Write-TestPackageDocuments {
         [object]$DepotInventoryDocument,
 
         [AllowNull()]
+        [object]$RepositoryInventoryDocument,
+
+        [AllowNull()]
         [object]$SourceInventoryDocument
     )
 
     $globalConfigPath = Join-Path $RootPath 'Configuration\Internal\Config.json'
     $depotInventoryPath = Join-Path $RootPath 'Configuration\Internal\DepotInventory.json'
+    $repositoryInventoryPath = Join-Path $RootPath 'Configuration\Internal\RepositoryInventory.json'
     $definitionPath = Join-Path $RootPath "$($DefinitionDocument.id).json"
     Write-TestJsonDocument -Path $globalConfigPath -Document $GlobalDocument
     if (-not $PSBoundParameters.ContainsKey('DepotInventoryDocument') -or $null -eq $DepotInventoryDocument) {
         $DepotInventoryDocument = New-TestDepotInventoryDocument -DefaultPackageDepotDirectory (Join-Path $RootPath 'DefaultPackageDepot')
     }
+    if (-not $PSBoundParameters.ContainsKey('RepositoryInventoryDocument') -or $null -eq $RepositoryInventoryDocument) {
+        $RepositoryInventoryDocument = New-TestRepositoryInventoryDocument
+    }
     Write-TestJsonDocument -Path $depotInventoryPath -Document $DepotInventoryDocument
+    Write-TestJsonDocument -Path $repositoryInventoryPath -Document $RepositoryInventoryDocument
     Write-TestJsonDocument -Path $definitionPath -Document $DefinitionDocument
 
     $sourceInventoryPath = $null
@@ -841,6 +869,7 @@ function global:Write-TestPackageDocuments {
     return [pscustomobject]@{
         GlobalConfigPath   = $globalConfigPath
         DepotInventoryPath = $depotInventoryPath
+        RepositoryInventoryPath = $repositoryInventoryPath
         DefinitionPath     = $definitionPath
         SourceInventoryPath = $sourceInventoryPath
     }

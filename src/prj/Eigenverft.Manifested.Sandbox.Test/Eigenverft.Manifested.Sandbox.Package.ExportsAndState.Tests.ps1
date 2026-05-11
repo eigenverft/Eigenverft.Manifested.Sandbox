@@ -40,6 +40,41 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - export
         $publicParameterNames | Should -Be @('Raw')
     }
 
+    It 'exports only the intended public command surface' {
+        $module = Import-Module -Name $script:ModuleManifestPath -Force -PassThru
+
+        @($module.ExportedCommands.Keys | Sort-Object) | Should -Be @(
+            'Add-PackageDepot',
+            'Add-PackageRepository',
+            'Add-TeamPackageDepot',
+            'Add-TeamPackageRepository',
+            'Get-PackageDepot',
+            'Get-PackageRepository',
+            'Get-PackageState',
+            'Get-SandboxVersion',
+            'Invoke-Package',
+            'Invoke-WebRequestEx',
+            'Remove-PackageDepot',
+            'Remove-PackageRepository',
+            'Sandbox',
+            'Set-PackageDepot',
+            'Set-PackageRepository',
+            'Trust-PackageRepository'
+        )
+        Get-Command -Name 'Initialize-ProxyAccessProfile' -Module $module -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
+    }
+
+    It 'keeps user-facing command files in command folders' {
+        $moduleProjectRoot = Join-Path (Split-Path -Parent $PSScriptRoot) 'Eigenverft.Manifested.Sandbox'
+
+        Test-Path -LiteralPath (Join-Path $moduleProjectRoot 'Commands\Package\Eigenverft.Manifested.Sandbox.Cmd.InvokePackage.ps1') -PathType Leaf | Should -BeTrue
+        Test-Path -LiteralPath (Join-Path $moduleProjectRoot 'Commands\Package\Eigenverft.Manifested.Sandbox.Cmd.GetPackageState.ps1') -PathType Leaf | Should -BeTrue
+        Test-Path -LiteralPath (Join-Path $moduleProjectRoot 'Commands\Depot\Eigenverft.Manifested.Sandbox.Cmd.PackageDepot.ps1') -PathType Leaf | Should -BeTrue
+        Test-Path -LiteralPath (Join-Path $moduleProjectRoot 'Commands\Repository\Eigenverft.Manifested.Sandbox.Cmd.PackageRepository.ps1') -PathType Leaf | Should -BeTrue
+        Test-Path -LiteralPath (Join-Path $moduleProjectRoot 'Commands\Module\Eigenverft.Manifested.Sandbox.Cmd.Module.ps1') -PathType Leaf | Should -BeTrue
+        Test-Path -LiteralPath (Join-Path $moduleProjectRoot 'Commands\Web\Eigenverft.Manifested.Sandbox.Cmd.InvokeWebRequestEx.ps1') -PathType Leaf | Should -BeTrue
+    }
+
     It 'returns an empty package state when durable inventory/history files and local directories are absent' {
         $root = Join-Path $TestDrive 'empty-package-state'
         $config = [pscustomobject]@{
@@ -114,7 +149,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - export
         $localRepositoryRoot = Join-Path $root 'PackageRepositories'
         $shimDirectory = Join-Path $root 'Shims'
         $installDirectory = Join-Path $installRoot 'vsc-rt\stable\1.0.0\win32-x64'
-        $definitionLocalPath = Join-Path $localRepositoryRoot 'EigenverftModule\VSCodeRuntime.json'
+        $definitionSnapshotPath = Join-Path $localRepositoryRoot 'EigenverftModule\VSCodeRuntime.json'
         $sourceInventoryPath = Join-Path (Join-Path $root 'Configuration\External') 'SourceInventory.json'
 
         $null = New-Item -ItemType Directory -Path $installDirectory -Force
@@ -122,7 +157,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - export
         $null = New-Item -ItemType Directory -Path $installStageRoot -Force
         $null = New-Item -ItemType Directory -Path $depotRoot -Force
         $null = New-Item -ItemType Directory -Path $shimDirectory -Force
-        Write-TestJsonDocument -Path $definitionLocalPath -Document (New-TestVSCodeDefinitionDocument -Releases @(
+        Write-TestJsonDocument -Path $definitionSnapshotPath -Document (New-TestVSCodeDefinitionDocument -Releases @(
                 New-TestPackageRelease -Id 'vsCode-win-x64-stable' -Version '1.0.0' -Architecture 'x64' -ArtifactDistributionVariant 'win32-x64'
             ))
         Write-TestJsonDocument -Path $sourceInventoryPath -Document @{ inventoryVersion = 1; global = @{}; sites = @{} }
@@ -146,7 +181,12 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - export
             definitionId     = 'VSCodeRuntime'
             definitionRepositoryId = 'EigenverftModule'
             definitionFileName = 'VSCodeRuntime.json'
-            definitionLocalPath = $definitionLocalPath
+            definitionSourceKind = 'moduleLocal'
+            definitionSourcePath = Join-Path $root 'VSCodeRuntime.json'
+            definitionSourceHash = 'source-hash'
+            definitionSnapshotPath = $definitionSnapshotPath
+            definitionSnapshotHash = 'snapshot-hash'
+            definitionResolvedAtUtc = '2026-04-25T11:59:00Z'
             releaseTrack     = 'stable'
             artifactDistributionVariant = 'win32-x64'
             currentReleaseId = 'vscode-test'
@@ -190,7 +230,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - export
         $state.OperationRecordCount | Should -Be 1
         $state.PackageRecords[0].InstallSlotId | Should -Be 'VSCodeRuntime:stable:win32-x64'
         $state.PackageRecords[0].DefinitionRepositoryId | Should -Be 'EigenverftModule'
-        $state.PackageRecords[0].DefinitionLocalExists | Should -BeTrue
+        $state.PackageRecords[0].DefinitionSnapshotExists | Should -BeTrue
         $state.PackageRecords[0].InstallDirectoryExists | Should -BeTrue
         $state.PackageRecords[0].PathRegistration.SourceKind | Should -Be 'shim'
         $state.PackageRecords[0].PathRegistration.RegisteredPath | Should -Be $shimDirectory

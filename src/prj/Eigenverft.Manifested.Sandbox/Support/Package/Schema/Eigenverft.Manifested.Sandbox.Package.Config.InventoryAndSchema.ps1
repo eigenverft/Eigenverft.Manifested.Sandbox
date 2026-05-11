@@ -292,10 +292,13 @@ Assert-PackageGlobalConfigSchema -GlobalDocumentInfo $globalInfo
         }
     }
 
-    foreach ($requiredProperty in @('preferredTargetInstallDirectory', 'repositorySources', 'localRepositoryRoot', 'acquisitionEnvironment', 'packageState', 'selectionDefaults')) {
+    foreach ($requiredProperty in @('preferredTargetInstallDirectory', 'localRepositoryRoot', 'acquisitionEnvironment', 'packageState', 'selectionDefaults')) {
         if (-not $package.PSObject.Properties[$requiredProperty]) {
             throw "Package global config '$($GlobalDocumentInfo.Path)' is missing required property '$requiredProperty'."
         }
+    }
+    if ($package.PSObject.Properties['repositorySources']) {
+        throw "Package global config '$($GlobalDocumentInfo.Path)' still uses retired property 'repositorySources'. Use Configuration/Internal/RepositoryInventory.json repositorySources."
     }
 
     if ($package.selectionDefaults.PSObject.Properties['channel']) {
@@ -372,16 +375,6 @@ Assert-PackageGlobalConfigSchema -GlobalDocumentInfo $globalInfo
     }
     if (-not $package.selectionDefaults.PSObject.Properties['releaseTrack']) {
         throw "Package global config '$($GlobalDocumentInfo.Path)' is missing selectionDefaults.releaseTrack."
-    }
-
-    foreach ($repositoryProperty in @($package.repositorySources.PSObject.Properties)) {
-        $repositorySource = $repositoryProperty.Value
-        if (-not $repositorySource.PSObject.Properties['kind'] -or [string]::IsNullOrWhiteSpace([string]$repositorySource.kind)) {
-            throw "Package global config '$($GlobalDocumentInfo.Path)' repositorySources.$($repositoryProperty.Name) is missing kind."
-        }
-        if (-not $repositorySource.PSObject.Properties['definitionRoot'] -or [string]::IsNullOrWhiteSpace([string]$repositorySource.definitionRoot)) {
-            throw "Package global config '$($GlobalDocumentInfo.Path)' repositorySources.$($repositoryProperty.Name) is missing definitionRoot."
-        }
     }
 
     if ($package.acquisitionEnvironment.PSObject.Properties['environmentSources'] -and $null -ne $package.acquisitionEnvironment.environmentSources) {

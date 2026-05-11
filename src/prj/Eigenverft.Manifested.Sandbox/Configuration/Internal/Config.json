@@ -2,12 +2,6 @@
   "package": {
     "applicationRootDirectory": "%LOCALAPPDATA%/Programs/Evf.Sandbox",
     "preferredTargetInstallDirectory": "{applicationRootDirectory}/Inst",
-    "repositorySources": {
-      "EigenverftModule": {
-        "kind": "moduleLocal",
-        "definitionRoot": "Repositories/EigenverftModule"
-      }
-    },
     "localRepositoryRoot": "{applicationRootDirectory}/PackageRepositories",
     "shimDirectory": "{applicationRootDirectory}/Shims",
     "layout": {

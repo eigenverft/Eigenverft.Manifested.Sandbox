@@ -1,0 +1,29 @@
+{
+  "inventoryVersion": 1,
+  "repositorySources": {
+    "EigenverftModule": {
+      "kind": "moduleLocal",
+      "enabled": true,
+      "searchOrder": 100,
+      "definitionRoot": "Repositories/EigenverftModule",
+      "trusted": true,
+      "trustMode": "moduleShipped"
+    },
+    "teamPackageRepository": {
+      "kind": "filesystem",
+      "enabled": false,
+      "searchOrder": 150,
+      "basePath": "\\\\team-share\\PackageRepository",
+      "trusted": false,
+      "trustMode": "unsigned"
+    },
+    "corpPackageRepository": {
+      "kind": "filesystem",
+      "enabled": false,
+      "searchOrder": 300,
+      "basePath": "\\\\corp-share\\PackageRepository",
+      "trusted": false,
+      "trustMode": "unsigned"
+    }
+  }
+}

@@ -576,6 +576,110 @@ exit /b 0
         $result.InstallerKind | Should -Be 'nsis'
     }
 
+    It 'invokes a registry uninstaller and does not append duplicate configured arguments' {
+        $uninstallerPath = Join-Path $TestDrive 'uninstall.exe'
+        Write-TestTextFile -Path $uninstallerPath -Content 'uninstaller'
+        $operation = [pscustomobject]@{
+            commandSource = [pscustomobject]@{
+                searchLocationId   = 'testRegistry'
+                registryValueOrder = @('QuietUninstallString', 'UninstallString')
+            }
+            commandArguments = @('/S')
+            elevation = 'none'
+            timeoutSec = 300
+            successExitCodes = @(0)
+            restartExitCodes = @()
+            uiMode = 'silent'
+        }
+        $packageResult = [pscustomobject]@{
+            DefinitionId = 'NotepadPlusPlus'
+            InstallDirectory = Join-Path $TestDrive 'npp'
+            PackageFilePath = $null
+            PackageFileStagingDirectory = Join-Path $TestDrive 'FileStage'
+            PackageInstallStageDirectory = Join-Path $TestDrive 'InstStage'
+            PackageConfig = [pscustomobject]@{ Definition = [pscustomobject]@{} }
+            Package = [pscustomobject]@{}
+        }
+
+        $invokeCalls = New-Object System.Collections.Generic.List[object]
+        Mock Get-PackageExistingInstallSearchLocationById { [pscustomobject]@{ id = 'testRegistry' } }
+        Mock Resolve-PackageExistingUninstallRegistryCandidate {
+            [pscustomobject]@{
+                RegistryEntry = [pscustomobject]@{
+                    QuietUninstallString = ('"{0}" /S' -f $uninstallerPath)
+                    UninstallString = $null
+                }
+            }
+        }
+        Mock Invoke-PackageInstallerCommand {
+            param($PackageResult, $CommandPath, $CommandArguments, $WorkingDirectory, $TimeoutSec, $SuccessExitCodes, $RestartExitCodes, $TargetKind, $InstallerKind, $UiMode, $LogPath, $ElevationMode)
+            $invokeCalls.Add([pscustomobject]@{
+                CommandPath = $CommandPath
+                CommandArguments = @($CommandArguments)
+                InstallerKind = $InstallerKind
+                ElevationMode = $ElevationMode
+            }) | Out-Null
+        }
+
+        $result = Invoke-PackageRegistryUninstaller -PackageResult $packageResult -Operation $operation -InstallerKind 'nsis'
+
+        $result.Status | Should -Be 'Invoked'
+        $invokeCalls.Count | Should -Be 1
+        $invokeCalls[0].CommandPath | Should -Be $uninstallerPath
+        $invokeCalls[0].CommandArguments | Should -Be @('/S')
+        $invokeCalls[0].InstallerKind | Should -Be 'nsis'
+    }
+
+    It 'falls back to tracked install directory removal when an installer uninstall command is missing' {
+        $installDirectory = Join-Path $TestDrive 'missing-uninstaller-fallback\App'
+        Write-TestTextFile -Path (Join-Path $installDirectory 'app.exe') -Content 'app'
+        $packageResult = [pscustomobject]@{
+            DefinitionId = 'NotepadPlusPlus'
+            InstallDirectory = $installDirectory
+            PackageConfig = [pscustomobject]@{
+                PreferredTargetInstallRootDirectory = (Join-Path $TestDrive 'missing-uninstaller-fallback')
+                Definition = [pscustomobject]@{
+                    packageOperations = [pscustomobject]@{
+                        removed = [pscustomobject]@{
+                            operation = [pscustomobject]@{ kind = 'nsisUninstaller' }
+                        }
+                    }
+                }
+            }
+        }
+
+        Mock Invoke-PackageRegistryUninstaller { [pscustomobject]@{ Status = 'CommandNotFound' } }
+
+        $result = Invoke-PackageRemovedOperation -PackageResult $packageResult
+
+        $result | Should -Be $packageResult
+        Test-Path -LiteralPath $installDirectory | Should -BeFalse
+    }
+
+    It 'does not fallback to directory deletion when a found uninstaller fails' {
+        $installDirectory = Join-Path $TestDrive 'failing-uninstaller\App'
+        Write-TestTextFile -Path (Join-Path $installDirectory 'app.exe') -Content 'app'
+        $packageResult = [pscustomobject]@{
+            DefinitionId = 'NotepadPlusPlus'
+            InstallDirectory = $installDirectory
+            PackageConfig = [pscustomobject]@{
+                PreferredTargetInstallRootDirectory = (Join-Path $TestDrive 'failing-uninstaller')
+                Definition = [pscustomobject]@{
+                    packageOperations = [pscustomobject]@{
+                        removed = [pscustomobject]@{
+                            operation = [pscustomobject]@{ kind = 'nsisUninstaller' }
+                        }
+                    }
+                }
+            }
+        }
+
+        Mock Invoke-PackageRegistryUninstaller { throw 'uninstaller exit failed' }
+
+        { Invoke-PackageRemovedOperation -PackageResult $packageResult } | Should -Throw '*uninstaller exit failed*'
+        Test-Path -LiteralPath $installDirectory | Should -BeTrue
+    }
+
     It 'installs a single package file into the configured target-relative path' {
         $rootPath = Join-Path $TestDrive 'package-install-file-route'
         $packageFilePath = Join-Path $rootPath 'package\Qwen3.5-9B-Q6_K.gguf'

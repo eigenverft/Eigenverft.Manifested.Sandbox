@@ -10,7 +10,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
 
         $globalInfo.Document.package.PSObject.Properties.Name | Should -Contain 'preferredTargetInstallDirectory'
         $globalInfo.Document.package.PSObject.Properties.Name | Should -Contain 'applicationRootDirectory'
-        $globalInfo.Document.package.PSObject.Properties.Name | Should -Contain 'repositorySources'
+        $globalInfo.Document.package.PSObject.Properties.Name | Should -Not -Contain 'repositorySources'
         $globalInfo.Document.package.PSObject.Properties.Name | Should -Contain 'localRepositoryRoot'
         $globalInfo.Document.package.PSObject.Properties.Name | Should -Contain 'shimDirectory'
         $globalInfo.Document.package.shimDirectory | Should -Be '{applicationRootDirectory}/Shims'
@@ -27,6 +27,11 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
         $globalInfo.Document.package.acquisitionEnvironment.defaults.PSObject.Properties.Name | Should -Not -Contain 'mirrorDownloadedArtifactsToDefaultPackageDepot'
         $globalInfo.Document.package.packageState.PSObject.Properties.Name | Should -Contain 'inventoryFilePath'
         $globalInfo.Document.package.packageState.PSObject.Properties.Name | Should -Contain 'operationHistoryFilePath'
+        $repositoryInfo = Read-PackageJsonDocument -Path (Get-PackageShippedRepositoryInventoryPath)
+        $repositoryInfo.Document.repositorySources.PSObject.Properties.Name | Should -Contain 'EigenverftModule'
+        $repositoryInfo.Document.repositorySources.EigenverftModule.kind | Should -Be 'moduleLocal'
+        $repositoryInfo.Document.repositorySources.EigenverftModule.trusted | Should -BeTrue
+        $repositoryInfo.Document.repositorySources.EigenverftModule.trustMode | Should -Be 'moduleShipped'
         $depotInfo = Read-PackageJsonDocument -Path (Get-PackageShippedDepotInventoryPath)
         $depotInfo.Document.acquisitionEnvironment.environmentSources.PSObject.Properties.Name | Should -Contain 'defaultPackageDepot'
         $depotInfo.Document.acquisitionEnvironment.environmentSources.defaultPackageDepot.readable | Should -BeTrue
@@ -74,7 +79,21 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
 
         $activeGlobalPath | Should -Be $localGlobalPath
         Test-Path -LiteralPath $localGlobalPath -PathType Leaf | Should -BeTrue
-        $localInfo.Document.package.repositorySources.EigenverftModule.kind | Should -Be 'moduleLocal'
+        $localInfo.Document.package.PSObject.Properties.Name | Should -Not -Contain 'repositorySources'
+    }
+
+    It 'creates the local RepositoryInventory.json copy from shipped configuration when missing' {
+        $localRepositoryInventoryPath = Get-PackageLocalRepositoryInventoryPath
+        if (Test-Path -LiteralPath $localRepositoryInventoryPath -PathType Leaf) {
+            Remove-Item -LiteralPath $localRepositoryInventoryPath -Force
+        }
+
+        $activeRepositoryInventoryPath = Get-PackageRepositoryInventoryPath
+        $localInfo = Read-PackageJsonDocument -Path $localRepositoryInventoryPath
+
+        $activeRepositoryInventoryPath | Should -Be $localRepositoryInventoryPath
+        Test-Path -LiteralPath $localRepositoryInventoryPath -PathType Leaf | Should -BeTrue
+        $localInfo.Document.repositorySources.EigenverftModule.kind | Should -Be 'moduleLocal'
     }
 
     It 'resolves package config paths from applicationRootDirectory and supports missing applicationRootDirectory fallback' {
@@ -380,7 +399,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
     }
 
     It 'fails clearly for unsupported package repositories' {
-        { Resolve-PackageDefinitionReference -RepositoryId 'OtherRepository' -DefinitionId 'VSCodeRuntime' } | Should -Throw "*Only 'EigenverftModule' is currently supported*"
+        { Resolve-PackageDefinitionReference -RepositoryId 'OtherRepository' -DefinitionId 'VSCodeRuntime' } | Should -Throw "*was not found*"
     }
 
     It 'completes removed desired state when inventory is missing and whenNotInInventory is succeed' {
@@ -524,6 +543,61 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
 
         $invAfter = Get-Content -LiteralPath $inventoryPath -Raw | ConvertFrom-Json
         @($invAfter.records).Count | Should -Be 0
+    }
+
+    It 'keeps inventory when removed absence verification fails before cleanup' {
+        $rootPath = Join-Path $TestDrive 'removed-absence-failure-keeps-inventory'
+        $globalDocument = New-TestPackageGlobalDocument -ApplicationRootDirectory (Join-Path $rootPath 'AppRoot')
+        $definitionDocument = New-TestVSCodeDefinitionDocument -Releases @(
+            New-TestPackageRelease -Id 'vsCode-win-x64-stable' -Version '2.0.0' -Architecture 'x64' -ArtifactDistributionVariant 'win32-x64' -FileName 'VSCode-win32-x64-2.0.0.zip' -AcquisitionCandidates @(
+                @{
+                    kind        = 'packageDepot'
+                    searchOrder = 10
+                }
+            )
+        )
+        $definitionDocument.packageOperations.removed.operation = @{
+            kind = 'none'
+        }
+        $documents = Write-TestPackageDocuments -RootPath $rootPath -GlobalDocument $globalDocument -DefinitionDocument $definitionDocument
+
+        $appRoot = Join-Path $rootPath 'AppRoot'
+        $installDir = Join-Path $appRoot 'Inst\vsc-rt\stable\2.0.0\win32-x64'
+        Write-TestTextFile -Path (Join-Path $installDir 'Code.exe') -Content 'x'
+        Write-TestTextFile -Path (Join-Path $installDir 'bin\code.cmd') -Content "@echo off`r`necho 2.0.0`r`n"
+        $null = New-Item -ItemType Directory -Path (Join-Path $installDir 'data') -Force
+
+        $inventoryPath = Join-Path $appRoot 'State\package-inventory.json'
+        $null = New-Item -ItemType Directory -Path (Split-Path -Parent $inventoryPath) -Force
+        $record = @{
+            installSlotId       = 'VSCodeRuntime:stable:win32-x64'
+            definitionId        = 'VSCodeRuntime'
+            definitionRepositoryId = 'EigenverftModule'
+            definitionFileName  = 'VSCodeRuntime.json'
+            definitionSourcePath = (Join-Path $rootPath 'VSCodeRuntime.json')
+            definitionLocalPath = (Join-Path $rootPath 'VSCodeRuntime.json')
+            releaseTrack        = 'stable'
+            artifactDistributionVariant = 'win32-x64'
+            currentReleaseId    = 'vsCode-win-x64-stable'
+            currentVersion      = '2.0.0'
+            installDirectory    = $installDir
+            ownershipKind       = 'PackageInstalled'
+            pathRegistration    = $null
+            updatedAtUtc        = [DateTime]::UtcNow.ToString('o')
+        }
+        Write-TestJsonDocument -Path $inventoryPath -Document @{ schemaVersion = 1; records = @($record) }
+
+        [Environment]::SetEnvironmentVariable($script:SourceInventoryEnvVarName, (Join-Path $TestDrive 'missing-inventory.json'), 'Process')
+        Mock Get-PackageGlobalConfigPath { $documents.GlobalConfigPath }
+        Mock Get-PackageDepotInventoryPath { $documents.DepotInventoryPath }
+        Mock Get-PackageDefinitionPath { param($DefinitionId) $documents.DefinitionPath }
+
+        $result = Invoke-Package -DefinitionId 'VSCodeRuntime' -DesiredState Removed
+
+        $result.Status | Should -Be 'Failed'
+        $result.ErrorMessage | Should -Match 'absence verification failed'
+        $invAfter = Get-Content -LiteralPath $inventoryPath -Raw | ConvertFrom-Json
+        @($invAfter.records).Count | Should -Be 1
     }
 
     It 'blocks removed when another inventory record definition still depends on the target' {
@@ -787,6 +861,23 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
         $result.Package.existingInstallDiscovery.searchLocations[0].installDirectorySource | Should -Be 'displayIconDirectory'
         $result.Package.packageFile.fileName | Should -Be $expectedFileName
         $result.Package.packageFile.contentHash.value | Should -Be $expectedSha256
+    }
+
+    It 'loads the shipped VSCodeUser definition with Inno Setup uninstall registry removal' {
+        [Environment]::SetEnvironmentVariable($script:SourceInventoryEnvVarName, (Join-Path $TestDrive 'missing-inventory.json'), 'Process')
+
+        $config = Get-PackageConfig -DefinitionId 'VSCodeUser'
+        $result = New-PackageResult -PackageConfig $config
+        $result = Resolve-PackagePackage -PackageResult $result
+
+        $config.DefinitionId | Should -Be 'VSCodeUser'
+        $result.Package.assigned.install.kind | Should -Be 'innoSetupInstaller'
+        $result.Package.removed.operation.kind | Should -Be 'innoSetupUninstaller'
+        $result.Package.existingInstallDiscovery.enabled | Should -Be $true
+        $result.Package.existingInstallDiscovery.searchLocations[0].kind | Should -Be 'windowsUninstallRegistryKey'
+        @($result.Package.existingInstallDiscovery.searchLocations[0].paths)[0] | Should -Match '^HKCU:'
+        $result.Package.existingInstallDiscovery.searchLocations[0].installDirectorySource | Should -Be 'installLocation'
+        $result.Package.removed.policy.allowedInventoryOwnershipKinds | Should -Contain 'AdoptedExternal'
     }
 
     It 'loads the shipped NodeRuntime definition and selects the fixed Node.js archive release' {

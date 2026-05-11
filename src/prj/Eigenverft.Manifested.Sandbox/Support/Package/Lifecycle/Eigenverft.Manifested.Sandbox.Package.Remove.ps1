@@ -165,7 +165,16 @@ function Get-PackageUninstallExecutableAndArgumentTail {
     }
 
     $idx = $expanded.IndexOf($exe, [System.StringComparison]::OrdinalIgnoreCase)
-    $after = if ($idx -lt 0) { '' } else { $expanded.Substring($idx + $exe.Length).Trim() }
+    $tailStart = if ($idx -lt 0) { -1 } else { $idx + $exe.Length }
+    if ($tailStart -ge 0 -and
+        $idx -gt 0 -and
+        $expanded[$idx - 1] -eq '"' -and
+        $expanded.Length -gt $tailStart -and
+        $expanded[$tailStart] -eq '"') {
+        $tailStart++
+    }
+
+    $after = if ($tailStart -lt 0) { '' } else { $expanded.Substring($tailStart).Trim() }
     $tokens = if ([string]::IsNullOrWhiteSpace($after)) {
         @()
     }
@@ -345,6 +354,179 @@ function Assert-PackageRemovalPolicy {
     return $PackageResult
 }
 
+function Test-PackageProcessArgumentPresent {
+    [CmdletBinding()]
+    param(
+        [AllowNull()]
+        [string[]]$Arguments,
+
+        [AllowNull()]
+        [string]$Argument
+    )
+
+    if ([string]::IsNullOrWhiteSpace($Argument)) {
+        return $true
+    }
+
+    $normalizedArgument = ([string]$Argument).Trim().Trim('"')
+    foreach ($existingArgument in @($Arguments)) {
+        if ([string]::Equals(([string]$existingArgument).Trim().Trim('"'), $normalizedArgument, [System.StringComparison]::OrdinalIgnoreCase)) {
+            return $true
+        }
+    }
+
+    return $false
+}
+
+function Invoke-PackageTrackedInstallDirectoryRemoval {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [psobject]$PackageResult,
+
+        [AllowNull()]
+        [string]$Reason
+    )
+
+    $target = [string]$PackageResult.InstallDirectory
+    if ([string]::IsNullOrWhiteSpace($target)) {
+        throw "Package removed operation 'deleteInstallDirectory' requires a resolved inventory installDirectory."
+    }
+
+    if (Test-Path -LiteralPath $target) {
+        Remove-PathIfExists -Path $target | Out-Null
+        $reasonText = if ([string]::IsNullOrWhiteSpace($Reason)) { '' } else { " ($Reason)" }
+        Write-PackageExecutionMessage -Message ("[ACTION] Deleted tracked install directory '{0}'{1}." -f $target, $reasonText)
+    }
+    else {
+        Write-PackageExecutionMessage -Message ("[STATE] tracked install directory removal skipped; path does not exist: '{0}'." -f $target)
+    }
+
+    $ceiling = Get-EmptyParentPruneCeilingDirectory -InstallLeafPath $target -PreferredInstallRootDirectory ([string]$PackageResult.PackageConfig.PreferredTargetInstallRootDirectory)
+    if (-not [string]::IsNullOrWhiteSpace($ceiling)) {
+        Remove-EmptyParentDirectoryChain -DeletedLeafPath $target -AncestorCeilingDirectory $ceiling
+        Write-PackageExecutionMessage -Message '[ACTION] Pruned empty parent directories after tracked install directory removal (up to configured install root when under it, otherwise up to volume or share root).'
+    }
+    else {
+        Write-PackageExecutionMessage -Level 'WRN' -Message '[WARN] Could not resolve empty-parent prune ceiling; skipping prune after tracked install directory removal.'
+    }
+
+    return $PackageResult
+}
+
+function Invoke-PackageRegistryUninstaller {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [psobject]$PackageResult,
+
+        [Parameter(Mandatory = $true)]
+        [psobject]$Operation,
+
+        [Parameter(Mandatory = $true)]
+        [string]$InstallerKind
+    )
+
+    $definition = $PackageResult.PackageConfig.Definition
+    $searchLocation = Get-PackageExistingInstallSearchLocationById -Definition $definition -SearchLocationId ([string]$Operation.commandSource.searchLocationId)
+    $resolved = Resolve-PackageExistingUninstallRegistryCandidate -SearchLocation $searchLocation
+    if (-not $resolved -or -not $resolved.RegistryEntry) {
+        return [pscustomobject]@{
+            Status        = 'CommandNotFound'
+            InstallerKind = $InstallerKind
+            CommandPath   = $null
+        }
+    }
+
+    $entry = $resolved.RegistryEntry
+    $chosenText = $null
+    foreach ($registryValueName in @($Operation.commandSource.registryValueOrder)) {
+        $prop = if ([string]::Equals([string]$registryValueName, 'QuietUninstallString', [System.StringComparison]::OrdinalIgnoreCase)) {
+            'QuietUninstallString'
+        }
+        else {
+            'UninstallString'
+        }
+        if (-not $entry.PSObject.Properties[$prop]) {
+            continue
+        }
+        $text = [string]$entry.$prop
+        if (-not [string]::IsNullOrWhiteSpace($text)) {
+            $chosenText = $text
+            break
+        }
+    }
+
+    if ([string]::IsNullOrWhiteSpace($chosenText)) {
+        return [pscustomobject]@{
+            Status        = 'CommandNotFound'
+            InstallerKind = $InstallerKind
+            CommandPath   = $null
+        }
+    }
+
+    $parsed = Get-PackageUninstallExecutableAndArgumentTail -RawText $chosenText
+    if ([string]::IsNullOrWhiteSpace($parsed.Executable) -or -not (Test-Path -LiteralPath $parsed.Executable -PathType Leaf)) {
+        return [pscustomobject]@{
+            Status        = 'CommandNotFound'
+            InstallerKind = $InstallerKind
+            CommandPath   = $parsed.Executable
+        }
+    }
+
+    $argumentTexts = New-Object System.Collections.Generic.List[string]
+    $commandArguments = New-Object System.Collections.Generic.List[string]
+    foreach ($token in @($parsed.ArgumentTokens)) {
+        $argumentTexts.Add([string]$token) | Out-Null
+        $commandArguments.Add((Format-PackageProcessArgument -Value $token)) | Out-Null
+    }
+
+    foreach ($argument in @($Operation.commandArguments)) {
+        $resolvedArgument = Resolve-PackageTemplateText -Text ([string]$argument) -PackageConfig $PackageResult.PackageConfig -Package $PackageResult.Package -ExtraTokens @{
+            packageFilePath                = $PackageResult.PackageFilePath
+            installDirectory               = $PackageResult.InstallDirectory
+            packageFileStagingDirectory    = $PackageResult.PackageFileStagingDirectory
+            packageInstallStageDirectory   = $PackageResult.PackageInstallStageDirectory
+            downloadDirectory              = $PackageResult.PackageFileStagingDirectory
+        }
+        if (Test-PackageProcessArgumentPresent -Arguments @($argumentTexts.ToArray()) -Argument $resolvedArgument) {
+            continue
+        }
+        $argumentTexts.Add([string]$resolvedArgument) | Out-Null
+        $commandArguments.Add((Format-PackageProcessArgument -Value $resolvedArgument)) | Out-Null
+    }
+
+    $timeoutSec = [int]$Operation.timeoutSec
+    $successExitCodes = @($Operation.successExitCodes | ForEach-Object { [int]$_ })
+    $restartExitCodes = @($Operation.restartExitCodes | ForEach-Object { [int]$_ })
+    $uiMode = [string]$Operation.uiMode
+    $workingDirectory = if (-not [string]::IsNullOrWhiteSpace([string]$PackageResult.InstallDirectory) -and (Test-Path -LiteralPath $PackageResult.InstallDirectory -PathType Container)) {
+        [string]$PackageResult.InstallDirectory
+    }
+    elseif (-not [string]::IsNullOrWhiteSpace([string]$PackageResult.PackageInstallStageDirectory)) {
+        [string]$PackageResult.PackageInstallStageDirectory
+    }
+    else {
+        [System.IO.Path]::GetTempPath()
+    }
+
+    $elevationMode = if ($Operation.PSObject.Properties['elevation'] -and -not [string]::IsNullOrWhiteSpace([string]$Operation.elevation)) {
+        [string]$Operation.elevation
+    }
+    else {
+        $null
+    }
+
+    $null = Invoke-PackageInstallerCommand -PackageResult $PackageResult -CommandPath $parsed.Executable -CommandArguments @($commandArguments.ToArray()) -WorkingDirectory $workingDirectory -TimeoutSec $timeoutSec -SuccessExitCodes @($successExitCodes) -RestartExitCodes @($restartExitCodes) -TargetKind 'directory' -InstallerKind $InstallerKind -UiMode $uiMode -LogPath $null -ElevationMode $elevationMode
+    Write-PackageExecutionMessage -Message ("[ACTION] Completed {0} uninstall command '{1}'." -f $InstallerKind, $parsed.Executable)
+
+    return [pscustomobject]@{
+        Status        = 'Invoked'
+        InstallerKind = $InstallerKind
+        CommandPath   = $parsed.Executable
+    }
+}
+
 function Invoke-PackageRemovedOperation {
     [CmdletBinding()]
     param(
@@ -366,102 +548,15 @@ function Invoke-PackageRemovedOperation {
             Write-PackageExecutionMessage -Message '[STATE] Removed operation kind is none; nothing to execute.'
         }
         'deleteInstallDirectory' {
-            $target = [string]$PackageResult.InstallDirectory
-            if ([string]::IsNullOrWhiteSpace($target)) {
-                throw "Package removed operation 'deleteInstallDirectory' requires a resolved inventory installDirectory."
-            }
-            if (Test-Path -LiteralPath $target) {
-                Remove-PathIfExists -Path $target | Out-Null
-                Write-PackageExecutionMessage -Message ("[ACTION] Deleted install directory '{0}' for removed operation." -f $target)
-            }
-            else {
-                Write-PackageExecutionMessage -Message ("[STATE] deleteInstallDirectory skipped; path does not exist: '{0}'." -f $target)
-            }
-
-            $ceiling = Get-EmptyParentPruneCeilingDirectory -InstallLeafPath $target -PreferredInstallRootDirectory ([string]$PackageResult.PackageConfig.PreferredTargetInstallRootDirectory)
-            if (-not [string]::IsNullOrWhiteSpace($ceiling)) {
-                Remove-EmptyParentDirectoryChain -DeletedLeafPath $target -AncestorCeilingDirectory $ceiling
-                Write-PackageExecutionMessage -Message '[ACTION] Pruned empty parent directories after deleteInstallDirectory (up to Inst root when under Inst, otherwise up to volume or share root).'
-            }
-            else {
-                Write-PackageExecutionMessage -Level 'WRN' -Message '[WARN] Could not resolve empty-parent prune ceiling; skipping prune after deleteInstallDirectory.'
-            }
+            $PackageResult = Invoke-PackageTrackedInstallDirectoryRemoval -PackageResult $PackageResult -Reason 'removed.operation.kind=deleteInstallDirectory'
         }
         { $_ -in @('nsisUninstaller', 'innoSetupUninstaller') } {
-            $searchLocation = Get-PackageExistingInstallSearchLocationById -Definition $definition -SearchLocationId ([string]$operation.commandSource.searchLocationId)
-            $resolved = Resolve-PackageExistingUninstallRegistryCandidate -SearchLocation $searchLocation
-            if (-not $resolved -or -not $resolved.RegistryEntry) {
-                throw "Package $kind removal could not resolve a Windows uninstall registry entry for searchLocationId '$($operation.commandSource.searchLocationId)'."
-            }
-
-            $entry = $resolved.RegistryEntry
-            $chosenText = $null
-            foreach ($registryValueName in @($operation.commandSource.registryValueOrder)) {
-                $prop = if ([string]::Equals([string]$registryValueName, 'QuietUninstallString', [System.StringComparison]::OrdinalIgnoreCase)) {
-                    'QuietUninstallString'
-                }
-                else {
-                    'UninstallString'
-                }
-                if (-not $entry.PSObject.Properties[$prop]) {
-                    continue
-                }
-                $text = [string]$entry.$prop
-                if (-not [string]::IsNullOrWhiteSpace($text)) {
-                    $chosenText = $text
-                    break
-                }
-            }
-
-            if ([string]::IsNullOrWhiteSpace($chosenText)) {
-                throw "Package $kind removal did not find a usable QuietUninstallString or UninstallString in the resolved registry entry."
-            }
-
-            $parsed = Get-PackageUninstallExecutableAndArgumentTail -RawText $chosenText
-            if ([string]::IsNullOrWhiteSpace($parsed.Executable) -or -not (Test-Path -LiteralPath $parsed.Executable -PathType Leaf)) {
-                throw "Package $kind removal resolved uninstall executable '$($parsed.Executable)' but it does not exist."
-            }
-
-            $commandArguments = New-Object System.Collections.Generic.List[string]
-            foreach ($token in @($parsed.ArgumentTokens)) {
-                $commandArguments.Add((Format-PackageProcessArgument -Value $token)) | Out-Null
-            }
-
-            foreach ($argument in @($operation.commandArguments)) {
-                $resolvedArgument = Resolve-PackageTemplateText -Text ([string]$argument) -PackageConfig $PackageResult.PackageConfig -Package $PackageResult.Package -ExtraTokens @{
-                    packageFilePath                = $PackageResult.PackageFilePath
-                    installDirectory               = $PackageResult.InstallDirectory
-                    packageFileStagingDirectory    = $PackageResult.PackageFileStagingDirectory
-                    packageInstallStageDirectory   = $PackageResult.PackageInstallStageDirectory
-                    downloadDirectory              = $PackageResult.PackageFileStagingDirectory
-                }
-                $commandArguments.Add((Format-PackageProcessArgument -Value $resolvedArgument)) | Out-Null
-            }
-
-            $timeoutSec = [int]$operation.timeoutSec
-            $successExitCodes = @($operation.successExitCodes | ForEach-Object { [int]$_ })
-            $restartExitCodes = @($operation.restartExitCodes | ForEach-Object { [int]$_ })
-            $uiMode = [string]$operation.uiMode
-            $workingDirectory = if (-not [string]::IsNullOrWhiteSpace([string]$PackageResult.InstallDirectory) -and (Test-Path -LiteralPath $PackageResult.InstallDirectory -PathType Container)) {
-                [string]$PackageResult.InstallDirectory
-            }
-            elseif (-not [string]::IsNullOrWhiteSpace([string]$PackageResult.PackageInstallStageDirectory)) {
-                [string]$PackageResult.PackageInstallStageDirectory
-            }
-            else {
-                [System.IO.Path]::GetTempPath()
-            }
-
-            $elevationMode = if ($operation.PSObject.Properties['elevation'] -and -not [string]::IsNullOrWhiteSpace([string]$operation.elevation)) {
-                [string]$operation.elevation
-            }
-            else {
-                $null
-            }
-
             $installerKind = if ([string]::Equals($kind, 'innoSetupUninstaller', [System.StringComparison]::OrdinalIgnoreCase)) { 'innoSetup' } else { 'nsis' }
-            $null = Invoke-PackageInstallerCommand -PackageResult $PackageResult -CommandPath $parsed.Executable -CommandArguments @($commandArguments.ToArray()) -WorkingDirectory $workingDirectory -TimeoutSec $timeoutSec -SuccessExitCodes @($successExitCodes) -RestartExitCodes @($restartExitCodes) -TargetKind 'directory' -InstallerKind $installerKind -UiMode $uiMode -LogPath $null -ElevationMode $elevationMode
-            Write-PackageExecutionMessage -Message ("[ACTION] Completed {0} removal operation." -f $kind)
+            $uninstallResult = Invoke-PackageRegistryUninstaller -PackageResult $PackageResult -Operation $operation -InstallerKind $installerKind
+            if ([string]::Equals([string]$uninstallResult.Status, 'CommandNotFound', [System.StringComparison]::OrdinalIgnoreCase)) {
+                Write-PackageExecutionMessage -Level 'WRN' -Message ("[WARN] Original installer uninstall command was not found for '{0}'; falling back to tracked install directory removal." -f $PackageResult.DefinitionId)
+                $PackageResult = Invoke-PackageTrackedInstallDirectoryRemoval -PackageResult $PackageResult -Reason 'installer uninstall command not found'
+            }
         }
         default {
             throw "Unsupported removed.operation.kind '$kind'."
@@ -560,13 +655,13 @@ function Invoke-PackageRemovedFlow {
         Write-PackageExecutionMessage -Message '[STEP] Executing removed.operation.'
         $PackageResult = Invoke-PackageRemovedOperation -PackageResult $PackageResult
 
-        $PackageResult.CurrentStep = 'PostRemoveCleanup'
-        Write-PackageExecutionMessage -Message '[STEP] Running post-remove cleanup.'
-        $PackageResult = Invoke-PackagePostRemoveCleanup -PackageResult $PackageResult
-
         $PackageResult.CurrentStep = 'VerifyRemovedAbsence'
         Write-PackageExecutionMessage -Message '[STEP] Verifying removed absence.'
         $PackageResult = Test-PackageRemovedAbsence -PackageResult $PackageResult
+
+        $PackageResult.CurrentStep = 'PostRemoveCleanup'
+        Write-PackageExecutionMessage -Message '[STEP] Running post-remove cleanup.'
+        $PackageResult = Invoke-PackagePostRemoveCleanup -PackageResult $PackageResult
 
         Write-PackageExecutionMessage -Message ("[OK] Package removal completed for definition '{0}'." -f $PackageResult.DefinitionId)
     }

@@ -139,7 +139,7 @@ Install or update Eigenverft.Manifested.Sandbox from the PowerShell Gallery, or 
 
 .DESCRIPTION
 Thin bootstrap surface (similar intent to Eigenverft.Manifested.Drydock). Main switches are mutually exclusive:
-- -Update : Install/update from PSGallery (stable; -Scope). On Windows, Initialize-ProxyAccessProfile (gallery URI) sets session + Global:ProxyParamsInstallModule for Install-Module; manual proxy UI is allowed when automatic resolution cannot reach the gallery. Non-Windows: minimal TLS/proxy only. Requires network.
+- -Update : Install/update from PSGallery (stable; -Scope). On Windows, the internal proxy bootstrap prepares session + Install-Module proxy parameters; manual proxy UI is allowed when automatic resolution cannot reach the gallery. Non-Windows: minimal TLS/proxy only. Requires network.
 - -Version : Print the same summary as Get-SandboxVersion (module version, shipped package examples, and exported commands).
 
 Without a main switch, prints a short usage note.
@@ -210,7 +210,7 @@ Sandbox -Version
             $sandboxIsWindows = [System.Environment]::OSVersion.Platform -eq [System.PlatformID]::Win32NT
 
             if ($sandboxIsWindows) {
-                # Manual proxy UI and non-interactive failure are handled inside Initialize-ProxyAccessProfile (UserInteractive + optional -SkipManualProxyPrompt).
+                # Manual proxy UI and non-interactive failure are handled by the private proxy bootstrap.
                 Initialize-ProxyAccessProfile -TestUri ([uri]'https://www.powershellgallery.com/api/v2/')
 
                 if ($null -ne $Global:ProxyParamsPrepareSession) {

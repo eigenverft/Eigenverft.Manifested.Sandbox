@@ -198,11 +198,18 @@ Copy-PackageDefinitionToLocalRepository -PackageResult $result
     $localDefinitionPath = [System.IO.Path]::GetFullPath((Join-Path $repositoryDirectory $definitionFileName))
     Copy-FileToPath -SourcePath $sourcePath -TargetPath $localDefinitionPath -Overwrite | Out-Null
 
+    $sourceHash = Get-PackageFileSha256 -Path $sourcePath
+    $snapshotHash = Get-PackageFileSha256 -Path $localDefinitionPath
+
     return [pscustomobject]@{
-        RepositoryId = $repositoryId
-        FileName     = $definitionFileName
-        SourcePath   = [System.IO.Path]::GetFullPath($sourcePath)
-        LocalPath    = $localDefinitionPath
+        RepositoryId  = $repositoryId
+        FileName      = $definitionFileName
+        SourceKind    = if ($config.PSObject.Properties['DefinitionSourceKind']) { [string]$config.DefinitionSourceKind } else { $null }
+        SourcePath    = [System.IO.Path]::GetFullPath($sourcePath)
+        SourceHash    = $sourceHash
+        SnapshotPath  = $localDefinitionPath
+        SnapshotHash  = $snapshotHash
+        ResolvedAtUtc = if ($config.PSObject.Properties['DefinitionResolvedAtUtc'] -and -not [string]::IsNullOrWhiteSpace([string]$config.DefinitionResolvedAtUtc)) { [string]$config.DefinitionResolvedAtUtc } else { [DateTime]::UtcNow.ToString('o') }
     }
 }
 
@@ -404,8 +411,12 @@ Update-PackageInventoryRecord -PackageResult $result
         definitionId    = $PackageResult.DefinitionId
         definitionRepositoryId = $definitionCopy.RepositoryId
         definitionFileName = $definitionCopy.FileName
+        definitionSourceKind = $definitionCopy.SourceKind
         definitionSourcePath = $definitionCopy.SourcePath
-        definitionLocalPath = $definitionCopy.LocalPath
+        definitionSourceHash = $definitionCopy.SourceHash
+        definitionSnapshotPath = $definitionCopy.SnapshotPath
+        definitionSnapshotHash = $definitionCopy.SnapshotHash
+        definitionResolvedAtUtc = $definitionCopy.ResolvedAtUtc
         releaseTrack    = if ($PackageResult.Package -and $PackageResult.Package.PSObject.Properties['releaseTrack']) { [string]$PackageResult.Package.releaseTrack } else { [string]$PackageResult.ReleaseTrack }
         artifactDistributionVariant = if ($PackageResult.Package -and $PackageResult.Package.PSObject.Properties['artifactDistributionVariant']) { [string]$PackageResult.Package.artifactDistributionVariant } else { $null }
         currentReleaseId = $PackageResult.PackageId

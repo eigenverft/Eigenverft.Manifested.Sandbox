@@ -98,16 +98,26 @@
     "registry": []
   },
   "existingInstallDiscovery": {
-    "enabled": false,
-    "searchLocations": [],
+    "enabled": true,
+    "searchLocations": [
+      {
+        "id": "vscodeUserUninstallRegistry",
+        "kind": "windowsUninstallRegistryKey",
+        "searchOrder": 100,
+        "paths": [
+          "HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\{771FD6B0-FA20-440A-A002-3B3BAC16DC50}_is1"
+        ],
+        "installDirectorySource": "installLocation"
+      }
+    ],
     "installRootRules": []
   },
   "packageOperations": {
     "policy": {
       "ownershipPolicy": {
-        "allowAdoptExternal": false,
+        "allowAdoptExternal": true,
         "upgradeAdoptedInstall": false,
-        "requirePackageOwnership": true
+        "requirePackageOwnership": false
       },
       "compatibility": {
         "checks": []
@@ -163,14 +173,34 @@
       "policy": {
         "whenNotInInventory": "succeed",
         "allowedInventoryOwnershipKinds": [
-          "PackageInstalled"
+          "PackageInstalled",
+          "AdoptedExternal"
         ],
         "allowUntrackedExternalRemoval": false,
         "removeDependencies": false
       },
       "operation": {
-        "kind": "deleteInstallDirectory",
-        "pathSource": "inventory.installDirectory"
+        "kind": "innoSetupUninstaller",
+        "commandSource": {
+          "use": "existingInstallDiscovery",
+          "searchLocationId": "vscodeUserUninstallRegistry",
+          "registryValueOrder": [
+            "QuietUninstallString",
+            "UninstallString"
+          ]
+        },
+        "commandArguments": [
+          "/VERYSILENT",
+          "/SUPPRESSMSGBOXES",
+          "/NORESTART"
+        ],
+        "elevation": "none",
+        "timeoutSec": 1200,
+        "successExitCodes": [
+          0
+        ],
+        "restartExitCodes": [],
+        "uiMode": "silent"
       },
       "absenceVerification": {
         "use": "presenceDiscovery",

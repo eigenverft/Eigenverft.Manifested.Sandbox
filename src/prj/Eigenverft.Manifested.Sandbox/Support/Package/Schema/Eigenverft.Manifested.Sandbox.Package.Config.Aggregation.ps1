@@ -259,18 +259,42 @@ Get-PackageConfig -DefinitionId VSCodeRuntime
         [string]$RepositoryId = (Get-PackageDefaultRepositoryId),
 
         [Parameter(Mandatory = $true)]
-        [string]$DefinitionId
+        [string]$DefinitionId,
+
+        [ValidateSet('Assigned', 'Removed')]
+        [string]$DesiredState = 'Assigned'
     )
 
     $globalDocumentInfo = Read-PackageJsonDocument -Path (Get-PackageGlobalConfigPath)
     Assert-PackageGlobalConfigSchema -GlobalDocumentInfo $globalDocumentInfo
 
-    $definitionReference = Resolve-PackageDefinitionReference -RepositoryId $RepositoryId -DefinitionId $DefinitionId
+    $packageGlobalConfig = $globalDocumentInfo.Document.package
+    $applicationRootDirectory = Resolve-PackageApplicationRootDirectory -GlobalConfiguration $packageGlobalConfig
+    $packageInventoryFilePath = if ($packageGlobalConfig.packageState.PSObject.Properties['inventoryFilePath'] -and
+        -not [string]::IsNullOrWhiteSpace([string]$packageGlobalConfig.packageState.inventoryFilePath)) {
+        Resolve-PackageConfiguredPath -PathValue ([string]$packageGlobalConfig.packageState.inventoryFilePath) -ApplicationRootDirectory $applicationRootDirectory
+    }
+    else {
+        Resolve-PackageConfiguredPath -PathValue 'State\package-inventory.json' -ApplicationRootDirectory $applicationRootDirectory
+    }
+
+    $definitionReference = $null
+    try {
+        $definitionReference = Resolve-PackageDefinitionReference -RepositoryId $RepositoryId -DefinitionId $DefinitionId -ApplicationRootDirectory $applicationRootDirectory
+    }
+    catch {
+        if (-not [string]::Equals($DesiredState, 'Removed', [System.StringComparison]::OrdinalIgnoreCase)) {
+            throw
+        }
+
+        $definitionReference = Resolve-PackageDefinitionSnapshotReference -RepositoryId $RepositoryId -DefinitionId $DefinitionId -PackageInventoryFilePath $packageInventoryFilePath -LiveResolutionError $_.Exception.Message
+        Write-PackageExecutionMessage -Level 'WRN' -Message ("[WARN] Live package repository definition could not be resolved for '{0}/{1}'; using local definition snapshot '{2}' for removal. Live error: {3}" -f $definitionReference.RepositoryId, $DefinitionId, $definitionReference.DefinitionPath, $_.Exception.Message)
+    }
+
     $definitionDocumentInfo = Read-PackageJsonDocument -Path $definitionReference.DefinitionPath
     Assert-PackageDefinitionSchema -DefinitionDocumentInfo $definitionDocumentInfo -DefinitionId $DefinitionId -DefinitionRepositoryId $definitionReference.RepositoryId
 
-    $packageGlobalConfig = $globalDocumentInfo.Document.package
-    $applicationRootDirectory = Resolve-PackageApplicationRootDirectory -GlobalConfiguration $packageGlobalConfig
+    $repositoryInventoryInfo = Get-PackageRepositoryInventoryInfo
     $depotInventoryInfo = Get-PackageDepotInventoryInfo
     $sourceInventoryInfo = Get-PackageSourceInventoryInfo -ApplicationRootDirectory $applicationRootDirectory
 
@@ -296,14 +320,6 @@ Get-PackageConfig -DefinitionId VSCodeRuntime
     }
     else {
         Resolve-PackageConfiguredPath -PathValue 'Inst' -ApplicationRootDirectory $applicationRootDirectory
-    }
-
-    $packageInventoryFilePath = if ($packageGlobalConfig.packageState.PSObject.Properties['inventoryFilePath'] -and
-        -not [string]::IsNullOrWhiteSpace([string]$packageGlobalConfig.packageState.inventoryFilePath)) {
-        Resolve-PackageConfiguredPath -PathValue ([string]$packageGlobalConfig.packageState.inventoryFilePath) -ApplicationRootDirectory $applicationRootDirectory
-    }
-    else {
-        Resolve-PackageConfiguredPath -PathValue 'State\package-inventory.json' -ApplicationRootDirectory $applicationRootDirectory
     }
 
     $packageOperationHistoryFilePath = if ($packageGlobalConfig.packageState.PSObject.Properties['operationHistoryFilePath'] -and
@@ -359,6 +375,8 @@ Get-PackageConfig -DefinitionId VSCodeRuntime
         ApplicationRootDirectory           = $applicationRootDirectory
         SourceInventoryPath                = $effectiveAcquisitionEnvironment.SourceInventoryPath
         SourceInventory                    = $sourceInventoryInfo.Document
+        RepositoryInventoryPath            = $repositoryInventoryInfo.Path
+        RepositoryInventory                = $repositoryInventoryInfo.Document
         DepotInventoryPath                 = $effectiveAcquisitionEnvironment.DepotInventoryPath
         DepotInventory                     = $depotInventoryInfo.Document
         EffectiveAcquisitionEnvironment    = $effectiveAcquisitionEnvironment
@@ -368,6 +386,13 @@ Get-PackageConfig -DefinitionId VSCodeRuntime
         DefinitionId                       = [string]$definition.id
         DefinitionRepositoryId             = $definitionRepositoryId
         DefinitionFileName                 = $definitionFileName
+        DefinitionSourceKind               = [string]$definitionReference.SourceKind
+        DefinitionSourcePath               = [string]$definitionReference.SourcePath
+        DefinitionSourceHash               = [string]$definitionReference.SourceHash
+        DefinitionSnapshotPath             = [string]$definitionReference.SnapshotPath
+        DefinitionSnapshotHash             = [string]$definitionReference.SnapshotHash
+        DefinitionResolvedAtUtc            = [string]$definitionReference.ResolvedAtUtc
+        DefinitionSnapshotFallback         = [bool]$definitionReference.SnapshotFallback
         DefinitionSources                  = $definition.artifacts.sources
         Display                            = $display
         SchemaVersion                      = [string]$definition.schemaVersion
@@ -547,7 +572,15 @@ New-PackageResult -PackageConfig $config
         OSVersion                        = $PackageConfig.OSVersion
         ReleaseTrack                     = $PackageConfig.ReleaseTrack
         SourceInventoryPath              = $PackageConfig.SourceInventoryPath
+        RepositoryInventoryPath          = $PackageConfig.RepositoryInventoryPath
         DepotInventoryPath               = $PackageConfig.DepotInventoryPath
+        DefinitionSourceKind             = $PackageConfig.DefinitionSourceKind
+        DefinitionSourcePath             = $PackageConfig.DefinitionSourcePath
+        DefinitionSourceHash             = $PackageConfig.DefinitionSourceHash
+        DefinitionSnapshotPath           = $PackageConfig.DefinitionSnapshotPath
+        DefinitionSnapshotHash           = $PackageConfig.DefinitionSnapshotHash
+        DefinitionResolvedAtUtc          = $PackageConfig.DefinitionResolvedAtUtc
+        DefinitionSnapshotFallback       = $PackageConfig.DefinitionSnapshotFallback
         PackageFileStagingRootDirectory    = $PackageConfig.PackageFileStagingRootDirectory
         PackageInstallStageRootDirectory   = $PackageConfig.PackageInstallStageRootDirectory
         DefaultPackageDepotDirectory     = $PackageConfig.DefaultPackageDepotDirectory

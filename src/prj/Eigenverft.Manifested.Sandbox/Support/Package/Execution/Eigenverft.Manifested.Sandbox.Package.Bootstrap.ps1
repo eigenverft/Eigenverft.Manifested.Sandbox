@@ -98,6 +98,24 @@ Get-PackageShippedDepotInventoryPath
     return (Join-Path (Join-Path (Get-PackageConfigurationRoot) 'Internal') 'DepotInventory.json')
 }
 
+function Get-PackageShippedRepositoryInventoryPath {
+<#
+.SYNOPSIS
+Returns the shipped Package repository-inventory path.
+
+.DESCRIPTION
+Builds the module-relative path to the JSON document that defines Package
+definition repository defaults.
+
+.EXAMPLE
+Get-PackageShippedRepositoryInventoryPath
+#>
+    [CmdletBinding()]
+    param()
+
+    return (Join-Path (Join-Path (Get-PackageConfigurationRoot) 'Internal') 'RepositoryInventory.json')
+}
+
 function Get-PackageLocalRoot {
 <#
 .SYNOPSIS
@@ -178,6 +196,24 @@ Get-PackageLocalDepotInventoryPath
     return [System.IO.Path]::GetFullPath((Join-Path (Join-Path (Get-PackageLocalRoot) 'Configuration\Internal') 'DepotInventory.json'))
 }
 
+function Get-PackageLocalRepositoryInventoryPath {
+<#
+.SYNOPSIS
+Returns the local Package repository-inventory path.
+
+.DESCRIPTION
+Builds the local copy path for RepositoryInventory.json. The local file can
+later be edited or refreshed independently of the module installation.
+
+.EXAMPLE
+Get-PackageLocalRepositoryInventoryPath
+#>
+    [CmdletBinding()]
+    param()
+
+    return [System.IO.Path]::GetFullPath((Join-Path (Join-Path (Get-PackageLocalRoot) 'Configuration\Internal') 'RepositoryInventory.json'))
+}
+
 function Get-PackageGlobalConfigPath {
 <#
 .SYNOPSIS
@@ -229,6 +265,34 @@ Get-PackageDepotInventoryPath
         }
 
         Copy-FileToPath -SourcePath (Get-PackageShippedDepotInventoryPath) -TargetPath $localInventoryPath -Overwrite | Out-Null
+    }
+
+    return $localInventoryPath
+}
+
+function Get-PackageRepositoryInventoryPath {
+<#
+.SYNOPSIS
+Returns the active Package repository-inventory path.
+
+.DESCRIPTION
+Returns the local RepositoryInventory.json path, creating it from the shipped
+module configuration when the local copy does not exist yet.
+
+.EXAMPLE
+Get-PackageRepositoryInventoryPath
+#>
+    [CmdletBinding()]
+    param()
+
+    $localInventoryPath = Get-PackageLocalRepositoryInventoryPath
+    if (-not (Test-Path -LiteralPath $localInventoryPath -PathType Leaf)) {
+        $localInventoryDirectory = Split-Path -Parent $localInventoryPath
+        if (-not [string]::IsNullOrWhiteSpace($localInventoryDirectory)) {
+            $null = New-Item -ItemType Directory -Path $localInventoryDirectory -Force
+        }
+
+        Copy-FileToPath -SourcePath (Get-PackageShippedRepositoryInventoryPath) -TargetPath $localInventoryPath -Overwrite | Out-Null
     }
 
     return $localInventoryPath
