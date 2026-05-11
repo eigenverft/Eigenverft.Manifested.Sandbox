@@ -367,9 +367,9 @@ function Get-PackageRepositorySummaries {
     $documentInfo = Get-PackageRepositoryInventoryEditInfo
     $applicationRootDirectory = $null
     try {
-        $globalDocumentInfo = Read-PackageJsonDocument -Path (Get-PackageGlobalConfigPath)
-        Assert-PackageGlobalConfigSchema -GlobalDocumentInfo $globalDocumentInfo
-        $applicationRootDirectory = Resolve-PackageApplicationRootDirectory -GlobalConfiguration $globalDocumentInfo.Document.package
+        $globalDocumentInfo = Read-PackageJsonDocument -Path (Get-PackageConfigPath)
+        Assert-PackageConfigSchema -PackageConfigDocumentInfo $globalDocumentInfo
+        $applicationRootDirectory = Resolve-PackageApplicationRootDirectory -PackageConfiguration $globalDocumentInfo.Document.package
     }
     catch {
         Write-Warning "Repository summaries could not resolve application root. Showing raw repository inventory only. $($_.Exception.Message)"
@@ -435,7 +435,7 @@ function Resolve-PackageRepositoryRootPath {
 
     $kind = [string]$Source.kind
     if (-not [bool]$Source.enabled) {
-        throw "Package repository '$RepositoryId' is disabled in RepositoryInventory.json."
+        throw "Package repository '$RepositoryId' is disabled in PackageRepositoryInventory.json."
     }
     if (-not [bool]$Source.trusted) {
         throw "Package repository '$RepositoryId' is not trusted. Use Trust-PackageRepository for trusted filesystem repositories."
@@ -475,18 +475,18 @@ function Resolve-PackageDefinitionSnapshotReference {
         [string]$DefinitionId,
 
         [Parameter(Mandatory = $true)]
-        [string]$PackageInventoryFilePath,
+        [string]$PackageAssignmentInventoryFilePath,
 
         [AllowNull()]
         [string]$LiveResolutionError = $null
     )
 
     $resolvedRepositoryId = if ([string]::IsNullOrWhiteSpace($RepositoryId)) { Get-PackageDefaultRepositoryId } else { [string]$RepositoryId }
-    if (-not (Test-Path -LiteralPath $PackageInventoryFilePath -PathType Leaf)) {
+    if (-not (Test-Path -LiteralPath $PackageAssignmentInventoryFilePath -PathType Leaf)) {
         throw "Package repository '$resolvedRepositoryId' definition '$DefinitionId' could not be resolved from the live repository source, and no package inventory exists for snapshot fallback. Live error: $LiveResolutionError"
     }
 
-    $inventoryInfo = Read-PackageJsonDocument -Path $PackageInventoryFilePath
+    $inventoryInfo = Read-PackageJsonDocument -Path $PackageAssignmentInventoryFilePath
     $records = @(
         foreach ($record in @($inventoryInfo.Document.records)) {
             if ([string]::Equals([string]$record.definitionRepositoryId, $resolvedRepositoryId, [System.StringComparison]::OrdinalIgnoreCase) -and
@@ -500,7 +500,7 @@ function Resolve-PackageDefinitionSnapshotReference {
     )
 
     if ($records.Count -eq 0) {
-        throw "Package repository '$resolvedRepositoryId' definition '$DefinitionId' could not be resolved from the live repository source, and no usable definition snapshot was found in '$PackageInventoryFilePath'. Live error: $LiveResolutionError"
+        throw "Package repository '$resolvedRepositoryId' definition '$DefinitionId' could not be resolved from the live repository source, and no usable definition snapshot was found in '$PackageAssignmentInventoryFilePath'. Live error: $LiveResolutionError"
     }
 
     $selectedRecord = @($records | Sort-Object -Property updatedAtUtc -Descending | Select-Object -First 1)[0]

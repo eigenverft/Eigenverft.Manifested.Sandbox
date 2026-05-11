@@ -625,6 +625,7 @@ function Get-PackagePackageDepotSources {
 
         $orderedSources.Add([pscustomobject]@{
             id           = $property.Name
+            basePath     = if ($source.PSObject.Properties['basePath']) { [string]$source.basePath } else { $null }
             searchOrder  = if ($source.PSObject.Properties['searchOrder']) { [int]$source.searchOrder } else { 1000 }
             readable     = if ($source.PSObject.Properties['readable']) { [bool]$source.readable } else { $true }
             writable     = if ($source.PSObject.Properties['writable']) { [bool]$source.writable } else { $false }
@@ -639,76 +640,323 @@ function Get-PackagePackageDepotSources {
     )
 }
 
-function Get-PackageWritableMirrorDepotSources {
+function Get-PackageDepotDistributionTargets {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true)]
         [psobject]$PackageConfig
     )
 
-    $mirrorSources = New-Object System.Collections.Generic.List[object]
+    $targets = New-Object System.Collections.Generic.List[object]
     foreach ($property in @($PackageConfig.EnvironmentSources.PSObject.Properties)) {
         $source = $property.Value
-        if (-not [string]::Equals([string]$source.kind, 'filesystem', [System.StringComparison]::OrdinalIgnoreCase)) {
-            continue
-        }
         if (-not ($source.PSObject.Properties['writable'] -and [bool]$source.writable)) {
             continue
         }
         if (-not ($source.PSObject.Properties['mirrorTarget'] -and [bool]$source.mirrorTarget)) {
             continue
         }
-        if (-not ($source.PSObject.Properties['basePath'] -and -not [string]::IsNullOrWhiteSpace([string]$source.basePath))) {
-            continue
-        }
 
-        $mirrorSources.Add([pscustomobject]@{
+        $targets.Add([pscustomobject]@{
             id           = $property.Name
-            basePath     = [string]$source.basePath
+            kind         = if ($source.PSObject.Properties['kind']) { [string]$source.kind } else { $null }
+            basePath     = if ($source.PSObject.Properties['basePath']) { [string]$source.basePath } else { $null }
             searchOrder  = if ($source.PSObject.Properties['searchOrder']) { [int]$source.searchOrder } else { 1000 }
             ensureExists = if ($source.PSObject.Properties['ensureExists']) { [bool]$source.ensureExists } else { $false }
         }) | Out-Null
     }
 
     return @(
-        $mirrorSources.ToArray() |
+        $targets.ToArray() |
             Sort-Object -Property searchOrder, id
     )
 }
 
-function Copy-PackageFileToMirrorDepots {
+function Get-PackageDepotDistributionFileHash {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true)]
-        [psobject]$PackageResult,
-
-        [Parameter(Mandatory = $true)]
-        [psobject]$SourceDefinition
+        [string]$Path
     )
 
-    if ([string]::IsNullOrWhiteSpace([string]$PackageResult.PackageFilePath) -or
-        -not (Test-Path -LiteralPath $PackageResult.PackageFilePath -PathType Leaf)) {
-        return
-    }
-    if (-not $PackageResult.Package -or -not $PackageResult.Package.PSObject.Properties['packageFile'] -or
-        -not $PackageResult.Package.packageFile.PSObject.Properties['fileName']) {
-        return
+    return (Get-FileHash -LiteralPath $Path -Algorithm SHA256).Hash.ToLowerInvariant()
+}
+
+function Test-PackageDepotDistributionFileMatches {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$SourcePath,
+
+        [Parameter(Mandatory = $true)]
+        [string]$TargetPath
+    )
+
+    if (-not (Test-Path -LiteralPath $TargetPath -PathType Leaf)) {
+        return [pscustomobject]@{
+            Matches = $false
+            Reason  = 'Missing'
+        }
     }
 
-    foreach ($mirrorSource in @(Get-PackageWritableMirrorDepotSources -PackageConfig $PackageResult.PackageConfig)) {
-        $targetDirectory = [System.IO.Path]::GetFullPath((Join-Path $mirrorSource.basePath $PackageResult.PackageDepotRelativeDirectory))
-        $targetPath = Join-Path $targetDirectory ([string]$PackageResult.Package.packageFile.fileName)
-        try {
-            if ($mirrorSource.ensureExists) {
-                $null = New-Item -ItemType Directory -Path $targetDirectory -Force
-            }
-            $null = Copy-FileToPath -SourcePath $PackageResult.PackageFilePath -TargetPath $targetPath -Overwrite
-            Write-PackageExecutionMessage -Message ("[ACTION] Mirrored package file to depot '{0}' at '{1}'." -f $mirrorSource.id, $targetPath)
-        }
-        catch {
-            Write-PackageExecutionMessage -Level 'WRN' -Message ("[WARN] Failed to mirror package file to depot '{0}' at '{1}': {2}" -f $mirrorSource.id, $targetPath, $_.Exception.Message)
+    $sourceItem = Get-Item -LiteralPath $SourcePath -ErrorAction Stop
+    $targetItem = Get-Item -LiteralPath $TargetPath -ErrorAction Stop
+    if ($sourceItem.Length -ne $targetItem.Length) {
+        return [pscustomobject]@{
+            Matches = $false
+            Reason  = 'SizeMismatch'
         }
     }
+
+    $sourceHash = Get-PackageDepotDistributionFileHash -Path $SourcePath
+    $targetHash = Get-PackageDepotDistributionFileHash -Path $TargetPath
+    return [pscustomobject]@{
+        Matches = [string]::Equals($sourceHash, $targetHash, [System.StringComparison]::OrdinalIgnoreCase)
+        Reason  = if ([string]::Equals($sourceHash, $targetHash, [System.StringComparison]::OrdinalIgnoreCase)) { 'AlreadyCurrent' } else { 'HashMismatch' }
+    }
+}
+
+function Resolve-PackageDepotDistributionSourceArtifact {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [psobject]$PackageResult
+    )
+
+    if (-not $PackageResult.Package -or -not $PackageResult.Package.PSObject.Properties['packageFile'] -or
+        -not $PackageResult.Package.packageFile.PSObject.Properties['fileName']) {
+        return $null
+    }
+
+    $orderedCandidates = if ($PackageResult.AcquisitionPlan) { @($PackageResult.AcquisitionPlan.Candidates) } else { @() }
+    $preferredVerification = Get-PackagePreferredVerification -AcquisitionCandidates $orderedCandidates
+
+    if (-not [string]::IsNullOrWhiteSpace([string]$PackageResult.PackageFilePath) -and
+        (Test-Path -LiteralPath $PackageResult.PackageFilePath -PathType Leaf)) {
+        $verification = Test-PackageSavedFile -Path $PackageResult.PackageFilePath -Verification $preferredVerification
+        if ($verification.Accepted) {
+            return [pscustomobject]@{
+                SourcePath   = [string]$PackageResult.PackageFilePath
+                SourceScope  = 'packageFileStaging'
+                SourceId     = 'packageFileStaging'
+                SourceKind   = 'filesystem'
+                Verification = $verification
+            }
+        }
+    }
+
+    $packageFileName = [string]$PackageResult.Package.packageFile.fileName
+    foreach ($depotSource in @(Get-PackagePackageDepotSources -PackageConfig $PackageResult.PackageConfig)) {
+        if ([string]::IsNullOrWhiteSpace([string]$depotSource.basePath)) {
+            continue
+        }
+        $candidateDirectory = [System.IO.Path]::GetFullPath((Join-Path ([string]$depotSource.basePath) $PackageResult.PackageDepotRelativeDirectory))
+        $candidatePath = Join-Path $candidateDirectory $packageFileName
+        if (-not (Test-Path -LiteralPath $candidatePath -PathType Leaf)) {
+            continue
+        }
+
+        $verification = Test-PackageSavedFile -Path $candidatePath -Verification $preferredVerification
+        if ($verification.Accepted) {
+            return [pscustomobject]@{
+                SourcePath   = $candidatePath
+                SourceScope  = 'environment'
+                SourceId     = [string]$depotSource.id
+                SourceKind   = 'filesystem'
+                Verification = $verification
+            }
+        }
+    }
+
+    return $null
+}
+
+function Resolve-PackageDepotDistributionPlan {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [psobject]$PackageResult
+    )
+
+    $mode = if ($PackageResult.PackageConfig.PSObject.Properties['DepotDistributionMode'] -and
+        -not [string]::IsNullOrWhiteSpace([string]$PackageResult.PackageConfig.DepotDistributionMode)) {
+        [string]$PackageResult.PackageConfig.DepotDistributionMode
+    }
+    else {
+        'packageFocused'
+    }
+
+    $actions = New-Object System.Collections.Generic.List[object]
+    $result = [pscustomobject]@{
+        Mode       = $mode
+        Status     = 'Skipped'
+        Reason     = $null
+        SourcePath = $null
+        SourceScope = $null
+        SourceId   = $null
+        Actions    = @()
+    }
+
+    if ([string]::Equals($mode, 'disabled', [System.StringComparison]::OrdinalIgnoreCase)) {
+        $result.Reason = 'DisabledByPolicy'
+        return $result
+    }
+
+    if (-not $PackageResult.Package -or -not $PackageResult.Package.PSObject.Properties['packageFile'] -or
+        -not $PackageResult.Package.packageFile.PSObject.Properties['fileName']) {
+        $result.Reason = 'PackageFileNotRequired'
+        return $result
+    }
+
+    $sourceArtifact = Resolve-PackageDepotDistributionSourceArtifact -PackageResult $PackageResult
+    if (-not $sourceArtifact) {
+        $result.Reason = 'NoVerifiedArtifact'
+        return $result
+    }
+
+    $result.Status = 'Planned'
+    $result.SourcePath = [string]$sourceArtifact.SourcePath
+    $result.SourceScope = [string]$sourceArtifact.SourceScope
+    $result.SourceId = [string]$sourceArtifact.SourceId
+
+    $sourceFullPath = [System.IO.Path]::GetFullPath([string]$sourceArtifact.SourcePath)
+    $packageFileName = [string]$PackageResult.Package.packageFile.fileName
+    foreach ($mirrorSource in @(Get-PackageDepotDistributionTargets -PackageConfig $PackageResult.PackageConfig)) {
+        if (-not [string]::Equals([string]$mirrorSource.kind, 'filesystem', [System.StringComparison]::OrdinalIgnoreCase)) {
+            $actions.Add([pscustomobject]@{
+                DepotId      = [string]$mirrorSource.id
+                Action       = 'Skip'
+                Status       = 'Skipped'
+                Reason       = 'UnsupportedDepotKind'
+                SourcePath   = $sourceFullPath
+                TargetPath   = $null
+                EnsureExists = [bool]$mirrorSource.ensureExists
+                ErrorMessage = $null
+            }) | Out-Null
+            continue
+        }
+        if ([string]::IsNullOrWhiteSpace([string]$mirrorSource.basePath)) {
+            $actions.Add([pscustomobject]@{
+                DepotId      = [string]$mirrorSource.id
+                Action       = 'Skip'
+                Status       = 'Skipped'
+                Reason       = 'MissingBasePath'
+                SourcePath   = $sourceFullPath
+                TargetPath   = $null
+                EnsureExists = [bool]$mirrorSource.ensureExists
+                ErrorMessage = $null
+            }) | Out-Null
+            continue
+        }
+
+        $targetDirectory = [System.IO.Path]::GetFullPath((Join-Path ([string]$mirrorSource.basePath) $PackageResult.PackageDepotRelativeDirectory))
+        $targetPath = Join-Path $targetDirectory $packageFileName
+        $targetFullPath = [System.IO.Path]::GetFullPath($targetPath)
+        if ([string]::Equals($sourceFullPath, $targetFullPath, [System.StringComparison]::OrdinalIgnoreCase)) {
+            $actions.Add([pscustomobject]@{
+                DepotId      = [string]$mirrorSource.id
+                Action       = 'Skip'
+                Status       = 'Skipped'
+                Reason       = 'SourceIsTarget'
+                SourcePath   = $sourceFullPath
+                TargetPath   = $targetFullPath
+                EnsureExists = [bool]$mirrorSource.ensureExists
+                ErrorMessage = $null
+            }) | Out-Null
+            continue
+        }
+
+        $match = Test-PackageDepotDistributionFileMatches -SourcePath $sourceFullPath -TargetPath $targetFullPath
+        if ($match.Matches) {
+            $actions.Add([pscustomobject]@{
+                DepotId      = [string]$mirrorSource.id
+                Action       = 'Skip'
+                Status       = 'Skipped'
+                Reason       = [string]$match.Reason
+                SourcePath   = $sourceFullPath
+                TargetPath   = $targetFullPath
+                EnsureExists = [bool]$mirrorSource.ensureExists
+                ErrorMessage = $null
+            }) | Out-Null
+            continue
+        }
+
+        if ([string]::Equals($mode, 'packageFocused', [System.StringComparison]::OrdinalIgnoreCase) -and
+            -not [string]::Equals([string]$match.Reason, 'Missing', [System.StringComparison]::OrdinalIgnoreCase)) {
+            $actions.Add([pscustomobject]@{
+                DepotId      = [string]$mirrorSource.id
+                Action       = 'Skip'
+                Status       = 'Skipped'
+                Reason       = 'DifferentTargetPreservedByPackageFocusedPolicy'
+                SourcePath   = $sourceFullPath
+                TargetPath   = $targetFullPath
+                EnsureExists = [bool]$mirrorSource.ensureExists
+                ErrorMessage = [string]$match.Reason
+            }) | Out-Null
+            continue
+        }
+
+        $actions.Add([pscustomobject]@{
+            DepotId      = [string]$mirrorSource.id
+            Action       = 'Copy'
+            Status       = 'Pending'
+            Reason       = [string]$match.Reason
+            SourcePath   = $sourceFullPath
+            TargetPath   = $targetFullPath
+            EnsureExists = [bool]$mirrorSource.ensureExists
+            ErrorMessage = $null
+        }) | Out-Null
+    }
+
+    $result.Actions = @($actions.ToArray())
+    return $result
+}
+
+function Invoke-PackageDepotDistribution {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [psobject]$PackageResult
+    )
+
+    $plan = Resolve-PackageDepotDistributionPlan -PackageResult $PackageResult
+    foreach ($action in @($plan.Actions)) {
+        if (-not [string]::Equals([string]$action.Action, 'Copy', [System.StringComparison]::OrdinalIgnoreCase)) {
+            continue
+        }
+        try {
+            $targetDirectory = Split-Path -Parent ([string]$action.TargetPath)
+            if ($action.EnsureExists -and -not [string]::IsNullOrWhiteSpace($targetDirectory)) {
+                $null = New-Item -ItemType Directory -Path $targetDirectory -Force
+            }
+            $null = Copy-FileToPath -SourcePath ([string]$action.SourcePath) -TargetPath ([string]$action.TargetPath) -Overwrite
+            $action.Status = 'Copied'
+            $action.ErrorMessage = $null
+            Write-PackageExecutionMessage -Message ("[ACTION] Mirrored package file to depot '{0}' at '{1}'." -f [string]$action.DepotId, [string]$action.TargetPath)
+        }
+        catch {
+            $action.Status = 'Failed'
+            $action.ErrorMessage = $_.Exception.Message
+            Write-PackageExecutionMessage -Level 'WRN' -Message ("[WARN] Failed to mirror package file to depot '{0}' at '{1}': {2}" -f [string]$action.DepotId, [string]$action.TargetPath, $_.Exception.Message)
+        }
+    }
+
+    $copiedCount = @($plan.Actions | Where-Object { [string]::Equals([string]$_.Status, 'Copied', [System.StringComparison]::OrdinalIgnoreCase) }).Count
+    $failedCount = @($plan.Actions | Where-Object { [string]::Equals([string]$_.Status, 'Failed', [System.StringComparison]::OrdinalIgnoreCase) }).Count
+    $skippedCount = @($plan.Actions | Where-Object { [string]::Equals([string]$_.Status, 'Skipped', [System.StringComparison]::OrdinalIgnoreCase) }).Count
+    $plan | Add-Member -MemberType NoteProperty -Name CopiedCount -Value $copiedCount -Force
+    $plan | Add-Member -MemberType NoteProperty -Name FailedCount -Value $failedCount -Force
+    $plan | Add-Member -MemberType NoteProperty -Name SkippedCount -Value $skippedCount -Force
+    $PackageResult.DepotDistribution = $plan
+
+    if ([string]::Equals([string]$plan.Status, 'Skipped', [System.StringComparison]::OrdinalIgnoreCase)) {
+        Write-PackageExecutionMessage -Message ("[STATE] Depot distribution skipped: mode='{0}', reason='{1}'." -f [string]$plan.Mode, [string]$plan.Reason)
+    }
+    else {
+        Write-PackageExecutionMessage -Message ("[STATE] Depot distribution completed: mode='{0}', copied={1}, skipped={2}, failed={3}." -f [string]$plan.Mode, $copiedCount, $skippedCount, $failedCount)
+    }
+
+    return $PackageResult
 }
 
 function Build-PackageAcquisitionPlan {
@@ -717,8 +965,8 @@ function Build-PackageAcquisitionPlan {
 Builds the internal Package acquisition plan for the selected release.
 
 .DESCRIPTION
-    Normalizes the ordered acquisition candidates and captures the install-preparation
-and default-depot targets so later package-file save steps can execute linearly.
+    Normalizes the ordered acquisition candidates and captures the package-file staging
+and depot targets so later package-file save steps can execute linearly.
 
 .PARAMETER PackageResult
 The Package result object to enrich.
@@ -1036,10 +1284,6 @@ Resolve-PackageInstallFile -PackageResult $result
                 Remove-Item -LiteralPath $PackageResult.PackageFilePath -Force
             }
             Move-Item -LiteralPath $stagingPath -Destination $PackageResult.PackageFilePath -Force
-
-            if ([string]::Equals([string]$resolvedSource.Kind, 'download', [System.StringComparison]::OrdinalIgnoreCase)) {
-                Copy-PackageFileToMirrorDepots -PackageResult $PackageResult -SourceDefinition $sourceDefinition
-            }
 
             $saveStatus = if ([string]::Equals([string]$sourceDefinition.Scope, 'environment', [System.StringComparison]::OrdinalIgnoreCase) -and
                 [string]::Equals([string]$sourceDefinition.Id, 'defaultPackageDepot', [System.StringComparison]::OrdinalIgnoreCase)) {

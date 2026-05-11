@@ -15,7 +15,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - reposi
 
     It 'adds a team package repository as enabled but untrusted at searchOrder 150 by default' {
         $root = Join-Path $TestDrive 'repo-add-team'
-        $inventoryPath = Join-Path $root 'Configuration\Internal\RepositoryInventory.json'
+        $inventoryPath = Join-Path $root 'Configuration\Internal\PackageRepositoryInventory.json'
         Write-TestJsonDocument -Path $inventoryPath -Document (New-TestRepositoryInventoryDocument)
 
         Mock Get-PackageRepositoryInventoryPath { $inventoryPath }
@@ -35,7 +35,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - reposi
 
     It 'places a package repository after an existing repository when requested' {
         $root = Join-Path $TestDrive 'repo-add-after'
-        $inventoryPath = Join-Path $root 'Configuration\Internal\RepositoryInventory.json'
+        $inventoryPath = Join-Path $root 'Configuration\Internal\PackageRepositoryInventory.json'
         $inventory = New-TestRepositoryInventoryDocument -RepositorySources @{
             sitePackageRepository = @{
                 kind        = 'filesystem'
@@ -58,7 +58,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - reposi
 
     It 'trusts an existing filesystem repository only with explicit unsigned permission' {
         $root = Join-Path $TestDrive 'repo-trust'
-        $inventoryPath = Join-Path $root 'Configuration\Internal\RepositoryInventory.json'
+        $inventoryPath = Join-Path $root 'Configuration\Internal\PackageRepositoryInventory.json'
         $inventory = New-TestRepositoryInventoryDocument -RepositorySources @{
             teamPackageRepository = @{
                 kind        = 'filesystem'
@@ -89,7 +89,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - reposi
         $repositoryRoot = Join-Path $root 'team-repo'
         $markerPath = Join-Path $repositoryRoot 'keep.json'
         Write-TestJsonDocument -Path $markerPath -Document @{ keep = $true }
-        $inventoryPath = Join-Path $root 'Configuration\Internal\RepositoryInventory.json'
+        $inventoryPath = Join-Path $root 'Configuration\Internal\PackageRepositoryInventory.json'
         $inventory = New-TestRepositoryInventoryDocument -RepositorySources @{
             teamPackageRepository = @{
                 kind        = 'filesystem'
@@ -119,7 +119,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - reposi
         Write-TestJsonDocument -Path (Join-Path $repositoryRoot 'VSCodeRuntime.json') -Document (New-TestVSCodeDefinitionDocument -Releases @(
                 New-TestPackageRelease -Id 'vsCode-v1' -Version '1.0.0' -Architecture 'x64' -ArtifactDistributionVariant 'win32-x64'
             ))
-        $inventoryPath = Join-Path $root 'Configuration\Internal\RepositoryInventory.json'
+        $inventoryPath = Join-Path $root 'Configuration\Internal\PackageRepositoryInventory.json'
         $inventory = New-TestRepositoryInventoryDocument -RepositorySources @{
             disabledRepository = @{
                 kind        = 'filesystem'
@@ -155,7 +155,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - reposi
                 New-TestPackageRelease -Id 'vsCode-v1' -Version '1.0.0' -Architecture 'x64' -ArtifactDistributionVariant 'win32-x64'
             ))
         $globalDocument = New-TestPackageGlobalDocument -ApplicationRootDirectory $applicationRoot
-        $depotInventory = New-TestDepotInventoryDocument -DefaultPackageDepotDirectory (Join-Path $root 'DefaultPackageDepot')
+        $depotInventory = New-TestDepotInventoryDocument -DefaultPackageDepotDirectory (Join-Path $root 'PkgDepot')
         $repositoryInventory = New-TestRepositoryInventoryDocument -RepositorySources @{
             teamPackageRepository = @{
                 kind        = 'filesystem'
@@ -170,7 +170,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - reposi
                 New-TestPackageRelease -Id 'unused' -Version '0.0.0' -Architecture 'x64' -ArtifactDistributionVariant 'win32-x64'
             ))
 
-        Mock Get-PackageGlobalConfigPath { $documents.GlobalConfigPath }
+        Mock Get-PackageConfigPath { $documents.GlobalConfigPath }
         Mock Get-PackageDepotInventoryPath { $documents.DepotInventoryPath }
         Mock Get-PackageRepositoryInventoryPath { $documents.RepositoryInventoryPath }
 
@@ -188,12 +188,12 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - reposi
     It 'falls back to an inventory definition snapshot for removed state when the live repository is unavailable' {
         $root = Join-Path $TestDrive 'repo-removed-snapshot'
         $applicationRoot = Join-Path $root 'AppRoot'
-        $snapshotPath = Join-Path $applicationRoot 'PackageRepositories\teamPackageRepository\VSCodeRuntime.json'
+        $snapshotPath = Join-Path $applicationRoot 'PkgRepos\teamPackageRepository\VSCodeRuntime.json'
         Write-TestJsonDocument -Path $snapshotPath -Document (New-TestVSCodeDefinitionDocument -Releases @(
                 New-TestPackageRelease -Id 'vsCode-v1' -Version '1.0.0' -Architecture 'x64' -ArtifactDistributionVariant 'win32-x64'
             ))
         $globalDocument = New-TestPackageGlobalDocument -ApplicationRootDirectory $applicationRoot
-        $depotInventory = New-TestDepotInventoryDocument -DefaultPackageDepotDirectory (Join-Path $root 'DefaultPackageDepot')
+        $depotInventory = New-TestDepotInventoryDocument -DefaultPackageDepotDirectory (Join-Path $root 'PkgDepot')
         $repositoryInventory = New-TestRepositoryInventoryDocument -RepositorySources @{
             teamPackageRepository = @{
                 kind        = 'filesystem'
@@ -207,7 +207,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - reposi
         $documents = Write-TestPackageDocuments -RootPath $root -GlobalDocument $globalDocument -DepotInventoryDocument $depotInventory -RepositoryInventoryDocument $repositoryInventory -DefinitionDocument (New-TestVSCodeDefinitionDocument -Releases @(
                 New-TestPackageRelease -Id 'unused' -Version '0.0.0' -Architecture 'x64' -ArtifactDistributionVariant 'win32-x64'
             ))
-        $inventoryPath = Join-Path $applicationRoot 'State\package-inventory.json'
+        $inventoryPath = Join-Path $applicationRoot 'State\PackageAssignmentInventory.json'
         Write-TestJsonDocument -Path $inventoryPath -Document @{
             schemaVersion = 1
             records = @(
@@ -231,7 +231,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - reposi
             )
         }
 
-        Mock Get-PackageGlobalConfigPath { $documents.GlobalConfigPath }
+        Mock Get-PackageConfigPath { $documents.GlobalConfigPath }
         Mock Get-PackageDepotInventoryPath { $documents.DepotInventoryPath }
         Mock Get-PackageRepositoryInventoryPath { $documents.RepositoryInventoryPath }
 

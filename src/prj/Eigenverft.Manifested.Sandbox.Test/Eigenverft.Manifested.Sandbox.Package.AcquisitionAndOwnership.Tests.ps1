@@ -54,7 +54,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - acquis
         $documents = Write-TestPackageDocuments -RootPath $rootPath -GlobalDocument $globalDocument -DepotInventoryDocument $depotInventoryDocument -DefinitionDocument (New-TestVSCodeDefinitionDocument -Releases @($release) -SharedReadiness (New-TestReadiness -Version '2.0.0'))
 
         [Environment]::SetEnvironmentVariable($script:SourceInventoryEnvVarName, (Join-Path $TestDrive 'missing-inventory.json'), 'Process')
-        Mock Get-PackageGlobalConfigPath { $documents.GlobalConfigPath }
+        Mock Get-PackageConfigPath { $documents.GlobalConfigPath }
         Mock Get-PackageDepotInventoryPath { $documents.DepotInventoryPath }
         Mock Get-PackageDefinitionPath { param($DefinitionId) $documents.DefinitionPath }
 
@@ -89,7 +89,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - acquis
         $documents = Write-TestPackageDocuments -RootPath $rootPath -GlobalDocument $globalDocument -DefinitionDocument (New-TestVSCodeDefinitionDocument -Releases @($release) -SharedReadiness (New-TestReadiness -Version '2.0.0'))
 
         [Environment]::SetEnvironmentVariable($script:SourceInventoryEnvVarName, (Join-Path $TestDrive 'missing-inventory.json'), 'Process')
-        Mock Get-PackageGlobalConfigPath { $documents.GlobalConfigPath }
+        Mock Get-PackageConfigPath { $documents.GlobalConfigPath }
         Mock Get-PackageDefinitionPath { param($DefinitionId) $documents.DefinitionPath }
         Mock Save-PackageDownloadFile { throw 'download should not run when the default package depot already has a verified artifact' }
 
@@ -137,7 +137,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - acquis
         $documents = Write-TestPackageDocuments -RootPath $rootPath -GlobalDocument $globalDocument -DepotInventoryDocument $depotInventoryDocument -DefinitionDocument (New-TestVSCodeDefinitionDocument -Releases @($release) -SharedReadiness (New-TestReadiness -Version '2.0.0'))
 
         [Environment]::SetEnvironmentVariable($script:SourceInventoryEnvVarName, (Join-Path $TestDrive 'missing-inventory.json'), 'Process')
-        Mock Get-PackageGlobalConfigPath { $documents.GlobalConfigPath }
+        Mock Get-PackageConfigPath { $documents.GlobalConfigPath }
         Mock Get-PackageDepotInventoryPath { $documents.DepotInventoryPath }
         Mock Get-PackageDefinitionPath { param($DefinitionId) $documents.DefinitionPath }
         Mock Save-PackageDownloadFile { throw 'download should not run when a readable package depot already has a verified artifact' }
@@ -159,6 +159,292 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - acquis
         Assert-MockCalled Save-PackageDownloadFile -Times 0
     }
 
+    It 'reconciles a newly added writable mirror depot from an existing depot artifact' {
+        $rootPath = Join-Path $TestDrive 'mirror-from-depot'
+        $packageArchive = New-TestPackageArchiveInfo -RootPath (Join-Path $rootPath 'archive') -Version '2.0.0' -ArchiveFileName 'VSCode-win32-x64-2.0.0.zip'
+        $defaultDepotPath = Join-Path $rootPath 'default-depot'
+        $teamDepotPath = Join-Path $rootPath 'team-depot'
+        $depotInventoryDocument = New-TestDepotInventoryDocument -DefaultPackageDepotDirectory $defaultDepotPath -EnvironmentSources @{
+            teamPackageDepot = @{
+                kind         = 'filesystem'
+                enabled      = $true
+                searchOrder  = 150
+                basePath     = $teamDepotPath
+                readable     = $true
+                writable     = $true
+                mirrorTarget = $true
+                ensureExists = $true
+            }
+        }
+        $release = New-TestPackageRelease -Id 'vsCode-win-x64-stable' -Version '2.0.0' -Architecture 'x64' -ArtifactDistributionVariant 'win32-x64' -FileName 'VSCode-win32-x64-2.0.0.zip' -AcquisitionCandidates @(
+            @{
+                kind         = 'packageDepot'
+                searchOrder  = 10
+                verification = @{ mode = 'required'; algorithm = 'sha256'; sha256 = $packageArchive.Sha256 }
+            },
+            @{
+                kind         = 'download'
+                sourceId     = 'vsCodeUpdateService'
+                searchOrder  = 100
+                sourcePath   = '2.0.0/win32-x64-archive/stable'
+                verification = @{ mode = 'required'; algorithm = 'sha256'; sha256 = $packageArchive.Sha256 }
+            }
+        )
+        $documents = Write-TestPackageDocuments -RootPath $rootPath -GlobalDocument (New-TestPackageGlobalDocument -PackageFileStagingDirectory (Join-Path $rootPath 'workspace') -DepotDistributionMode 'packageFocused') -DepotInventoryDocument $depotInventoryDocument -DefinitionDocument (New-TestVSCodeDefinitionDocument -Releases @($release) -SharedReadiness (New-TestReadiness -Version '2.0.0'))
+
+        [Environment]::SetEnvironmentVariable($script:SourceInventoryEnvVarName, (Join-Path $TestDrive 'missing-inventory.json'), 'Process')
+        Mock Get-PackageConfigPath { $documents.GlobalConfigPath }
+        Mock Get-PackageDepotInventoryPath { $documents.DepotInventoryPath }
+        Mock Get-PackageDefinitionPath { param($DefinitionId) $documents.DefinitionPath }
+        Mock Save-PackageDownloadFile { throw 'download should not run when a readable depot already has the package file' }
+
+        $config = Get-PackageConfig -DefinitionId 'VSCodeRuntime'
+        $result = New-PackageResult -PackageConfig $config
+        $result = Resolve-PackagePackage -PackageResult $result
+        $result = Resolve-PackagePaths -PackageResult $result
+        $result = Build-PackageAcquisitionPlan -PackageResult $result
+
+        $null = New-Item -ItemType Directory -Path (Split-Path -Parent $result.DefaultPackageDepotFilePath) -Force
+        Copy-FileToPath -SourcePath $packageArchive.ZipPath -TargetPath $result.DefaultPackageDepotFilePath -Overwrite | Out-Null
+        $teamDepotFilePath = Join-Path (Join-Path $teamDepotPath $result.PackageDepotRelativeDirectory) 'VSCode-win32-x64-2.0.0.zip'
+
+        $result = Resolve-PackageInstallFile -PackageResult $result
+        $result = Invoke-PackageDepotDistribution -PackageResult $result
+
+        $result.PackageFilePreparation.Status | Should -Be 'HydratedFromDefaultPackageDepot'
+        $result.DepotDistribution.CopiedCount | Should -Be 1
+        Test-Path -LiteralPath $teamDepotFilePath -PathType Leaf | Should -BeTrue
+        (Get-FileHash -LiteralPath $teamDepotFilePath -Algorithm SHA256).Hash.ToLowerInvariant() | Should -Be $packageArchive.Sha256
+        Assert-MockCalled Save-PackageDownloadFile -Times 0
+    }
+
+    It 'reconciles mirror depots from a verified staging file reuse' {
+        $rootPath = Join-Path $TestDrive 'mirror-from-staging'
+        $packageArchive = New-TestPackageArchiveInfo -RootPath (Join-Path $rootPath 'archive') -Version '2.0.0' -ArchiveFileName 'VSCode-win32-x64-2.0.0.zip'
+        $teamDepotPath = Join-Path $rootPath 'team-depot'
+        $depotInventoryDocument = New-TestDepotInventoryDocument -DefaultPackageDepotDirectory (Join-Path $rootPath 'default-depot') -EnvironmentSources @{
+            teamPackageDepot = @{
+                kind         = 'filesystem'
+                enabled      = $true
+                searchOrder  = 150
+                basePath     = $teamDepotPath
+                readable     = $true
+                writable     = $true
+                mirrorTarget = $true
+                ensureExists = $true
+            }
+        }
+        $release = New-TestPackageRelease -Id 'vsCode-win-x64-stable' -Version '2.0.0' -Architecture 'x64' -ArtifactDistributionVariant 'win32-x64' -FileName 'VSCode-win32-x64-2.0.0.zip' -AcquisitionCandidates @(
+            @{
+                kind         = 'packageDepot'
+                searchOrder  = 10
+                verification = @{ mode = 'required'; algorithm = 'sha256'; sha256 = $packageArchive.Sha256 }
+            }
+        )
+        $documents = Write-TestPackageDocuments -RootPath $rootPath -GlobalDocument (New-TestPackageGlobalDocument -PackageFileStagingDirectory (Join-Path $rootPath 'workspace') -DepotDistributionMode 'packageFocused') -DepotInventoryDocument $depotInventoryDocument -DefinitionDocument (New-TestVSCodeDefinitionDocument -Releases @($release) -SharedReadiness (New-TestReadiness -Version '2.0.0'))
+
+        [Environment]::SetEnvironmentVariable($script:SourceInventoryEnvVarName, (Join-Path $TestDrive 'missing-inventory.json'), 'Process')
+        Mock Get-PackageConfigPath { $documents.GlobalConfigPath }
+        Mock Get-PackageDepotInventoryPath { $documents.DepotInventoryPath }
+        Mock Get-PackageDefinitionPath { param($DefinitionId) $documents.DefinitionPath }
+
+        $config = Get-PackageConfig -DefinitionId 'VSCodeRuntime'
+        $result = New-PackageResult -PackageConfig $config
+        $result = Resolve-PackagePackage -PackageResult $result
+        $result = Resolve-PackagePaths -PackageResult $result
+        $result = Build-PackageAcquisitionPlan -PackageResult $result
+        $null = New-Item -ItemType Directory -Path $result.PackageFileStagingDirectory -Force
+        Copy-FileToPath -SourcePath $packageArchive.ZipPath -TargetPath $result.PackageFilePath -Overwrite | Out-Null
+        $teamDepotFilePath = Join-Path (Join-Path $teamDepotPath $result.PackageDepotRelativeDirectory) 'VSCode-win32-x64-2.0.0.zip'
+        $defaultDepotFilePath = $result.DefaultPackageDepotFilePath
+
+        $result = Resolve-PackageInstallFile -PackageResult $result
+        $result = Invoke-PackageDepotDistribution -PackageResult $result
+
+        $result.PackageFilePreparation.Status | Should -Be 'ReusedPackageFile'
+        $result.DepotDistribution.CopiedCount | Should -Be 2
+        Test-Path -LiteralPath $teamDepotFilePath -PathType Leaf | Should -BeTrue
+        Test-Path -LiteralPath $defaultDepotFilePath -PathType Leaf | Should -BeTrue
+    }
+
+    It 'reconciles mirror depots during package-owned reuse from readable depots without downloading' {
+        $rootPath = Join-Path $TestDrive 'mirror-from-reuse'
+        $packageArchive = New-TestPackageArchiveInfo -RootPath (Join-Path $rootPath 'archive') -Version '2.0.0' -ArchiveFileName 'VSCode-win32-x64-2.0.0.zip'
+        $defaultDepotPath = Join-Path $rootPath 'default-depot'
+        $teamDepotPath = Join-Path $rootPath 'team-depot'
+        $depotInventoryDocument = New-TestDepotInventoryDocument -DefaultPackageDepotDirectory $defaultDepotPath -EnvironmentSources @{
+            teamPackageDepot = @{
+                kind         = 'filesystem'
+                enabled      = $true
+                searchOrder  = 150
+                basePath     = $teamDepotPath
+                readable     = $true
+                writable     = $true
+                mirrorTarget = $true
+                ensureExists = $true
+            }
+        }
+        $release = New-TestPackageRelease -Id 'vsCode-win-x64-stable' -Version '2.0.0' -Architecture 'x64' -ArtifactDistributionVariant 'win32-x64' -FileName 'VSCode-win32-x64-2.0.0.zip' -AcquisitionCandidates @(
+            @{
+                kind         = 'packageDepot'
+                searchOrder  = 10
+                verification = @{ mode = 'required'; algorithm = 'sha256'; sha256 = $packageArchive.Sha256 }
+            },
+            @{
+                kind         = 'download'
+                sourceId     = 'vsCodeUpdateService'
+                searchOrder  = 100
+                sourcePath   = '2.0.0/win32-x64-archive/stable'
+                verification = @{ mode = 'required'; algorithm = 'sha256'; sha256 = $packageArchive.Sha256 }
+            }
+        )
+        $documents = Write-TestPackageDocuments -RootPath $rootPath -GlobalDocument (New-TestPackageGlobalDocument -PackageFileStagingDirectory (Join-Path $rootPath 'workspace') -DepotDistributionMode 'packageFocused') -DepotInventoryDocument $depotInventoryDocument -DefinitionDocument (New-TestVSCodeDefinitionDocument -Releases @($release) -SharedReadiness (New-TestReadiness -Version '2.0.0'))
+
+        [Environment]::SetEnvironmentVariable($script:SourceInventoryEnvVarName, (Join-Path $TestDrive 'missing-inventory.json'), 'Process')
+        Mock Get-PackageConfigPath { $documents.GlobalConfigPath }
+        Mock Get-PackageDepotInventoryPath { $documents.DepotInventoryPath }
+        Mock Get-PackageDefinitionPath { param($DefinitionId) $documents.DefinitionPath }
+        Mock Save-PackageDownloadFile { throw 'download should not run to reconcile mirror depots during package-owned reuse' }
+
+        $config = Get-PackageConfig -DefinitionId 'VSCodeRuntime'
+        $result = New-PackageResult -PackageConfig $config
+        $result = Resolve-PackagePackage -PackageResult $result
+        $result = Resolve-PackagePaths -PackageResult $result
+        $result = Build-PackageAcquisitionPlan -PackageResult $result
+        $null = New-Item -ItemType Directory -Path (Split-Path -Parent $result.DefaultPackageDepotFilePath) -Force
+        Copy-FileToPath -SourcePath $packageArchive.ZipPath -TargetPath $result.DefaultPackageDepotFilePath -Overwrite | Out-Null
+        $result.ExistingPackage = [pscustomobject]@{ Decision = 'ReusePackageOwned' }
+        $teamDepotFilePath = Join-Path (Join-Path $teamDepotPath $result.PackageDepotRelativeDirectory) 'VSCode-win32-x64-2.0.0.zip'
+
+        $result = Resolve-PackageInstallFile -PackageResult $result
+        $result = Invoke-PackageDepotDistribution -PackageResult $result
+
+        $result.PackageFilePreparation.Status | Should -Be 'Skipped'
+        $result.DepotDistribution.CopiedCount | Should -Be 1
+        Test-Path -LiteralPath $teamDepotFilePath -PathType Leaf | Should -BeTrue
+        Assert-MockCalled Save-PackageDownloadFile -Times 0
+    }
+
+    It 'respects packageFocused and disabled depot distribution modes' {
+        $rootPath = Join-Path $TestDrive 'mirror-policy'
+        $packageArchive = New-TestPackageArchiveInfo -RootPath (Join-Path $rootPath 'archive') -Version '2.0.0' -ArchiveFileName 'VSCode-win32-x64-2.0.0.zip'
+        $teamDepotPath = Join-Path $rootPath 'team-depot'
+        $depotInventoryDocument = New-TestDepotInventoryDocument -DefaultPackageDepotDirectory (Join-Path $rootPath 'default-depot') -EnvironmentSources @{
+            teamPackageDepot = @{
+                kind         = 'filesystem'
+                enabled      = $true
+                searchOrder  = 150
+                basePath     = $teamDepotPath
+                readable     = $true
+                writable     = $true
+                mirrorTarget = $true
+                ensureExists = $true
+            }
+        }
+        $release = New-TestPackageRelease -Id 'vsCode-win-x64-stable' -Version '2.0.0' -Architecture 'x64' -ArtifactDistributionVariant 'win32-x64' -FileName 'VSCode-win32-x64-2.0.0.zip' -AcquisitionCandidates @(
+            @{
+                kind         = 'packageDepot'
+                searchOrder  = 10
+                verification = @{ mode = 'required'; algorithm = 'sha256'; sha256 = $packageArchive.Sha256 }
+            }
+        )
+        $documents = Write-TestPackageDocuments -RootPath $rootPath -GlobalDocument (New-TestPackageGlobalDocument -PackageFileStagingDirectory (Join-Path $rootPath 'workspace') -DepotDistributionMode 'packageFocused') -DepotInventoryDocument $depotInventoryDocument -DefinitionDocument (New-TestVSCodeDefinitionDocument -Releases @($release) -SharedReadiness (New-TestReadiness -Version '2.0.0'))
+
+        [Environment]::SetEnvironmentVariable($script:SourceInventoryEnvVarName, (Join-Path $TestDrive 'missing-inventory.json'), 'Process')
+        Mock Get-PackageConfigPath { $documents.GlobalConfigPath }
+        Mock Get-PackageDepotInventoryPath { $documents.DepotInventoryPath }
+        Mock Get-PackageDefinitionPath { param($DefinitionId) $documents.DefinitionPath }
+
+        $config = Get-PackageConfig -DefinitionId 'VSCodeRuntime'
+        $result = New-PackageResult -PackageConfig $config
+        $result = Resolve-PackagePackage -PackageResult $result
+        $result = Resolve-PackagePaths -PackageResult $result
+        $result = Build-PackageAcquisitionPlan -PackageResult $result
+        $null = New-Item -ItemType Directory -Path $result.PackageFileStagingDirectory -Force
+        Copy-FileToPath -SourcePath $packageArchive.ZipPath -TargetPath $result.PackageFilePath -Overwrite | Out-Null
+        $teamDepotFilePath = Join-Path (Join-Path $teamDepotPath $result.PackageDepotRelativeDirectory) 'VSCode-win32-x64-2.0.0.zip'
+        $null = New-Item -ItemType Directory -Path (Split-Path -Parent $teamDepotFilePath) -Force
+        Write-TestTextFile -Path $teamDepotFilePath -Content 'stale'
+
+        $result = Resolve-PackageInstallFile -PackageResult $result
+        $result = Invoke-PackageDepotDistribution -PackageResult $result
+
+        $result.DepotDistribution.Status | Should -Be 'Planned'
+        $teamAction = $result.DepotDistribution.Actions | Where-Object DepotId -EQ 'teamPackageDepot'
+        $teamAction.Status | Should -Be 'Skipped'
+        $teamAction.Reason | Should -Be 'DifferentTargetPreservedByPackageFocusedPolicy'
+        Get-Content -LiteralPath $teamDepotFilePath -Raw | Should -Be 'stale'
+
+        $config.DepotDistributionMode = 'disabled'
+        $result.PackageConfig = $config
+        $result = Invoke-PackageDepotDistribution -PackageResult $result
+        $result.DepotDistribution.Status | Should -Be 'Skipped'
+        $result.DepotDistribution.Reason | Should -Be 'DisabledByPolicy'
+    }
+
+    It 'skips matching mirror targets and overwrites stale mirror targets' {
+        $rootPath = Join-Path $TestDrive 'mirror-current-stale'
+        $packageArchive = New-TestPackageArchiveInfo -RootPath (Join-Path $rootPath 'archive') -Version '2.0.0' -ArchiveFileName 'VSCode-win32-x64-2.0.0.zip'
+        $currentDepotPath = Join-Path $rootPath 'current-depot'
+        $staleDepotPath = Join-Path $rootPath 'stale-depot'
+        $depotInventoryDocument = New-TestDepotInventoryDocument -DefaultPackageDepotDirectory (Join-Path $rootPath 'default-depot') -EnvironmentSources @{
+            currentPackageDepot = @{
+                kind         = 'filesystem'
+                enabled      = $true
+                searchOrder  = 150
+                basePath     = $currentDepotPath
+                readable     = $true
+                writable     = $true
+                mirrorTarget = $true
+                ensureExists = $true
+            }
+            stalePackageDepot = @{
+                kind         = 'filesystem'
+                enabled      = $true
+                searchOrder  = 160
+                basePath     = $staleDepotPath
+                readable     = $true
+                writable     = $true
+                mirrorTarget = $true
+                ensureExists = $true
+            }
+        }
+        $release = New-TestPackageRelease -Id 'vsCode-win-x64-stable' -Version '2.0.0' -Architecture 'x64' -ArtifactDistributionVariant 'win32-x64' -FileName 'VSCode-win32-x64-2.0.0.zip' -AcquisitionCandidates @(
+            @{
+                kind         = 'packageDepot'
+                searchOrder  = 10
+                verification = @{ mode = 'required'; algorithm = 'sha256'; sha256 = $packageArchive.Sha256 }
+            }
+        )
+        $documents = Write-TestPackageDocuments -RootPath $rootPath -GlobalDocument (New-TestPackageGlobalDocument -PackageFileStagingDirectory (Join-Path $rootPath 'workspace') -DepotDistributionMode 'depotFocused') -DepotInventoryDocument $depotInventoryDocument -DefinitionDocument (New-TestVSCodeDefinitionDocument -Releases @($release) -SharedReadiness (New-TestReadiness -Version '2.0.0'))
+
+        [Environment]::SetEnvironmentVariable($script:SourceInventoryEnvVarName, (Join-Path $TestDrive 'missing-inventory.json'), 'Process')
+        Mock Get-PackageConfigPath { $documents.GlobalConfigPath }
+        Mock Get-PackageDepotInventoryPath { $documents.DepotInventoryPath }
+        Mock Get-PackageDefinitionPath { param($DefinitionId) $documents.DefinitionPath }
+
+        $config = Get-PackageConfig -DefinitionId 'VSCodeRuntime'
+        $result = New-PackageResult -PackageConfig $config
+        $result = Resolve-PackagePackage -PackageResult $result
+        $result = Resolve-PackagePaths -PackageResult $result
+        $result = Build-PackageAcquisitionPlan -PackageResult $result
+        $null = New-Item -ItemType Directory -Path $result.PackageFileStagingDirectory -Force
+        Copy-FileToPath -SourcePath $packageArchive.ZipPath -TargetPath $result.PackageFilePath -Overwrite | Out-Null
+        $currentTarget = Join-Path (Join-Path $currentDepotPath $result.PackageDepotRelativeDirectory) 'VSCode-win32-x64-2.0.0.zip'
+        $staleTarget = Join-Path (Join-Path $staleDepotPath $result.PackageDepotRelativeDirectory) 'VSCode-win32-x64-2.0.0.zip'
+        $null = New-Item -ItemType Directory -Path (Split-Path -Parent $currentTarget) -Force
+        $null = New-Item -ItemType Directory -Path (Split-Path -Parent $staleTarget) -Force
+        Copy-FileToPath -SourcePath $packageArchive.ZipPath -TargetPath $currentTarget -Overwrite | Out-Null
+        Write-TestTextFile -Path $staleTarget -Content 'stale'
+
+        $result = Resolve-PackageInstallFile -PackageResult $result
+        $result = Invoke-PackageDepotDistribution -PackageResult $result
+
+        ($result.DepotDistribution.Actions | Where-Object DepotId -EQ 'currentPackageDepot').Reason | Should -Be 'AlreadyCurrent'
+        ($result.DepotDistribution.Actions | Where-Object DepotId -EQ 'stalePackageDepot').Status | Should -Be 'Copied'
+        (Get-FileHash -LiteralPath $staleTarget -Algorithm SHA256).Hash.ToLowerInvariant() | Should -Be $packageArchive.Sha256
+    }
+
     It 'uses packageFile.contentHash when acquisition candidates only declare verification mode' {
         $rootPath = Join-Path $TestDrive 'packagefile-contenthash'
         $packageArchive = New-TestPackageArchiveInfo -RootPath (Join-Path $rootPath 'archive') -Version '2.0.0' -ArchiveFileName 'VSCode-win32-x64-2.0.0.zip'
@@ -173,7 +459,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - acquis
         $documents = Write-TestPackageDocuments -RootPath $rootPath -GlobalDocument $globalDocument -DefinitionDocument (New-TestVSCodeDefinitionDocument -Releases @($release) -SharedReadiness (New-TestReadiness -Version '2.0.0'))
 
         [Environment]::SetEnvironmentVariable($script:SourceInventoryEnvVarName, (Join-Path $TestDrive 'missing-inventory.json'), 'Process')
-        Mock Get-PackageGlobalConfigPath { $documents.GlobalConfigPath }
+        Mock Get-PackageConfigPath { $documents.GlobalConfigPath }
         Mock Get-PackageDefinitionPath { param($DefinitionId) $documents.DefinitionPath }
 
         $config = Get-PackageConfig -DefinitionId 'VSCodeRuntime'
@@ -206,10 +492,10 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - acquis
         $policy = New-TestOwnershipPolicy -AllowAdoptExternal $true
         $readiness = New-TestReadiness -Version '2.0.0' -Directories @()
         $release = New-TestPackageRelease -Id 'vsCode-win-x64-stable' -Version '2.0.0' -Architecture 'x64' -ArtifactDistributionVariant 'win32-x64' -Install @{ kind = 'reuseExisting' } -ExistingInstallDiscovery $existingInstallDiscovery -OwnershipPolicy $policy -Readiness $readiness
-        $documents = Write-TestPackageDocuments -RootPath $rootPath -GlobalDocument (New-TestPackageGlobalDocument -PackageInventoryFilePath (Join-Path $rootPath 'package-inventory.json')) -DefinitionDocument (New-TestVSCodeDefinitionDocument -Releases @($release) -SharedReadiness $readiness)
+        $documents = Write-TestPackageDocuments -RootPath $rootPath -GlobalDocument (New-TestPackageGlobalDocument -PackageAssignmentInventoryFilePath (Join-Path $rootPath 'PackageAssignmentInventory.json')) -DefinitionDocument (New-TestVSCodeDefinitionDocument -Releases @($release) -SharedReadiness $readiness)
 
         [Environment]::SetEnvironmentVariable($script:SourceInventoryEnvVarName, (Join-Path $TestDrive 'missing-inventory.json'), 'Process')
-        Mock Get-PackageGlobalConfigPath { $documents.GlobalConfigPath }
+        Mock Get-PackageConfigPath { $documents.GlobalConfigPath }
         Mock Get-PackageDefinitionPath { param($DefinitionId) $documents.DefinitionPath }
 
         $config = Get-PackageConfig -DefinitionId 'VSCodeRuntime'
@@ -238,10 +524,10 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - acquis
         $policy = New-TestOwnershipPolicy -AllowAdoptExternal $true -RequirePackageOwnership $true
         $readiness = New-TestReadiness -Version '2.0.0' -Directories @()
         $release = New-TestPackageRelease -Id 'vsCode-win-x64-stable' -Version '2.0.0' -Architecture 'x64' -ArtifactDistributionVariant 'win32-x64' -Install @{ kind = 'reuseExisting' } -ExistingInstallDiscovery $existingInstallDiscovery -OwnershipPolicy $policy -Readiness $readiness
-        $documents = Write-TestPackageDocuments -RootPath $rootPath -GlobalDocument (New-TestPackageGlobalDocument -PackageInventoryFilePath (Join-Path $rootPath 'package-inventory.json')) -DefinitionDocument (New-TestVSCodeDefinitionDocument -Releases @($release) -SharedReadiness $readiness)
+        $documents = Write-TestPackageDocuments -RootPath $rootPath -GlobalDocument (New-TestPackageGlobalDocument -PackageAssignmentInventoryFilePath (Join-Path $rootPath 'PackageAssignmentInventory.json')) -DefinitionDocument (New-TestVSCodeDefinitionDocument -Releases @($release) -SharedReadiness $readiness)
 
         [Environment]::SetEnvironmentVariable($script:SourceInventoryEnvVarName, (Join-Path $TestDrive 'missing-inventory.json'), 'Process')
-        Mock Get-PackageGlobalConfigPath { $documents.GlobalConfigPath }
+        Mock Get-PackageConfigPath { $documents.GlobalConfigPath }
         Mock Get-PackageDefinitionPath { param($DefinitionId) $documents.DefinitionPath }
 
         $config = Get-PackageConfig -DefinitionId 'VSCodeRuntime'
@@ -260,7 +546,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - acquis
         $rootPath = Join-Path $TestDrive 'reuse-managed'
         $installRoot = Join-Path $rootPath 'managed-install'
         $binDirectory = Join-Path $installRoot 'bin'
-        $packageStateIndexPath = Join-Path $rootPath 'package-inventory.json'
+        $packageStateIndexPath = Join-Path $rootPath 'PackageAssignmentInventory.json'
         $null = New-Item -ItemType Directory -Path $binDirectory -Force
         Write-TestTextFile -Path (Join-Path $installRoot 'Code.exe') -Content 'fake'
         Write-TestTextFile -Path (Join-Path $binDirectory 'code.cmd') -Content "@echo off`r`necho 2.0.0`r`n"
@@ -286,10 +572,10 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - acquis
         $policy = New-TestOwnershipPolicy -AllowAdoptExternal $true
         $readiness = New-TestReadiness -Version '2.0.0' -Directories @()
         $release = New-TestPackageRelease -Id 'vsCode-win-x64-stable' -Version '2.0.0' -Architecture 'x64' -ArtifactDistributionVariant 'win32-x64' -Install @{ kind = 'reuseExisting' } -ExistingInstallDiscovery $existingInstallDiscovery -OwnershipPolicy $policy -Readiness $readiness
-        $documents = Write-TestPackageDocuments -RootPath $rootPath -GlobalDocument (New-TestPackageGlobalDocument -PackageInventoryFilePath $packageStateIndexPath) -DefinitionDocument (New-TestVSCodeDefinitionDocument -Releases @($release) -SharedReadiness $readiness)
+        $documents = Write-TestPackageDocuments -RootPath $rootPath -GlobalDocument (New-TestPackageGlobalDocument -PackageAssignmentInventoryFilePath $packageStateIndexPath) -DefinitionDocument (New-TestVSCodeDefinitionDocument -Releases @($release) -SharedReadiness $readiness)
 
         [Environment]::SetEnvironmentVariable($script:SourceInventoryEnvVarName, (Join-Path $TestDrive 'missing-inventory.json'), 'Process')
-        Mock Get-PackageGlobalConfigPath { $documents.GlobalConfigPath }
+        Mock Get-PackageConfigPath { $documents.GlobalConfigPath }
         Mock Get-PackageDefinitionPath { param($DefinitionId) $documents.DefinitionPath }
 
         $config = Get-PackageConfig -DefinitionId 'VSCodeRuntime'
@@ -317,10 +603,10 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - acquis
             kind             = 'reuseExisting'
             installDirectory = $installRoot
         } -ExistingInstallDiscovery (New-TestExistingInstallDiscovery -Enabled $true -SearchLocations @()) -OwnershipPolicy (New-TestOwnershipPolicy -AllowAdoptExternal $true) -Readiness $readiness
-        $documents = Write-TestPackageDocuments -RootPath $rootPath -GlobalDocument (New-TestPackageGlobalDocument -PreferredTargetInstallDirectory (Join-Path $rootPath 'managed-root') -PackageInventoryFilePath (Join-Path $rootPath 'package-inventory.json')) -DefinitionDocument (New-TestVSCodeDefinitionDocument -Releases @($release) -SharedReadiness $readiness)
+        $documents = Write-TestPackageDocuments -RootPath $rootPath -GlobalDocument (New-TestPackageGlobalDocument -PreferredTargetInstallDirectory (Join-Path $rootPath 'managed-root') -PackageAssignmentInventoryFilePath (Join-Path $rootPath 'PackageAssignmentInventory.json')) -DefinitionDocument (New-TestVSCodeDefinitionDocument -Releases @($release) -SharedReadiness $readiness)
 
         [Environment]::SetEnvironmentVariable($script:SourceInventoryEnvVarName, (Join-Path $TestDrive 'missing-inventory.json'), 'Process')
-        Mock Get-PackageGlobalConfigPath { $documents.GlobalConfigPath }
+        Mock Get-PackageConfigPath { $documents.GlobalConfigPath }
         Mock Get-PackageDefinitionPath { param($DefinitionId) $documents.DefinitionPath }
 
         $config = Get-PackageConfig -DefinitionId 'VSCodeRuntime'
@@ -357,7 +643,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - acquis
         $documents = Write-TestPackageDocuments -RootPath $rootPath -GlobalDocument $globalDocument -DefinitionDocument (New-TestVSCodeDefinitionDocument -Releases @($release) -SharedReadiness (New-TestReadiness -Version '2.0.0'))
 
         [Environment]::SetEnvironmentVariable($script:SourceInventoryEnvVarName, (Join-Path $TestDrive 'missing-inventory.json'), 'Process')
-        Mock Get-PackageGlobalConfigPath { $documents.GlobalConfigPath }
+        Mock Get-PackageConfigPath { $documents.GlobalConfigPath }
         Mock Get-PackageDefinitionPath { param($DefinitionId) $documents.DefinitionPath }
 
         $config = Get-PackageConfig -DefinitionId 'VSCodeRuntime'

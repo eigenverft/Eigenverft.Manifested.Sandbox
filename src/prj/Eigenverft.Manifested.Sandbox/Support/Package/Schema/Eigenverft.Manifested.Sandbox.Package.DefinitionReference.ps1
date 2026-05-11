@@ -9,7 +9,7 @@ Resolves a Package definition identity to a concrete definition document path.
 
 .DESCRIPTION
 Creates the repository-resolution seam used by the generic Package command
-surface. RepositoryInventory.json is the source of truth for live definition
+surface. PackageRepositoryInventory.json is the source of truth for live definition
 sources. Local definition snapshots are used only by explicit removal fallback.
 #>
     [CmdletBinding()]

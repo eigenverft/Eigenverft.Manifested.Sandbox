@@ -78,30 +78,30 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - export
     It 'returns an empty package state when durable inventory/history files and local directories are absent' {
         $root = Join-Path $TestDrive 'empty-package-state'
         $config = [pscustomobject]@{
-            LocalConfigurationPath              = Join-Path $root 'Configuration\Internal\Config.json'
+            PackageConfigPath              = Join-Path $root 'Configuration\Internal\PackageConfig.json'
             PreferredTargetInstallRootDirectory = Join-Path $root 'Inst'
             PackageFileStagingRootDirectory       = Join-Path $root 'PackageFileStaging'
             PackageInstallStageRootDirectory    = Join-Path $root 'PackageInstallStage'
-            DefaultPackageDepotDirectory        = Join-Path $root 'DefaultPackageDepot'
-            LocalRepositoryRoot                 = Join-Path $root 'PackageRepositories'
+            DefaultPackageDepotDirectory        = Join-Path $root 'PkgDepot'
+            LocalRepositoryRoot                 = Join-Path $root 'PkgRepos'
             ShimDirectory                       = Join-Path $root 'Shims'
-            PackageInventoryFilePath            = Join-Path (Join-Path $root 'State') 'package-inventory.json'
-            PackageOperationHistoryFilePath     = Join-Path (Join-Path $root 'State') 'package-operation-history.json'
+            PackageAssignmentInventoryFilePath            = Join-Path (Join-Path $root 'State') 'PackageAssignmentInventory.json'
+            PackageOperationHistoryFilePath     = Join-Path (Join-Path $root 'State') 'PackageOperationHistory.json'
         }
-        $sourceInventoryPath = Join-Path (Join-Path $root 'Configuration\External') 'SourceInventory.json'
+        $sourceInventoryPath = Join-Path (Join-Path $root 'Configuration\External') 'PackageSourceInventory.json'
 
         Mock Get-PackageConfig { throw 'Get-PackageState must not load a package definition.' }
         Mock Get-PackageStateConfig { return $config }
-        Mock Get-PackageInventory { return [pscustomobject]@{ Path = $config.PackageInventoryFilePath; Records = @() } }
+        Mock Get-PackageInventory { return [pscustomobject]@{ Path = $config.PackageAssignmentInventoryFilePath; Records = @() } }
         Mock Get-PackageOperationHistory { return [pscustomobject]@{ Path = $config.PackageOperationHistoryFilePath; Records = @() } }
         $config | Add-Member -MemberType NoteProperty -Name SourceInventoryInfo -Value ([pscustomobject]@{ Path = $sourceInventoryPath; Exists = $false; Document = $null })
 
         $state = Get-PackageState
 
         $state.LocalRoot | Should -Be $root
-        $state.LocalConfigurationExists | Should -BeFalse
-        $state.PackageInventoryExists | Should -BeFalse
-        $state.OperationHistoryExists | Should -BeFalse
+        $state.PackageConfigExists | Should -BeFalse
+        $state.PackageAssignmentInventoryExists | Should -BeFalse
+        $state.PackageOperationHistoryExists | Should -BeFalse
         $state.SourceInventoryExists | Should -BeFalse
         $state.PackageRecordCount | Should -Be 0
         $state.OperationRecordCount | Should -Be 0
@@ -118,21 +118,21 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - export
     It 'gets package state without loading a package definition config' {
         $root = Join-Path $TestDrive 'definition-free-package-state'
         $config = [pscustomobject]@{
-            LocalConfigurationPath              = Join-Path $root 'Configuration\Internal\Config.json'
+            PackageConfigPath              = Join-Path $root 'Configuration\Internal\PackageConfig.json'
             PreferredTargetInstallRootDirectory = Join-Path $root 'Inst'
             PackageFileStagingRootDirectory       = Join-Path $root 'PackageFileStaging'
             PackageInstallStageRootDirectory    = Join-Path $root 'PackageInstallStage'
-            DefaultPackageDepotDirectory        = Join-Path $root 'DefaultPackageDepot'
-            LocalRepositoryRoot                 = Join-Path $root 'PackageRepositories'
+            DefaultPackageDepotDirectory        = Join-Path $root 'PkgDepot'
+            LocalRepositoryRoot                 = Join-Path $root 'PkgRepos'
             ShimDirectory                       = Join-Path $root 'Shims'
-            PackageInventoryFilePath            = Join-Path (Join-Path $root 'State') 'package-inventory.json'
-            PackageOperationHistoryFilePath     = Join-Path (Join-Path $root 'State') 'package-operation-history.json'
-            SourceInventoryInfo                 = [pscustomobject]@{ Path = (Join-Path (Join-Path $root 'Configuration\External') 'SourceInventory.json'); Exists = $false; Document = $null }
+            PackageAssignmentInventoryFilePath            = Join-Path (Join-Path $root 'State') 'PackageAssignmentInventory.json'
+            PackageOperationHistoryFilePath     = Join-Path (Join-Path $root 'State') 'PackageOperationHistory.json'
+            SourceInventoryInfo                 = [pscustomobject]@{ Path = (Join-Path (Join-Path $root 'Configuration\External') 'PackageSourceInventory.json'); Exists = $false; Document = $null }
         }
 
         Mock Get-PackageConfig { throw 'VSCodeRuntime definition should not be required for state.' }
         Mock Get-PackageStateConfig { return $config }
-        Mock Get-PackageInventory { return [pscustomobject]@{ Path = $config.PackageInventoryFilePath; Records = @() } }
+        Mock Get-PackageInventory { return [pscustomobject]@{ Path = $config.PackageAssignmentInventoryFilePath; Records = @() } }
         Mock Get-PackageOperationHistory { return [pscustomobject]@{ Path = $config.PackageOperationHistoryFilePath; Records = @() } }
 
         { Get-PackageState } | Should -Not -Throw
@@ -145,12 +145,12 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - export
         $installRoot = Join-Path $root 'Inst'
         $workspaceRoot = Join-Path $root 'PackageFileStaging'
         $installStageRoot = Join-Path $root 'PackageInstallStage'
-        $depotRoot = Join-Path $root 'DefaultPackageDepot'
-        $localRepositoryRoot = Join-Path $root 'PackageRepositories'
+        $depotRoot = Join-Path $root 'PkgDepot'
+        $localRepositoryRoot = Join-Path $root 'PkgRepos'
         $shimDirectory = Join-Path $root 'Shims'
         $installDirectory = Join-Path $installRoot 'vsc-rt\stable\1.0.0\win32-x64'
         $definitionSnapshotPath = Join-Path $localRepositoryRoot 'EigenverftModule\VSCodeRuntime.json'
-        $sourceInventoryPath = Join-Path (Join-Path $root 'Configuration\External') 'SourceInventory.json'
+        $sourceInventoryPath = Join-Path (Join-Path $root 'Configuration\External') 'PackageSourceInventory.json'
 
         $null = New-Item -ItemType Directory -Path $installDirectory -Force
         $null = New-Item -ItemType Directory -Path $workspaceRoot -Force
@@ -163,17 +163,17 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - export
         Write-TestJsonDocument -Path $sourceInventoryPath -Document @{ inventoryVersion = 1; global = @{}; sites = @{} }
 
         $config = [pscustomobject]@{
-            LocalConfigurationPath              = Join-Path $root 'Configuration\Internal\Config.json'
+            PackageConfigPath              = Join-Path $root 'Configuration\Internal\PackageConfig.json'
             PreferredTargetInstallRootDirectory = $installRoot
             PackageFileStagingRootDirectory       = $workspaceRoot
             PackageInstallStageRootDirectory    = $installStageRoot
             DefaultPackageDepotDirectory        = $depotRoot
             LocalRepositoryRoot                 = $localRepositoryRoot
             ShimDirectory                       = $shimDirectory
-            PackageInventoryFilePath            = Join-Path (Join-Path $root 'State') 'package-inventory.json'
-            PackageOperationHistoryFilePath     = Join-Path (Join-Path $root 'State') 'package-operation-history.json'
+            PackageAssignmentInventoryFilePath            = Join-Path (Join-Path $root 'State') 'PackageAssignmentInventory.json'
+            PackageOperationHistoryFilePath     = Join-Path (Join-Path $root 'State') 'PackageOperationHistory.json'
         }
-        Write-TestJsonDocument -Path $config.PackageInventoryFilePath -Document @{ records = @() }
+        Write-TestJsonDocument -Path $config.PackageAssignmentInventoryFilePath -Document @{ records = @() }
         Write-TestJsonDocument -Path $config.PackageOperationHistoryFilePath -Document @{ records = @() }
 
         $ownershipRecord = [pscustomobject]@{
@@ -218,13 +218,13 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - export
 
         Mock Get-PackageConfig { throw 'Get-PackageState must not load a package definition.' }
         Mock Get-PackageStateConfig { return $config }
-        Mock Get-PackageInventory { return [pscustomobject]@{ Path = $config.PackageInventoryFilePath; Records = @($ownershipRecord) } }
+        Mock Get-PackageInventory { return [pscustomobject]@{ Path = $config.PackageAssignmentInventoryFilePath; Records = @($ownershipRecord) } }
         Mock Get-PackageOperationHistory { return [pscustomobject]@{ Path = $config.PackageOperationHistoryFilePath; Records = @($operationRecord) } }
 
         $state = Get-PackageState
 
-        $state.PackageInventoryExists | Should -BeTrue
-        $state.OperationHistoryExists | Should -BeTrue
+        $state.PackageAssignmentInventoryExists | Should -BeTrue
+        $state.PackageOperationHistoryExists | Should -BeTrue
         $state.SourceInventoryExists | Should -BeTrue
         $state.PackageRecordCount | Should -Be 1
         $state.OperationRecordCount | Should -Be 1
@@ -246,19 +246,19 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - export
     It 'returns the resolved raw package state on request' {
         $root = Join-Path $TestDrive 'raw-package-state'
         $config = [pscustomobject]@{
-            LocalConfigurationPath              = Join-Path $root 'Configuration\Internal\Config.json'
+            PackageConfigPath              = Join-Path $root 'Configuration\Internal\PackageConfig.json'
             PreferredTargetInstallRootDirectory = Join-Path $root 'Inst'
             PackageFileStagingRootDirectory       = Join-Path $root 'PackageFileStaging'
             PackageInstallStageRootDirectory    = Join-Path $root 'PackageInstallStage'
-            DefaultPackageDepotDirectory        = Join-Path $root 'DefaultPackageDepot'
-            LocalRepositoryRoot                 = Join-Path $root 'PackageRepositories'
+            DefaultPackageDepotDirectory        = Join-Path $root 'PkgDepot'
+            LocalRepositoryRoot                 = Join-Path $root 'PkgRepos'
             ShimDirectory                       = Join-Path $root 'Shims'
-            PackageInventoryFilePath            = Join-Path (Join-Path $root 'State') 'package-inventory.json'
-            PackageOperationHistoryFilePath     = Join-Path (Join-Path $root 'State') 'package-operation-history.json'
+            PackageAssignmentInventoryFilePath            = Join-Path (Join-Path $root 'State') 'PackageAssignmentInventory.json'
+            PackageOperationHistoryFilePath     = Join-Path (Join-Path $root 'State') 'PackageOperationHistory.json'
         }
-        $packageInventory = [pscustomobject]@{ Path = $config.PackageInventoryFilePath; Records = @([pscustomobject]@{ definitionId = 'VSCodeRuntime' }) }
+        $packageInventory = [pscustomobject]@{ Path = $config.PackageAssignmentInventoryFilePath; Records = @([pscustomobject]@{ definitionId = 'VSCodeRuntime' }) }
         $operationHistory = [pscustomobject]@{ Path = $config.PackageOperationHistoryFilePath; Records = @([pscustomobject]@{ definitionId = 'VSCodeRuntime' }) }
-        $sourceInventory = [pscustomobject]@{ Path = (Join-Path (Join-Path $root 'Configuration\External') 'SourceInventory.json'); Exists = $false; Document = $null }
+        $sourceInventory = [pscustomobject]@{ Path = (Join-Path (Join-Path $root 'Configuration\External') 'PackageSourceInventory.json'); Exists = $false; Document = $null }
 
         $config | Add-Member -MemberType NoteProperty -Name SourceInventoryInfo -Value $sourceInventory
 
@@ -270,8 +270,8 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - export
         $state = Get-PackageState -Raw
 
         $state.Config | Should -Be $config
-        $state.PackageInventory | Should -Be $packageInventory
-        $state.OperationHistory | Should -Be $operationHistory
+        $state.PackageAssignmentInventory | Should -Be $packageInventory
+        $state.PackageOperationHistory | Should -Be $operationHistory
         $state.SourceInventory | Should -Be $sourceInventory
         $state.Directories.Installed.Path | Should -Be $config.PreferredTargetInstallRootDirectory
     }

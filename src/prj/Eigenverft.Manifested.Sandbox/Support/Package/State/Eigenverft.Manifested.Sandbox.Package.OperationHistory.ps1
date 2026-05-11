@@ -96,6 +96,7 @@ Creates one operation-history record from a finalized Package result.
     $packageFilePreparation = $PackageResult.PackageFilePreparation
     $selectedSource = if ($packageFilePreparation -and $packageFilePreparation.PSObject.Properties['SelectedSource']) { $packageFilePreparation.SelectedSource } else { $null }
     $verification = if ($packageFilePreparation -and $packageFilePreparation.PSObject.Properties['Verification']) { $packageFilePreparation.Verification } else { $null }
+    $depotDistribution = if ($PackageResult.PSObject.Properties['DepotDistribution']) { $PackageResult.DepotDistribution } else { $null }
     $installStatus = if ($PackageResult.Assigned -and $PackageResult.Assigned.PSObject.Properties['Status']) { [string]$PackageResult.Assigned.Status } else { $null }
     $operationId = if ($PackageResult.PSObject.Properties['OperationId'] -and -not [string]::IsNullOrWhiteSpace([string]$PackageResult.OperationId)) {
         [string]$PackageResult.OperationId
@@ -136,6 +137,16 @@ Creates one operation-history record from a finalized Package result.
             sourceScope                 = if ($selectedSource -and $selectedSource.PSObject.Properties['SourceScope']) { [string]$selectedSource.SourceScope } else { $null }
             sourceId                    = if ($selectedSource -and $selectedSource.PSObject.Properties['SourceId']) { [string]$selectedSource.SourceId } else { $null }
             verificationStatus          = if ($verification -and $verification.PSObject.Properties['Status']) { [string]$verification.Status } else { $null }
+        }
+        depotDistribution             = [pscustomobject]@{
+            mode        = if ($depotDistribution -and $depotDistribution.PSObject.Properties['Mode']) { [string]$depotDistribution.Mode } else { $null }
+            status      = if ($depotDistribution -and $depotDistribution.PSObject.Properties['Status']) { [string]$depotDistribution.Status } else { $null }
+            reason      = if ($depotDistribution -and $depotDistribution.PSObject.Properties['Reason']) { [string]$depotDistribution.Reason } else { $null }
+            sourceScope = if ($depotDistribution -and $depotDistribution.PSObject.Properties['SourceScope']) { [string]$depotDistribution.SourceScope } else { $null }
+            sourceId    = if ($depotDistribution -and $depotDistribution.PSObject.Properties['SourceId']) { [string]$depotDistribution.SourceId } else { $null }
+            copied      = if ($depotDistribution -and $depotDistribution.PSObject.Properties['CopiedCount']) { [int]$depotDistribution.CopiedCount } else { 0 }
+            skipped     = if ($depotDistribution -and $depotDistribution.PSObject.Properties['SkippedCount']) { [int]$depotDistribution.SkippedCount } else { 0 }
+            failed      = if ($depotDistribution -and $depotDistribution.PSObject.Properties['FailedCount']) { [int]$depotDistribution.FailedCount } else { 0 }
         }
         dependencies                  = @($PackageResult.Dependencies | ForEach-Object { Select-PackageOperationDependencySummary -Dependency $_ })
     }

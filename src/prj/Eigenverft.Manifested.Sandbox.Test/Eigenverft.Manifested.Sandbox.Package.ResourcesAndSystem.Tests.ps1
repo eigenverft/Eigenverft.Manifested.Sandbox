@@ -111,15 +111,15 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - resour
     It 'writes inventory records keyed by install slot and updates current release metadata' {
         $rootPath = Join-Path $TestDrive 'ownership-record'
         $installRoot = Join-Path $rootPath 'managed-install'
-        $packageStateIndexPath = Join-Path $rootPath 'package-inventory.json'
+        $packageStateIndexPath = Join-Path $rootPath 'PackageAssignmentInventory.json'
         $null = New-Item -ItemType Directory -Path $installRoot -Force
 
-        $globalDocument = New-TestPackageGlobalDocument -PackageInventoryFilePath $packageStateIndexPath
+        $globalDocument = New-TestPackageGlobalDocument -PackageAssignmentInventoryFilePath $packageStateIndexPath
         $release = New-TestPackageRelease -Id 'vsCode-win-x64-stable' -Version '3.0.0' -Architecture 'x64' -ArtifactDistributionVariant 'win32-x64' -Install @{ kind = 'reuseExisting' } -Readiness (New-TestReadiness -Version '3.0.0')
         $documents = Write-TestPackageDocuments -RootPath $rootPath -GlobalDocument $globalDocument -DefinitionDocument (New-TestVSCodeDefinitionDocument -Releases @($release) -SharedReadiness (New-TestReadiness -Version '3.0.0'))
 
         [Environment]::SetEnvironmentVariable($script:SourceInventoryEnvVarName, (Join-Path $TestDrive 'missing-inventory.json'), 'Process')
-        Mock Get-PackageGlobalConfigPath { $documents.GlobalConfigPath }
+        Mock Get-PackageConfigPath { $documents.GlobalConfigPath }
         Mock Get-PackageDefinitionPath { param($DefinitionId) $documents.DefinitionPath }
 
         $config = Get-PackageConfig -DefinitionId 'VSCodeRuntime'
@@ -170,7 +170,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - resour
         [Environment]::SetEnvironmentVariable($script:SourceInventoryEnvVarName, (Join-Path $rootPath 'missing-source-inventory.json'), 'Process')
         [Environment]::SetEnvironmentVariable($script:SiteCodeEnvVarName, 'BER', 'Process')
 
-        Mock Get-PackageGlobalConfigPath { $documents.GlobalConfigPath }
+        Mock Get-PackageConfigPath { $documents.GlobalConfigPath }
         Mock Get-PackageDefinitionPath { param($DefinitionId) $documents.DefinitionPath }
 
         $config = Get-PackageConfig -DefinitionId 'VSCodeRuntime'

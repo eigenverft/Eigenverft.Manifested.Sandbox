@@ -62,7 +62,7 @@ Get-PackageDefaultRepositoryId
     return $script:ManifestedPackageDefaultRepositoryId
 }
 
-function Get-PackageShippedGlobalConfigPath {
+function Get-PackageShippedConfigPath {
 <#
 .SYNOPSIS
 Returns the shipped Package config path.
@@ -72,12 +72,12 @@ Builds the module-relative path to the JSON document that defines Package
 defaults.
 
 .EXAMPLE
-Get-PackageShippedGlobalConfigPath
+Get-PackageShippedConfigPath
 #>
     [CmdletBinding()]
     param()
 
-    return (Join-Path (Join-Path (Get-PackageConfigurationRoot) 'Internal') 'Config.json')
+    return (Join-Path (Join-Path (Get-PackageConfigurationRoot) 'Internal') 'PackageConfig.json')
 }
 
 function Get-PackageShippedDepotInventoryPath {
@@ -95,7 +95,7 @@ Get-PackageShippedDepotInventoryPath
     [CmdletBinding()]
     param()
 
-    return (Join-Path (Join-Path (Get-PackageConfigurationRoot) 'Internal') 'DepotInventory.json')
+    return (Join-Path (Join-Path (Get-PackageConfigurationRoot) 'Internal') 'PackageDepotInventory.json')
 }
 
 function Get-PackageShippedRepositoryInventoryPath {
@@ -113,7 +113,7 @@ Get-PackageShippedRepositoryInventoryPath
     [CmdletBinding()]
     param()
 
-    return (Join-Path (Join-Path (Get-PackageConfigurationRoot) 'Internal') 'RepositoryInventory.json')
+    return (Join-Path (Join-Path (Get-PackageConfigurationRoot) 'Internal') 'PackageRepositoryInventory.json')
 }
 
 function Get-PackageLocalRoot {
@@ -122,8 +122,8 @@ function Get-PackageLocalRoot {
 Returns the Package local application-data root.
 
 .DESCRIPTION
-Resolves the local Package root from the shipped Config.json. This bootstrap
-step intentionally does not read the local Config.json because the local root
+Resolves the local Package root from the shipped PackageConfig.json. This bootstrap
+step intentionally does not read the local PackageConfig.json because the local root
 is needed before the local config path can be known.
 
 .EXAMPLE
@@ -132,7 +132,7 @@ Get-PackageLocalRoot
     [CmdletBinding()]
     param()
 
-    $shippedConfigPath = Get-PackageShippedGlobalConfigPath
+    $shippedConfigPath = Get-PackageShippedConfigPath
     if (-not (Test-Path -LiteralPath $shippedConfigPath -PathType Leaf)) {
         throw "Package shipped config '$shippedConfigPath' does not exist. Cannot resolve the local Package root."
     }
@@ -160,22 +160,22 @@ Get-PackageLocalRoot
     }
 }
 
-function Get-PackageLocalGlobalConfigPath {
+function Get-PackageLocalConfigPath {
 <#
 .SYNOPSIS
 Returns the local Package config path.
 
 .DESCRIPTION
-Builds the local copy path for Config.json. The local file can later be edited
+Builds the local copy path for PackageConfig.json. The local file can later be edited
 or refreshed independently of the module installation.
 
 .EXAMPLE
-Get-PackageLocalGlobalConfigPath
+Get-PackageLocalConfigPath
 #>
     [CmdletBinding()]
     param()
 
-    return [System.IO.Path]::GetFullPath((Join-Path (Join-Path (Get-PackageLocalRoot) 'Configuration\Internal') 'Config.json'))
+    return [System.IO.Path]::GetFullPath((Join-Path (Join-Path (Get-PackageLocalRoot) 'Configuration\Internal') 'PackageConfig.json'))
 }
 
 function Get-PackageLocalDepotInventoryPath {
@@ -184,7 +184,7 @@ function Get-PackageLocalDepotInventoryPath {
 Returns the local Package depot-inventory path.
 
 .DESCRIPTION
-Builds the local copy path for DepotInventory.json. The local file can later
+Builds the local copy path for PackageDepotInventory.json. The local file can later
 be edited or refreshed independently of the module installation.
 
 .EXAMPLE
@@ -193,7 +193,7 @@ Get-PackageLocalDepotInventoryPath
     [CmdletBinding()]
     param()
 
-    return [System.IO.Path]::GetFullPath((Join-Path (Join-Path (Get-PackageLocalRoot) 'Configuration\Internal') 'DepotInventory.json'))
+    return [System.IO.Path]::GetFullPath((Join-Path (Join-Path (Get-PackageLocalRoot) 'Configuration\Internal') 'PackageDepotInventory.json'))
 }
 
 function Get-PackageLocalRepositoryInventoryPath {
@@ -202,7 +202,7 @@ function Get-PackageLocalRepositoryInventoryPath {
 Returns the local Package repository-inventory path.
 
 .DESCRIPTION
-Builds the local copy path for RepositoryInventory.json. The local file can
+Builds the local copy path for PackageRepositoryInventory.json. The local file can
 later be edited or refreshed independently of the module installation.
 
 .EXAMPLE
@@ -211,32 +211,32 @@ Get-PackageLocalRepositoryInventoryPath
     [CmdletBinding()]
     param()
 
-    return [System.IO.Path]::GetFullPath((Join-Path (Join-Path (Get-PackageLocalRoot) 'Configuration\Internal') 'RepositoryInventory.json'))
+    return [System.IO.Path]::GetFullPath((Join-Path (Join-Path (Get-PackageLocalRoot) 'Configuration\Internal') 'PackageRepositoryInventory.json'))
 }
 
-function Get-PackageGlobalConfigPath {
+function Get-PackageConfigPath {
 <#
 .SYNOPSIS
 Returns the active Package config path.
 
 .DESCRIPTION
-Returns the local Config.json path, creating it from the shipped module
+Returns the local PackageConfig.json path, creating it from the shipped module
 configuration when the local copy does not exist yet.
 
 .EXAMPLE
-Get-PackageGlobalConfigPath
+Get-PackageConfigPath
 #>
     [CmdletBinding()]
     param()
 
-    $localConfigPath = Get-PackageLocalGlobalConfigPath
+    $localConfigPath = Get-PackageLocalConfigPath
     if (-not (Test-Path -LiteralPath $localConfigPath -PathType Leaf)) {
         $localConfigDirectory = Split-Path -Parent $localConfigPath
         if (-not [string]::IsNullOrWhiteSpace($localConfigDirectory)) {
             $null = New-Item -ItemType Directory -Path $localConfigDirectory -Force
         }
 
-        Copy-FileToPath -SourcePath (Get-PackageShippedGlobalConfigPath) -TargetPath $localConfigPath -Overwrite | Out-Null
+        Copy-FileToPath -SourcePath (Get-PackageShippedConfigPath) -TargetPath $localConfigPath -Overwrite | Out-Null
     }
 
     return $localConfigPath
@@ -248,7 +248,7 @@ function Get-PackageDepotInventoryPath {
 Returns the active Package depot-inventory path.
 
 .DESCRIPTION
-Returns the local DepotInventory.json path, creating it from the shipped
+Returns the local PackageDepotInventory.json path, creating it from the shipped
 module configuration when the local copy does not exist yet.
 
 .EXAMPLE
@@ -276,7 +276,7 @@ function Get-PackageRepositoryInventoryPath {
 Returns the active Package repository-inventory path.
 
 .DESCRIPTION
-Returns the local RepositoryInventory.json path, creating it from the shipped
+Returns the local PackageRepositoryInventory.json path, creating it from the shipped
 module configuration when the local copy does not exist yet.
 
 .EXAMPLE

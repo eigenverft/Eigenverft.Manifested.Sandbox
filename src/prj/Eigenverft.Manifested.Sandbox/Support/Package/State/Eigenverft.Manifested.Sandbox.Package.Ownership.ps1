@@ -79,7 +79,7 @@ Get-PackageInventory -PackageConfig $config
         [psobject]$PackageConfig
     )
 
-    $indexPath = $PackageConfig.PackageInventoryFilePath
+    $indexPath = $PackageConfig.PackageAssignmentInventoryFilePath
     if ([string]::IsNullOrWhiteSpace($indexPath)) {
         throw 'Package inventory path is not configured.'
     }
@@ -290,7 +290,7 @@ Set-PackageExistingPackage -PackageResult $result
 
     if (-not $PackageResult.ExistingPackage) {
         $PackageResult.Ownership = [pscustomobject]@{
-            InventoryPath   = $PackageResult.PackageConfig.PackageInventoryFilePath
+            InventoryPath   = $PackageResult.PackageConfig.PackageAssignmentInventoryFilePath
             InstallSlotId   = Get-PackageInstallSlotId -PackageResult $PackageResult
             Classification  = 'NotFound'
             OwnershipRecord = $null
@@ -307,7 +307,7 @@ Set-PackageExistingPackage -PackageResult $result
     }
     $installSlotId = Get-PackageInstallSlotId -PackageResult $PackageResult
     $PackageResult.Ownership = [pscustomobject]@{
-        InventoryPath   = $PackageResult.PackageConfig.PackageInventoryFilePath
+        InventoryPath   = $PackageResult.PackageConfig.PackageAssignmentInventoryFilePath
         InstallSlotId   = $installSlotId
         Classification  = $classification
         OwnershipRecord = $record

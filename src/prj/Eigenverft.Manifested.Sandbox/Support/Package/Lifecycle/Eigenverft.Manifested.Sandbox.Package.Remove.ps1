@@ -188,7 +188,7 @@ function Get-PackageUninstallExecutableAndArgumentTail {
     }
 }
 
-function ConvertFrom-PackageInventoryPathRegistrationRecord {
+function ConvertFrom-PackageAssignmentInventoryPathRegistrationRecord {
     [CmdletBinding()]
     param(
         [AllowNull()]
@@ -294,7 +294,7 @@ function Resolve-PackageRemovalInstallContext {
     }
 
     $pathRegistration = if ($record.PSObject.Properties['pathRegistration'] -and $null -ne $record.pathRegistration) {
-        ConvertFrom-PackageInventoryPathRegistrationRecord -PathRegistrationRecord $record.pathRegistration
+        ConvertFrom-PackageAssignmentInventoryPathRegistrationRecord -PathRegistrationRecord $record.pathRegistration
     }
     else {
         $null

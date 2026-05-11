@@ -148,6 +148,7 @@ function Invoke-PackageAssignedFlow {
         [pscustomobject]@{ Name = 'ClassifyExistingPackage'; Message = '[STEP] Classifying install ownership.'; Action = { param($r) Set-PackageExistingPackage -PackageResult $r } },
         [pscustomobject]@{ Name = 'ResolveExistingPackageDecision'; Message = '[STEP] Deciding reuse, adoption, or replacement.'; Action = { param($r) Resolve-PackageExistingPackageDecision -PackageResult $r } },
         [pscustomobject]@{ Name = 'PreparePackageAssignedFile'; Message = '[STEP] Ensuring package file is available.'; Action = { param($r) Resolve-PackageInstallFile -PackageResult $r } },
+        [pscustomobject]@{ Name = 'DistributePackageFileToDepots'; Message = '[STEP] Reconciling package file depot mirrors.'; Action = { param($r) Invoke-PackageDepotDistribution -PackageResult $r } },
         [pscustomobject]@{ Name = 'AssignPackage'; Message = '[STEP] Assigning the package (install or reuse per assigned install operation).'; Action = { param($r) Set-PackageAssignedState -PackageResult $r } },
         [pscustomobject]@{ Name = 'CheckAssignedReadiness'; Message = '[STEP] Checking assigned package readiness.'; Action = { param($r) Test-PackageAssignedReadiness -PackageResult $r } },
         [pscustomobject]@{ Name = 'RegisterPath'; Message = '[STEP] Applying PATH registration.'; Action = { param($r) Register-PackagePath -PackageResult $r } },

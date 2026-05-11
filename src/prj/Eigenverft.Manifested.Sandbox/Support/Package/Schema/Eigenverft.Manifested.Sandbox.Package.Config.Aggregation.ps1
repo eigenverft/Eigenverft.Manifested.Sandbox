@@ -101,8 +101,8 @@ Starts from the shipped acquisition-environment config, applies optional
 inventory global and site overlays, resolves concrete store paths, and returns
 the internal effective environment model used by later source planning.
 
-.PARAMETER GlobalConfiguration
-The shipped Package global config object.
+.PARAMETER PackageConfiguration
+The shipped Package config object.
 
 .PARAMETER SourceInventoryInfo
 The optional external source-inventory document info.
@@ -111,12 +111,12 @@ The optional external source-inventory document info.
 The internal depot-inventory document info.
 
 .EXAMPLE
-Resolve-PackageEffectiveAcquisitionEnvironment -GlobalConfiguration $global -SourceInventoryInfo $inventory -DepotInventoryInfo $depotInventory
+Resolve-PackageEffectiveAcquisitionEnvironment -PackageConfiguration $global -SourceInventoryInfo $inventory -DepotInventoryInfo $depotInventory
 #>
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true)]
-        [psobject]$GlobalConfiguration,
+        [psobject]$PackageConfiguration,
 
         [Parameter(Mandatory = $true)]
         [psobject]$SourceInventoryInfo,
@@ -125,7 +125,7 @@ Resolve-PackageEffectiveAcquisitionEnvironment -GlobalConfiguration $global -Sou
         [psobject]$DepotInventoryInfo
     )
 
-    $mergedAcquisitionEnvironment = ConvertTo-PackageMergeValue -InputObject $GlobalConfiguration.acquisitionEnvironment
+    $mergedAcquisitionEnvironment = ConvertTo-PackageMergeValue -InputObject $PackageConfiguration.acquisitionEnvironment
     $activeSiteCodes = @(Get-PackageActiveSiteCodes)
 
     if ($DepotInventoryInfo -and $DepotInventoryInfo.Document) {
@@ -160,7 +160,7 @@ Resolve-PackageEffectiveAcquisitionEnvironment -GlobalConfiguration $global -Sou
     }
 
     $acquisitionEnvironment = ConvertTo-PackageObject -InputObject $mergedAcquisitionEnvironment
-    $applicationRootDirectory = Resolve-PackageApplicationRootDirectory -GlobalConfiguration $GlobalConfiguration
+    $applicationRootDirectory = Resolve-PackageApplicationRootDirectory -PackageConfiguration $PackageConfiguration
 
     $packageFileStagingDirectory = if ($acquisitionEnvironment.stores.PSObject.Properties['packageFileStagingDirectory'] -and
         -not [string]::IsNullOrWhiteSpace([string]$acquisitionEnvironment.stores.packageFileStagingDirectory)) {
@@ -181,6 +181,14 @@ Resolve-PackageEffectiveAcquisitionEnvironment -GlobalConfiguration $global -Sou
     $allowFallback = $true
     if ($acquisitionEnvironment.defaults.PSObject.Properties['allowFallback']) {
         $allowFallback = [bool]$acquisitionEnvironment.defaults.allowFallback
+    }
+    $depotDistributionMode = 'packageFocused'
+    if ($acquisitionEnvironment.defaults.PSObject.Properties['depotDistributionMode'] -and
+        -not [string]::IsNullOrWhiteSpace([string]$acquisitionEnvironment.defaults.depotDistributionMode)) {
+        $depotDistributionMode = [string]$acquisitionEnvironment.defaults.depotDistributionMode
+    }
+    if ($depotDistributionMode -notin @('packageFocused', 'depotFocused', 'disabled')) {
+        throw "Effective package acquisition environment defines unsupported defaults.depotDistributionMode '$depotDistributionMode'. Use 'packageFocused', 'depotFocused', or 'disabled'."
     }
 
     $configuredEnvironmentSources = $null
@@ -211,7 +219,8 @@ Resolve-PackageEffectiveAcquisitionEnvironment -GlobalConfiguration $global -Sou
             DefaultPackageDepotDirectory = $defaultPackageDepotDirectory
         }
         Defaults            = [pscustomobject]@{
-            AllowFallback = $allowFallback
+            AllowFallback          = $allowFallback
+            DepotDistributionMode  = $depotDistributionMode
         }
         EnvironmentSources  = $environmentSources
     }
@@ -241,7 +250,7 @@ function Get-PackageConfig {
 Loads the effective Package config for a definition id.
 
 .DESCRIPTION
-Loads the shipped Package global document, applies the optional external
+Loads the shipped Package config document, applies the optional external
 source inventory, loads one shipped Package definition, validates the
 current schema, resolves runtime context and Package roots, and returns the
 combined config object for command orchestration.
@@ -265,17 +274,17 @@ Get-PackageConfig -DefinitionId VSCodeRuntime
         [string]$DesiredState = 'Assigned'
     )
 
-    $globalDocumentInfo = Read-PackageJsonDocument -Path (Get-PackageGlobalConfigPath)
-    Assert-PackageGlobalConfigSchema -GlobalDocumentInfo $globalDocumentInfo
+    $globalDocumentInfo = Read-PackageJsonDocument -Path (Get-PackageConfigPath)
+    Assert-PackageConfigSchema -PackageConfigDocumentInfo $globalDocumentInfo
 
     $packageGlobalConfig = $globalDocumentInfo.Document.package
-    $applicationRootDirectory = Resolve-PackageApplicationRootDirectory -GlobalConfiguration $packageGlobalConfig
+    $applicationRootDirectory = Resolve-PackageApplicationRootDirectory -PackageConfiguration $packageGlobalConfig
     $packageInventoryFilePath = if ($packageGlobalConfig.packageState.PSObject.Properties['inventoryFilePath'] -and
         -not [string]::IsNullOrWhiteSpace([string]$packageGlobalConfig.packageState.inventoryFilePath)) {
         Resolve-PackageConfiguredPath -PathValue ([string]$packageGlobalConfig.packageState.inventoryFilePath) -ApplicationRootDirectory $applicationRootDirectory
     }
     else {
-        Resolve-PackageConfiguredPath -PathValue 'State\package-inventory.json' -ApplicationRootDirectory $applicationRootDirectory
+        Resolve-PackageConfiguredPath -PathValue 'State\PackageAssignmentInventory.json' -ApplicationRootDirectory $applicationRootDirectory
     }
 
     $definitionReference = $null
@@ -287,7 +296,7 @@ Get-PackageConfig -DefinitionId VSCodeRuntime
             throw
         }
 
-        $definitionReference = Resolve-PackageDefinitionSnapshotReference -RepositoryId $RepositoryId -DefinitionId $DefinitionId -PackageInventoryFilePath $packageInventoryFilePath -LiveResolutionError $_.Exception.Message
+        $definitionReference = Resolve-PackageDefinitionSnapshotReference -RepositoryId $RepositoryId -DefinitionId $DefinitionId -PackageAssignmentInventoryFilePath $packageInventoryFilePath -LiveResolutionError $_.Exception.Message
         Write-PackageExecutionMessage -Level 'WRN' -Message ("[WARN] Live package repository definition could not be resolved for '{0}/{1}'; using local definition snapshot '{2}' for removal. Live error: {3}" -f $definitionReference.RepositoryId, $DefinitionId, $definitionReference.DefinitionPath, $_.Exception.Message)
     }
 
@@ -300,7 +309,7 @@ Get-PackageConfig -DefinitionId VSCodeRuntime
 
     $runtimeContext = Get-PackageRuntimeContext
     $definition = $definitionDocumentInfo.Document
-    $effectiveAcquisitionEnvironment = Resolve-PackageEffectiveAcquisitionEnvironment -GlobalConfiguration $packageGlobalConfig -SourceInventoryInfo $sourceInventoryInfo -DepotInventoryInfo $depotInventoryInfo
+    $effectiveAcquisitionEnvironment = Resolve-PackageEffectiveAcquisitionEnvironment -PackageConfiguration $packageGlobalConfig -SourceInventoryInfo $sourceInventoryInfo -DepotInventoryInfo $depotInventoryInfo
 
     $selectionReleaseTrack = 'none'
     if ($packageGlobalConfig.selectionDefaults.PSObject.Properties['releaseTrack'] -and
@@ -327,7 +336,7 @@ Get-PackageConfig -DefinitionId VSCodeRuntime
         Resolve-PackageConfiguredPath -PathValue ([string]$packageGlobalConfig.packageState.operationHistoryFilePath) -ApplicationRootDirectory $applicationRootDirectory
     }
     else {
-        Resolve-PackageConfiguredPath -PathValue 'State\package-operation-history.json' -ApplicationRootDirectory $applicationRootDirectory
+        Resolve-PackageConfiguredPath -PathValue 'State\PackageOperationHistory.json' -ApplicationRootDirectory $applicationRootDirectory
     }
 
     $localRepositoryRoot = if ($packageGlobalConfig.PSObject.Properties['localRepositoryRoot'] -and
@@ -335,7 +344,7 @@ Get-PackageConfig -DefinitionId VSCodeRuntime
         Resolve-PackageConfiguredPath -PathValue ([string]$packageGlobalConfig.localRepositoryRoot) -ApplicationRootDirectory $applicationRootDirectory
     }
     else {
-        Resolve-PackageConfiguredPath -PathValue 'PackageRepositories' -ApplicationRootDirectory $applicationRootDirectory
+        Resolve-PackageConfiguredPath -PathValue 'PkgRepos' -ApplicationRootDirectory $applicationRootDirectory
     }
 
     $shimDirectory = if ($packageGlobalConfig.PSObject.Properties['shimDirectory'] -and
@@ -370,8 +379,8 @@ Get-PackageConfig -DefinitionId VSCodeRuntime
     }
 
     return [pscustomobject]@{
-        GlobalConfigurationPath            = $globalDocumentInfo.Path
-        GlobalConfiguration                = $packageGlobalConfig
+        PackageConfigPath                  = $globalDocumentInfo.Path
+        PackageConfigDocument              = $packageGlobalConfig
         ApplicationRootDirectory           = $applicationRootDirectory
         SourceInventoryPath                = $effectiveAcquisitionEnvironment.SourceInventoryPath
         SourceInventory                    = $sourceInventoryInfo.Document
@@ -409,9 +418,10 @@ Get-PackageConfig -DefinitionId VSCodeRuntime
         ShimDirectory                      = $shimDirectory
         PackageDepotRelativePathTemplate   = $packageDepotRelativePathTemplate
         PackageWorkSlotDirectoryTemplate   = $packageWorkSlotDirectoryTemplate
-        PackageInventoryFilePath           = $packageInventoryFilePath
+        PackageAssignmentInventoryFilePath           = $packageInventoryFilePath
         PackageOperationHistoryFilePath    = $packageOperationHistoryFilePath
         AllowAcquisitionFallback           = $effectiveAcquisitionEnvironment.Defaults.AllowFallback
+        DepotDistributionMode              = $effectiveAcquisitionEnvironment.Defaults.DepotDistributionMode
         EnvironmentSources                 = $effectiveAcquisitionEnvironment.EnvironmentSources
     }
 }
@@ -587,7 +597,7 @@ New-PackageResult -PackageConfig $config
         PreferredTargetInstallRootDirectory = $PackageConfig.PreferredTargetInstallRootDirectory
         LocalRepositoryRoot              = $PackageConfig.LocalRepositoryRoot
         ShimDirectory                    = $PackageConfig.ShimDirectory
-        PackageInventoryFilePath         = $PackageConfig.PackageInventoryFilePath
+        PackageAssignmentInventoryFilePath         = $PackageConfig.PackageAssignmentInventoryFilePath
         PackageOperationHistoryFilePath  = $PackageConfig.PackageOperationHistoryFilePath
         LocalEnvironment                 = $null
         Package                          = $null
@@ -607,6 +617,7 @@ New-PackageResult -PackageConfig $config
         Ownership                        = $null
         InstallOrigin                    = $null
         PackageFilePreparation                  = $null
+        DepotDistribution                = $null
         Dependencies                     = @()
         Assigned                         = $null
         Removed                          = $null

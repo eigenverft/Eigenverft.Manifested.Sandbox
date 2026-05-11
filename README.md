@@ -9,8 +9,8 @@ The primary intent is fast, repeatable setup inside Windows Sandbox. The same mo
 🚀 **Key Features:**
 - Ready-to-download Windows Sandbox profile in the repo for repeatable bring-up
 - Package-backed provisioning for `python`, `pwsh`, `git`, `gh`, `code`, `notepad++`, `node`, `npm`, `opencode`, `gemini`, `qwen`, `codex`, Qwen GGUF model resources, llama.cpp, and VC++ prerequisites
-- Package state tracking through local package indexes under `%LOCALAPPDATA%\Programs\Evf.Sandbox`
-- Package/depot layout that can reuse local package files and later grow toward shared package repositories
+- Package state tracking through local package assignment inventory and operation history under `%LOCALAPPDATA%\Programs\Evf.Sandbox`
+- Package depot/repository layout that can reuse local artifacts and resolve package definitions from configured sources
 - Managed npm ownership under the sandbox Node runtime, including proxy-aware npm configuration when Windows resolves the npm registry through a proxy
 - Proxy-aware startup and download handling for managed or corporate Windows environments
 - Compacted embedded startup helpers so the `.wsb` `LogonCommand` fits within the practical 8 KB command-line limit
@@ -106,11 +106,33 @@ The startup helpers are compacted and compressed so the Windows Sandbox `LogonCo
 
 ## 📌 Current State
 
-The module exports a single package dispatcher, **`Invoke-Package`**, plus helpers such as **`Get-PackageState`**, **`Get-SandboxVersion`**, **`Sandbox`**, **`Invoke-WebRequestEx`**, and **`Initialize-ProxyAccessProfile`**.
+The module exports a single package dispatcher, **`Invoke-Package`**, plus helpers such as **`Get-PackageState`**, **`Get-SandboxVersion`**, **`Sandbox`**, and **`Invoke-WebRequestEx`**.
 
-`Invoke-Package` accepts `-RepositoryId` (defaults to the shipped `EigenverftModule` repository), one or more `-DefinitionId` values, `-DesiredState Assigned` or `Removed`, and optional `-FailFast`. It loads the matching JSON package definition under `Repositories\EigenverftModule`, resolves dependencies and acquisition, installs or reuses per policy, validates, and updates inventory.
+`Invoke-Package` accepts `-RepositoryId` (defaults to the shipped `EigenverftModule` repository), one or more `-DefinitionId` values, `-DesiredState Assigned` or `Removed`, and optional `-FailFast`. It loads the matching JSON package definition under `Repositories\EigenverftModule`, resolves dependencies and acquisition, assigns or reuses per policy, checks readiness, and updates inventory.
 
 `Get-SandboxVersion` prints the module version, example `Invoke-Package` lines for each shipped definition discovered on disk, and the remaining exported commands.
+
+### Package Vocabulary
+
+| Term | Meaning |
+| --- | --- |
+| **Package depot** | Durable artifact storage for downloaded or mirrored package files such as installers, archives, model files, and runtime payloads. The default local depot folder is `PkgDepot`. |
+| **Package repository** | Source of package definition JSON files. Repositories describe what to assign or remove; they do not store package artifacts. Local definition snapshots use the default `PkgRepos` folder. |
+| **Assigned** | Desired state that makes a package definition ready on the machine by reusing, adopting, repairing, or assigning it as policy allows. |
+| **Removed** | Desired state that removes a tracked package when that package definition supports removal. |
+| **Package assignment inventory** | Current tracked **Assigned** package facts: definition, selected version, install directory, ownership kind, and definition snapshot. |
+| **Operation history** | Append-only history of package command runs, including successes, skips, and failures. |
+
+### Package Files And State
+
+| File | Role |
+| --- | --- |
+| `Configuration/Internal/PackageConfig.json` | Main package configuration: application paths, selection defaults, and acquisition policy. |
+| `Configuration/Internal/PackageDepotInventory.json` | Depot roots, capabilities, search order, and mirror-target flags. |
+| `Configuration/Internal/PackageRepositoryInventory.json` | Package definition repository sources, enablement, and trust. |
+| `Configuration/External/PackageSourceInventory.json` | Optional external/site acquisition overlays; can be overridden with `EIGENVERFT_MANIFESTED_PACKAGE_SOURCE_INVENTORY_PATH`. |
+| `State/PackageAssignmentInventory.json` | Current tracked **Assigned** package facts. |
+| `State/PackageOperationHistory.json` | Append-only command history for **Assigned** and **Removed** runs. |
 
 ---
 
@@ -125,8 +147,8 @@ Get-PackageState
 ```
 
 - `Get-SandboxVersion` shows the module version, example `Invoke-Package -DefinitionId '…'` lines for shipped definitions, and other exported commands.
-- `Get-PackageState` reads the local package state and package-file indexes, reports configured directories, and shows whether copied package definition JSON files and install directories still exist.
-- `Invoke-Package` with definition ids such as `PythonRuntime`, `PowerShell7`, `GitRuntime`, `VSCodeRuntime`, `NotepadPlusPlus`, and `NodeRuntime` ensures those pinned definitions reach **Assigned** (reuse, repair, or install per each definition’s policy).
+- `Get-PackageState` reads local package assignment inventory and operation history, reports configured directories, and shows whether copied package definition JSON files and install directories still exist.
+- `Invoke-Package` with definition ids such as `PythonRuntime`, `PowerShell7`, `GitRuntime`, `VSCodeRuntime`, `NotepadPlusPlus`, and `NodeRuntime` ensures those pinned definitions reach **Assigned** (reuse, repair, adoption, or assignment per each definition’s policy).
 - `OpenCodeCli` and `CodexCli` are npm-backed; they depend on `NodeRuntime`, and Codex’s definition also depends on `VisualCppRedistributable`.
 - `VisualCppRedistributable` is a machine prerequisite: it can report already-satisfied state from registry validation and only runs the Microsoft installer when needed.
 - `LlamaCppRuntime` and `Qwen35_9B_Q6_K_Model` cover the llama.cpp runtime and pinned GGUF model resource respectively.
@@ -151,7 +173,7 @@ Import-Module Eigenverft.Manifested.Sandbox
 - To test another branch, swap `main` in the raw `.wsb` download URL before launching the sandbox.
 - If you are working from a local checkout instead of the raw download, edit the tracked `.wsb` file directly and launch that local copy.
 - Keep `.wsb` files small and let versioned PowerShell own the real startup logic whenever you want a more maintainable sandbox launch path.
-- Run `Get-PackageState` after a bootstrap chain when you want the quickest view of package records, package files, and local repository copies.
+- Run `Get-PackageState` after a bootstrap chain when you want the quickest view of package records, operation history, depot/repository paths, and local definition snapshots.
 - Run `Invoke-Package -DefinitionId VisualCppRedistributable` in an elevated PowerShell session if the Microsoft Visual C++ Redistributable needs installation or repair.
 
 ## 📄 License

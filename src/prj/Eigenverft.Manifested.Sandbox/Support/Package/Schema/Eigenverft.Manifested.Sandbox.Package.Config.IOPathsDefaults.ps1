@@ -16,7 +16,7 @@ returns the resolved path together with the parsed document object.
 Path to the JSON file that should be loaded.
 
 .EXAMPLE
-Read-PackageJsonDocument -Path .\Configuration\Internal\Config.json
+Read-PackageJsonDocument -Path .\Configuration\Internal\PackageConfig.json
 #>
     [CmdletBinding()]
     param(
@@ -73,7 +73,7 @@ function Get-PackageDefaultApplicationRootDirectory {
 Returns the default Package application root.
 
 .DESCRIPTION
-Builds the fallback local application root used when Config.json does not
+Builds the fallback local application root used when PackageConfig.json does not
 define package.applicationRootDirectory.
 #>
     [CmdletBinding()]
@@ -86,13 +86,13 @@ function Resolve-PackageApplicationRootDirectory {
     [CmdletBinding()]
     param(
         [AllowNull()]
-        [psobject]$GlobalConfiguration
+        [psobject]$PackageConfiguration
     )
 
-    if ($GlobalConfiguration -and
-        $GlobalConfiguration.PSObject.Properties['applicationRootDirectory'] -and
-        -not [string]::IsNullOrWhiteSpace([string]$GlobalConfiguration.applicationRootDirectory)) {
-        return Resolve-ConfiguredPath -PathValue ([string]$GlobalConfiguration.applicationRootDirectory) -BaseDirectory (Get-PackageLocalRoot) -Tokens @{}
+    if ($PackageConfiguration -and
+        $PackageConfiguration.PSObject.Properties['applicationRootDirectory'] -and
+        -not [string]::IsNullOrWhiteSpace([string]$PackageConfiguration.applicationRootDirectory)) {
+        return Resolve-ConfiguredPath -PathValue ([string]$PackageConfiguration.applicationRootDirectory) -BaseDirectory (Get-PackageLocalRoot) -Tokens @{}
     }
 
     return Get-PackageDefaultApplicationRootDirectory
@@ -222,7 +222,7 @@ function Get-PackageDefaultShimDirectory {
 Returns the default Package shim root.
 
 .DESCRIPTION
-Builds the fallback local shim root when Config.json does not define one
+Builds the fallback local shim root when PackageConfig.json does not define one
 explicitly.
 #>
     [CmdletBinding()]
@@ -238,7 +238,7 @@ Returns the default Package preferred target-install root.
 
 .DESCRIPTION
 Builds the fallback local application-data root for Package preferred
-target installs when the global document does not define one explicitly.
+target installs when the Package config document does not define one explicitly.
 
 .EXAMPLE
 Get-PackageDefaultPreferredTargetInstallDirectory
@@ -249,22 +249,22 @@ Get-PackageDefaultPreferredTargetInstallDirectory
     return [System.IO.Path]::GetFullPath((Join-Path (Get-PackageDefaultApplicationRootDirectory) 'Inst'))
 }
 
-function Get-PackageDefaultPackageInventoryFilePath {
+function Get-PackageDefaultPackageAssignmentInventoryFilePath {
 <#
 .SYNOPSIS
 Returns the default Package inventory path.
 
 .DESCRIPTION
 Builds the fallback local package inventory file path when the Package
-global document does not define one explicitly.
+Package config document does not define one explicitly.
 
 .EXAMPLE
-Get-PackageDefaultPackageInventoryFilePath
+Get-PackageDefaultPackageAssignmentInventoryFilePath
 #>
     [CmdletBinding()]
     param()
 
-    return [System.IO.Path]::GetFullPath((Join-Path (Join-Path (Get-PackageDefaultApplicationRootDirectory) 'State') 'package-inventory.json'))
+    return [System.IO.Path]::GetFullPath((Join-Path (Join-Path (Get-PackageDefaultApplicationRootDirectory) 'State') 'PackageAssignmentInventory.json'))
 }
 
 function Get-PackageDefaultOperationHistoryFilePath {
@@ -274,7 +274,7 @@ Returns the default Package operation-history path.
 
 .DESCRIPTION
 Builds the fallback local package operation-history file path when the Package
-global document does not define one explicitly.
+Package config document does not define one explicitly.
 
 .EXAMPLE
 Get-PackageDefaultOperationHistoryFilePath
@@ -282,7 +282,7 @@ Get-PackageDefaultOperationHistoryFilePath
     [CmdletBinding()]
     param()
 
-    return [System.IO.Path]::GetFullPath((Join-Path (Join-Path (Get-PackageDefaultApplicationRootDirectory) 'State') 'package-operation-history.json'))
+    return [System.IO.Path]::GetFullPath((Join-Path (Join-Path (Get-PackageDefaultApplicationRootDirectory) 'State') 'PackageOperationHistory.json'))
 }
 
 function Get-PackageDefaultLocalRepositoryRoot {
@@ -300,7 +300,7 @@ Get-PackageDefaultLocalRepositoryRoot
     [CmdletBinding()]
     param()
 
-    return [System.IO.Path]::GetFullPath((Join-Path (Get-PackageDefaultApplicationRootDirectory) 'PackageRepositories'))
+    return [System.IO.Path]::GetFullPath((Join-Path (Get-PackageDefaultApplicationRootDirectory) 'PkgRepos'))
 }
 
 function Get-PackageDefaultSourceInventoryPath {
@@ -318,7 +318,7 @@ Get-PackageDefaultSourceInventoryPath
     [CmdletBinding()]
     param()
 
-    return [System.IO.Path]::GetFullPath((Join-Path (Join-Path (Get-PackageDefaultApplicationRootDirectory) 'Configuration\External') 'SourceInventory.json'))
+    return [System.IO.Path]::GetFullPath((Join-Path (Join-Path (Get-PackageDefaultApplicationRootDirectory) 'Configuration\External') 'PackageSourceInventory.json'))
 }
 
 function Get-PackageDefaultLogRootDirectory {
@@ -349,16 +349,16 @@ place the inventory directly under the package root, so this helper accepts
 both shapes.
 
 .EXAMPLE
-Get-PackageRootFromInventoryPath -PackageInventoryFilePath $path
+Get-PackageRootFromInventoryPath -PackageAssignmentInventoryFilePath $path
 #>
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true)]
         [ValidateNotNullOrEmpty()]
-        [string]$PackageInventoryFilePath
+        [string]$PackageAssignmentInventoryFilePath
     )
 
-    $indexDirectory = Split-Path -Parent ([System.IO.Path]::GetFullPath($PackageInventoryFilePath))
+    $indexDirectory = Split-Path -Parent ([System.IO.Path]::GetFullPath($PackageAssignmentInventoryFilePath))
     if ([string]::Equals((Split-Path -Leaf $indexDirectory), 'State', [System.StringComparison]::OrdinalIgnoreCase)) {
         return [System.IO.Path]::GetFullPath((Split-Path -Parent $indexDirectory))
     }

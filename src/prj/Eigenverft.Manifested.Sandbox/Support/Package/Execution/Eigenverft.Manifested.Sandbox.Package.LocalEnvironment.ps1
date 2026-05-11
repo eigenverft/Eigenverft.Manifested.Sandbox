@@ -18,7 +18,7 @@ Returns the one-time local Package environment marker path.
         $applicationRootDirectory = Get-PackageDefaultApplicationRootDirectory
     }
 
-    return [System.IO.Path]::GetFullPath((Join-Path (Join-Path $applicationRootDirectory 'State') 'package-local-environment.json'))
+    return [System.IO.Path]::GetFullPath((Join-Path (Join-Path $applicationRootDirectory 'State') 'PackageLocalEnvironment.json'))
 }
 
 function Add-PackageLocalEnvironmentDirectoryCandidate {
@@ -74,11 +74,11 @@ the existing lazy creation paths elsewhere in the Package flow.
     $directoryCandidates = [System.Collections.Generic.List[string]]::new()
     Add-PackageLocalEnvironmentDirectoryCandidate -Candidates $directoryCandidates -Path $applicationRootDirectory
     Add-PackageLocalEnvironmentDirectoryCandidate -Candidates $directoryCandidates -Path (Split-Path -Parent $markerPath)
-    Add-PackageLocalEnvironmentDirectoryCandidate -Candidates $directoryCandidates -Path (Split-Path -Parent (Get-PackageLocalGlobalConfigPath))
+    Add-PackageLocalEnvironmentDirectoryCandidate -Candidates $directoryCandidates -Path (Split-Path -Parent (Get-PackageLocalConfigPath))
     Add-PackageLocalEnvironmentDirectoryCandidate -Candidates $directoryCandidates -Path (Split-Path -Parent (Get-PackageLocalDepotInventoryPath))
     Add-PackageLocalEnvironmentDirectoryCandidate -Candidates $directoryCandidates -Path (Split-Path -Parent (Get-PackageLocalRepositoryInventoryPath))
     Add-PackageLocalEnvironmentDirectoryCandidate -Candidates $directoryCandidates -Path (Join-Path (Join-Path $applicationRootDirectory 'Configuration') 'External')
-    Add-PackageLocalEnvironmentDirectoryCandidate -Candidates $directoryCandidates -Path (Split-Path -Parent ([string]$PackageConfig.PackageInventoryFilePath))
+    Add-PackageLocalEnvironmentDirectoryCandidate -Candidates $directoryCandidates -Path (Split-Path -Parent ([string]$PackageConfig.PackageAssignmentInventoryFilePath))
     Add-PackageLocalEnvironmentDirectoryCandidate -Candidates $directoryCandidates -Path (Split-Path -Parent ([string]$PackageConfig.PackageOperationHistoryFilePath))
     Add-PackageLocalEnvironmentDirectoryCandidate -Candidates $directoryCandidates -Path ([string]$PackageConfig.PreferredTargetInstallRootDirectory)
     Add-PackageLocalEnvironmentDirectoryCandidate -Candidates $directoryCandidates -Path ([string]$PackageConfig.PackageFileStagingRootDirectory)

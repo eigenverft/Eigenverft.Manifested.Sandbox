@@ -113,15 +113,15 @@ function Get-PackageStateConfig {
     [CmdletBinding()]
     param()
 
-    $globalDocumentInfo = Read-PackageJsonDocument -Path (Get-PackageGlobalConfigPath)
-    Assert-PackageGlobalConfigSchema -GlobalDocumentInfo $globalDocumentInfo
+    $globalDocumentInfo = Read-PackageJsonDocument -Path (Get-PackageConfigPath)
+    Assert-PackageConfigSchema -PackageConfigDocumentInfo $globalDocumentInfo
 
     $packageGlobalConfig = $globalDocumentInfo.Document.package
-    $applicationRootDirectory = Resolve-PackageApplicationRootDirectory -GlobalConfiguration $packageGlobalConfig
+    $applicationRootDirectory = Resolve-PackageApplicationRootDirectory -PackageConfiguration $packageGlobalConfig
     $repositoryInventoryInfo = Get-PackageRepositoryInventoryInfo
     $depotInventoryInfo = Get-PackageDepotInventoryInfo
     $sourceInventoryInfo = Get-PackageSourceInventoryInfo -ApplicationRootDirectory $applicationRootDirectory
-    $effectiveAcquisitionEnvironment = Resolve-PackageEffectiveAcquisitionEnvironment -GlobalConfiguration $packageGlobalConfig -SourceInventoryInfo $sourceInventoryInfo -DepotInventoryInfo $depotInventoryInfo
+    $effectiveAcquisitionEnvironment = Resolve-PackageEffectiveAcquisitionEnvironment -PackageConfiguration $packageGlobalConfig -SourceInventoryInfo $sourceInventoryInfo -DepotInventoryInfo $depotInventoryInfo
 
     $preferredTargetInstallDirectory = if ($packageGlobalConfig.PSObject.Properties['preferredTargetInstallDirectory'] -and
         -not [string]::IsNullOrWhiteSpace([string]$packageGlobalConfig.preferredTargetInstallDirectory)) {
@@ -136,7 +136,7 @@ function Get-PackageStateConfig {
         Resolve-PackageConfiguredPath -PathValue ([string]$packageGlobalConfig.packageState.inventoryFilePath) -ApplicationRootDirectory $applicationRootDirectory
     }
     else {
-        Resolve-PackageConfiguredPath -PathValue 'State\package-inventory.json' -ApplicationRootDirectory $applicationRootDirectory
+        Resolve-PackageConfiguredPath -PathValue 'State\PackageAssignmentInventory.json' -ApplicationRootDirectory $applicationRootDirectory
     }
 
     $packageOperationHistoryFilePath = if ($packageGlobalConfig.packageState.PSObject.Properties['operationHistoryFilePath'] -and
@@ -144,7 +144,7 @@ function Get-PackageStateConfig {
         Resolve-PackageConfiguredPath -PathValue ([string]$packageGlobalConfig.packageState.operationHistoryFilePath) -ApplicationRootDirectory $applicationRootDirectory
     }
     else {
-        Resolve-PackageConfiguredPath -PathValue 'State\package-operation-history.json' -ApplicationRootDirectory $applicationRootDirectory
+        Resolve-PackageConfiguredPath -PathValue 'State\PackageOperationHistory.json' -ApplicationRootDirectory $applicationRootDirectory
     }
 
     $localRepositoryRoot = if ($packageGlobalConfig.PSObject.Properties['localRepositoryRoot'] -and
@@ -152,7 +152,7 @@ function Get-PackageStateConfig {
         Resolve-PackageConfiguredPath -PathValue ([string]$packageGlobalConfig.localRepositoryRoot) -ApplicationRootDirectory $applicationRootDirectory
     }
     else {
-        Resolve-PackageConfiguredPath -PathValue 'PackageRepositories' -ApplicationRootDirectory $applicationRootDirectory
+        Resolve-PackageConfiguredPath -PathValue 'PkgRepos' -ApplicationRootDirectory $applicationRootDirectory
     }
 
     $shimDirectory = if ($packageGlobalConfig.PSObject.Properties['shimDirectory'] -and
@@ -164,10 +164,9 @@ function Get-PackageStateConfig {
     }
 
     return [pscustomobject]@{
-        GlobalConfigurationPath             = $globalDocumentInfo.Path
-        GlobalConfiguration                 = $packageGlobalConfig
+        PackageConfigPath                   = $globalDocumentInfo.Path
+        PackageConfigDocument               = $packageGlobalConfig
         ApplicationRootDirectory            = $applicationRootDirectory
-        LocalConfigurationPath              = Get-PackageLocalGlobalConfigPath
         LocalRepositoryInventoryPath        = Get-PackageLocalRepositoryInventoryPath
         RepositoryInventoryPath             = $repositoryInventoryInfo.Path
         RepositoryInventory                 = $repositoryInventoryInfo.Document
@@ -186,7 +185,7 @@ function Get-PackageStateConfig {
         PreferredTargetInstallRootDirectory = $preferredTargetInstallDirectory
         LocalRepositoryRoot                 = $localRepositoryRoot
         ShimDirectory                       = $shimDirectory
-        PackageInventoryFilePath            = $packageInventoryFilePath
+        PackageAssignmentInventoryFilePath            = $packageInventoryFilePath
         PackageOperationHistoryFilePath     = $packageOperationHistoryFilePath
         EnvironmentSources                  = $effectiveAcquisitionEnvironment.EnvironmentSources
     }

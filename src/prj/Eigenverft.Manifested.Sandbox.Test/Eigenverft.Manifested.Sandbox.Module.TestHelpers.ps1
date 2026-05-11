@@ -154,11 +154,13 @@ function global:New-TestPackageGlobalDocument {
         [string]$PreferredTargetInstallDirectory,
         [string]$LocalRepositoryRoot,
         [string]$ShimDirectory,
-        [string]$PackageInventoryFilePath,
+        [string]$PackageAssignmentInventoryFilePath,
         [string]$PackageOperationHistoryFilePath,
         [string]$PackageDepotRelativePath = '{definitionId}/{releaseTrack}/{version}/{artifactDistributionVariant}',
         [string]$PackageWorkSlotDirectory = '{definitionId}-{slotHash}',
         [bool]$AllowFallback = $true,
+        [AllowNull()]
+        [string]$DepotDistributionMode = 'packageFocused',
         [string]$ReleaseTrack = 'stable',
         [string]$Strategy = 'latestByVersion',
         [hashtable]$EnvironmentSources = $null
@@ -173,6 +175,9 @@ function global:New-TestPackageGlobalDocument {
             allowFallback = $AllowFallback
         }
     }
+    if (-not [string]::IsNullOrWhiteSpace($DepotDistributionMode)) {
+        $acquisitionEnvironment.defaults.depotDistributionMode = $DepotDistributionMode
+    }
     if ($PSBoundParameters.ContainsKey('EnvironmentSources') -and $null -ne $EnvironmentSources) {
         $acquisitionEnvironment.environmentSources = $EnvironmentSources
     }
@@ -181,7 +186,7 @@ function global:New-TestPackageGlobalDocument {
         package = @{
             applicationRootDirectory = if ($PSBoundParameters.ContainsKey('ApplicationRootDirectory')) { $ApplicationRootDirectory } else { '%LOCALAPPDATA%/Programs/Evf.Sandbox' }
             preferredTargetInstallDirectory = if ($PSBoundParameters.ContainsKey('PreferredTargetInstallDirectory')) { $PreferredTargetInstallDirectory } else { '{applicationRootDirectory}/Inst' }
-            localRepositoryRoot = if ($PSBoundParameters.ContainsKey('LocalRepositoryRoot')) { $LocalRepositoryRoot } else { '{applicationRootDirectory}/PackageRepositories' }
+            localRepositoryRoot = if ($PSBoundParameters.ContainsKey('LocalRepositoryRoot')) { $LocalRepositoryRoot } else { '{applicationRootDirectory}/PkgRepos' }
             shimDirectory = if ($PSBoundParameters.ContainsKey('ShimDirectory')) { $ShimDirectory } else { '{applicationRootDirectory}/Shims' }
             layout = @{
                 packageDepotRelativePath = $PackageDepotRelativePath
@@ -189,8 +194,8 @@ function global:New-TestPackageGlobalDocument {
             }
             acquisitionEnvironment = $acquisitionEnvironment
             packageState = @{
-                inventoryFilePath = if ($PSBoundParameters.ContainsKey('PackageInventoryFilePath')) { $PackageInventoryFilePath } else { '{applicationRootDirectory}/State/package-inventory.json' }
-                operationHistoryFilePath = if ($PSBoundParameters.ContainsKey('PackageOperationHistoryFilePath')) { $PackageOperationHistoryFilePath } else { '{applicationRootDirectory}/State/package-operation-history.json' }
+                inventoryFilePath = if ($PSBoundParameters.ContainsKey('PackageAssignmentInventoryFilePath')) { $PackageAssignmentInventoryFilePath } else { '{applicationRootDirectory}/State/PackageAssignmentInventory.json' }
+                operationHistoryFilePath = if ($PSBoundParameters.ContainsKey('PackageOperationHistoryFilePath')) { $PackageOperationHistoryFilePath } else { '{applicationRootDirectory}/State/PackageOperationHistory.json' }
             }
             selectionDefaults = @{
                 releaseTrack = $ReleaseTrack
@@ -264,7 +269,7 @@ function global:New-TestDepotInventoryDocument {
         kind         = 'filesystem'
         enabled      = $true
         searchOrder  = 300
-        basePath     = if ($PSBoundParameters.ContainsKey('DefaultPackageDepotDirectory')) { $DefaultPackageDepotDirectory } else { '{applicationRootDirectory}/DefaultPackageDepot' }
+        basePath     = if ($PSBoundParameters.ContainsKey('DefaultPackageDepotDirectory')) { $DefaultPackageDepotDirectory } else { '{applicationRootDirectory}/PkgDepot' }
     } -Writable $true -MirrorTarget $true -EnsureExists $true
     foreach ($key in @($EnvironmentSources.Keys)) {
         $sources[$key] = if ([string]::Equals([string]$EnvironmentSources[$key].kind, 'filesystem', [System.StringComparison]::OrdinalIgnoreCase)) {
@@ -845,13 +850,13 @@ function global:Write-TestPackageDocuments {
         [object]$SourceInventoryDocument
     )
 
-    $globalConfigPath = Join-Path $RootPath 'Configuration\Internal\Config.json'
-    $depotInventoryPath = Join-Path $RootPath 'Configuration\Internal\DepotInventory.json'
-    $repositoryInventoryPath = Join-Path $RootPath 'Configuration\Internal\RepositoryInventory.json'
+    $globalConfigPath = Join-Path $RootPath 'Configuration\Internal\PackageConfig.json'
+    $depotInventoryPath = Join-Path $RootPath 'Configuration\Internal\PackageDepotInventory.json'
+    $repositoryInventoryPath = Join-Path $RootPath 'Configuration\Internal\PackageRepositoryInventory.json'
     $definitionPath = Join-Path $RootPath "$($DefinitionDocument.id).json"
     Write-TestJsonDocument -Path $globalConfigPath -Document $GlobalDocument
     if (-not $PSBoundParameters.ContainsKey('DepotInventoryDocument') -or $null -eq $DepotInventoryDocument) {
-        $DepotInventoryDocument = New-TestDepotInventoryDocument -DefaultPackageDepotDirectory (Join-Path $RootPath 'DefaultPackageDepot')
+        $DepotInventoryDocument = New-TestDepotInventoryDocument -DefaultPackageDepotDirectory (Join-Path $RootPath 'PkgDepot')
     }
     if (-not $PSBoundParameters.ContainsKey('RepositoryInventoryDocument') -or $null -eq $RepositoryInventoryDocument) {
         $RepositoryInventoryDocument = New-TestRepositoryInventoryDocument
@@ -862,7 +867,7 @@ function global:Write-TestPackageDocuments {
 
     $sourceInventoryPath = $null
     if ($PSBoundParameters.ContainsKey('SourceInventoryDocument') -and $null -ne $SourceInventoryDocument) {
-        $sourceInventoryPath = Join-Path $RootPath 'SourceInventory.json'
+        $sourceInventoryPath = Join-Path $RootPath 'PackageSourceInventory.json'
         Write-TestJsonDocument -Path $sourceInventoryPath -Document $SourceInventoryDocument
     }
 

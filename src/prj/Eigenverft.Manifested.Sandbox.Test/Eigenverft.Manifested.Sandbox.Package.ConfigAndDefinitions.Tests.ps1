@@ -6,7 +6,7 @@
 
 Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config and definitions' -Body {
     It 'loads the shipped global config without baked-in environment sources' {
-        $globalInfo = Read-PackageJsonDocument -Path (Get-PackageShippedGlobalConfigPath)
+        $globalInfo = Read-PackageJsonDocument -Path (Get-PackageShippedConfigPath)
 
         $globalInfo.Document.package.PSObject.Properties.Name | Should -Contain 'preferredTargetInstallDirectory'
         $globalInfo.Document.package.PSObject.Properties.Name | Should -Contain 'applicationRootDirectory'
@@ -24,6 +24,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
         $globalInfo.Document.package.acquisitionEnvironment.stores.packageInstallStageDirectory | Should -Be '{applicationRootDirectory}/InstStage'
         $globalInfo.Document.package.acquisitionEnvironment.stores.PSObject.Properties.Name | Should -Not -Contain 'defaultPackageDepotDirectory'
         $globalInfo.Document.package.acquisitionEnvironment.defaults.PSObject.Properties.Name | Should -Contain 'allowFallback'
+        $globalInfo.Document.package.acquisitionEnvironment.defaults.depotDistributionMode | Should -Be 'packageFocused'
         $globalInfo.Document.package.acquisitionEnvironment.defaults.PSObject.Properties.Name | Should -Not -Contain 'mirrorDownloadedArtifactsToDefaultPackageDepot'
         $globalInfo.Document.package.packageState.PSObject.Properties.Name | Should -Contain 'inventoryFilePath'
         $globalInfo.Document.package.packageState.PSObject.Properties.Name | Should -Contain 'operationHistoryFilePath'
@@ -38,43 +39,43 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
         $depotInfo.Document.acquisitionEnvironment.environmentSources.defaultPackageDepot.writable | Should -BeTrue
         $depotInfo.Document.acquisitionEnvironment.environmentSources.defaultPackageDepot.mirrorTarget | Should -BeTrue
         $depotInfo.Document.acquisitionEnvironment.environmentSources.defaultPackageDepot.ensureExists | Should -BeTrue
-        $depotInfo.Document.acquisitionEnvironment.environmentSources.defaultPackageDepot.basePath | Should -Be '{applicationRootDirectory}/DefaultPackageDepot'
+        $depotInfo.Document.acquisitionEnvironment.environmentSources.defaultPackageDepot.basePath | Should -Be '{applicationRootDirectory}/PkgDepot'
         $globalInfo.Document.package.acquisitionEnvironment.PSObject.Properties.Name | Should -Not -Contain 'tracking'
         $globalInfo.Document.package.acquisitionEnvironment.PSObject.Properties['environmentSources'] | Should -BeNullOrEmpty
     }
 
-    It 'resolves the bootstrap local root from shipped Config.json' {
+    It 'resolves the bootstrap local root from shipped PackageConfig.json' {
         $rootPath = Join-Path $TestDrive 'bootstrap-root-config'
         $applicationRootPath = Join-Path $rootPath 'AppRoot'
-        $shippedConfigPath = Join-Path $rootPath 'Configuration\Internal\Config.json'
+        $shippedConfigPath = Join-Path $rootPath 'Configuration\Internal\PackageConfig.json'
         Write-TestJsonDocument -Path $shippedConfigPath -Document (New-TestPackageGlobalDocument -ApplicationRootDirectory $applicationRootPath)
-        Mock Get-PackageShippedGlobalConfigPath { $shippedConfigPath }
+        Mock Get-PackageShippedConfigPath { $shippedConfigPath }
 
         Get-PackageLocalRoot | Should -Be ([System.IO.Path]::GetFullPath($applicationRootPath))
     }
 
-    It 'fails clearly when shipped Config.json cannot provide an absolute bootstrap root' {
-        $missingRootConfigPath = Join-Path $TestDrive 'missing-root\Config.json'
+    It 'fails clearly when shipped PackageConfig.json cannot provide an absolute bootstrap root' {
+        $missingRootConfigPath = Join-Path $TestDrive 'missing-root\PackageConfig.json'
         Write-TestJsonDocument -Path $missingRootConfigPath -Document @{ package = @{} }
         $mockShippedConfigPath = $missingRootConfigPath
-        Mock Get-PackageShippedGlobalConfigPath { $mockShippedConfigPath }
+        Mock Get-PackageShippedConfigPath { $mockShippedConfigPath }
 
         { Get-PackageLocalRoot } | Should -Throw '*must define package.applicationRootDirectory*'
 
-        $relativeRootConfigPath = Join-Path $TestDrive 'relative-root\Config.json'
+        $relativeRootConfigPath = Join-Path $TestDrive 'relative-root\PackageConfig.json'
         Write-TestJsonDocument -Path $relativeRootConfigPath -Document (New-TestPackageGlobalDocument -ApplicationRootDirectory 'relative-root')
         $mockShippedConfigPath = $relativeRootConfigPath
 
         { Get-PackageLocalRoot } | Should -Throw '*does not resolve to an absolute path*'
     }
 
-    It 'creates the local Config.json copy from shipped configuration when missing' {
-        $localGlobalPath = Get-PackageLocalGlobalConfigPath
+    It 'creates the local PackageConfig.json copy from shipped configuration when missing' {
+        $localGlobalPath = Get-PackageLocalConfigPath
         if (Test-Path -LiteralPath $localGlobalPath -PathType Leaf) {
             Remove-Item -LiteralPath $localGlobalPath -Force
         }
 
-        $activeGlobalPath = Get-PackageGlobalConfigPath
+        $activeGlobalPath = Get-PackageConfigPath
         $localInfo = Read-PackageJsonDocument -Path $localGlobalPath
 
         $activeGlobalPath | Should -Be $localGlobalPath
@@ -82,7 +83,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
         $localInfo.Document.package.PSObject.Properties.Name | Should -Not -Contain 'repositorySources'
     }
 
-    It 'creates the local RepositoryInventory.json copy from shipped configuration when missing' {
+    It 'creates the local PackageRepositoryInventory.json copy from shipped configuration when missing' {
         $localRepositoryInventoryPath = Get-PackageLocalRepositoryInventoryPath
         if (Test-Path -LiteralPath $localRepositoryInventoryPath -PathType Leaf) {
             Remove-Item -LiteralPath $localRepositoryInventoryPath -Force
@@ -111,7 +112,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
         $documents = Write-TestPackageDocuments -RootPath $rootPath -GlobalDocument $globalDocument -DefinitionDocument $definitionDocument
 
         [Environment]::SetEnvironmentVariable($script:SourceInventoryEnvVarName, (Join-Path $TestDrive 'missing-inventory.json'), 'Process')
-        Mock Get-PackageGlobalConfigPath { $documents.GlobalConfigPath }
+        Mock Get-PackageConfigPath { $documents.GlobalConfigPath }
         Mock Get-PackageDefinitionPath { param($DefinitionId) $documents.DefinitionPath }
 
         $config = Get-PackageConfig -DefinitionId 'VSCodeRuntime'
@@ -120,15 +121,15 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
         $config.PreferredTargetInstallRootDirectory | Should -Be ([System.IO.Path]::GetFullPath((Join-Path $applicationRootPath 'Inst')))
         $config.PackageFileStagingRootDirectory | Should -Be ([System.IO.Path]::GetFullPath((Join-Path $applicationRootPath 'FileStage')))
         $config.PackageInstallStageRootDirectory | Should -Be ([System.IO.Path]::GetFullPath((Join-Path $applicationRootPath 'InstStage')))
-        $config.DefaultPackageDepotDirectory | Should -Be ([System.IO.Path]::GetFullPath((Join-Path $applicationRootPath 'DefaultPackageDepot')))
-        $config.LocalRepositoryRoot | Should -Be ([System.IO.Path]::GetFullPath((Join-Path $applicationRootPath 'PackageRepositories')))
+        $config.DefaultPackageDepotDirectory | Should -Be ([System.IO.Path]::GetFullPath((Join-Path $applicationRootPath 'PkgDepot')))
+        $config.LocalRepositoryRoot | Should -Be ([System.IO.Path]::GetFullPath((Join-Path $applicationRootPath 'PkgRepos')))
         $config.ShimDirectory | Should -Be ([System.IO.Path]::GetFullPath((Join-Path $applicationRootPath 'Shims')))
 
         $fallbackRootPath = Join-Path $TestDrive 'application-root-fallback'
         $fallbackGlobalDocument = New-TestPackageGlobalDocument
         $fallbackGlobalDocument.package.Remove('applicationRootDirectory')
         $fallbackDocuments = Write-TestPackageDocuments -RootPath $fallbackRootPath -GlobalDocument $fallbackGlobalDocument -DefinitionDocument $definitionDocument
-        Mock Get-PackageGlobalConfigPath { $fallbackDocuments.GlobalConfigPath }
+        Mock Get-PackageConfigPath { $fallbackDocuments.GlobalConfigPath }
         Mock Get-PackageDefinitionPath { param($DefinitionId) $fallbackDocuments.DefinitionPath }
 
         $fallbackConfig = Get-PackageConfig -DefinitionId 'VSCodeRuntime'
@@ -156,7 +157,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
         $documents = Write-TestPackageDocuments -RootPath $rootPath -GlobalDocument $globalDocument -DefinitionDocument $definitionDocument
 
         [Environment]::SetEnvironmentVariable($script:SourceInventoryEnvVarName, (Join-Path $TestDrive 'missing-inventory.json'), 'Process')
-        Mock Get-PackageGlobalConfigPath { $documents.GlobalConfigPath }
+        Mock Get-PackageConfigPath { $documents.GlobalConfigPath }
         Mock Get-PackageDefinitionPath { param($DefinitionId) $documents.DefinitionPath }
 
         $config = Get-PackageConfig -DefinitionId 'VSCodeRuntime'
@@ -167,7 +168,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
         $config.ShimDirectory | Should -Be ([System.IO.Path]::GetFullPath((Join-Path $applicationRootPath 'Shims')))
     }
 
-    It 'creates the local DepotInventory.json copy from shipped configuration when missing' {
+    It 'creates the local PackageDepotInventory.json copy from shipped configuration when missing' {
         $localDepotInventoryPath = Get-PackageLocalDepotInventoryPath
         if (Test-Path -LiteralPath $localDepotInventoryPath -PathType Leaf) {
             Remove-Item -LiteralPath $localDepotInventoryPath -Force
@@ -184,7 +185,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
     It 'initializes the local package environment once and creates only eligible depot roots' {
         $rootPath = Join-Path $TestDrive 'local-environment-init'
         $applicationRootPath = Join-Path $rootPath 'AppRoot'
-        $defaultDepotPath = Join-Path $rootPath 'DefaultPackageDepot'
+        $defaultDepotPath = Join-Path $rootPath 'PkgDepot'
         $readOnlyDepotPath = Join-Path $rootPath 'ReadOnlyPackageDepot'
         $disabledDepotPath = Join-Path $rootPath 'DisabledPackageDepot'
         $globalDocument = New-TestPackageGlobalDocument -ApplicationRootDirectory $applicationRootPath
@@ -221,14 +222,14 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
         $documents = Write-TestPackageDocuments -RootPath $rootPath -GlobalDocument $globalDocument -DepotInventoryDocument $depotInventory -DefinitionDocument $definitionDocument
 
         [Environment]::SetEnvironmentVariable($script:SourceInventoryEnvVarName, (Join-Path $TestDrive 'missing-inventory.json'), 'Process')
-        Mock Get-PackageGlobalConfigPath { $documents.GlobalConfigPath }
+        Mock Get-PackageConfigPath { $documents.GlobalConfigPath }
         Mock Get-PackageDepotInventoryPath { $documents.DepotInventoryPath }
         Mock Get-PackageDefinitionPath { param($DefinitionId) $documents.DefinitionPath }
 
         $config = Get-PackageConfig -DefinitionId 'VSCodeRuntime'
         $environment = Initialize-PackageLocalEnvironment -PackageConfig $config
-        $markerPath = Join-Path (Join-Path $applicationRootPath 'State') 'package-local-environment.json'
-        $localConfigDirectory = Split-Path -Parent (Get-PackageLocalGlobalConfigPath)
+        $markerPath = Join-Path (Join-Path $applicationRootPath 'State') 'PackageLocalEnvironment.json'
+        $localConfigDirectory = Split-Path -Parent (Get-PackageLocalConfigPath)
         $localDepotInventoryDirectory = Split-Path -Parent (Get-PackageLocalDepotInventoryPath)
 
         $environment.Status | Should -Be 'Initialized'
@@ -242,7 +243,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
         Test-Path -LiteralPath (Join-Path $applicationRootPath 'Inst') -PathType Container | Should -BeTrue
         Test-Path -LiteralPath (Join-Path $applicationRootPath 'FileStage') -PathType Container | Should -BeTrue
         Test-Path -LiteralPath (Join-Path $applicationRootPath 'InstStage') -PathType Container | Should -BeTrue
-        Test-Path -LiteralPath (Join-Path $applicationRootPath 'PackageRepositories') -PathType Container | Should -BeTrue
+        Test-Path -LiteralPath (Join-Path $applicationRootPath 'PkgRepos') -PathType Container | Should -BeTrue
         Test-Path -LiteralPath (Join-Path $applicationRootPath 'Shims') -PathType Container | Should -BeTrue
         Test-Path -LiteralPath (Join-Path (Join-Path $applicationRootPath 'Caches') 'npm') -PathType Container | Should -BeTrue
         Test-Path -LiteralPath $defaultDepotPath -PathType Container | Should -BeTrue
@@ -254,7 +255,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
     It 'skips all directory verification when the local environment marker already exists' {
         $rootPath = Join-Path $TestDrive 'local-environment-marker-skip'
         $applicationRootPath = Join-Path $rootPath 'AppRoot'
-        $markerPath = Join-Path (Join-Path $applicationRootPath 'State') 'package-local-environment.json'
+        $markerPath = Join-Path (Join-Path $applicationRootPath 'State') 'PackageLocalEnvironment.json'
         Write-TestJsonDocument -Path $markerPath -Document @{
             schemaVersion = 1
             initializedAtUtc = [DateTime]::UtcNow.ToString('o')
@@ -273,7 +274,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
         $documents = Write-TestPackageDocuments -RootPath $rootPath -GlobalDocument $globalDocument -DefinitionDocument $definitionDocument
 
         [Environment]::SetEnvironmentVariable($script:SourceInventoryEnvVarName, (Join-Path $TestDrive 'missing-inventory.json'), 'Process')
-        Mock Get-PackageGlobalConfigPath { $documents.GlobalConfigPath }
+        Mock Get-PackageConfigPath { $documents.GlobalConfigPath }
         Mock Get-PackageDepotInventoryPath { $documents.DepotInventoryPath }
         Mock Get-PackageDefinitionPath { param($DefinitionId) $documents.DefinitionPath }
 
@@ -303,7 +304,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
         $documents = Write-TestPackageDocuments -RootPath $rootPath -GlobalDocument $globalDocument -DefinitionDocument $definitionDocument
 
         [Environment]::SetEnvironmentVariable($script:SourceInventoryEnvVarName, (Join-Path $TestDrive 'missing-inventory.json'), 'Process')
-        Mock Get-PackageGlobalConfigPath { $documents.GlobalConfigPath }
+        Mock Get-PackageConfigPath { $documents.GlobalConfigPath }
         Mock Get-PackageDepotInventoryPath { $documents.DepotInventoryPath }
         Mock Get-PackageDefinitionPath { param($DefinitionId) $documents.DefinitionPath }
         Mock Initialize-PackageLocalEnvironment { throw 'local environment boom' }
@@ -415,12 +416,12 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
         )
         $documents = Write-TestPackageDocuments -RootPath $rootPath -GlobalDocument $globalDocument -DefinitionDocument $definitionDocument
 
-        $inventoryPath = Join-Path (Join-Path $rootPath 'AppRoot') 'State\package-inventory.json'
+        $inventoryPath = Join-Path (Join-Path $rootPath 'AppRoot') 'State\PackageAssignmentInventory.json'
         $null = New-Item -ItemType Directory -Path (Split-Path -Parent $inventoryPath) -Force
         Write-TestJsonDocument -Path $inventoryPath -Document @{ schemaVersion = 1; records = @() }
 
         [Environment]::SetEnvironmentVariable($script:SourceInventoryEnvVarName, (Join-Path $TestDrive 'missing-inventory.json'), 'Process')
-        Mock Get-PackageGlobalConfigPath { $documents.GlobalConfigPath }
+        Mock Get-PackageConfigPath { $documents.GlobalConfigPath }
         Mock Get-PackageDepotInventoryPath { $documents.DepotInventoryPath }
         Mock Get-PackageDefinitionPath { param($DefinitionId) $documents.DefinitionPath }
 
@@ -444,12 +445,12 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
         $definitionDocument.packageOperations.removed.policy.whenNotInInventory = 'fail'
         $documents = Write-TestPackageDocuments -RootPath $rootPath -GlobalDocument $globalDocument -DefinitionDocument $definitionDocument
 
-        $inventoryPath = Join-Path (Join-Path $rootPath 'AppRoot') 'State\package-inventory.json'
+        $inventoryPath = Join-Path (Join-Path $rootPath 'AppRoot') 'State\PackageAssignmentInventory.json'
         $null = New-Item -ItemType Directory -Path (Split-Path -Parent $inventoryPath) -Force
         Write-TestJsonDocument -Path $inventoryPath -Document @{ schemaVersion = 1; records = @() }
 
         [Environment]::SetEnvironmentVariable($script:SourceInventoryEnvVarName, (Join-Path $TestDrive 'missing-inventory.json'), 'Process')
-        Mock Get-PackageGlobalConfigPath { $documents.GlobalConfigPath }
+        Mock Get-PackageConfigPath { $documents.GlobalConfigPath }
         Mock Get-PackageDepotInventoryPath { $documents.DepotInventoryPath }
         Mock Get-PackageDefinitionPath { param($DefinitionId) $documents.DefinitionPath }
 
@@ -473,12 +474,12 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
         $definitionDocument.packageOperations.removed.policy.removeDependencies = $true
         $documents = Write-TestPackageDocuments -RootPath $rootPath -GlobalDocument $globalDocument -DefinitionDocument $definitionDocument
 
-        $inventoryPath = Join-Path (Join-Path $rootPath 'AppRoot') 'State\package-inventory.json'
+        $inventoryPath = Join-Path (Join-Path $rootPath 'AppRoot') 'State\PackageAssignmentInventory.json'
         $null = New-Item -ItemType Directory -Path (Split-Path -Parent $inventoryPath) -Force
         Write-TestJsonDocument -Path $inventoryPath -Document @{ schemaVersion = 1; records = @() }
 
         [Environment]::SetEnvironmentVariable($script:SourceInventoryEnvVarName, (Join-Path $TestDrive 'missing-inventory.json'), 'Process')
-        Mock Get-PackageGlobalConfigPath { $documents.GlobalConfigPath }
+        Mock Get-PackageConfigPath { $documents.GlobalConfigPath }
         Mock Get-PackageDepotInventoryPath { $documents.DepotInventoryPath }
         Mock Get-PackageDefinitionPath { param($DefinitionId) $documents.DefinitionPath }
 
@@ -509,7 +510,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
         Write-TestTextFile -Path (Join-Path $installDir 'Code.exe') -Content 'x'
         Write-TestTextFile -Path (Join-Path $installDir 'bin\code.cmd') -Content '@echo off'
 
-        $inventoryPath = Join-Path $appRoot 'State\package-inventory.json'
+        $inventoryPath = Join-Path $appRoot 'State\PackageAssignmentInventory.json'
         $null = New-Item -ItemType Directory -Path (Split-Path -Parent $inventoryPath) -Force
         $record = @{
             installSlotId       = 'VSCodeRuntime:stable:win32-x64'
@@ -530,7 +531,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
         Write-TestJsonDocument -Path $inventoryPath -Document @{ schemaVersion = 1; records = @($record) }
 
         [Environment]::SetEnvironmentVariable($script:SourceInventoryEnvVarName, (Join-Path $TestDrive 'missing-inventory.json'), 'Process')
-        Mock Get-PackageGlobalConfigPath { $documents.GlobalConfigPath }
+        Mock Get-PackageConfigPath { $documents.GlobalConfigPath }
         Mock Get-PackageDepotInventoryPath { $documents.DepotInventoryPath }
         Mock Get-PackageDefinitionPath { param($DefinitionId) $documents.DefinitionPath }
 
@@ -567,7 +568,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
         Write-TestTextFile -Path (Join-Path $installDir 'bin\code.cmd') -Content "@echo off`r`necho 2.0.0`r`n"
         $null = New-Item -ItemType Directory -Path (Join-Path $installDir 'data') -Force
 
-        $inventoryPath = Join-Path $appRoot 'State\package-inventory.json'
+        $inventoryPath = Join-Path $appRoot 'State\PackageAssignmentInventory.json'
         $null = New-Item -ItemType Directory -Path (Split-Path -Parent $inventoryPath) -Force
         $record = @{
             installSlotId       = 'VSCodeRuntime:stable:win32-x64'
@@ -588,7 +589,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
         Write-TestJsonDocument -Path $inventoryPath -Document @{ schemaVersion = 1; records = @($record) }
 
         [Environment]::SetEnvironmentVariable($script:SourceInventoryEnvVarName, (Join-Path $TestDrive 'missing-inventory.json'), 'Process')
-        Mock Get-PackageGlobalConfigPath { $documents.GlobalConfigPath }
+        Mock Get-PackageConfigPath { $documents.GlobalConfigPath }
         Mock Get-PackageDepotInventoryPath { $documents.DepotInventoryPath }
         Mock Get-PackageDefinitionPath { param($DefinitionId) $documents.DefinitionPath }
 
@@ -663,12 +664,12 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
                 updatedAtUtc                 = $now
             }
         )
-        $inventoryPath = Join-Path $appRoot 'State\package-inventory.json'
+        $inventoryPath = Join-Path $appRoot 'State\PackageAssignmentInventory.json'
         $null = New-Item -ItemType Directory -Path (Split-Path -Parent $inventoryPath) -Force
         Write-TestJsonDocument -Path $inventoryPath -Document @{ schemaVersion = 1; records = $records }
 
         [Environment]::SetEnvironmentVariable($script:SourceInventoryEnvVarName, (Join-Path $TestDrive 'missing-inventory.json'), 'Process')
-        Mock Get-PackageGlobalConfigPath { $documents.GlobalConfigPath }
+        Mock Get-PackageConfigPath { $documents.GlobalConfigPath }
         Mock Get-PackageDepotInventoryPath { $documents.DepotInventoryPath }
 
         $result = Invoke-Package -DefinitionId 'NodeRuntime' -DesiredState Removed
@@ -687,7 +688,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
         Write-TestJsonDocument -Path $globalConfigPath -Document $badGlobal
 
         $globalInfo = Read-PackageJsonDocument -Path $globalConfigPath
-        { Assert-PackageGlobalConfigSchema -GlobalDocumentInfo $globalInfo } | Should -Throw '*ownershipTracking*'
+        { Assert-PackageConfigSchema -PackageConfigDocumentInfo $globalInfo } | Should -Throw '*ownershipTracking*'
     }
 
     It 'fails clearly when global config still uses retired artifactIndexFilePath' {
@@ -698,7 +699,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
         Write-TestJsonDocument -Path $globalConfigPath -Document $badGlobal
 
         $globalInfo = Read-PackageJsonDocument -Path $globalConfigPath
-        { Assert-PackageGlobalConfigSchema -GlobalDocumentInfo $globalInfo } | Should -Throw '*artifactIndexFilePath*'
+        { Assert-PackageConfigSchema -PackageConfigDocumentInfo $globalInfo } | Should -Throw '*artifactIndexFilePath*'
     }
 
     It 'fails clearly when global config still uses retired packageFileIndexFilePath' {
@@ -710,7 +711,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
         Write-TestJsonDocument -Path $globalConfigPath -Document $badGlobal
 
         $globalInfo = Read-PackageJsonDocument -Path $globalConfigPath
-        { Assert-PackageGlobalConfigSchema -GlobalDocumentInfo $globalInfo } | Should -Throw '*packageFileIndexFilePath*'
+        { Assert-PackageConfigSchema -PackageConfigDocumentInfo $globalInfo } | Should -Throw '*packageFileIndexFilePath*'
     }
 
     It 'fails clearly when global config still uses retired installWorkspaceDirectory' {
@@ -721,7 +722,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
         Write-TestJsonDocument -Path $globalConfigPath -Document $badGlobal
 
         $globalInfo = Read-PackageJsonDocument -Path $globalConfigPath
-        { Assert-PackageGlobalConfigSchema -GlobalDocumentInfo $globalInfo } | Should -Throw '*installWorkspaceDirectory*'
+        { Assert-PackageConfigSchema -PackageConfigDocumentInfo $globalInfo } | Should -Throw '*installWorkspaceDirectory*'
     }
 
     It 'fails clearly when global config still uses retired installPreparationDirectory' {
@@ -733,7 +734,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
         Write-TestJsonDocument -Path $globalConfigPath -Document $badGlobal
 
         $globalInfo = Read-PackageJsonDocument -Path $globalConfigPath
-        { Assert-PackageGlobalConfigSchema -GlobalDocumentInfo $globalInfo } | Should -Throw '*installPreparationDirectory*'
+        { Assert-PackageConfigSchema -PackageConfigDocumentInfo $globalInfo } | Should -Throw '*installPreparationDirectory*'
     }
 
     It 'fails clearly when global config still uses retired mirrorDownloadedArtifactsToDefaultPackageDepot' {
@@ -743,7 +744,17 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
         Write-TestJsonDocument -Path $globalConfigPath -Document $badGlobal
 
         $globalInfo = Read-PackageJsonDocument -Path $globalConfigPath
-        { Assert-PackageGlobalConfigSchema -GlobalDocumentInfo $globalInfo } | Should -Throw '*mirrorDownloadedArtifactsToDefaultPackageDepot*'
+        { Assert-PackageConfigSchema -PackageConfigDocumentInfo $globalInfo } | Should -Throw '*mirrorDownloadedArtifactsToDefaultPackageDepot*'
+    }
+
+    It 'rejects unsupported depot distribution modes' {
+        $globalConfigPath = Join-Path $TestDrive 'Global-invalid-depot-distribution-mode.json'
+        $badGlobal = New-TestPackageGlobalDocument
+        $badGlobal.package.acquisitionEnvironment.defaults.depotDistributionMode = 'surpriseMe'
+        Write-TestJsonDocument -Path $globalConfigPath -Document $badGlobal
+
+        $globalInfo = Read-PackageJsonDocument -Path $globalConfigPath
+        { Assert-PackageConfigSchema -PackageConfigDocumentInfo $globalInfo } | Should -Throw '*depotDistributionMode*'
     }
 
     It 'rejects filesystem depot inventory entries without explicit capability fields' {
@@ -1164,14 +1175,14 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
     }
 
     It 'fails clearly when the shipped global config still defines vsCodeUpdateService as an environment source' {
-        $globalConfigPath = Join-Path $TestDrive 'Config.json'
+        $globalConfigPath = Join-Path $TestDrive 'PackageConfig.json'
         $badGlobal = New-TestPackageGlobalDocument -EnvironmentSources @{
             vsCodeUpdateService = @{ kind = 'download'; baseUri = 'https://example.invalid/' }
         }
         Write-TestJsonDocument -Path $globalConfigPath -Document $badGlobal
 
         $globalInfo = Read-PackageJsonDocument -Path $globalConfigPath
-        { Assert-PackageGlobalConfigSchema -GlobalDocumentInfo $globalInfo } | Should -Throw '*vsCodeUpdateService*'
+        { Assert-PackageConfigSchema -PackageConfigDocumentInfo $globalInfo } | Should -Throw '*vsCodeUpdateService*'
     }
 
     It 'fails clearly when a definition still uses requireManagedOwnership' {
@@ -1361,7 +1372,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
         [Environment]::SetEnvironmentVariable($script:SourceInventoryEnvVarName, $null, 'Process')
         $applicationRootPath = Join-Path $TestDrive 'custom-app-root'
         Get-PackageSourceInventoryPath -ApplicationRootDirectory $applicationRootPath |
-            Should -Be ([System.IO.Path]::GetFullPath((Join-Path (Join-Path $applicationRootPath 'Configuration\External') 'SourceInventory.json')))
+            Should -Be ([System.IO.Path]::GetFullPath((Join-Path (Join-Path $applicationRootPath 'Configuration\External') 'PackageSourceInventory.json')))
     }
 
     It 'loads source inventory from the env-var path and applies the inventory global overlay when no site code is set' {
@@ -1385,13 +1396,36 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
         [Environment]::SetEnvironmentVariable($script:SourceInventoryEnvVarName, $documents.SourceInventoryPath, 'Process')
         [Environment]::SetEnvironmentVariable($script:SiteCodeEnvVarName, $null, 'Process')
 
-        Mock Get-PackageGlobalConfigPath { $documents.GlobalConfigPath }
+        Mock Get-PackageConfigPath { $documents.GlobalConfigPath }
         Mock Get-PackageDefinitionPath { param($DefinitionId) $documents.DefinitionPath }
 
         $config = Get-PackageConfig -DefinitionId 'VSCodeRuntime'
 
         $config.EnvironmentSources.PSObject.Properties.Name | Should -Contain 'remotePackageDepot'
         $config.EnvironmentSources.remotePackageDepot.basePath | Should -Be (Join-Path $TestDrive 'global-remote')
+    }
+
+    It 'rejects unsupported depot distribution modes from inventory overlays' {
+        $rootPath = Join-Path $TestDrive 'inventory-invalid-depot-distribution-mode'
+        $documents = Write-TestPackageDocuments -RootPath $rootPath -GlobalDocument (New-TestPackageGlobalDocument) -DefinitionDocument (New-TestVSCodeDefinitionDocument -Releases @(
+                New-TestPackageRelease -Id 'vsCode-win-x64-stable' -Version '2.0.0' -Architecture 'x64' -ArtifactDistributionVariant 'win32-x64' -FileName 'VSCode-win32-x64-2.0.0.zip' -AcquisitionCandidates @(
+                    @{
+                        kind        = 'packageDepot'
+                        searchOrder = 100
+                        verification = @{ mode = 'none' }
+                    }
+                )
+            )) -SourceInventoryDocument (New-TestSourceInventoryDocument -GlobalDefaults @{
+                depotDistributionMode = 'mirrorMagic'
+            })
+
+        [Environment]::SetEnvironmentVariable($script:SourceInventoryEnvVarName, $documents.SourceInventoryPath, 'Process')
+        [Environment]::SetEnvironmentVariable($script:SiteCodeEnvVarName, $null, 'Process')
+
+        Mock Get-PackageConfigPath { $documents.GlobalConfigPath }
+        Mock Get-PackageDefinitionPath { param($DefinitionId) $documents.DefinitionPath }
+
+        { Get-PackageConfig -DefinitionId 'VSCodeRuntime' } | Should -Throw '*depotDistributionMode*'
     }
 
     It 'applies the site overlay on top of the inventory global overlay when site code is present' {
@@ -1421,7 +1455,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
         [Environment]::SetEnvironmentVariable($script:SourceInventoryEnvVarName, $documents.SourceInventoryPath, 'Process')
         [Environment]::SetEnvironmentVariable($script:SiteCodeEnvVarName, 'BER', 'Process')
 
-        Mock Get-PackageGlobalConfigPath { $documents.GlobalConfigPath }
+        Mock Get-PackageConfigPath { $documents.GlobalConfigPath }
         Mock Get-PackageDefinitionPath { param($DefinitionId) $documents.DefinitionPath }
 
         $config = Get-PackageConfig -DefinitionId 'VSCodeRuntime'
@@ -1472,7 +1506,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
         [Environment]::SetEnvironmentVariable($script:SourceInventoryEnvVarName, (Join-Path $TestDrive 'missing-inventory.json'), 'Process')
         [Environment]::SetEnvironmentVariable($script:SiteCodeEnvVarName, 'BER;BER-ENG', 'Process')
 
-        Mock Get-PackageGlobalConfigPath { $documents.GlobalConfigPath }
+        Mock Get-PackageConfigPath { $documents.GlobalConfigPath }
         Mock Get-PackageDepotInventoryPath { $documents.DepotInventoryPath }
         Mock Get-PackageDefinitionPath { param($DefinitionId) $documents.DefinitionPath }
 
@@ -1501,7 +1535,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
         $documents = Write-TestPackageDocuments -RootPath $rootPath -GlobalDocument (New-TestPackageGlobalDocument) -DefinitionDocument (New-TestVSCodeDefinitionDocument -Releases @($release))
 
         [Environment]::SetEnvironmentVariable($script:SourceInventoryEnvVarName, (Join-Path $TestDrive 'missing-inventory.json'), 'Process')
-        Mock Get-PackageGlobalConfigPath { $documents.GlobalConfigPath }
+        Mock Get-PackageConfigPath { $documents.GlobalConfigPath }
         Mock Get-PackageDefinitionPath { param($DefinitionId) $documents.DefinitionPath }
 
         $config = Get-PackageConfig -DefinitionId 'VSCodeRuntime'
@@ -1523,7 +1557,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
             })
 
         [Environment]::SetEnvironmentVariable($script:SourceInventoryEnvVarName, $documents.SourceInventoryPath, 'Process')
-        Mock Get-PackageGlobalConfigPath { $documents.GlobalConfigPath }
+        Mock Get-PackageConfigPath { $documents.GlobalConfigPath }
         Mock Get-PackageDefinitionPath { param($DefinitionId) $documents.DefinitionPath }
 
         $config = Get-PackageConfig -DefinitionId 'VSCodeRuntime'
@@ -1555,7 +1589,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
         })
 
         [Environment]::SetEnvironmentVariable($script:SourceInventoryEnvVarName, (Join-Path $TestDrive 'missing-inventory.json'), 'Process')
-        Mock Get-PackageGlobalConfigPath { $documents.GlobalConfigPath }
+        Mock Get-PackageConfigPath { $documents.GlobalConfigPath }
         Mock Get-PackageDefinitionPath { param($DefinitionId) $documents.DefinitionPath }
 
         $config = Get-PackageConfig -DefinitionId 'VSCodeRuntime'
@@ -1589,7 +1623,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
         })
 
         [Environment]::SetEnvironmentVariable($script:SourceInventoryEnvVarName, (Join-Path $TestDrive 'missing-inventory.json'), 'Process')
-        Mock Get-PackageGlobalConfigPath { $documents.GlobalConfigPath }
+        Mock Get-PackageConfigPath { $documents.GlobalConfigPath }
         Mock Get-PackageDefinitionPath { param($DefinitionId) $documents.DefinitionPath }
 
         { Get-PackageConfig -DefinitionId 'VSCodeRuntime' } | Should -Throw '*requires releaseTag*'
@@ -1614,7 +1648,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
         })
 
         [Environment]::SetEnvironmentVariable($script:SourceInventoryEnvVarName, (Join-Path $TestDrive 'missing-inventory.json'), 'Process')
-        Mock Get-PackageGlobalConfigPath { $documents.GlobalConfigPath }
+        Mock Get-PackageConfigPath { $documents.GlobalConfigPath }
         Mock Get-PackageDefinitionPath { param($DefinitionId) $documents.DefinitionPath }
         Mock Get-GitHubRelease {
             [pscustomobject]@{
@@ -1739,7 +1773,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
         $documents = Write-TestPackageDocuments -RootPath $rootPath -GlobalDocument (New-TestPackageGlobalDocument -ReleaseTrack 'stable') -DefinitionDocument (New-TestVSCodeDefinitionDocument -Releases @($release) -SharedReadiness (New-TestReadiness -Version '2.0.0'))
 
         [Environment]::SetEnvironmentVariable($script:SourceInventoryEnvVarName, (Join-Path $TestDrive 'missing-inventory.json'), 'Process')
-        Mock Get-PackageGlobalConfigPath { $documents.GlobalConfigPath }
+        Mock Get-PackageConfigPath { $documents.GlobalConfigPath }
         Mock Get-PackageDefinitionPath { param($DefinitionId) $documents.DefinitionPath }
 
         $config = Get-PackageConfig -DefinitionId 'VSCodeRuntime'
@@ -1770,7 +1804,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
         $documents = Write-TestPackageDocuments -RootPath $rootPath -GlobalDocument (New-TestPackageGlobalDocument) -DefinitionDocument (New-TestVSCodeDefinitionDocument -Releases @($release) -SharedReadiness (New-TestReadiness -Version '2.0.0'))
 
         [Environment]::SetEnvironmentVariable($script:SourceInventoryEnvVarName, (Join-Path $TestDrive 'missing-inventory.json'), 'Process')
-        Mock Get-PackageGlobalConfigPath { $documents.GlobalConfigPath }
+        Mock Get-PackageConfigPath { $documents.GlobalConfigPath }
         Mock Get-PackageDefinitionPath { param($DefinitionId) $documents.DefinitionPath }
 
         $messages = New-Object System.Collections.Generic.List[string]

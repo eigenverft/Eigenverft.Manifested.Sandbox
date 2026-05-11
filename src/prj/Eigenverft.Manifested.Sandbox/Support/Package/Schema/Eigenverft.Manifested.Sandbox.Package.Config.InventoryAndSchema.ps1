@@ -28,7 +28,7 @@ Get-PackageSourceInventoryPath
     }
 
     if (-not [string]::IsNullOrWhiteSpace($ApplicationRootDirectory)) {
-        return (Resolve-PackageConfiguredPath -PathValue 'Configuration\External\SourceInventory.json' -ApplicationRootDirectory $ApplicationRootDirectory)
+        return (Resolve-PackageConfiguredPath -PathValue 'Configuration\External\PackageSourceInventory.json' -ApplicationRootDirectory $ApplicationRootDirectory)
     }
 
     return (Get-PackageDefaultSourceInventoryPath)
@@ -260,127 +260,133 @@ Get-PackageSourceInventoryInfo
     }
 }
 
-function Assert-PackageGlobalConfigSchema {
+function Assert-PackageConfigSchema {
 <#
 .SYNOPSIS
-Validates the Package global config schema.
+Validates the Package config schema.
 
 .DESCRIPTION
 Rejects retired global field names and requires the current Package
 preferred-install and acquisition-environment fields.
 
-.PARAMETER GlobalDocumentInfo
-The loaded Package global config document info.
+.PARAMETER PackageConfigDocumentInfo
+The loaded Package config document info.
 
 .EXAMPLE
-Assert-PackageGlobalConfigSchema -GlobalDocumentInfo $globalInfo
+Assert-PackageConfigSchema -PackageConfigDocumentInfo $globalInfo
 #>
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true)]
-        [psobject]$GlobalDocumentInfo
+        [psobject]$PackageConfigDocumentInfo
     )
 
-    if (-not $GlobalDocumentInfo.Document.PSObject.Properties['package'] -or $null -eq $GlobalDocumentInfo.Document.package) {
-        throw "Package global config '$($GlobalDocumentInfo.Path)' does not contain a 'package' object."
+    if (-not $PackageConfigDocumentInfo.Document.PSObject.Properties['package'] -or $null -eq $PackageConfigDocumentInfo.Document.package) {
+        throw "Package config '$($PackageConfigDocumentInfo.Path)' does not contain a 'package' object."
     }
 
-    $package = $GlobalDocumentInfo.Document.package
+    $package = $PackageConfigDocumentInfo.Document.package
     foreach ($retiredProperty in @('managedStorageRoots', 'acquisitionDefaults', 'sourceBindings', 'downloadRootDirectory', 'installRootDirectory', 'allowSourceFallback', 'packageSelection', 'ownershipTracking')) {
         if ($package.PSObject.Properties[$retiredProperty]) {
-            throw "Package global config '$($GlobalDocumentInfo.Path)' still uses retired property '$retiredProperty'."
+            throw "Package config '$($PackageConfigDocumentInfo.Path)' still uses retired property '$retiredProperty'."
         }
     }
 
     foreach ($requiredProperty in @('preferredTargetInstallDirectory', 'localRepositoryRoot', 'acquisitionEnvironment', 'packageState', 'selectionDefaults')) {
         if (-not $package.PSObject.Properties[$requiredProperty]) {
-            throw "Package global config '$($GlobalDocumentInfo.Path)' is missing required property '$requiredProperty'."
+            throw "Package config '$($PackageConfigDocumentInfo.Path)' is missing required property '$requiredProperty'."
         }
     }
     if ($package.PSObject.Properties['repositorySources']) {
-        throw "Package global config '$($GlobalDocumentInfo.Path)' still uses retired property 'repositorySources'. Use Configuration/Internal/RepositoryInventory.json repositorySources."
+        throw "Package config '$($PackageConfigDocumentInfo.Path)' still uses retired property 'repositorySources'. Use Configuration/Internal/PackageRepositoryInventory.json repositorySources."
     }
 
     if ($package.selectionDefaults.PSObject.Properties['channel']) {
-        throw "Package global config '$($GlobalDocumentInfo.Path)' still uses retired property 'selectionDefaults.channel'."
+        throw "Package config '$($PackageConfigDocumentInfo.Path)' still uses retired property 'selectionDefaults.channel'."
     }
 
     if ([string]::IsNullOrWhiteSpace([string]$package.preferredTargetInstallDirectory)) {
-        throw "Package global config '$($GlobalDocumentInfo.Path)' is missing preferredTargetInstallDirectory."
+        throw "Package config '$($PackageConfigDocumentInfo.Path)' is missing preferredTargetInstallDirectory."
     }
     if ($package.PSObject.Properties['applicationRootDirectory'] -and
         [string]::IsNullOrWhiteSpace([string]$package.applicationRootDirectory)) {
-        throw "Package global config '$($GlobalDocumentInfo.Path)' defines an empty applicationRootDirectory."
+        throw "Package config '$($PackageConfigDocumentInfo.Path)' defines an empty applicationRootDirectory."
     }
     if ($package.PSObject.Properties['shimDirectory'] -and
         [string]::IsNullOrWhiteSpace([string]$package.shimDirectory)) {
-        throw "Package global config '$($GlobalDocumentInfo.Path)' defines an empty shimDirectory."
+        throw "Package config '$($PackageConfigDocumentInfo.Path)' defines an empty shimDirectory."
     }
     if ($package.PSObject.Properties['layout'] -and $package.layout) {
         foreach ($layoutProperty in @('packageDepotRelativePath', 'packageWorkSlotDirectory')) {
             if ($package.layout.PSObject.Properties[$layoutProperty] -and
                 [string]::IsNullOrWhiteSpace([string]$package.layout.$layoutProperty)) {
-                throw "Package global config '$($GlobalDocumentInfo.Path)' defines an empty layout.$layoutProperty."
+                throw "Package config '$($PackageConfigDocumentInfo.Path)' defines an empty layout.$layoutProperty."
             }
         }
     }
 
     foreach ($requiredAcquisitionProperty in @('stores', 'defaults')) {
         if (-not $package.acquisitionEnvironment.PSObject.Properties[$requiredAcquisitionProperty]) {
-            throw "Package global config '$($GlobalDocumentInfo.Path)' is missing acquisitionEnvironment.$requiredAcquisitionProperty."
+            throw "Package config '$($PackageConfigDocumentInfo.Path)' is missing acquisitionEnvironment.$requiredAcquisitionProperty."
         }
     }
 
     if ($package.acquisitionEnvironment.stores.PSObject.Properties['defaultPackageDepotDirectory']) {
-        throw "Package global config '$($GlobalDocumentInfo.Path)' still uses retired property 'acquisitionEnvironment.stores.defaultPackageDepotDirectory'. Use Configuration/Internal/DepotInventory.json environmentSources.defaultPackageDepot.basePath."
+        throw "Package config '$($PackageConfigDocumentInfo.Path)' still uses retired property 'acquisitionEnvironment.stores.defaultPackageDepotDirectory'. Use Configuration/Internal/PackageDepotInventory.json environmentSources.defaultPackageDepot.basePath."
     }
     if ($package.acquisitionEnvironment.stores.PSObject.Properties['installWorkspaceDirectory']) {
-        throw "Package global config '$($GlobalDocumentInfo.Path)' still uses retired property 'acquisitionEnvironment.stores.installWorkspaceDirectory'. Use 'acquisitionEnvironment.stores.packageFileStagingDirectory'."
+        throw "Package config '$($PackageConfigDocumentInfo.Path)' still uses retired property 'acquisitionEnvironment.stores.installWorkspaceDirectory'. Use 'acquisitionEnvironment.stores.packageFileStagingDirectory'."
     }
     if ($package.acquisitionEnvironment.stores.PSObject.Properties['installPreparationDirectory']) {
-        throw "Package global config '$($GlobalDocumentInfo.Path)' still uses retired property 'acquisitionEnvironment.stores.installPreparationDirectory'. Use 'acquisitionEnvironment.stores.packageFileStagingDirectory' and 'acquisitionEnvironment.stores.packageInstallStageDirectory'."
+        throw "Package config '$($PackageConfigDocumentInfo.Path)' still uses retired property 'acquisitionEnvironment.stores.installPreparationDirectory'. Use 'acquisitionEnvironment.stores.packageFileStagingDirectory' and 'acquisitionEnvironment.stores.packageInstallStageDirectory'."
     }
     if ($package.acquisitionEnvironment.defaults.PSObject.Properties['mirrorDownloadedArtifactsToDefaultPackageDepot']) {
-        throw "Package global config '$($GlobalDocumentInfo.Path)' still uses retired property 'acquisitionEnvironment.defaults.mirrorDownloadedArtifactsToDefaultPackageDepot'. Use Configuration/Internal/DepotInventory.json environmentSources.<depotId>.mirrorTarget with writable=true."
+        throw "Package config '$($PackageConfigDocumentInfo.Path)' still uses retired property 'acquisitionEnvironment.defaults.mirrorDownloadedArtifactsToDefaultPackageDepot'. Use Configuration/Internal/PackageDepotInventory.json environmentSources.<depotId>.mirrorTarget with writable=true."
+    }
+    if ($package.acquisitionEnvironment.defaults.PSObject.Properties['depotDistributionMode']) {
+        $depotDistributionMode = [string]$package.acquisitionEnvironment.defaults.depotDistributionMode
+        if ($depotDistributionMode -notin @('packageFocused', 'depotFocused', 'disabled')) {
+            throw "Package config '$($PackageConfigDocumentInfo.Path)' defines unsupported acquisitionEnvironment.defaults.depotDistributionMode '$depotDistributionMode'. Use 'packageFocused', 'depotFocused', or 'disabled'."
+        }
     }
 
     foreach ($requiredStoreProperty in @('packageFileStagingDirectory', 'packageInstallStageDirectory')) {
         if (-not $package.acquisitionEnvironment.stores.PSObject.Properties[$requiredStoreProperty]) {
-            throw "Package global config '$($GlobalDocumentInfo.Path)' is missing acquisitionEnvironment.stores.$requiredStoreProperty."
+            throw "Package config '$($PackageConfigDocumentInfo.Path)' is missing acquisitionEnvironment.stores.$requiredStoreProperty."
         }
     }
 
     foreach ($requiredDefaultProperty in @('allowFallback')) {
         if (-not $package.acquisitionEnvironment.defaults.PSObject.Properties[$requiredDefaultProperty]) {
-            throw "Package global config '$($GlobalDocumentInfo.Path)' is missing acquisitionEnvironment.defaults.$requiredDefaultProperty."
+            throw "Package config '$($PackageConfigDocumentInfo.Path)' is missing acquisitionEnvironment.defaults.$requiredDefaultProperty."
         }
     }
 
     if ($package.acquisitionEnvironment.PSObject.Properties['tracking'] -and $package.acquisitionEnvironment.tracking) {
         if ($package.acquisitionEnvironment.tracking.PSObject.Properties['artifactIndexFilePath']) {
-            throw "Package global config '$($GlobalDocumentInfo.Path)' still uses retired property 'acquisitionEnvironment.tracking.artifactIndexFilePath'. Package-file inventory is no longer durable state."
+            throw "Package config '$($PackageConfigDocumentInfo.Path)' still uses retired property 'acquisitionEnvironment.tracking.artifactIndexFilePath'. Package-file inventory is no longer durable state."
         }
         if ($package.acquisitionEnvironment.tracking.PSObject.Properties['packageFileIndexFilePath']) {
-            throw "Package global config '$($GlobalDocumentInfo.Path)' still uses retired property 'acquisitionEnvironment.tracking.packageFileIndexFilePath'. Package-file inventory is resolved live from package definitions, config, and depot inventory."
+            throw "Package config '$($PackageConfigDocumentInfo.Path)' still uses retired property 'acquisitionEnvironment.tracking.packageFileIndexFilePath'. Package-file inventory is resolved live from package definitions, config, and depot inventory."
         }
     }
     if ($package.packageState.PSObject.Properties['indexFilePath']) {
-        throw "Package global config '$($GlobalDocumentInfo.Path)' still uses retired property 'packageState.indexFilePath'. Use 'packageState.inventoryFilePath'."
+        throw "Package config '$($PackageConfigDocumentInfo.Path)' still uses retired property 'packageState.indexFilePath'. Use 'packageState.inventoryFilePath'."
     }
     if (-not $package.packageState.PSObject.Properties['inventoryFilePath']) {
-        throw "Package global config '$($GlobalDocumentInfo.Path)' is missing packageState.inventoryFilePath."
+        throw "Package config '$($PackageConfigDocumentInfo.Path)' is missing packageState.inventoryFilePath."
     }
     if (-not $package.packageState.PSObject.Properties['operationHistoryFilePath']) {
-        throw "Package global config '$($GlobalDocumentInfo.Path)' is missing packageState.operationHistoryFilePath."
+        throw "Package config '$($PackageConfigDocumentInfo.Path)' is missing packageState.operationHistoryFilePath."
     }
     if (-not $package.selectionDefaults.PSObject.Properties['releaseTrack']) {
-        throw "Package global config '$($GlobalDocumentInfo.Path)' is missing selectionDefaults.releaseTrack."
+        throw "Package config '$($PackageConfigDocumentInfo.Path)' is missing selectionDefaults.releaseTrack."
     }
 
     if ($package.acquisitionEnvironment.PSObject.Properties['environmentSources'] -and $null -ne $package.acquisitionEnvironment.environmentSources) {
         foreach ($retiredEnvironmentSourceId in @('localPackageDepot', 'remotePackageDepot', 'corpPackageDepot', 'sitePackageDepot', 'vsCodeUpdateService')) {
             if ($package.acquisitionEnvironment.environmentSources.PSObject.Properties[$retiredEnvironmentSourceId]) {
-                throw "Package global config '$($GlobalDocumentInfo.Path)' must not define acquisitionEnvironment.environmentSources.$retiredEnvironmentSourceId in the shipped global config."
+                throw "Package config '$($PackageConfigDocumentInfo.Path)' must not define acquisitionEnvironment.environmentSources.$retiredEnvironmentSourceId in the shipped global config."
             }
         }
     }

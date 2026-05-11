@@ -26,9 +26,9 @@ function Get-PackageState {
 
     if ($Raw.IsPresent) {
         return [pscustomobject]@{
-            Config           = $config
-            PackageInventory = $packageInventory
-            OperationHistory = $operationHistory
+            Config                     = $config
+            PackageAssignmentInventory = $packageInventory
+            PackageOperationHistory    = $operationHistory
             RepositoryInventory = $repositoryInventoryInfo
             DepotInventory   = $depotInventoryInfo
             SourceInventory  = $sourceInventoryInfo
@@ -37,8 +37,8 @@ function Get-PackageState {
     }
 
     $localRoot = $null
-    if (-not [string]::IsNullOrWhiteSpace([string]$config.PackageInventoryFilePath)) {
-        $localRoot = Get-PackageRootFromInventoryPath -PackageInventoryFilePath $config.PackageInventoryFilePath
+    if (-not [string]::IsNullOrWhiteSpace([string]$config.PackageAssignmentInventoryFilePath)) {
+        $localRoot = Get-PackageRootFromInventoryPath -PackageAssignmentInventoryFilePath $config.PackageAssignmentInventoryFilePath
     }
 
     $packageRecords = @($packageInventory.Records)
@@ -47,8 +47,8 @@ function Get-PackageState {
     return [pscustomobject]@{
         LocalRoot                 = $localRoot
         ApplicationRootDirectory  = $config.ApplicationRootDirectory
-        LocalConfigurationPath    = $config.LocalConfigurationPath
-        LocalConfigurationExists  = Test-PackageStateLeafPath -Path $config.LocalConfigurationPath
+        PackageConfigPath    = $config.PackageConfigPath
+        PackageConfigExists  = Test-PackageStateLeafPath -Path $config.PackageConfigPath
         LocalRepositoryInventoryPath = $config.LocalRepositoryInventoryPath
         LocalRepositoryInventoryExists = Test-PackageStateLeafPath -Path $config.LocalRepositoryInventoryPath
         RepositoryInventoryPath    = $repositoryInventoryInfo.Path
@@ -58,10 +58,10 @@ function Get-PackageState {
         DepotInventoryPath        = $depotInventoryInfo.Path
         DepotInventoryExists      = [bool]$depotInventoryInfo.Exists
         LocalRepositoryRoot       = $config.LocalRepositoryRoot
-        PackageInventoryPath      = $packageInventory.Path
-        PackageInventoryExists    = Test-PackageStateLeafPath -Path $packageInventory.Path
-        OperationHistoryPath      = $operationHistory.Path
-        OperationHistoryExists    = Test-PackageStateLeafPath -Path $operationHistory.Path
+        PackageAssignmentInventoryPath      = $packageInventory.Path
+        PackageAssignmentInventoryExists    = Test-PackageStateLeafPath -Path $packageInventory.Path
+        PackageOperationHistoryPath      = $operationHistory.Path
+        PackageOperationHistoryExists    = Test-PackageStateLeafPath -Path $operationHistory.Path
         SourceInventoryPath       = $sourceInventoryInfo.Path
         SourceInventoryExists     = [bool]$sourceInventoryInfo.Exists
         PackageRecordCount        = $packageRecords.Count
