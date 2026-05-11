@@ -218,6 +218,20 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - acquis
         Assert-MockCalled Save-PackageDownloadFile -Times 0
     }
 
+    It 'skips depot distribution when effective package has null packageFile (npm-style artifact)' {
+        $result = @{
+            Package       = [pscustomobject]@{ packageFile = $null }
+            PackageConfig = [pscustomobject]@{
+                DepotDistributionMode = 'packageFocused'
+                EnvironmentSources    = [pscustomobject]@{}
+            }
+        }
+
+        { Invoke-PackageDepotDistribution -PackageResult $result } | Should -Not -Throw
+        $result.DepotDistribution.Status | Should -Be 'Skipped'
+        $result.DepotDistribution.Reason | Should -Be 'PackageFileNotRequired'
+    }
+
     It 'reconciles mirror depots from a verified staging file reuse' {
         $rootPath = Join-Path $TestDrive 'mirror-from-staging'
         $packageArchive = New-TestPackageArchiveInfo -RootPath (Join-Path $rootPath 'archive') -Version '2.0.0' -ArchiveFileName 'VSCode-win32-x64-2.0.0.zip'

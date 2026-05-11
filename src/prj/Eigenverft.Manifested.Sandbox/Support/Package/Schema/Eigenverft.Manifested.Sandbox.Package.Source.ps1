@@ -723,8 +723,11 @@ function Resolve-PackageDepotDistributionSourceArtifact {
         [psobject]$PackageResult
     )
 
-    if (-not $PackageResult.Package -or -not $PackageResult.Package.PSObject.Properties['packageFile'] -or
-        -not $PackageResult.Package.packageFile.PSObject.Properties['fileName']) {
+    if (-not $PackageResult.Package -or
+        -not $PackageResult.Package.PSObject.Properties['packageFile'] -or
+        -not $PackageResult.Package.packageFile -or
+        -not $PackageResult.Package.packageFile.PSObject.Properties['fileName'] -or
+        [string]::IsNullOrWhiteSpace([string]$PackageResult.Package.packageFile.fileName)) {
         return $null
     }
 
@@ -802,8 +805,11 @@ function Resolve-PackageDepotDistributionPlan {
         return $result
     }
 
-    if (-not $PackageResult.Package -or -not $PackageResult.Package.PSObject.Properties['packageFile'] -or
-        -not $PackageResult.Package.packageFile.PSObject.Properties['fileName']) {
+    if (-not $PackageResult.Package -or
+        -not $PackageResult.Package.PSObject.Properties['packageFile'] -or
+        -not $PackageResult.Package.packageFile -or
+        -not $PackageResult.Package.packageFile.PSObject.Properties['fileName'] -or
+        [string]::IsNullOrWhiteSpace([string]$PackageResult.Package.packageFile.fileName)) {
         $result.Reason = 'PackageFileNotRequired'
         return $result
     }
