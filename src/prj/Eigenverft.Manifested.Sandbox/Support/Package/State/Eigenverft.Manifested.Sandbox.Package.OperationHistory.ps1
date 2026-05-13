@@ -117,6 +117,11 @@ Creates one operation-history record from a finalized Package result.
         completedAtUtc                = $CompletedAtUtc
         repositoryId                  = [string]$PackageResult.RepositoryId
         definitionId                  = [string]$PackageResult.DefinitionId
+        definitionPublisherId         = if ($PackageResult.PSObject.Properties['DefinitionPublisherId']) { [string]$PackageResult.DefinitionPublisherId } else { $null }
+        definitionRevision            = if ($PackageResult.PSObject.Properties['DefinitionRevision']) { [int]$PackageResult.DefinitionRevision } else { $null }
+        definitionRepositorySourceId  = if ($PackageResult.PSObject.Properties['DefinitionRepositorySourceId']) { [string]$PackageResult.DefinitionRepositorySourceId } else { $null }
+        definitionCandidatePath       = if ($PackageResult.PSObject.Properties['DefinitionCandidatePath']) { [string]$PackageResult.DefinitionCandidatePath } else { $null }
+        definitionAssignedSnapshotPath = if ($PackageResult.PSObject.Properties['DefinitionAssignedSnapshotPath']) { [string]$PackageResult.DefinitionAssignedSnapshotPath } else { $null }
         desiredState                  = [string]$PackageResult.DesiredState
         status                        = [string]$PackageResult.Status
         failureReason                 = [string]$PackageResult.FailureReason

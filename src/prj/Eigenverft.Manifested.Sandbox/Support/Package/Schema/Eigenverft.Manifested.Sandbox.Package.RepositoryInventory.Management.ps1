@@ -474,6 +474,9 @@ function Resolve-PackageDefinitionSnapshotReference {
         [Parameter(Mandatory = $true)]
         [string]$DefinitionId,
 
+        [AllowNull()]
+        [string]$PublisherId = $null,
+
         [Parameter(Mandatory = $true)]
         [string]$PackageAssignmentInventoryFilePath,
 
@@ -481,43 +484,62 @@ function Resolve-PackageDefinitionSnapshotReference {
         [string]$LiveResolutionError = $null
     )
 
-    $resolvedRepositoryId = if ([string]::IsNullOrWhiteSpace($RepositoryId)) { Get-PackageDefaultRepositoryId } else { [string]$RepositoryId }
     if (-not (Test-Path -LiteralPath $PackageAssignmentInventoryFilePath -PathType Leaf)) {
-        throw "Package repository '$resolvedRepositoryId' definition '$DefinitionId' could not be resolved from the live repository source, and no package inventory exists for snapshot fallback. Live error: $LiveResolutionError"
+        throw "Package definition '$DefinitionId' could not be resolved from package inventory because '$PackageAssignmentInventoryFilePath' does not exist. Live error: $LiveResolutionError"
     }
 
     $inventoryInfo = Read-PackageJsonDocument -Path $PackageAssignmentInventoryFilePath
     $records = @(
         foreach ($record in @($inventoryInfo.Document.records)) {
-            if ([string]::Equals([string]$record.definitionRepositoryId, $resolvedRepositoryId, [System.StringComparison]::OrdinalIgnoreCase) -and
-                [string]::Equals([string]$record.definitionId, $DefinitionId, [System.StringComparison]::OrdinalIgnoreCase)) {
-                $snapshotPath = if ($record.PSObject.Properties['definitionSnapshotPath']) { [string]$record.definitionSnapshotPath } elseif ($record.PSObject.Properties['definitionLocalPath']) { [string]$record.definitionLocalPath } else { $null }
-                if (-not [string]::IsNullOrWhiteSpace($snapshotPath) -and (Test-Path -LiteralPath $snapshotPath -PathType Leaf)) {
-                    $record
+            if (-not [string]::Equals([string]$record.definitionId, $DefinitionId, [System.StringComparison]::OrdinalIgnoreCase)) {
+                continue
+            }
+            if (-not [string]::IsNullOrWhiteSpace($RepositoryId)) {
+                $recordRepositoryId = if ($record.PSObject.Properties['definitionRepositorySourceId']) { [string]$record.definitionRepositorySourceId } else { $null }
+                if (-not [string]::Equals($recordRepositoryId, $RepositoryId, [System.StringComparison]::OrdinalIgnoreCase)) {
+                    continue
                 }
+            }
+            if (-not [string]::IsNullOrWhiteSpace($PublisherId)) {
+                $recordPublisherId = if ($record.PSObject.Properties['definitionPublisherId']) { [string]$record.definitionPublisherId } else { $null }
+                if (-not [string]::Equals($recordPublisherId, $PublisherId, [System.StringComparison]::OrdinalIgnoreCase)) {
+                    continue
+                }
+            }
+
+            $snapshotPath = if ($record.PSObject.Properties['definitionAssignedSnapshotPath']) { [string]$record.definitionAssignedSnapshotPath } else { $null }
+            if (-not [string]::IsNullOrWhiteSpace($snapshotPath) -and (Test-Path -LiteralPath $snapshotPath -PathType Leaf)) {
+                $record
             }
         }
     )
 
     if ($records.Count -eq 0) {
-        throw "Package repository '$resolvedRepositoryId' definition '$DefinitionId' could not be resolved from the live repository source, and no usable definition snapshot was found in '$PackageAssignmentInventoryFilePath'. Live error: $LiveResolutionError"
+        throw "Package definition '$DefinitionId' could not be resolved from the live repository source, and no usable assigned definition snapshot was found in '$PackageAssignmentInventoryFilePath'. Live error: $LiveResolutionError"
     }
 
     $selectedRecord = @($records | Sort-Object -Property updatedAtUtc -Descending | Select-Object -First 1)[0]
-    $selectedSnapshotPath = if ($selectedRecord.PSObject.Properties['definitionSnapshotPath']) { [string]$selectedRecord.definitionSnapshotPath } else { [string]$selectedRecord.definitionLocalPath }
+    $selectedSnapshotPath = [string]$selectedRecord.definitionAssignedSnapshotPath
+    $repositorySourceId = if ($selectedRecord.PSObject.Properties['definitionRepositorySourceId']) { [string]$selectedRecord.definitionRepositorySourceId } else { $null }
 
     return [pscustomobject]@{
-        RepositoryId       = $resolvedRepositoryId
+        RepositoryId       = $repositorySourceId
         DefinitionId       = [string]$DefinitionId
         DefinitionPath     = [System.IO.Path]::GetFullPath($selectedSnapshotPath)
-        SourceKind         = 'snapshot'
+        SourceKind         = 'assignedSnapshot'
         SourcePath         = if ($selectedRecord.PSObject.Properties['definitionSourcePath']) { [string]$selectedRecord.definitionSourcePath } else { $null }
         SourceHash         = if ($selectedRecord.PSObject.Properties['definitionSourceHash']) { [string]$selectedRecord.definitionSourceHash } else { $null }
         SnapshotPath       = [System.IO.Path]::GetFullPath($selectedSnapshotPath)
         SnapshotHash       = Get-PackageFileSha256 -Path $selectedSnapshotPath
+        CandidatePath      = if ($selectedRecord.PSObject.Properties['definitionCandidatePath']) { [string]$selectedRecord.definitionCandidatePath } else { $null }
+        CandidateHash      = if ($selectedRecord.PSObject.Properties['definitionCandidateHash']) { [string]$selectedRecord.definitionCandidateHash } else { $null }
         ResolvedAtUtc      = [DateTime]::UtcNow.ToString('o')
         SnapshotFallback   = $true
         FallbackReason     = $LiveResolutionError
         InventoryRecord    = $selectedRecord
+        PublisherId        = if ($selectedRecord.PSObject.Properties['definitionPublisherId']) { [string]$selectedRecord.definitionPublisherId } else { $null }
+        PublisherName      = if ($selectedRecord.PSObject.Properties['definitionPublisherName']) { [string]$selectedRecord.definitionPublisherName } else { $null }
+        DefinitionRevision = if ($selectedRecord.PSObject.Properties['definitionRevision']) { [int]$selectedRecord.definitionRevision } else { 0 }
+        PublishedAtUtc     = if ($selectedRecord.PSObject.Properties['definitionPublishedAtUtc']) { [string]$selectedRecord.definitionPublishedAtUtc } else { $null }
     }
 }

@@ -1,8 +1,14 @@
 {
-  "$schema": "../Schema/eigenverft-module-package-definition-1.3.schema.json",
-  "$comment": "Schema-first draft for Visual Studio Code Windows user setup (x64). Acquisition URL and sha256 were taken from microsoft/winget-pkgs (Microsoft.VisualStudioCode.installer.yaml, user scope x64) on 2026-05-10; silent-install flags follow https://code.visualstudio.com/docs/setup/windows (Inno Setup + /mergetasks=!runcode). This file is intentionally produced without reading Wire1_3.ps1 or sibling *.json examples.",
-  "schemaVersion": "1.3",
+  "$comment": "Schema-first draft for Visual Studio Code Windows user setup (x64). Acquisition URL and sha256 were taken from microsoft/winget-pkgs (Microsoft.VisualStudioCode.installer.yaml, user scope x64) on 2026-05-10; silent-install flags follow https://code.visualstudio.com/docs/setup/windows (Inno Setup + /mergetasks=!runcode).",
+  "$schema": "../../Schema/eigenverft-module-package-definition-1.4.schema.json",
+  "schemaVersion": "1.4",
   "id": "VSCodeUser",
+  "definitionPublication": {
+    "publisherId": "EigenverftModule",
+    "publisherName": "Eigenverft Module",
+    "definitionRevision": 1,
+    "publishedAtUtc": "2026-05-13T12:00:00Z"
+  },
   "display": {
     "default": {
       "name": "Visual Studio Code (User)",

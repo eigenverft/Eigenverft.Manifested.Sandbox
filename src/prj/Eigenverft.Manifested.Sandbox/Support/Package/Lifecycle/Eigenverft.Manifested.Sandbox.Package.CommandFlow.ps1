@@ -196,7 +196,10 @@ function Invoke-PackageDefinitionCommandCore {
     [CmdletBinding()]
     param(
         [AllowNull()]
-        [string]$RepositoryId = (Get-PackageDefaultRepositoryId),
+        [string]$RepositoryId = $null,
+
+        [AllowNull()]
+        [string]$PublisherId = $null,
 
         [Parameter(Mandatory = $true)]
         [ValidateNotNullOrEmpty()]
@@ -208,7 +211,7 @@ function Invoke-PackageDefinitionCommandCore {
         [object[]]$DependencyStack = @()
     )
 
-    $packageConfig = Get-PackageConfig -RepositoryId $RepositoryId -DefinitionId $DefinitionId -DesiredState $DesiredState
+    $packageConfig = Get-PackageConfig -RepositoryId $RepositoryId -PublisherId $PublisherId -DefinitionId $DefinitionId -DesiredState $DesiredState
     $result = New-PackageResult -DesiredState $DesiredState -PackageConfig $packageConfig
 
     if ([string]::Equals($DesiredState, 'Removed', [System.StringComparison]::OrdinalIgnoreCase)) {

@@ -2,8 +2,8 @@
     Eigenverft.Manifested.Sandbox.Package.Remove - DesiredState Removed orchestration.
     Dot-sourced from Eigenverft.Manifested.Sandbox.psm1 after Package.CommandFlow.ps1.
 
-    Removal safety: other inventory rows are scanned by loading each row's definition and
-    matching dependencies against the target definition (repositoryId + definitionId).
+    Removal safety: other inventory rows are scanned by loading each row's assigned
+    definition snapshot and matching dependencies against the target definition.
     Persisted dependencyInstallSlotIds on inventory rows (see Update-PackageInventoryRecord)
     documents direct dependency slots for operators; blocking is driven by definition
     metadata so stale slot lists cannot bypass the check.
@@ -25,7 +25,6 @@ function Get-PackageInventoryDependentBlockingRecords {
         [string]$TargetDefinitionId
     )
 
-    $targetKey = Get-PackageDependencyReferenceKey -RepositoryId $TargetRepositoryId -DefinitionId $TargetDefinitionId
     $index = Get-PackageInventory -PackageConfig $PackageConfig
     $blockers = New-Object System.Collections.Generic.List[object]
 
@@ -35,21 +34,28 @@ function Get-PackageInventoryDependentBlockingRecords {
             continue
         }
 
-        $parentRepositoryId = if ($record.PSObject.Properties['definitionRepositoryId'] -and -not [string]::IsNullOrWhiteSpace([string]$record.definitionRepositoryId)) {
-            [string]$record.definitionRepositoryId
+        $parentRepositoryId = if ($record.PSObject.Properties['definitionRepositorySourceId'] -and -not [string]::IsNullOrWhiteSpace([string]$record.definitionRepositorySourceId)) {
+            [string]$record.definitionRepositorySourceId
+        }
+        else { $null }
+        $parentDefinitionId = [string]$record.definitionId
+        $parentSnapshotPath = if ($record.PSObject.Properties['definitionAssignedSnapshotPath'] -and -not [string]::IsNullOrWhiteSpace([string]$record.definitionAssignedSnapshotPath)) {
+            [string]$record.definitionAssignedSnapshotPath
         }
         else {
-            Get-PackageDefaultRepositoryId
+            $null
         }
-        $parentDefinitionId = [string]$record.definitionId
+
+        if ([string]::IsNullOrWhiteSpace($parentSnapshotPath) -or -not (Test-Path -LiteralPath $parentSnapshotPath -PathType Leaf)) {
+            throw "Package removal dependency scan failed for inventory installSlotId '$slot': assigned definition snapshot is missing."
+        }
 
         try {
-            $definitionReference = Resolve-PackageDefinitionReference -RepositoryId $parentRepositoryId -DefinitionId $parentDefinitionId
-            $definitionDocumentInfo = Read-PackageJsonDocument -Path $definitionReference.DefinitionPath
+            $definitionDocumentInfo = Read-PackageJsonDocument -Path $parentSnapshotPath
             Assert-PackageDefinitionSchema -DefinitionDocumentInfo $definitionDocumentInfo -DefinitionId $parentDefinitionId -DefinitionRepositoryId $parentRepositoryId
         }
         catch {
-            throw "Package removal dependency scan failed while reading definition '$parentRepositoryId/$parentDefinitionId' for inventory installSlotId '$slot': $($_.Exception.Message)"
+            throw "Package removal dependency scan failed while reading assigned definition snapshot '$parentSnapshotPath' for inventory installSlotId '$slot': $($_.Exception.Message)"
         }
 
         $definition = $definitionDocumentInfo.Document
@@ -71,11 +77,13 @@ function Get-PackageInventoryDependentBlockingRecords {
                 [string]$dependency.repositoryId
             }
             else {
-                $parentRepositoryId
+                $null
             }
 
-            $depKey = Get-PackageDependencyReferenceKey -RepositoryId $depRepositoryId -DefinitionId $depDefinitionId
-            if ([string]::Equals($depKey, $targetKey, [System.StringComparison]::OrdinalIgnoreCase)) {
+            $definitionMatches = [string]::Equals($depDefinitionId, $TargetDefinitionId, [System.StringComparison]::OrdinalIgnoreCase)
+            $repositoryMatches = [string]::IsNullOrWhiteSpace($depRepositoryId) -or
+                [string]::Equals($depRepositoryId, $TargetRepositoryId, [System.StringComparison]::OrdinalIgnoreCase)
+            if ($definitionMatches -and $repositoryMatches) {
                 $blockers.Add([pscustomobject]@{
                     DependentInstallSlotId = $slot
                     DependentDefinitionId  = $parentDefinitionId

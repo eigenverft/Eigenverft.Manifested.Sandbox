@@ -719,8 +719,14 @@ exit /b 0
         $preferredTargetInstallDirectory = Join-Path $rootPath 'installs'
         $packageStateIndexFilePath = Join-Path $rootPath 'PackageAssignmentInventory.json'
         $definitionDocument = @{
-            schemaVersion = '1.3'
+            schemaVersion = '1.4'
             id = 'Qwen35_9B_Q6_K_Model'
+            definitionPublication = @{
+                publisherId = 'EigenverftModule'
+                publisherName = 'Eigenverft Module'
+                definitionRevision = 1
+                publishedAtUtc = '2026-05-13T12:00:00Z'
+            }
             display = @{
                 default = @{
                     name = 'Qwen 3.5 2B Q8_0'

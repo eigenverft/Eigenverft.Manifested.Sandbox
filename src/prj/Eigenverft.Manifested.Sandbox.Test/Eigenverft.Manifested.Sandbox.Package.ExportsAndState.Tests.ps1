@@ -149,7 +149,8 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - export
         $localRepositoryRoot = Join-Path $root 'PkgRepos'
         $shimDirectory = Join-Path $root 'Shims'
         $installDirectory = Join-Path $installRoot 'vsc-rt\stable\1.0.0\win32-x64'
-        $definitionSnapshotPath = Join-Path $localRepositoryRoot 'EigenverftModule\VSCodeRuntime.json'
+        $definitionCandidatePath = Join-Path $localRepositoryRoot 'Candidate\EigenverftModule\VSCodeRuntime.json'
+        $definitionAssignedSnapshotPath = Join-Path $localRepositoryRoot 'Assigned\EigenverftModule\VSCodeRuntime.json'
         $sourceInventoryPath = Join-Path (Join-Path $root 'Configuration\External') 'PackageSourceInventory.json'
 
         $null = New-Item -ItemType Directory -Path $installDirectory -Force
@@ -157,7 +158,10 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - export
         $null = New-Item -ItemType Directory -Path $installStageRoot -Force
         $null = New-Item -ItemType Directory -Path $depotRoot -Force
         $null = New-Item -ItemType Directory -Path $shimDirectory -Force
-        Write-TestJsonDocument -Path $definitionSnapshotPath -Document (New-TestVSCodeDefinitionDocument -Releases @(
+        Write-TestJsonDocument -Path $definitionCandidatePath -Document (New-TestVSCodeDefinitionDocument -Releases @(
+                New-TestPackageRelease -Id 'vsCode-win-x64-stable' -Version '1.0.0' -Architecture 'x64' -ArtifactDistributionVariant 'win32-x64'
+            ))
+        Write-TestJsonDocument -Path $definitionAssignedSnapshotPath -Document (New-TestVSCodeDefinitionDocument -Releases @(
                 New-TestPackageRelease -Id 'vsCode-win-x64-stable' -Version '1.0.0' -Architecture 'x64' -ArtifactDistributionVariant 'win32-x64'
             ))
         Write-TestJsonDocument -Path $sourceInventoryPath -Document @{ inventoryVersion = 1; global = @{}; sites = @{} }
@@ -179,13 +183,18 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - export
         $ownershipRecord = [pscustomobject]@{
             installSlotId    = 'VSCodeRuntime:stable:win32-x64'
             definitionId     = 'VSCodeRuntime'
-            definitionRepositoryId = 'EigenverftModule'
-            definitionFileName = 'VSCodeRuntime.json'
+            definitionPublisherId = 'EigenverftModule'
+            definitionPublisherName = 'Eigenverft Module'
+            definitionRevision = 1
+            definitionPublishedAtUtc = '2026-05-13T12:00:00Z'
+            definitionRepositorySourceId = 'EigenverftModule'
             definitionSourceKind = 'moduleLocal'
             definitionSourcePath = Join-Path $root 'VSCodeRuntime.json'
             definitionSourceHash = 'source-hash'
-            definitionSnapshotPath = $definitionSnapshotPath
-            definitionSnapshotHash = 'snapshot-hash'
+            definitionCandidatePath = $definitionCandidatePath
+            definitionCandidateHash = 'candidate-hash'
+            definitionAssignedSnapshotPath = $definitionAssignedSnapshotPath
+            definitionAssignedSnapshotHash = 'snapshot-hash'
             definitionResolvedAtUtc = '2026-04-25T11:59:00Z'
             releaseTrack     = 'stable'
             artifactDistributionVariant = 'win32-x64'
@@ -229,8 +238,9 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - export
         $state.PackageRecordCount | Should -Be 1
         $state.OperationRecordCount | Should -Be 1
         $state.PackageRecords[0].InstallSlotId | Should -Be 'VSCodeRuntime:stable:win32-x64'
-        $state.PackageRecords[0].DefinitionRepositoryId | Should -Be 'EigenverftModule'
-        $state.PackageRecords[0].DefinitionSnapshotExists | Should -BeTrue
+        $state.PackageRecords[0].DefinitionRepositorySourceId | Should -Be 'EigenverftModule'
+        $state.PackageRecords[0].DefinitionCandidateExists | Should -BeTrue
+        $state.PackageRecords[0].DefinitionAssignedSnapshotExists | Should -BeTrue
         $state.PackageRecords[0].InstallDirectoryExists | Should -BeTrue
         $state.PackageRecords[0].PathRegistration.SourceKind | Should -Be 'shim'
         $state.PackageRecords[0].PathRegistration.RegisteredPath | Should -Be $shimDirectory

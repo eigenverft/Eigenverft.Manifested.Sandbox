@@ -19,8 +19,7 @@ function Resolve-PackageDependencyStack {
 function Get-PackageDependencyReferenceKey {
     [CmdletBinding()]
     param(
-        [Parameter(Mandatory = $true)]
-        [ValidateNotNullOrEmpty()]
+        [AllowNull()]
         [string]$RepositoryId,
 
         [Parameter(Mandatory = $true)]
@@ -28,7 +27,8 @@ function Get-PackageDependencyReferenceKey {
         [string]$DefinitionId
     )
 
-    return ('{0}:{1}' -f $RepositoryId, $DefinitionId)
+    $repositoryKey = if ([string]::IsNullOrWhiteSpace($RepositoryId)) { '*' } else { [string]$RepositoryId }
+    return ('{0}:{1}' -f $repositoryKey, $DefinitionId)
 }
 
 function Get-PackageResultRepositoryId {
@@ -68,7 +68,7 @@ function Resolve-PackageDependencyRepositoryId {
         return [string]$Dependency.repositoryId
     }
 
-    return (Get-PackageResultRepositoryId -PackageResult $PackageResult)
+    return $null
 }
 
 function Resolve-PackageDependencyCommandEntryPoints {
@@ -109,8 +109,7 @@ dependency logic can extend this function without changing the command flow.
         [ValidateNotNullOrEmpty()]
         [string]$DefinitionId,
 
-        [Parameter(Mandatory = $true)]
-        [ValidateNotNullOrEmpty()]
+        [AllowNull()]
         [string]$RepositoryId,
 
         [object[]]$DependencyStack = @()
@@ -165,25 +164,37 @@ Resolve-PackageDependencies -PackageResult $result
         $dependencyRepositoryId = Resolve-PackageDependencyRepositoryId -PackageResult $PackageResult -Dependency $dependency
         $dependencyKey = Get-PackageDependencyReferenceKey -RepositoryId $dependencyRepositoryId -DefinitionId $dependencyDefinitionId
         $currentKey = Get-PackageDependencyReferenceKey -RepositoryId $parentRepositoryId -DefinitionId ([string]$PackageResult.DefinitionId)
-        if ([string]::Equals($dependencyKey, $currentKey, [System.StringComparison]::OrdinalIgnoreCase)) {
+        if ([string]::Equals($dependencyDefinitionId, [string]$PackageResult.DefinitionId, [System.StringComparison]::OrdinalIgnoreCase) -and
+            ([string]::IsNullOrWhiteSpace($dependencyRepositoryId) -or [string]::Equals($dependencyRepositoryId, $parentRepositoryId, [System.StringComparison]::OrdinalIgnoreCase))) {
             throw "Package definition '$($PackageResult.DefinitionId)' cannot depend on itself."
         }
         if (-not $seenDependencyIds.Add($dependencyKey)) {
             continue
         }
-        if ($currentStack -contains $dependencyKey) {
+        $dependencyKeyAlreadyInStack = ($currentStack -contains $dependencyKey)
+        if (-not $dependencyKeyAlreadyInStack -and [string]::IsNullOrWhiteSpace($dependencyRepositoryId)) {
+            foreach ($stackEntry in @($currentStack)) {
+                if ([string]::Equals(([string]$stackEntry).Split(':')[-1], $dependencyDefinitionId, [System.StringComparison]::OrdinalIgnoreCase)) {
+                    $dependencyKeyAlreadyInStack = $true
+                    break
+                }
+            }
+        }
+        if ($dependencyKeyAlreadyInStack) {
             throw ("Package dependency cycle detected: {0} -> {1}." -f (($currentStack -join ' -> ')), $dependencyKey)
         }
 
-        Write-PackageExecutionMessage -Message ("[STEP] Ensuring package dependency '{0}' from repository '{1}'." -f $dependencyDefinitionId, $dependencyRepositoryId)
+        $dependencyRepositoryText = if ([string]::IsNullOrWhiteSpace($dependencyRepositoryId)) { '<active repositories>' } else { $dependencyRepositoryId }
+        Write-PackageExecutionMessage -Message ("[STEP] Ensuring package dependency '{0}' from repository '{1}'." -f $dependencyDefinitionId, $dependencyRepositoryText)
         $dependencyResult = Resolve-PackageDependencyDefinition -PackageResult $PackageResult -RepositoryId $dependencyRepositoryId -DefinitionId $dependencyDefinitionId -DependencyStack (@($currentStack) + $dependencyKey)
+        $resolvedDependencyRepositoryId = if ($dependencyResult -and $dependencyResult.PSObject.Properties['RepositoryId']) { [string]$dependencyResult.RepositoryId } else { $dependencyRepositoryId }
         $dependencyStatus = if ($dependencyResult) { [string]$dependencyResult.Status } else { '<none>' }
         if (-not $dependencyResult -or -not [string]::Equals($dependencyStatus, 'Ready', [System.StringComparison]::OrdinalIgnoreCase)) {
-            throw "Package dependency '$dependencyRepositoryId/$dependencyDefinitionId' did not become ready. Status='$dependencyStatus'."
+            throw "Package dependency '$dependencyRepositoryText/$dependencyDefinitionId' did not become ready. Status='$dependencyStatus'."
         }
 
         $dependencyRecords.Add([pscustomobject]@{
-            RepositoryId   = $dependencyRepositoryId
+            RepositoryId   = $resolvedDependencyRepositoryId
             DefinitionId   = $dependencyDefinitionId
             Status         = $dependencyStatus
             InstallOrigin  = [string]$dependencyResult.InstallOrigin
@@ -193,7 +204,7 @@ Resolve-PackageDependencies -PackageResult $result
             Result         = $dependencyResult
         }) | Out-Null
 
-        Write-PackageExecutionMessage -Message ("[STATE] Package dependency ready: repository='{0}', definition='{1}', installOrigin='{2}', installStatus='{3}'." -f $dependencyRepositoryId, $dependencyDefinitionId, [string]$dependencyResult.InstallOrigin, $(if ($dependencyResult.Assigned -and $dependencyResult.Assigned.PSObject.Properties['Status']) { [string]$dependencyResult.Assigned.Status } else { '<none>' }))
+        Write-PackageExecutionMessage -Message ("[STATE] Package dependency ready: repository='{0}', definition='{1}', installOrigin='{2}', installStatus='{3}'." -f $resolvedDependencyRepositoryId, $dependencyDefinitionId, [string]$dependencyResult.InstallOrigin, $(if ($dependencyResult.Assigned -and $dependencyResult.Assigned.PSObject.Properties['Status']) { [string]$dependencyResult.Assigned.Status } else { '<none>' }))
     }
 
     $PackageResult.Dependencies = @($dependencyRecords.ToArray())

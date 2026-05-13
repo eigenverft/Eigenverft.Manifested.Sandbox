@@ -1,14 +1,14 @@
 <#
     Eigenverft.Manifested.Sandbox.Package.DefinitionSchema
-    Package definition JSON validation for the mandatory schemaVersion 1.3 wire model.
+    Package definition JSON validation for the mandatory schemaVersion 1.4 wire model.
 
-    Runtime validation is PowerShell-only (this module + DefinitionSchema.Wire1_3.ps1). The JSON schema file
+    Runtime validation is PowerShell-only (this module + DefinitionSchema.Wire1_4.ps1). The JSON schema file
     is the editor/human contract (canonical conforming examples live as *.json next to the schema); keep schema and asserts aligned. Schema root may include x-eigenverftAgentHint for LLM task disambiguation - runtime ignores it.
 #>
 
 # Mandatory schemaVersion for package definitions.
 $script:PackageDefinitionSupportedSchemaVersions = @(
-    '1.3'
+    '1.4'
 )
 
 function Assert-PackageDefinitionSchemaVersionSupported {
@@ -28,7 +28,7 @@ function Assert-PackageDefinitionSchemaVersionSupported {
     }
 
     $supportedList = ($script:PackageDefinitionSupportedSchemaVersions | ForEach-Object { "'$_'" }) -join ', '
-    throw "Package definition '$DefinitionDocumentPath' uses unsupported schemaVersion '$SchemaVersionText'. The mandatory package definition schemaVersion is '1.3'. Supported schemaVersion values are $supportedList."
+    throw "Package definition '$DefinitionDocumentPath' uses unsupported schemaVersion '$SchemaVersionText'. The mandatory package definition schemaVersion is '1.4'. Supported schemaVersion values are $supportedList."
 }
 
 function Assert-PackageDefinitionSchema {
@@ -37,7 +37,7 @@ function Assert-PackageDefinitionSchema {
 Validates the Package definition schema for this package pass.
 
     .DESCRIPTION
-Rejects retired top-level names, requires schemaVersion 1.3 fields, then
+Rejects retired top-level names, requires schemaVersion 1.4 fields, then
 validates dependencies/artifacts/presenceDiscovery/existingInstallDiscovery/packageOperations references.
 
 .PARAMETER DefinitionDocumentInfo
@@ -85,7 +85,7 @@ Assert-PackageDefinitionSchema -DefinitionDocumentInfo $definitionInfo -Definiti
     }
     Assert-PackageDefinitionSchemaVersionSupported -SchemaVersionText $schemaVersionText -DefinitionDocumentPath $DefinitionDocumentInfo.Path
 
-    foreach ($requiredProperty in @('schemaVersion', 'id', 'display', 'dependencies', 'artifacts', 'presenceDiscovery', 'existingInstallDiscovery', 'packageOperations')) {
+    foreach ($requiredProperty in @('schemaVersion', 'id', 'definitionPublication', 'display', 'dependencies', 'artifacts', 'presenceDiscovery', 'existingInstallDiscovery', 'packageOperations')) {
         if (-not $definition.PSObject.Properties[$requiredProperty]) {
             throw "Package definition '$($DefinitionDocumentInfo.Path)' is missing required property '$requiredProperty'."
         }
@@ -107,8 +107,8 @@ Assert-PackageDefinitionSchema -DefinitionDocumentInfo $definitionInfo -Definiti
     }
 
     switch -Exact ($schemaVersionText) {
-        '1.3' {
-            Assert-PackageDefinitionSchema_1_3 -DefinitionDocumentInfo $DefinitionDocumentInfo -DefinitionId $DefinitionId -DefinitionRepositoryId $DefinitionRepositoryId
+        '1.4' {
+            Assert-PackageDefinitionSchema_1_4 -DefinitionDocumentInfo $DefinitionDocumentInfo -DefinitionId $DefinitionId -DefinitionRepositoryId $DefinitionRepositoryId
             return
         }
         default {

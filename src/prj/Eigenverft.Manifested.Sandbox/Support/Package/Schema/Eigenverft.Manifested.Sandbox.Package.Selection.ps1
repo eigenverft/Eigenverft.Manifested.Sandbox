@@ -316,7 +316,7 @@ function Resolve-PackagePackage {
 Attaches the selected release to a Package result.
 
 .DESCRIPTION
-Selects a schemaVersion 1.3 artifact target and release entry for the
+Selects a schemaVersion 1.4 artifact target and release entry for the
 resolved Package config, projects that artifact target/release into the runtime
 assigned package object, and attaches it to the result.
 
@@ -339,7 +339,7 @@ Resolve-PackagePackage -PackageResult $result
         throw "Unsupported Package selection strategy '$($packageConfig.SelectionStrategy)'."
     }
 
-    $selectedPackage = Resolve-PackageEffectivePackage_1_3 -PackageConfig $packageConfig
+    $selectedPackage = Resolve-PackageEffectivePackage_1_4 -PackageConfig $packageConfig
 
     $PackageResult.Package = $selectedPackage
     $PackageResult.EffectiveRelease = $selectedPackage

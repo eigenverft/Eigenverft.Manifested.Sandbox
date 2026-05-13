@@ -1,29 +1,26 @@
 {
-  "$schema": "../Schema/eigenverft-module-package-definition-1.3.schema.json",
-  "schemaVersion": "1.3",
-  "id": "CodexCli",
+  "$schema": "../../Schema/eigenverft-module-package-definition-1.4.schema.json",
+  "schemaVersion": "1.4",
+  "id": "CursorCli",
+  "definitionPublication": {
+    "publisherId": "EigenverftModule",
+    "publisherName": "Eigenverft Module",
+    "definitionRevision": 1,
+    "publishedAtUtc": "2026-05-13T12:00:00Z"
+  },
   "display": {
     "default": {
-      "name": "Codex CLI",
-      "publisher": "OpenAI",
-      "corporation": "OpenAI",
-      "summary": "Pinned Codex CLI npm runtime"
+      "name": "Cursor Agent CLI",
+      "publisher": "Anysphere",
+      "corporation": "Anysphere",
+      "summary": "Pinned Cursor Agent CLI (portable Windows bundle from Cursor lab CDN)"
     }
   },
-  "dependencies": [
-    {
-      "repositoryId": "EigenverftModule",
-      "definitionId": "VisualCppRedistributable"
-    },
-    {
-      "repositoryId": "EigenverftModule",
-      "definitionId": "NodeRuntime"
-    }
-  ],
+  "dependencies": [],
   "artifacts": {
     "targets": [
       {
-        "id": "CodexCli-win32-x64-stable",
+        "id": "CursorCli-win32-x64-stable",
         "releaseTrack": "stable",
         "artifactDistributionVariant": "win32-x64",
         "constraints": {
@@ -37,10 +34,29 @@
         "versionSelection": {
           "strategy": "latestByVersion",
           "allowPrerelease": false
-        }
+        },
+        "fileNameTemplate": "agent-cli-package-{version}-{artifactDistributionVariant}.zip",
+        "acquisitionCandidates": [
+          {
+            "kind": "packageDepot",
+            "searchOrder": 100,
+            "verification": {
+              "mode": "optional"
+            }
+          },
+          {
+            "kind": "download",
+            "sourceId": "cursorAgentCliLab",
+            "sourcePath": "{version}/windows/x64/agent-cli-package.zip",
+            "searchOrder": 900,
+            "verification": {
+              "mode": "required"
+            }
+          }
+        ]
       },
       {
-        "id": "CodexCli-win32-arm64-stable",
+        "id": "CursorCli-win32-arm64-stable",
         "releaseTrack": "stable",
         "artifactDistributionVariant": "win32-arm64",
         "constraints": {
@@ -54,39 +70,69 @@
         "versionSelection": {
           "strategy": "latestByVersion",
           "allowPrerelease": false
-        }
+        },
+        "fileNameTemplate": "agent-cli-package-{version}-{artifactDistributionVariant}.zip",
+        "acquisitionCandidates": [
+          {
+            "kind": "packageDepot",
+            "searchOrder": 100,
+            "verification": {
+              "mode": "optional"
+            }
+          },
+          {
+            "kind": "download",
+            "sourceId": "cursorAgentCliLab",
+            "sourcePath": "{version}/windows/arm64/agent-cli-package.zip",
+            "searchOrder": 900,
+            "verification": {
+              "mode": "required"
+            }
+          }
+        ]
       }
     ],
     "releases": [
       {
-        "version": "0.130.0",
+        "version": "2026.05.09-0afadcc",
         "releaseTracks": [
           "stable"
         ],
         "targetArtifacts": {
-          "CodexCli-win32-x64-stable": {
-            "artifactId": "codex-runtime-win32-x64-stable"
+          "CursorCli-win32-x64-stable": {
+            "artifactId": "cursor-cli-runtime-win32-x64-stable",
+            "contentHash": {
+              "algorithm": "sha256",
+              "value": "9acfc6043f021508bb91badc8b8d6c34ef00bd3389907d8930514f1c8b52f03c"
+            }
           },
-          "CodexCli-win32-arm64-stable": {
-            "artifactId": "codex-runtime-win32-arm64-stable"
+          "CursorCli-win32-arm64-stable": {
+            "artifactId": "cursor-cli-runtime-win32-arm64-stable",
+            "contentHash": {
+              "algorithm": "sha256",
+              "value": "9b622fb0d7f51f8e1bfa5dcb840a5c5eaaf4829fda588e653fc04e3c83dbd1ac"
+            }
           }
         }
       }
     ],
-    "sources": {}
+    "sources": {
+      "cursorAgentCliLab": {
+        "kind": "download",
+        "baseUri": "https://downloads.cursor.com/lab/"
+      }
+    }
   },
   "presenceDiscovery": {
     "files": [
-      "codex.cmd",
-      "node_modules/@openai/codex/package.json"
+      "cursor-agent.cmd",
+      "node.exe"
     ],
-    "directories": [
-      "node_modules"
-    ],
+    "directories": [],
     "commands": [
       {
-        "name": "codex",
-        "relativePath": "codex.cmd",
+        "name": "agent",
+        "relativePath": "cursor-agent.cmd",
         "requiredForState": true,
         "exposeCommand": true,
         "stateChecks": [
@@ -94,7 +140,8 @@
             "arguments": [
               "--version"
             ],
-            "outputPattern": "(?m)^(?<value>.+\\S.*)$"
+            "outputPattern": "(?m)^(?<value>\\S+)\\s*$",
+            "expectedValue": "{version}"
           }
         ]
       }
@@ -129,17 +176,17 @@
     },
     "assigned": {
       "install": {
-        "kind": "npmGlobalPackage",
-        "installerCommand": "npm",
-        "packageSpec": "@openai/codex@{version}",
-        "installDirectory": "codex-runtime/{releaseTrack}/{version}/{artifactDistributionVariant}"
+        "kind": "expandArchive",
+        "installDirectory": "cursor-cli-runtime/{releaseTrack}/{version}/{artifactDistributionVariant}",
+        "expandedRoot": "dist-package",
+        "createDirectories": []
       },
       "readyStateCheck": {
         "use": "presenceDiscovery",
         "expectedVersion": "{version}",
         "require": {
           "files": true,
-          "directories": true,
+          "directories": false,
           "commands": true,
           "apps": false,
           "metadataFiles": false,

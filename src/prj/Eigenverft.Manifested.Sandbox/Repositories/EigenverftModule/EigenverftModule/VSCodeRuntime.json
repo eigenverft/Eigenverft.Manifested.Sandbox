@@ -1,22 +1,28 @@
 {
-  "$schema": "../Schema/eigenverft-module-package-definition-1.3.schema.json",
-  "schemaVersion": "1.3",
-  "id": "PythonRuntime",
+  "$schema": "../../Schema/eigenverft-module-package-definition-1.4.schema.json",
+  "schemaVersion": "1.4",
+  "id": "VSCodeRuntime",
+  "definitionPublication": {
+    "publisherId": "EigenverftModule",
+    "publisherName": "Eigenverft Module",
+    "definitionRevision": 1,
+    "publishedAtUtc": "2026-05-13T12:00:00Z"
+  },
   "display": {
     "default": {
-      "name": "Python",
-      "publisher": "Python Software Foundation",
-      "corporation": "Python Software Foundation",
-      "summary": "Portable Python runtime from the official NuGet package"
+      "name": "Visual Studio Code",
+      "publisher": "Microsoft",
+      "corporation": "Microsoft Corporation",
+      "summary": "Code editor"
     }
   },
   "dependencies": [],
   "artifacts": {
     "targets": [
       {
-        "id": "PythonRuntime-win-x64-stable",
+        "id": "VSCodeRuntime-win32-x64-stable",
         "releaseTrack": "stable",
-        "artifactDistributionVariant": "win-x64",
+        "artifactDistributionVariant": "win32-x64",
         "constraints": {
           "os": [
             "windows"
@@ -29,7 +35,7 @@
           "strategy": "latestByVersion",
           "allowPrerelease": false
         },
-        "fileNameTemplate": "python.{version}.nupkg",
+        "fileNameTemplate": "VSCode-win32-x64-{version}.zip",
         "acquisitionCandidates": [
           {
             "kind": "packageDepot",
@@ -40,9 +46,9 @@
           },
           {
             "kind": "download",
-            "sourceId": "pythonNuGetPackage",
-            "sourcePath": "python/{version}/python.{version}.nupkg",
+            "sourceId": "vsCodeUpdateService",
             "searchOrder": 900,
+            "sourcePath": "{version}/win32-x64-archive/stable",
             "verification": {
               "mode": "required"
             }
@@ -50,9 +56,9 @@
         ]
       },
       {
-        "id": "PythonRuntime-win-arm64-stable",
+        "id": "VSCodeRuntime-win32-arm64-stable",
         "releaseTrack": "stable",
-        "artifactDistributionVariant": "win-arm64",
+        "artifactDistributionVariant": "win32-arm64",
         "constraints": {
           "os": [
             "windows"
@@ -65,7 +71,7 @@
           "strategy": "latestByVersion",
           "allowPrerelease": false
         },
-        "fileNameTemplate": "pythonarm64.{version}.nupkg",
+        "fileNameTemplate": "VSCode-win32-arm64-{version}.zip",
         "acquisitionCandidates": [
           {
             "kind": "packageDepot",
@@ -76,9 +82,9 @@
           },
           {
             "kind": "download",
-            "sourceId": "pythonNuGetPackage",
-            "sourcePath": "pythonarm64/{version}/pythonarm64.{version}.nupkg",
+            "sourceId": "vsCodeUpdateService",
             "searchOrder": 900,
+            "sourcePath": "{version}/win32-arm64-archive/stable",
             "verification": {
               "mode": "required"
             }
@@ -88,50 +94,47 @@
     ],
     "releases": [
       {
-        "version": "3.13.13",
+        "version": "1.119.0",
         "releaseTracks": [
           "stable"
         ],
-        "upstreamRelease": {
-          "sourceId": "pythonNuGetPackage",
-          "releaseTag": "3.13.13"
-        },
         "targetArtifacts": {
-          "PythonRuntime-win-x64-stable": {
-            "artifactId": "python-runtime-win-x64-stable",
+          "VSCodeRuntime-win32-x64-stable": {
+            "artifactId": "vsCode-win-x64-stable",
             "contentHash": {
               "algorithm": "sha256",
-              "value": "c2347c2975f661b2dafceacc94218dfe87781955a3cd309c633d343b8c8dac31"
+              "value": "fea13bf400c6770dd14eeabc0e47757ffe2703f1a3f2a258faa22bce3bdd21af"
             }
           },
-          "PythonRuntime-win-arm64-stable": {
-            "artifactId": "python-runtime-win-arm64-stable",
+          "VSCodeRuntime-win32-arm64-stable": {
+            "artifactId": "vsCode-win-arm64-stable",
             "contentHash": {
               "algorithm": "sha256",
-              "value": "2a0406b834d4ff33414f70597b67797466ba2344baa534ab8f62c4eae1c3e599"
+              "value": "7e40617507cb917fdaa7b7f6312c3202352e2f2db102e80d28b80d2fee99e2ed"
             }
           }
         }
       }
     ],
     "sources": {
-      "pythonNuGetPackage": {
+      "vsCodeUpdateService": {
         "kind": "download",
-        "baseUri": "https://api.nuget.org/v3-flatcontainer/"
+        "baseUri": "https://update.code.visualstudio.com"
       }
     }
   },
   "presenceDiscovery": {
     "files": [
-      "python.exe"
+      "Code.exe",
+      "bin/code.cmd"
     ],
     "directories": [
-      "Lib/site-packages/pip"
+      "data"
     ],
     "commands": [
       {
-        "name": "python",
-        "relativePath": "python.exe",
+        "name": "code",
+        "relativePath": "bin/code.cmd",
         "requiredForState": true,
         "exposeCommand": true,
         "stateChecks": [
@@ -139,37 +142,88 @@
             "arguments": [
               "--version"
             ],
-            "outputPattern": "(?m)^Python\\s+(?<value>\\d+\\.\\d+\\.\\d+)\\s*$",
+            "outputPattern": "(?m)^(?<value>\\d+\\.\\d+\\.\\d+)\\s*$",
             "expectedValue": "{version}"
-          },
-          {
-            "arguments": [
-              "-m",
-              "pip",
-              "--version"
-            ],
-            "outputPattern": "(?m)^pip\\s+(?<value>\\d+\\.\\d+(?:\\.\\d+)?(?:[-+][0-9A-Za-z.\\-]+)?)\\s+from\\s+.+$"
           }
         ]
       }
     ],
-    "apps": [],
+    "apps": [
+      {
+        "name": "Code",
+        "relativePath": "Code.exe",
+        "requiredForState": true,
+        "exposeApp": true
+      }
+    ],
     "metadataFiles": [],
-    "signatures": [],
-    "fileDetails": [],
+    "signatures": [
+      {
+        "relativePath": "Code.exe",
+        "requireValid": true,
+        "subjectContains": "Microsoft Corporation"
+      }
+    ],
+    "fileDetails": [
+      {
+        "relativePath": "Code.exe",
+        "productName": "Visual Studio Code",
+        "fileDescription": "Visual Studio Code"
+      }
+    ],
     "registry": []
   },
   "existingInstallDiscovery": {
-    "enabled": false,
-    "searchLocations": [],
-    "installRootRules": []
+    "enabled": true,
+    "searchLocations": [
+      {
+        "id": "vsCodeCommandCodeCmd",
+        "kind": "command",
+        "searchOrder": 100,
+        "name": "code.cmd"
+      },
+      {
+        "id": "vsCodeCommandCode",
+        "kind": "command",
+        "searchOrder": 110,
+        "name": "code"
+      },
+      {
+        "id": "vsCodeProgramFilesCodeCmd",
+        "kind": "path",
+        "searchOrder": 120,
+        "path": "%ProgramFiles%/Microsoft VS Code/bin/code.cmd"
+      },
+      {
+        "id": "vsCodeLocalAppDataCodeCmd",
+        "kind": "path",
+        "searchOrder": 130,
+        "path": "%LOCALAPPDATA%/Programs/Microsoft VS Code/bin/code.cmd"
+      }
+    ],
+    "installRootRules": [
+      {
+        "match": {
+          "kind": "fileName",
+          "value": "code.cmd"
+        },
+        "installRootRelativePath": ".."
+      },
+      {
+        "match": {
+          "kind": "fileName",
+          "value": "Code.exe"
+        },
+        "installRootRelativePath": "."
+      }
+    ]
   },
   "packageOperations": {
     "policy": {
       "ownershipPolicy": {
-        "allowAdoptExternal": false,
-        "upgradeAdoptedInstall": false,
-        "requirePackageOwnership": true
+        "allowAdoptExternal": true,
+        "upgradeAdoptedInstall": true,
+        "requirePackageOwnership": false
       },
       "compatibility": {
         "checks": [
@@ -184,9 +238,11 @@
     "assigned": {
       "install": {
         "kind": "expandArchive",
-        "installDirectory": "python-runtime/{releaseTrack}/{version}/{artifactDistributionVariant}",
-        "expandedRoot": "tools",
-        "createDirectories": []
+        "installDirectory": "vsc-rt/{releaseTrack}/{version}/{artifactDistributionVariant}",
+        "expandedRoot": "auto",
+        "createDirectories": [
+          "data"
+        ]
       },
       "readyStateCheck": {
         "use": "presenceDiscovery",
@@ -195,11 +251,11 @@
           "files": true,
           "directories": true,
           "commands": true,
-          "apps": false,
-          "metadataFiles": false,
-          "signatures": false,
-          "fileDetails": false,
-          "registry": false
+          "apps": true,
+          "metadataFiles": true,
+          "signatures": true,
+          "fileDetails": true,
+          "registry": true
         }
       },
       "pathRegistration": {

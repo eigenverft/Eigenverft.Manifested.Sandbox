@@ -141,21 +141,21 @@ Save-PackageInventory -InventoryPath $path -Records $records
     } | ConvertTo-Json -Depth 20 | Set-Content -LiteralPath $InventoryPath -Encoding UTF8
 }
 
-function Copy-PackageDefinitionToLocalRepository {
+function Copy-PackageDefinitionToAssignedSnapshot {
 <#
 .SYNOPSIS
-Copies the loaded Package definition into the local repository cache.
+Copies the materialized Candidate Package definition into the Assigned snapshot store.
 
 .DESCRIPTION
-Stores the original definition JSON file under the configured local repository
-root using the source repository id and original filename. The copy stays a
-plain package definition document.
+Stores the exact definition used by a successful Assigned operation under the
+configured local repository root. The Assigned snapshot is the durable definition
+material used later by Removed and audit flows.
 
 .PARAMETER PackageResult
 The current Package result object.
 
 .EXAMPLE
-Copy-PackageDefinitionToLocalRepository -PackageResult $result
+Copy-PackageDefinitionToAssignedSnapshot -PackageResult $result
 #>
     [CmdletBinding()]
     param(
@@ -164,25 +164,15 @@ Copy-PackageDefinitionToLocalRepository -PackageResult $result
     )
 
     $config = $PackageResult.PackageConfig
-    $sourcePath = [string]$config.DefinitionPath
+    $sourcePath = if ($config.PSObject.Properties['DefinitionCandidatePath'] -and
+        -not [string]::IsNullOrWhiteSpace([string]$config.DefinitionCandidatePath)) {
+        [string]$config.DefinitionCandidatePath
+    }
+    else {
+        [string]$config.DefinitionPath
+    }
     if ([string]::IsNullOrWhiteSpace($sourcePath) -or -not (Test-Path -LiteralPath $sourcePath -PathType Leaf)) {
-        throw "Package definition source path '$sourcePath' is not available for local repository copy."
-    }
-
-    $repositoryId = if ($config.PSObject.Properties['DefinitionRepositoryId'] -and
-        -not [string]::IsNullOrWhiteSpace([string]$config.DefinitionRepositoryId)) {
-        [string]$config.DefinitionRepositoryId
-    }
-    else {
-        Get-PackageDefaultRepositoryId
-    }
-
-    $definitionFileName = if ($config.PSObject.Properties['DefinitionFileName'] -and
-        -not [string]::IsNullOrWhiteSpace([string]$config.DefinitionFileName)) {
-        [string]$config.DefinitionFileName
-    }
-    else {
-        Split-Path -Leaf $sourcePath
+        throw "Package definition Candidate path '$sourcePath' is not available for Assigned snapshot copy."
     }
 
     $localRepositoryRoot = if ($config.PSObject.Properties['LocalRepositoryRoot'] -and
@@ -193,23 +183,31 @@ Copy-PackageDefinitionToLocalRepository -PackageResult $result
         Get-PackageDefaultLocalRepositoryRoot
     }
 
-    $repositoryDirectory = [System.IO.Path]::GetFullPath((Join-Path $localRepositoryRoot $repositoryId))
-    $null = New-Item -ItemType Directory -Path $repositoryDirectory -Force
-    $localDefinitionPath = [System.IO.Path]::GetFullPath((Join-Path $repositoryDirectory $definitionFileName))
-    Copy-FileToPath -SourcePath $sourcePath -TargetPath $localDefinitionPath -Overwrite | Out-Null
-
-    $sourceHash = Get-PackageFileSha256 -Path $sourcePath
-    $snapshotHash = Get-PackageFileSha256 -Path $localDefinitionPath
+    $publisherId = if ($config.PSObject.Properties['DefinitionPublisherId'] -and
+        -not [string]::IsNullOrWhiteSpace([string]$config.DefinitionPublisherId)) {
+        [string]$config.DefinitionPublisherId
+    }
+    else {
+        Get-PackageDefaultRepositoryId
+    }
+    $publisherName = if ($config.PSObject.Properties['DefinitionPublisherName']) { [string]$config.DefinitionPublisherName } else { $null }
+    $definitionRevision = if ($config.PSObject.Properties['DefinitionRevision']) { [int]$config.DefinitionRevision } else { 0 }
+    $assignedCopy = Copy-PackageDefinitionToLocalDefinitionStore -Role 'Assigned' -SourcePath $sourcePath -LocalRepositoryRoot $localRepositoryRoot -PublisherId $publisherId -DefinitionId ([string]$PackageResult.DefinitionId) -DefinitionRevision $definitionRevision
 
     return [pscustomobject]@{
-        RepositoryId  = $repositoryId
-        FileName      = $definitionFileName
-        SourceKind    = if ($config.PSObject.Properties['DefinitionSourceKind']) { [string]$config.DefinitionSourceKind } else { $null }
-        SourcePath    = [System.IO.Path]::GetFullPath($sourcePath)
-        SourceHash    = $sourceHash
-        SnapshotPath  = $localDefinitionPath
-        SnapshotHash  = $snapshotHash
-        ResolvedAtUtc = if ($config.PSObject.Properties['DefinitionResolvedAtUtc'] -and -not [string]::IsNullOrWhiteSpace([string]$config.DefinitionResolvedAtUtc)) { [string]$config.DefinitionResolvedAtUtc } else { [DateTime]::UtcNow.ToString('o') }
+        RepositorySourceId      = if ($config.PSObject.Properties['DefinitionRepositorySourceId']) { [string]$config.DefinitionRepositorySourceId } else { [string]$config.DefinitionRepositoryId }
+        PublisherId             = $publisherId
+        PublisherName           = $publisherName
+        DefinitionRevision      = $definitionRevision
+        PublishedAtUtc          = if ($config.PSObject.Properties['DefinitionPublishedAtUtc']) { [string]$config.DefinitionPublishedAtUtc } else { $null }
+        SourceKind              = if ($config.PSObject.Properties['DefinitionSourceKind']) { [string]$config.DefinitionSourceKind } else { $null }
+        SourcePath              = if ($config.PSObject.Properties['DefinitionSourcePath'] -and -not [string]::IsNullOrWhiteSpace([string]$config.DefinitionSourcePath)) { [System.IO.Path]::GetFullPath([string]$config.DefinitionSourcePath) } else { $null }
+        SourceHash              = if ($config.PSObject.Properties['DefinitionSourceHash']) { [string]$config.DefinitionSourceHash } else { $null }
+        CandidatePath           = [System.IO.Path]::GetFullPath($sourcePath)
+        CandidateHash           = Get-PackageFileSha256 -Path $sourcePath
+        AssignedSnapshotPath    = [System.IO.Path]::GetFullPath([string]$assignedCopy.Path)
+        AssignedSnapshotHash    = [string]$assignedCopy.Hash
+        ResolvedAtUtc           = if ($config.PSObject.Properties['DefinitionResolvedAtUtc'] -and -not [string]::IsNullOrWhiteSpace([string]$config.DefinitionResolvedAtUtc)) { [string]$config.DefinitionResolvedAtUtc } else { [DateTime]::UtcNow.ToString('o') }
     }
 }
 
@@ -371,7 +369,7 @@ Update-PackageInventoryRecord -PackageResult $result
         [System.IO.Path]::GetFullPath($PackageResult.InstallDirectory)
     }
     $installSlotId = Get-PackageInstallSlotId -PackageResult $PackageResult
-    $definitionCopy = Copy-PackageDefinitionToLocalRepository -PackageResult $PackageResult
+    $definitionCopy = Copy-PackageDefinitionToAssignedSnapshot -PackageResult $PackageResult
     $pathRegistrationRecord = $null
     if ($PackageResult.PSObject.Properties['PathRegistration'] -and $null -ne $PackageResult.PathRegistration) {
         $pathRegistrationRecord = [pscustomobject]@{
@@ -409,13 +407,18 @@ Update-PackageInventoryRecord -PackageResult $result
     $newRecord = [pscustomobject]@{
         installSlotId   = $installSlotId
         definitionId    = $PackageResult.DefinitionId
-        definitionRepositoryId = $definitionCopy.RepositoryId
-        definitionFileName = $definitionCopy.FileName
+        definitionPublisherId = $definitionCopy.PublisherId
+        definitionPublisherName = $definitionCopy.PublisherName
+        definitionRevision = $definitionCopy.DefinitionRevision
+        definitionPublishedAtUtc = $definitionCopy.PublishedAtUtc
+        definitionRepositorySourceId = $definitionCopy.RepositorySourceId
         definitionSourceKind = $definitionCopy.SourceKind
         definitionSourcePath = $definitionCopy.SourcePath
         definitionSourceHash = $definitionCopy.SourceHash
-        definitionSnapshotPath = $definitionCopy.SnapshotPath
-        definitionSnapshotHash = $definitionCopy.SnapshotHash
+        definitionCandidatePath = $definitionCopy.CandidatePath
+        definitionCandidateHash = $definitionCopy.CandidateHash
+        definitionAssignedSnapshotPath = $definitionCopy.AssignedSnapshotPath
+        definitionAssignedSnapshotHash = $definitionCopy.AssignedSnapshotHash
         definitionResolvedAtUtc = $definitionCopy.ResolvedAtUtc
         releaseTrack    = if ($PackageResult.Package -and $PackageResult.Package.PSObject.Properties['releaseTrack']) { [string]$PackageResult.Package.releaseTrack } else { [string]$PackageResult.ReleaseTrack }
         artifactDistributionVariant = if ($PackageResult.Package -and $PackageResult.Package.PSObject.Properties['artifactDistributionVariant']) { [string]$PackageResult.Package.artifactDistributionVariant } else { $null }

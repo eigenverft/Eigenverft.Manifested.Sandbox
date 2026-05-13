@@ -1,22 +1,32 @@
 {
-  "$schema": "../Schema/eigenverft-module-package-definition-1.3.schema.json",
-  "schemaVersion": "1.3",
-  "id": "PowerShell7",
+  "$schema": "../../Schema/eigenverft-module-package-definition-1.4.schema.json",
+  "schemaVersion": "1.4",
+  "id": "OpenCodeCli",
+  "definitionPublication": {
+    "publisherId": "EigenverftModule",
+    "publisherName": "Eigenverft Module",
+    "definitionRevision": 1,
+    "publishedAtUtc": "2026-05-13T12:00:00Z"
+  },
   "display": {
     "default": {
-      "name": "PowerShell 7",
-      "publisher": "Microsoft",
-      "corporation": "Microsoft Corporation",
-      "summary": "Portable PowerShell 7 runtime"
+      "name": "OpenCode CLI",
+      "publisher": "SST",
+      "corporation": "SST",
+      "summary": "Pinned OpenCode CLI npm runtime"
     }
   },
-  "dependencies": [],
+  "dependencies": [
+    {
+      "definitionId": "NodeRuntime"
+    }
+  ],
   "artifacts": {
     "targets": [
       {
-        "id": "PowerShell7-win-x64-stable",
+        "id": "OpenCodeCli-win32-x64-stable",
         "releaseTrack": "stable",
-        "artifactDistributionVariant": "win-x64",
+        "artifactDistributionVariant": "win32-x64",
         "constraints": {
           "os": [
             "windows"
@@ -28,30 +38,12 @@
         "versionSelection": {
           "strategy": "latestByVersion",
           "allowPrerelease": false
-        },
-        "fileNameTemplate": "PowerShell-{version}-win-x64.zip",
-        "acquisitionCandidates": [
-          {
-            "kind": "packageDepot",
-            "searchOrder": 100,
-            "verification": {
-              "mode": "optional"
-            }
-          },
-          {
-            "kind": "download",
-            "sourceId": "powerShellGitHub",
-            "searchOrder": 900,
-            "verification": {
-              "mode": "required"
-            }
-          }
-        ]
+        }
       },
       {
-        "id": "PowerShell7-win-arm64-stable",
+        "id": "OpenCodeCli-win32-arm64-stable",
         "releaseTrack": "stable",
-        "artifactDistributionVariant": "win-arm64",
+        "artifactDistributionVariant": "win32-arm64",
         "constraints": {
           "os": [
             "windows"
@@ -63,84 +55,47 @@
         "versionSelection": {
           "strategy": "latestByVersion",
           "allowPrerelease": false
-        },
-        "fileNameTemplate": "PowerShell-{version}-win-arm64.zip",
-        "acquisitionCandidates": [
-          {
-            "kind": "packageDepot",
-            "searchOrder": 100,
-            "verification": {
-              "mode": "optional"
-            }
-          },
-          {
-            "kind": "download",
-            "sourceId": "powerShellGitHub",
-            "searchOrder": 900,
-            "verification": {
-              "mode": "required"
-            }
-          }
-        ]
+        }
       }
     ],
     "releases": [
       {
-        "version": "7.6.1",
+        "version": "1.14.46",
         "releaseTracks": [
           "stable"
         ],
-        "upstreamRelease": {
-          "sourceId": "powerShellGitHub",
-          "releaseTag": "v7.6.1"
-        },
         "targetArtifacts": {
-          "PowerShell7-win-x64-stable": {
-            "artifactId": "ps7-runtime-win-x64-stable",
-            "contentHash": {
-              "algorithm": "sha256",
-              "value": "b5c9e8457ca7df4998abe3cc2c58e6dd4005ad1b4c5320bbac86244a747db91d"
-            }
+          "OpenCodeCli-win32-x64-stable": {
+            "artifactId": "opencode-runtime-win32-x64-stable"
           },
-          "PowerShell7-win-arm64-stable": {
-            "artifactId": "ps7-runtime-win-arm64-stable",
-            "contentHash": {
-              "algorithm": "sha256",
-              "value": "f8976558a687dd610eec33a42868a090f611f3bfbc0ae69c2bc5d986e3b53847"
-            }
+          "OpenCodeCli-win32-arm64-stable": {
+            "artifactId": "opencode-runtime-win32-arm64-stable"
           }
         }
       }
     ],
-    "sources": {
-      "powerShellGitHub": {
-        "kind": "githubRelease",
-        "githubOwner": "PowerShell",
-        "githubRepository": "PowerShell"
-      }
-    }
+    "sources": {}
   },
   "presenceDiscovery": {
     "files": [
-      "pwsh.exe"
+      "opencode.cmd",
+      "node_modules/opencode-ai/package.json"
     ],
-    "directories": [],
+    "directories": [
+      "node_modules"
+    ],
     "commands": [
       {
-        "name": "pwsh",
-        "relativePath": "pwsh.exe",
+        "name": "opencode",
+        "relativePath": "opencode.cmd",
         "requiredForState": true,
         "exposeCommand": true,
         "stateChecks": [
           {
             "arguments": [
-              "-NoLogo",
-              "-NoProfile",
-              "-Command",
-              "$PSVersionTable.PSVersion.ToString()"
+              "--version"
             ],
-            "outputPattern": "(?m)^(?<value>\\d+\\.\\d+\\.\\d+)\\s*$",
-            "expectedValue": "{version}"
+            "outputPattern": "(?m)^(?<value>.+\\S.*)$"
           }
         ]
       }
@@ -175,17 +130,17 @@
     },
     "assigned": {
       "install": {
-        "kind": "expandArchive",
-        "installDirectory": "ps7-runtime/{releaseTrack}/{version}/{artifactDistributionVariant}",
-        "expandedRoot": "auto",
-        "createDirectories": []
+        "kind": "npmGlobalPackage",
+        "installerCommand": "npm",
+        "packageSpec": "opencode-ai@{version}",
+        "installDirectory": "opencode-runtime/{releaseTrack}/{version}/{artifactDistributionVariant}"
       },
       "readyStateCheck": {
         "use": "presenceDiscovery",
         "expectedVersion": "{version}",
         "require": {
           "files": true,
-          "directories": false,
+          "directories": true,
           "commands": true,
           "apps": false,
           "metadataFiles": false,

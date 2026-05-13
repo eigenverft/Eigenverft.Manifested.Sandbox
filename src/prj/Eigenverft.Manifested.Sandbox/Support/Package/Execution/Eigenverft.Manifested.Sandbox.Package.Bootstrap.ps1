@@ -340,9 +340,8 @@ function Get-PackageDefinitionPath {
 Returns the shipped Package definition path for an id.
 
 .DESCRIPTION
-Builds the module-relative path to a Package definition JSON file in the
-shipped EigenverftModule repository by using the definition id as the filename
-stem.
+Finds a Package definition JSON file in the shipped EigenverftModule repository
+by reading the JSON id. Filenames and subdirectories are storage details.
 
 .PARAMETER DefinitionId
 The Package definition id.
@@ -356,6 +355,24 @@ Get-PackageDefinitionPath -DefinitionId VSCodeRuntime
         [string]$DefinitionId
     )
 
-    return (Join-Path (Join-Path (Get-PackageRepositoriesRoot) (Get-PackageDefaultRepositoryId)) ($DefinitionId + '.json'))
+    $repositoryRoot = Join-Path (Get-PackageRepositoriesRoot) (Get-PackageDefaultRepositoryId)
+    if (-not (Test-Path -LiteralPath $repositoryRoot -PathType Container)) {
+        throw "Package repository root '$repositoryRoot' does not exist."
+    }
+
+    foreach ($jsonFile in @(Get-ChildItem -LiteralPath $repositoryRoot -Filter '*.json' -File -Recurse)) {
+        try {
+            $document = Get-Content -LiteralPath $jsonFile.FullName -Raw -ErrorAction Stop | ConvertFrom-Json -ErrorAction Stop
+            if ($document.PSObject.Properties['id'] -and
+                [string]::Equals([string]$document.id, $DefinitionId, [System.StringComparison]::OrdinalIgnoreCase)) {
+                return [System.IO.Path]::GetFullPath($jsonFile.FullName)
+            }
+        }
+        catch {
+            continue
+        }
+    }
+
+    throw "Package definition '$DefinitionId' was not found by JSON id under shipped repository '$repositoryRoot'."
 }
 

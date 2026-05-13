@@ -74,7 +74,7 @@ Displays module information, per-definition Invoke-Package examples, and other e
         try {
             $repoDir = Join-Path (Get-PackageRepositoriesRoot) $defaultRepo
             if (Test-Path -LiteralPath $repoDir) {
-                foreach ($jsonFile in Get-ChildItem -LiteralPath $repoDir -Filter *.json -File) {
+                foreach ($jsonFile in Get-ChildItem -LiteralPath $repoDir -Filter *.json -File -Recurse) {
                     try {
                         $doc = Get-Content -LiteralPath $jsonFile.FullName -Raw | ConvertFrom-Json
                         $sv = if ($doc.PSObject.Properties['schemaVersion']) { [string]$doc.schemaVersion } else { '' }

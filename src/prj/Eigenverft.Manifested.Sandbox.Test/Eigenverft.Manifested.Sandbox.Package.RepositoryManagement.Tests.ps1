@@ -188,7 +188,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - reposi
     It 'falls back to an inventory definition snapshot for removed state when the live repository is unavailable' {
         $root = Join-Path $TestDrive 'repo-removed-snapshot'
         $applicationRoot = Join-Path $root 'AppRoot'
-        $snapshotPath = Join-Path $applicationRoot 'PkgRepos\teamPackageRepository\VSCodeRuntime.json'
+        $snapshotPath = Join-Path $applicationRoot 'PkgRepos\Assigned\EigenverftModule\VSCodeRuntime.json'
         Write-TestJsonDocument -Path $snapshotPath -Document (New-TestVSCodeDefinitionDocument -Releases @(
                 New-TestPackageRelease -Id 'vsCode-v1' -Version '1.0.0' -Architecture 'x64' -ArtifactDistributionVariant 'win32-x64'
             ))
@@ -214,12 +214,15 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - reposi
                 @{
                     installSlotId = 'VSCodeRuntime:stable:win32-x64'
                     definitionId = 'VSCodeRuntime'
-                    definitionRepositoryId = 'teamPackageRepository'
-                    definitionFileName = 'VSCodeRuntime.json'
+                    definitionPublisherId = 'EigenverftModule'
+                    definitionPublisherName = 'Eigenverft Module'
+                    definitionRevision = 1
+                    definitionPublishedAtUtc = '2026-05-13T12:00:00Z'
+                    definitionRepositorySourceId = 'teamPackageRepository'
                     definitionSourceKind = 'filesystem'
                     definitionSourcePath = Join-Path $root 'missing-repo'
-                    definitionSnapshotPath = $snapshotPath
-                    definitionSnapshotHash = (Get-PackageFileSha256 -Path $snapshotPath)
+                    definitionAssignedSnapshotPath = $snapshotPath
+                    definitionAssignedSnapshotHash = (Get-PackageFileSha256 -Path $snapshotPath)
                     releaseTrack = 'stable'
                     artifactDistributionVariant = 'win32-x64'
                     currentReleaseId = 'vsCode-v1'

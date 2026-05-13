@@ -144,16 +144,20 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - resour
         $record = $savedDocument.Document.records[0]
 
         $record.installSlotId | Should -Be 'VSCodeRuntime:stable:win32-x64'
-        $record.definitionRepositoryId | Should -Be 'EigenverftModule'
-        $record.definitionFileName | Should -Be 'VSCodeRuntime.json'
-        $record.definitionSourceKind | Should -Be 'moduleLocal'
+        $record.definitionPublisherId | Should -Be 'EigenverftModule'
+        $record.definitionPublisherName | Should -Be 'Eigenverft Module'
+        $record.definitionRevision | Should -Be 1
+        $record.definitionRepositorySourceId | Should -Be 'EigenverftModule'
+        $record.definitionSourceKind | Should -Be 'filesystem'
         $record.definitionSourcePath | Should -Be ([System.IO.Path]::GetFullPath($documents.DefinitionPath))
         $record.definitionSourceHash | Should -Not -BeNullOrEmpty
-        $record.definitionSnapshotPath | Should -Not -BeNullOrEmpty
-        $record.definitionSnapshotHash | Should -Not -BeNullOrEmpty
+        $record.definitionCandidatePath | Should -Not -BeNullOrEmpty
+        $record.definitionCandidateHash | Should -Not -BeNullOrEmpty
+        $record.definitionAssignedSnapshotPath | Should -Not -BeNullOrEmpty
+        $record.definitionAssignedSnapshotHash | Should -Not -BeNullOrEmpty
         $record.definitionResolvedAtUtc | Should -Not -BeNullOrEmpty
-        Test-Path -LiteralPath $record.definitionSnapshotPath -PathType Leaf | Should -BeTrue
-        (Read-PackageJsonDocument -Path $record.definitionSnapshotPath).Document.id | Should -Be 'VSCodeRuntime'
+        Test-Path -LiteralPath $record.definitionAssignedSnapshotPath -PathType Leaf | Should -BeTrue
+        (Read-PackageJsonDocument -Path $record.definitionAssignedSnapshotPath).Document.id | Should -Be 'VSCodeRuntime'
         $record.currentReleaseId | Should -Be 'vsCode-win-x64-stable'
         $record.currentVersion | Should -Be '3.0.0'
         $record.installDirectory | Should -Be $installRoot

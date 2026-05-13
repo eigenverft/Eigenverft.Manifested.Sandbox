@@ -286,7 +286,8 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
         @($environment.CreatedDirectories).Count | Should -Be 0
         @($environment.ExistingDirectories).Count | Should -Be 0
         @($environment.SkippedSources).Count | Should -Be 0
-        Test-Path -LiteralPath $config.LocalRepositoryRoot -PathType Container | Should -BeFalse
+        Test-Path -LiteralPath $config.LocalRepositoryRoot -PathType Container | Should -BeTrue
+        Test-Path -LiteralPath $config.DefinitionCandidatePath -PathType Leaf | Should -BeTrue
         Test-Path -LiteralPath $config.DefaultPackageDepotDirectory -PathType Container | Should -BeFalse
     }
 
@@ -316,7 +317,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
         $result.ErrorMessage | Should -Be 'local environment boom'
     }
 
-    It 'runs Invoke-Package with default repository and assigned state' {
+    It 'runs Invoke-Package with active repository search and assigned state' {
         Mock Invoke-PackageDefinitionCommandCore {
             [pscustomobject]@{
                 RepositoryId = $RepositoryId
@@ -329,7 +330,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
         $result = Invoke-Package -DefinitionId 'GitRuntime'
 
         Assert-MockCalled Invoke-PackageDefinitionCommandCore -Times 1 -ParameterFilter {
-            $RepositoryId -eq 'EigenverftModule' -and
+            [string]::IsNullOrWhiteSpace($RepositoryId) -and
             $DefinitionId -eq 'GitRuntime' -and
             $DesiredState -eq 'Assigned'
         }
@@ -512,13 +513,21 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
 
         $inventoryPath = Join-Path $appRoot 'State\PackageAssignmentInventory.json'
         $null = New-Item -ItemType Directory -Path (Split-Path -Parent $inventoryPath) -Force
+        $assignedSnapshotPath = Join-Path $appRoot 'PkgRepos\Assigned\EigenverftModule\VSCodeRuntime.json'
+        Write-TestJsonDocument -Path $assignedSnapshotPath -Document $definitionDocument
         $record = @{
             installSlotId       = 'VSCodeRuntime:stable:win32-x64'
             definitionId        = 'VSCodeRuntime'
-            definitionRepositoryId = 'EigenverftModule'
-            definitionFileName  = 'VSCodeRuntime.json'
-            definitionSourcePath = (Join-Path $rootPath 'VSCodeRuntime.json')
-            definitionLocalPath = (Join-Path $rootPath 'VSCodeRuntime.json')
+            definitionPublisherId = 'EigenverftModule'
+            definitionPublisherName = 'Eigenverft Module'
+            definitionRevision = 1
+            definitionPublishedAtUtc = '2026-05-13T00:00:00Z'
+            definitionRepositorySourceId = 'EigenverftModule'
+            definitionSourceKind = 'filesystem'
+            definitionSourcePath = $documents.DefinitionPath
+            definitionSourceHash = (Get-PackageFileSha256 -Path $documents.DefinitionPath)
+            definitionAssignedSnapshotPath = $assignedSnapshotPath
+            definitionAssignedSnapshotHash = (Get-PackageFileSha256 -Path $assignedSnapshotPath)
             releaseTrack        = 'stable'
             artifactDistributionVariant = 'win32-x64'
             currentReleaseId    = 'vsCode-win-x64-stable'
@@ -570,13 +579,21 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
 
         $inventoryPath = Join-Path $appRoot 'State\PackageAssignmentInventory.json'
         $null = New-Item -ItemType Directory -Path (Split-Path -Parent $inventoryPath) -Force
+        $assignedSnapshotPath = Join-Path $appRoot 'PkgRepos\Assigned\EigenverftModule\VSCodeRuntime.json'
+        Write-TestJsonDocument -Path $assignedSnapshotPath -Document $definitionDocument
         $record = @{
             installSlotId       = 'VSCodeRuntime:stable:win32-x64'
             definitionId        = 'VSCodeRuntime'
-            definitionRepositoryId = 'EigenverftModule'
-            definitionFileName  = 'VSCodeRuntime.json'
-            definitionSourcePath = (Join-Path $rootPath 'VSCodeRuntime.json')
-            definitionLocalPath = (Join-Path $rootPath 'VSCodeRuntime.json')
+            definitionPublisherId = 'EigenverftModule'
+            definitionPublisherName = 'Eigenverft Module'
+            definitionRevision = 1
+            definitionPublishedAtUtc = '2026-05-13T00:00:00Z'
+            definitionRepositorySourceId = 'EigenverftModule'
+            definitionSourceKind = 'filesystem'
+            definitionSourcePath = $documents.DefinitionPath
+            definitionSourceHash = (Get-PackageFileSha256 -Path $documents.DefinitionPath)
+            definitionAssignedSnapshotPath = $assignedSnapshotPath
+            definitionAssignedSnapshotHash = (Get-PackageFileSha256 -Path $assignedSnapshotPath)
             releaseTrack        = 'stable'
             artifactDistributionVariant = 'win32-x64'
             currentReleaseId    = 'vsCode-win-x64-stable'
@@ -606,7 +623,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
         $defDir = Join-Path $rootPath 'RepoDefs'
         $null = New-Item -ItemType Directory -Path $defDir -Force
         $moduleProjectRoot = Join-Path (Split-Path -Parent $PSScriptRoot) 'Eigenverft.Manifested.Sandbox'
-        $shippedDefs = Join-Path $moduleProjectRoot 'Repositories\EigenverftModule'
+        $shippedDefs = Join-Path $moduleProjectRoot 'Repositories\EigenverftModule\EigenverftModule'
         Copy-Item -LiteralPath (Join-Path $shippedDefs 'CodexCli.json') -Destination (Join-Path $defDir 'CodexCli.json') -Force
         Copy-Item -LiteralPath (Join-Path $shippedDefs 'NodeRuntime.json') -Destination (Join-Path $defDir 'NodeRuntime.json') -Force
 
@@ -634,10 +651,14 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
             @{
                 installSlotId                = 'CodexCli:stable:win32-x64'
                 definitionId                 = 'CodexCli'
-                definitionRepositoryId       = 'EigenverftModule'
-                definitionFileName           = 'CodexCli.json'
+                definitionPublisherId        = 'EigenverftModule'
+                definitionPublisherName      = 'Eigenverft Module'
+                definitionRevision           = 1
+                definitionPublishedAtUtc     = '2026-05-13T12:00:00Z'
+                definitionRepositorySourceId = 'EigenverftModule'
                 definitionSourcePath         = (Join-Path $defDir 'CodexCli.json')
-                definitionLocalPath          = (Join-Path $defDir 'CodexCli.json')
+                definitionAssignedSnapshotPath = (Join-Path $defDir 'CodexCli.json')
+                definitionAssignedSnapshotHash = (Get-PackageFileSha256 -Path (Join-Path $defDir 'CodexCli.json'))
                 releaseTrack                 = 'stable'
                 artifactDistributionVariant  = 'win32-x64'
                 currentReleaseId             = 'CodexCli-win32-x64-stable'
@@ -650,10 +671,14 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
             @{
                 installSlotId                = 'NodeRuntime:stable:win-x64'
                 definitionId                 = 'NodeRuntime'
-                definitionRepositoryId       = 'EigenverftModule'
-                definitionFileName           = 'NodeRuntime.json'
+                definitionPublisherId        = 'EigenverftModule'
+                definitionPublisherName      = 'Eigenverft Module'
+                definitionRevision           = 1
+                definitionPublishedAtUtc     = '2026-05-13T12:00:00Z'
+                definitionRepositorySourceId = 'EigenverftModule'
                 definitionSourcePath         = (Join-Path $defDir 'NodeRuntime.json')
-                definitionLocalPath          = (Join-Path $defDir 'NodeRuntime.json')
+                definitionAssignedSnapshotPath = (Join-Path $defDir 'NodeRuntime.json')
+                definitionAssignedSnapshotHash = (Get-PackageFileSha256 -Path (Join-Path $defDir 'NodeRuntime.json'))
                 releaseTrack                 = 'stable'
                 artifactDistributionVariant  = 'win-x64'
                 currentReleaseId             = 'NodeRuntime-win-x64-stable'
@@ -794,7 +819,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
 
         $config.DefinitionId | Should -Be 'LlamaCppRuntime'
         @($config.Definition.dependencies.definitionId) | Should -Be @('VisualCppRedistributable')
-        @($config.Definition.dependencies.repositoryId) | Should -Be @('EigenverftModule')
+        @($config.Definition.dependencies.repositoryId) | Should -Be @($null)
         $sourceDefinition.Kind | Should -Be 'githubRelease'
         $sourceDefinition.GitHubOwner | Should -Be 'ggml-org'
         $sourceDefinition.GitHubRepository | Should -Be 'llama.cpp'
@@ -985,11 +1010,11 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
             $config.Definition.presenceDiscovery.commands[0].relativePath | Should -Be $case.RelativePath
             if ($case.DefinitionId -eq 'CodexCli') {
                 @($config.Definition.dependencies.definitionId) | Should -Be @('VisualCppRedistributable', 'NodeRuntime')
-                @($config.Definition.dependencies.repositoryId) | Should -Be @('EigenverftModule', 'EigenverftModule')
+                @($config.Definition.dependencies.repositoryId) | Should -Be @($null, $null)
             }
             else {
                 @($config.Definition.dependencies.definitionId) | Should -Be @('NodeRuntime')
-                @($config.Definition.dependencies.repositoryId) | Should -Be @('EigenverftModule')
+                @($config.Definition.dependencies.repositoryId) | Should -Be @($null)
             }
             $result.Package.packageFile | Should -BeNullOrEmpty
             $result.AcquisitionPlan.PackageFileRequired | Should -BeFalse

@@ -1,27 +1,28 @@
 {
-  "$schema": "../Schema/eigenverft-module-package-definition-1.3.schema.json",
-  "schemaVersion": "1.3",
-  "id": "LlamaCppRuntime",
+  "$schema": "../../Schema/eigenverft-module-package-definition-1.4.schema.json",
+  "schemaVersion": "1.4",
+  "id": "PythonRuntime",
+  "definitionPublication": {
+    "publisherId": "EigenverftModule",
+    "publisherName": "Eigenverft Module",
+    "definitionRevision": 1,
+    "publishedAtUtc": "2026-05-13T12:00:00Z"
+  },
   "display": {
     "default": {
-      "name": "llama.cpp",
-      "publisher": "ggml-org",
-      "corporation": "ggml-org",
-      "summary": "Local LLM runtime and CLI tools"
+      "name": "Python",
+      "publisher": "Python Software Foundation",
+      "corporation": "Python Software Foundation",
+      "summary": "Portable Python runtime from the official NuGet package"
     }
   },
-  "dependencies": [
-    {
-      "repositoryId": "EigenverftModule",
-      "definitionId": "VisualCppRedistributable"
-    }
-  ],
+  "dependencies": [],
   "artifacts": {
     "targets": [
       {
-        "id": "LlamaCppRuntime-win-cpu-x64-stable",
+        "id": "PythonRuntime-win-x64-stable",
         "releaseTrack": "stable",
-        "artifactDistributionVariant": "win-cpu-x64",
+        "artifactDistributionVariant": "win-x64",
         "constraints": {
           "os": [
             "windows"
@@ -34,7 +35,7 @@
           "strategy": "latestByVersion",
           "allowPrerelease": false
         },
-        "fileNameTemplate": "llama-b{version}-bin-win-cpu-x64.zip",
+        "fileNameTemplate": "python.{version}.nupkg",
         "acquisitionCandidates": [
           {
             "kind": "packageDepot",
@@ -45,7 +46,44 @@
           },
           {
             "kind": "download",
-            "sourceId": "llamaCppGitHub",
+            "sourceId": "pythonNuGetPackage",
+            "sourcePath": "python/{version}/python.{version}.nupkg",
+            "searchOrder": 900,
+            "verification": {
+              "mode": "required"
+            }
+          }
+        ]
+      },
+      {
+        "id": "PythonRuntime-win-arm64-stable",
+        "releaseTrack": "stable",
+        "artifactDistributionVariant": "win-arm64",
+        "constraints": {
+          "os": [
+            "windows"
+          ],
+          "cpu": [
+            "arm64"
+          ]
+        },
+        "versionSelection": {
+          "strategy": "latestByVersion",
+          "allowPrerelease": false
+        },
+        "fileNameTemplate": "pythonarm64.{version}.nupkg",
+        "acquisitionCandidates": [
+          {
+            "kind": "packageDepot",
+            "searchOrder": 100,
+            "verification": {
+              "mode": "optional"
+            }
+          },
+          {
+            "kind": "download",
+            "sourceId": "pythonNuGetPackage",
+            "sourcePath": "pythonarm64/{version}/pythonarm64.{version}.nupkg",
             "searchOrder": 900,
             "verification": {
               "mode": "required"
@@ -56,51 +94,50 @@
     ],
     "releases": [
       {
-        "version": "9094",
+        "version": "3.13.13",
         "releaseTracks": [
           "stable"
         ],
         "upstreamRelease": {
-          "sourceId": "llamaCppGitHub",
-          "releaseTag": "b9094"
+          "sourceId": "pythonNuGetPackage",
+          "releaseTag": "3.13.13"
         },
         "targetArtifacts": {
-          "LlamaCppRuntime-win-cpu-x64-stable": {
-            "artifactId": "llama-cpp-win-cpu-x64-stable",
+          "PythonRuntime-win-x64-stable": {
+            "artifactId": "python-runtime-win-x64-stable",
             "contentHash": {
               "algorithm": "sha256",
-              "value": "5c788e2c59bc64fae603c57e5f6d73be50600418763f11d5cdc7be175dc9075a"
+              "value": "c2347c2975f661b2dafceacc94218dfe87781955a3cd309c633d343b8c8dac31"
+            }
+          },
+          "PythonRuntime-win-arm64-stable": {
+            "artifactId": "python-runtime-win-arm64-stable",
+            "contentHash": {
+              "algorithm": "sha256",
+              "value": "2a0406b834d4ff33414f70597b67797466ba2344baa534ab8f62c4eae1c3e599"
             }
           }
         }
       }
     ],
     "sources": {
-      "llamaCppGitHub": {
-        "kind": "githubRelease",
-        "githubOwner": "ggml-org",
-        "githubRepository": "llama.cpp"
+      "pythonNuGetPackage": {
+        "kind": "download",
+        "baseUri": "https://api.nuget.org/v3-flatcontainer/"
       }
     }
   },
   "presenceDiscovery": {
     "files": [
-      "llama-cli.exe",
-      "llama-server.exe",
-      "llama-quantize.exe",
-      "llama-bench.exe",
-      "llama.dll",
-      "llama-common.dll",
-      "ggml.dll",
-      "ggml-base.dll",
-      "ggml-cpu-x64.dll",
-      "libomp140.x86_64.dll"
+      "python.exe"
     ],
-    "directories": [],
+    "directories": [
+      "Lib/site-packages/pip"
+    ],
     "commands": [
       {
-        "name": "llama-cli",
-        "relativePath": "llama-cli.exe",
+        "name": "python",
+        "relativePath": "python.exe",
         "requiredForState": true,
         "exposeCommand": true,
         "stateChecks": [
@@ -108,34 +145,18 @@
             "arguments": [
               "--version"
             ],
-            "outputPattern": "(?im)^version:\\s*(?<value>\\d+)\\b",
+            "outputPattern": "(?m)^Python\\s+(?<value>\\d+\\.\\d+\\.\\d+)\\s*$",
             "expectedValue": "{version}"
+          },
+          {
+            "arguments": [
+              "-m",
+              "pip",
+              "--version"
+            ],
+            "outputPattern": "(?m)^pip\\s+(?<value>\\d+\\.\\d+(?:\\.\\d+)?(?:[-+][0-9A-Za-z.\\-]+)?)\\s+from\\s+.+$"
           }
         ]
-      },
-      {
-        "name": "llama-server",
-        "relativePath": "llama-server.exe",
-        "requiredForState": false,
-        "exposeCommand": true
-      },
-      {
-        "name": "llama-quantize",
-        "relativePath": "llama-quantize.exe",
-        "requiredForState": false,
-        "exposeCommand": true
-      },
-      {
-        "name": "llama-bench",
-        "relativePath": "llama-bench.exe",
-        "requiredForState": false,
-        "exposeCommand": true
-      },
-      {
-        "name": "llama-tokenize",
-        "relativePath": "llama-tokenize.exe",
-        "requiredForState": false,
-        "exposeCommand": true
       }
     ],
     "apps": [],
@@ -154,7 +175,7 @@
       "ownershipPolicy": {
         "allowAdoptExternal": false,
         "upgradeAdoptedInstall": false,
-        "requirePackageOwnership": false
+        "requirePackageOwnership": true
       },
       "compatibility": {
         "checks": [
@@ -169,8 +190,8 @@
     "assigned": {
       "install": {
         "kind": "expandArchive",
-        "installDirectory": "llama-cpp-runtime/{releaseTrack}/{version}/{artifactDistributionVariant}",
-        "expandedRoot": "auto",
+        "installDirectory": "python-runtime/{releaseTrack}/{version}/{artifactDistributionVariant}",
+        "expandedRoot": "tools",
         "createDirectories": []
       },
       "readyStateCheck": {
@@ -178,7 +199,7 @@
         "expectedVersion": "{version}",
         "require": {
           "files": true,
-          "directories": false,
+          "directories": true,
           "commands": true,
           "apps": false,
           "metadataFiles": false,

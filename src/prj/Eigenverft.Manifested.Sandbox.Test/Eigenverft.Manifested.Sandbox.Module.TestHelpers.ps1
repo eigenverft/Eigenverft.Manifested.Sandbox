@@ -23,7 +23,7 @@ function global:Invoke-TestPackageDescribe {
             $script:OriginalSourceInventoryPath = [Environment]::GetEnvironmentVariable($script:SourceInventoryEnvVarName, 'Process')
             $script:OriginalSiteCode = [Environment]::GetEnvironmentVariable($script:SiteCodeEnvVarName, 'Process')
             $script:OriginalLocalAppData = [Environment]::GetEnvironmentVariable('LOCALAPPDATA', 'Process')
-            [Environment]::SetEnvironmentVariable('LOCALAPPDATA', (Join-Path $TestDrive 'LocalAppData'), 'Process')
+            [Environment]::SetEnvironmentVariable('LOCALAPPDATA', (Join-Path $TestDrive ('LocalAppData-' + [guid]::NewGuid().ToString('N'))), 'Process')
         }
 
         AfterEach {
@@ -496,6 +496,16 @@ function global:New-TestVSCodeDefinitionDocument {
         [Parameter(Mandatory = $true)]
         [array]$Releases,
 
+        [string]$DefinitionId = 'VSCodeRuntime',
+
+        [string]$PublisherId = 'EigenverftModule',
+
+        [string]$PublisherName = 'Eigenverft Module',
+
+        [int]$DefinitionRevision = 1,
+
+        [string]$PublishedAtUtc = '2026-05-13T12:00:00Z',
+
         [string]$UpstreamBaseUri = 'https://update.code.visualstudio.com',
 
         [hashtable]$UpstreamSources = $null,
@@ -755,8 +765,14 @@ function global:New-TestVSCodeDefinitionDocument {
     }
 
     return @{
-        schemaVersion = '1.3'
-        id            = 'VSCodeRuntime'
+        schemaVersion = '1.4'
+        id            = $DefinitionId
+        definitionPublication = @{
+            publisherId = $PublisherId
+            publisherName = $PublisherName
+            definitionRevision = $DefinitionRevision
+            publishedAtUtc = $PublishedAtUtc
+        }
         display       = @{
             default = @{
                 name        = 'Visual Studio Code'
@@ -853,17 +869,43 @@ function global:Write-TestPackageDocuments {
     $globalConfigPath = Join-Path $RootPath 'Configuration\Internal\PackageConfig.json'
     $depotInventoryPath = Join-Path $RootPath 'Configuration\Internal\PackageDepotInventory.json'
     $repositoryInventoryPath = Join-Path $RootPath 'Configuration\Internal\PackageRepositoryInventory.json'
-    $definitionPath = Join-Path $RootPath "$($DefinitionDocument.id).json"
+    $repositoryDefinitionsRoot = Join-Path $RootPath 'RepositoryDefinitions'
+    $definitionPublisherId = if ($DefinitionDocument.PSObject.Properties['definitionPublication'] -and
+        $DefinitionDocument.definitionPublication.PSObject.Properties['publisherId'] -and
+        -not [string]::IsNullOrWhiteSpace([string]$DefinitionDocument.definitionPublication.publisherId)) {
+        [string]$DefinitionDocument.definitionPublication.publisherId
+    }
+    else {
+        'EigenverftModule'
+    }
+    $definitionPath = Join-Path (Join-Path $repositoryDefinitionsRoot $definitionPublisherId) "$($DefinitionDocument.id).json"
     Write-TestJsonDocument -Path $globalConfigPath -Document $GlobalDocument
     if (-not $PSBoundParameters.ContainsKey('DepotInventoryDocument') -or $null -eq $DepotInventoryDocument) {
         $DepotInventoryDocument = New-TestDepotInventoryDocument -DefaultPackageDepotDirectory (Join-Path $RootPath 'PkgDepot')
     }
     if (-not $PSBoundParameters.ContainsKey('RepositoryInventoryDocument') -or $null -eq $RepositoryInventoryDocument) {
-        $RepositoryInventoryDocument = New-TestRepositoryInventoryDocument
+        $RepositoryInventoryDocument = @{
+            inventoryVersion = 1
+            repositorySources = @{
+                EigenverftModule = @{
+                    kind = 'filesystem'
+                    enabled = $true
+                    searchOrder = 100
+                    basePath = $repositoryDefinitionsRoot
+                    trusted = $true
+                    trustMode = 'unsignedExplicit'
+                }
+            }
+        }
     }
     Write-TestJsonDocument -Path $depotInventoryPath -Document $DepotInventoryDocument
     Write-TestJsonDocument -Path $repositoryInventoryPath -Document $RepositoryInventoryDocument
     Write-TestJsonDocument -Path $definitionPath -Document $DefinitionDocument
+
+    # Repository resolution no longer uses filename-based Get-PackageDefinitionPath.
+    # Keep the bootstrap-local repository inventory aligned for tests that mock
+    # PackageConfig.json only.
+    Write-TestJsonDocument -Path (Get-PackageLocalRepositoryInventoryPath) -Document $RepositoryInventoryDocument
 
     $sourceInventoryPath = $null
     if ($PSBoundParameters.ContainsKey('SourceInventoryDocument') -and $null -ne $SourceInventoryDocument) {

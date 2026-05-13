@@ -84,17 +84,26 @@ function Select-PackageStateOwnershipRecord {
         @()
     }
 
+    $candidatePath = if ($Record.PSObject.Properties['definitionCandidatePath']) { [string]$Record.definitionCandidatePath } else { $null }
+    $assignedSnapshotPath = if ($Record.PSObject.Properties['definitionAssignedSnapshotPath']) { [string]$Record.definitionAssignedSnapshotPath } else { $null }
+
     return [pscustomobject]@{
         InstallSlotId          = $Record.installSlotId
         DefinitionId           = $Record.definitionId
-        DefinitionRepositoryId = $Record.definitionRepositoryId
-        DefinitionFileName     = $Record.definitionFileName
+        DefinitionPublisherId  = if ($Record.PSObject.Properties['definitionPublisherId']) { $Record.definitionPublisherId } else { $null }
+        DefinitionPublisherName = if ($Record.PSObject.Properties['definitionPublisherName']) { $Record.definitionPublisherName } else { $null }
+        DefinitionRevision     = if ($Record.PSObject.Properties['definitionRevision']) { $Record.definitionRevision } else { $null }
+        DefinitionPublishedAtUtc = if ($Record.PSObject.Properties['definitionPublishedAtUtc']) { $Record.definitionPublishedAtUtc } else { $null }
+        DefinitionRepositorySourceId = if ($Record.PSObject.Properties['definitionRepositorySourceId']) { $Record.definitionRepositorySourceId } else { $null }
         DefinitionSourceKind   = if ($Record.PSObject.Properties['definitionSourceKind']) { $Record.definitionSourceKind } else { $null }
         DefinitionSourcePath   = $Record.definitionSourcePath
         DefinitionSourceHash   = if ($Record.PSObject.Properties['definitionSourceHash']) { $Record.definitionSourceHash } else { $null }
-        DefinitionSnapshotPath = if ($Record.PSObject.Properties['definitionSnapshotPath']) { $Record.definitionSnapshotPath } elseif ($Record.PSObject.Properties['definitionLocalPath']) { $Record.definitionLocalPath } else { $null }
-        DefinitionSnapshotHash = if ($Record.PSObject.Properties['definitionSnapshotHash']) { $Record.definitionSnapshotHash } else { $null }
-        DefinitionSnapshotExists = Test-PackageStateLeafPath -Path $(if ($Record.PSObject.Properties['definitionSnapshotPath']) { [string]$Record.definitionSnapshotPath } elseif ($Record.PSObject.Properties['definitionLocalPath']) { [string]$Record.definitionLocalPath } else { $null })
+        DefinitionCandidatePath = $candidatePath
+        DefinitionCandidateHash = if ($Record.PSObject.Properties['definitionCandidateHash']) { $Record.definitionCandidateHash } else { $null }
+        DefinitionCandidateExists = Test-PackageStateLeafPath -Path $candidatePath
+        DefinitionAssignedSnapshotPath = $assignedSnapshotPath
+        DefinitionAssignedSnapshotHash = if ($Record.PSObject.Properties['definitionAssignedSnapshotHash']) { $Record.definitionAssignedSnapshotHash } else { $null }
+        DefinitionAssignedSnapshotExists = Test-PackageStateLeafPath -Path $assignedSnapshotPath
         DefinitionResolvedAtUtc = if ($Record.PSObject.Properties['definitionResolvedAtUtc']) { $Record.definitionResolvedAtUtc } else { $null }
         ReleaseTrack           = $Record.releaseTrack
         ArtifactDistributionVariant = $Record.artifactDistributionVariant
