@@ -1,5 +1,7 @@
 <#
     Public package command surface.
+
+    Optional -RepositoryId narrows definition resolution to JSON documents whose repositoryId matches (all enabled trusted endpoints are still scanned first).
 #>
 
 function Invoke-Package {
@@ -16,9 +18,6 @@ function Invoke-Package {
         [AllowNull()]
         [string]$RepositoryId = $null,
 
-        [AllowNull()]
-        [string]$PublisherId = $null,
-
         [Parameter(Mandatory = $true)]
         [ValidateNotNullOrEmpty()]
         [string[]]$DefinitionId,
@@ -30,7 +29,7 @@ function Invoke-Package {
     )
 
     foreach ($definition in $DefinitionId) {
-        $result = Invoke-PackageDefinitionCommandCore -RepositoryId $RepositoryId -PublisherId $PublisherId -DefinitionId $definition -DesiredState $DesiredState
+        $result = Invoke-PackageDefinitionCommandCore -RepositoryId $RepositoryId -DefinitionId $definition -DesiredState $DesiredState
         $result
         if ($FailFast -and $result -and -not [string]::Equals([string]$result.Status, 'Ready', [System.StringComparison]::OrdinalIgnoreCase)) {
             break

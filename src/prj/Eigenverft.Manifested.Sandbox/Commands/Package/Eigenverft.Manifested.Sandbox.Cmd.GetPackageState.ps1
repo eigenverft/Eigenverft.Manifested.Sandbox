@@ -12,7 +12,7 @@ function Get-PackageState {
     $packageInventory = Get-PackageInventory -PackageConfig $config
     $operationHistory = Get-PackageOperationHistory -PackageConfig $config
     $sourceInventoryInfo = $config.SourceInventoryInfo
-    $repositoryInventoryInfo = $config.RepositoryInventoryInfo
+    $endpointInventoryInfo = $config.EndpointInventoryInfo
     $depotInventoryInfo = $config.DepotInventoryInfo
 
     $directories = [pscustomobject]@{
@@ -29,7 +29,7 @@ function Get-PackageState {
             Config                     = $config
             PackageAssignmentInventory = $packageInventory
             PackageOperationHistory    = $operationHistory
-            RepositoryInventory = $repositoryInventoryInfo
+            EndpointInventory = $endpointInventoryInfo
             DepotInventory   = $depotInventoryInfo
             SourceInventory  = $sourceInventoryInfo
             Directories      = $directories
@@ -49,10 +49,10 @@ function Get-PackageState {
         ApplicationRootDirectory  = $config.ApplicationRootDirectory
         PackageConfigPath    = $config.PackageConfigPath
         PackageConfigExists  = Test-PackageStateLeafPath -Path $config.PackageConfigPath
-        LocalRepositoryInventoryPath = $config.LocalRepositoryInventoryPath
-        LocalRepositoryInventoryExists = Test-PackageStateLeafPath -Path $config.LocalRepositoryInventoryPath
-        RepositoryInventoryPath    = $repositoryInventoryInfo.Path
-        RepositoryInventoryExists  = [bool]$repositoryInventoryInfo.Exists
+        LocalEndpointInventoryPath = $config.LocalEndpointInventoryPath
+        LocalEndpointInventoryExists = Test-PackageStateLeafPath -Path $config.LocalEndpointInventoryPath
+        EndpointInventoryPath    = $endpointInventoryInfo.Path
+        EndpointInventoryExists  = [bool]$endpointInventoryInfo.Exists
         LocalDepotInventoryPath   = $config.LocalDepotInventoryPath
         LocalDepotInventoryExists = Test-PackageStateLeafPath -Path $config.LocalDepotInventoryPath
         DepotInventoryPath        = $depotInventoryInfo.Path

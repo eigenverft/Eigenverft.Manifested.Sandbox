@@ -188,7 +188,7 @@ Copy-PackageDefinitionToAssignedSnapshot -PackageResult $result
         [string]$config.DefinitionPublisherId
     }
     else {
-        Get-PackageDefaultRepositoryId
+        'Eigenverft'
     }
     $publisherName = if ($config.PSObject.Properties['DefinitionPublisherName']) { [string]$config.DefinitionPublisherName } else { $null }
     $definitionRevision = if ($config.PSObject.Properties['DefinitionRevision']) { [int]$config.DefinitionRevision } else { 0 }

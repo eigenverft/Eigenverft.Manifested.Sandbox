@@ -75,18 +75,18 @@ FunctionsToExport = @(
     'Sandbox',
     'Add-PackageDepot',
     'Add-TeamPackageDepot',
-    'Add-PackageRepository',
-    'Add-TeamPackageRepository',
+    'Add-PackageEndpoint',
+    'Add-TeamPackageEndpoint',
     'Get-PackageDepot',
-    'Get-PackageRepository',
+    'Get-PackageEndpoint',
     'Get-PackageState',
     'Invoke-Package',
     'Invoke-WebRequestEx',
     'Remove-PackageDepot',
-    'Remove-PackageRepository',
+    'Remove-PackageEndpoint',
     'Set-PackageDepot',
-    'Set-PackageRepository',
-    'Trust-PackageRepository'
+    'Set-PackageEndpoint',
+    'Trust-PackageEndpoint'
 )
 
 # Cmdlets to export from this module, for best performance, do not use wildcards and do not delete the entry, use an empty array if there are no cmdlets to export.

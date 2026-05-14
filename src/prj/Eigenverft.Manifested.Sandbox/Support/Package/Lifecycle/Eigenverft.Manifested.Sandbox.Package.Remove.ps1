@@ -73,8 +73,8 @@ function Get-PackageInventoryDependentBlockingRecords {
                 continue
             }
 
-            $depRepositoryId = if ($dependency.PSObject.Properties['repositoryId'] -and -not [string]::IsNullOrWhiteSpace([string]$dependency.repositoryId)) {
-                [string]$dependency.repositoryId
+            $depRepositoryId = if ($dependency.PSObject.Properties['repositorySourceId'] -and -not [string]::IsNullOrWhiteSpace([string]$dependency.repositorySourceId)) {
+                [string]$dependency.repositorySourceId
             }
             else {
                 $null
@@ -627,7 +627,7 @@ function Invoke-PackageRemovedFlow {
     )
 
     try {
-        Write-PackageExecutionMessage -Message ("[START] Invoke-Package repository='{0}' definition='{1}' desiredState='{2}'." -f $PackageResult.RepositoryId, $PackageResult.DefinitionId, $PackageResult.DesiredState)
+        Write-PackageExecutionMessage -Message ("[START] Invoke-Package repositorySource='{0}' definition='{1}' desiredState='{2}'." -f $PackageResult.RepositorySourceId, $PackageResult.DefinitionId, $PackageResult.DesiredState)
 
         $PackageResult.CurrentStep = 'InitializeLocalEnvironment'
         Write-PackageExecutionMessage -Message '[STEP] Initializing local package environment.'

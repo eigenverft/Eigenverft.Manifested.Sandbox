@@ -1,27 +1,44 @@
 <#
-    Eigenverft.Manifested.Sandbox.Package - repository inventory management helpers.
+    Eigenverft.Manifested.Sandbox.Package - PackageEndpointInventory.json management helpers.
 #>
 
-function Assert-PackageRepositoryId {
+function Assert-PackageEndpointName {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true)]
-        [string]$RepositoryId
+        [string]$EndpointName
     )
 
-    if ([string]::IsNullOrWhiteSpace($RepositoryId)) {
-        throw 'RepositoryId must not be empty.'
+    if ([string]::IsNullOrWhiteSpace($EndpointName)) {
+        throw 'Package endpoint name must not be empty.'
     }
-    if ($RepositoryId -notmatch '^[A-Za-z][A-Za-z0-9_-]*$') {
-        throw "RepositoryId '$RepositoryId' is invalid. Use letters, numbers, '-' or '_' and start with a letter."
+    if ($EndpointName -notmatch '^[A-Za-z][A-Za-z0-9_-]*$') {
+        throw "Package endpoint name '$EndpointName' is invalid. Use letters, numbers, '-' or '_' and start with a letter."
     }
 }
 
-function Assert-PackageRepositorySource {
+function Get-PackageEndpointSourceEntries {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true)]
-        [string]$RepositoryId,
+        [psobject]$Document
+    )
+
+    if (-not $Document.PSObject.Properties['endpoints'] -or $null -eq $Document.endpoints) {
+        return @()
+    }
+    if ($Document.endpoints -isnot [System.Array]) {
+        throw "Package endpoint inventory must define endpoints as an array of objects with endpointName. The keyed-object endpoints shape is retired."
+    }
+
+    return @($Document.endpoints)
+}
+
+function Assert-PackageEndpointSource {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$EndpointName,
 
         [Parameter(Mandatory = $true)]
         [psobject]$SourceValue,
@@ -30,102 +47,113 @@ function Assert-PackageRepositorySource {
         [string]$DocumentPath
     )
 
-    foreach ($requiredProperty in @('kind', 'enabled', 'searchOrder', 'trusted', 'trustMode')) {
+    foreach ($requiredProperty in @('endpointName', 'kind', 'enabled', 'searchOrder', 'trusted', 'trustMode')) {
         if (-not $SourceValue.PSObject.Properties[$requiredProperty]) {
-            throw "Package repository source '$RepositoryId' in '$DocumentPath' is missing '$requiredProperty'."
+            throw "Package endpoint '$EndpointName' in '$DocumentPath' is missing '$requiredProperty'."
         }
     }
+    if (-not [string]::Equals([string]$SourceValue.endpointName, $EndpointName, [System.StringComparison]::OrdinalIgnoreCase)) {
+        throw "Package endpoint '$EndpointName' in '$DocumentPath' has mismatched endpointName '$($SourceValue.endpointName)'."
+    }
     if ($SourceValue.PSObject.Properties['priority']) {
-        throw "Package repository source '$RepositoryId' in '$DocumentPath' still uses retired property 'priority'. Use 'searchOrder'."
+        throw "Package endpoint '$EndpointName' in '$DocumentPath' still uses retired property 'priority'. Use 'searchOrder'."
     }
 
     $kind = [string]$SourceValue.kind
     $trustMode = [string]$SourceValue.trustMode
     if ($kind -notin @('moduleLocal', 'filesystem', 'httpsCatalog')) {
-        throw "Package repository source '$RepositoryId' in '$DocumentPath' has unsupported kind '$kind'."
+        throw "Package endpoint '$EndpointName' in '$DocumentPath' has unsupported kind '$kind'."
     }
     if ($trustMode -notin @('moduleShipped', 'unsigned', 'unsignedExplicit', 'signedCatalog')) {
-        throw "Package repository source '$RepositoryId' in '$DocumentPath' has unsupported trustMode '$trustMode'."
+        throw "Package endpoint '$EndpointName' in '$DocumentPath' has unsupported trustMode '$trustMode'."
     }
 
     if ([string]::Equals($kind, 'moduleLocal', [System.StringComparison]::OrdinalIgnoreCase)) {
         if (-not $SourceValue.PSObject.Properties['definitionRoot'] -or [string]::IsNullOrWhiteSpace([string]$SourceValue.definitionRoot)) {
-            throw "Package repository source '$RepositoryId' in '$DocumentPath' is missing definitionRoot."
+            throw "Package endpoint '$EndpointName' in '$DocumentPath' is missing definitionRoot."
         }
         if (-not [bool]$SourceValue.trusted -or -not [string]::Equals($trustMode, 'moduleShipped', [System.StringComparison]::OrdinalIgnoreCase)) {
-            throw "Package repository source '$RepositoryId' in '$DocumentPath' kind moduleLocal must use trusted=true and trustMode='moduleShipped'."
+            throw "Package endpoint '$EndpointName' in '$DocumentPath' kind moduleLocal must use trusted=true and trustMode='moduleShipped'."
         }
     }
     elseif ([string]::Equals($kind, 'filesystem', [System.StringComparison]::OrdinalIgnoreCase)) {
         if (-not $SourceValue.PSObject.Properties['basePath'] -or [string]::IsNullOrWhiteSpace([string]$SourceValue.basePath)) {
-            throw "Package repository source '$RepositoryId' in '$DocumentPath' is missing basePath."
+            throw "Package endpoint '$EndpointName' in '$DocumentPath' is missing basePath."
         }
         if ([bool]$SourceValue.trusted -and -not [string]::Equals($trustMode, 'unsignedExplicit', [System.StringComparison]::OrdinalIgnoreCase)) {
-            throw "Package repository source '$RepositoryId' in '$DocumentPath' kind filesystem must use trustMode='unsignedExplicit' when trusted=true."
+            throw "Package endpoint '$EndpointName' in '$DocumentPath' kind filesystem must use trustMode='unsignedExplicit' when trusted=true."
         }
         if ([string]::Equals($trustMode, 'unsignedExplicit', [System.StringComparison]::OrdinalIgnoreCase) -and -not [bool]$SourceValue.trusted) {
-            throw "Package repository source '$RepositoryId' in '$DocumentPath' uses trustMode='unsignedExplicit' but trusted is false."
+            throw "Package endpoint '$EndpointName' in '$DocumentPath' uses trustMode='unsignedExplicit' but trusted is false."
         }
     }
     elseif ([string]::Equals($kind, 'httpsCatalog', [System.StringComparison]::OrdinalIgnoreCase)) {
         foreach ($requiredHttpsProperty in @('baseUri', 'catalogPath')) {
             if (-not $SourceValue.PSObject.Properties[$requiredHttpsProperty] -or [string]::IsNullOrWhiteSpace([string]$SourceValue.$requiredHttpsProperty)) {
-                throw "Package repository source '$RepositoryId' in '$DocumentPath' kind httpsCatalog is missing $requiredHttpsProperty."
+                throw "Package endpoint '$EndpointName' in '$DocumentPath' kind httpsCatalog is missing $requiredHttpsProperty."
             }
         }
     }
 }
 
-function Assert-PackageRepositoryInventorySchema {
+function Assert-PackageEndpointInventorySchema {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true)]
-        [psobject]$RepositoryInventoryDocumentInfo
+        [psobject]$EndpointInventoryDocumentInfo
     )
 
-    $document = $RepositoryInventoryDocumentInfo.Document
+    $document = $EndpointInventoryDocumentInfo.Document
     if (-not $document.PSObject.Properties['inventoryVersion']) {
-        throw "Package repository inventory '$($RepositoryInventoryDocumentInfo.Path)' is missing inventoryVersion."
+        throw "Package endpoint inventory '$($EndpointInventoryDocumentInfo.Path)' is missing inventoryVersion."
     }
-    if (-not $document.PSObject.Properties['repositorySources'] -or $null -eq $document.repositorySources) {
-        throw "Package repository inventory '$($RepositoryInventoryDocumentInfo.Path)' is missing repositorySources."
+    if (-not $document.PSObject.Properties['endpoints'] -or $null -eq $document.endpoints) {
+        throw "Package endpoint inventory '$($EndpointInventoryDocumentInfo.Path)' is missing endpoints."
     }
 
-    foreach ($sourceProperty in @($document.repositorySources.PSObject.Properties)) {
-        Assert-PackageRepositorySource -RepositoryId $sourceProperty.Name -SourceValue $sourceProperty.Value -DocumentPath $RepositoryInventoryDocumentInfo.Path
+    $seen = New-Object 'System.Collections.Generic.HashSet[string]' ([System.StringComparer]::OrdinalIgnoreCase)
+    foreach ($source in @(Get-PackageEndpointSourceEntries -Document $document)) {
+        if (-not $source.PSObject.Properties['endpointName'] -or [string]::IsNullOrWhiteSpace([string]$source.endpointName)) {
+            throw "Package endpoint inventory '$($EndpointInventoryDocumentInfo.Path)' has an endpoint without endpointName."
+        }
+        $endpointName = [string]$source.endpointName
+        if (-not $seen.Add($endpointName)) {
+            throw "Package endpoint inventory '$($EndpointInventoryDocumentInfo.Path)' defines duplicate endpointName '$endpointName'."
+        }
+        Assert-PackageEndpointSource -EndpointName $endpointName -SourceValue $source -DocumentPath $EndpointInventoryDocumentInfo.Path
     }
 }
 
-function Get-PackageRepositoryInventoryInfo {
+function Get-PackageEndpointInventoryInfo {
     [CmdletBinding()]
     param()
 
-    $inventoryPath = Get-PackageRepositoryInventoryPath
+    $inventoryPath = Get-PackageEndpointInventoryPath
     $documentInfo = Read-PackageJsonDocument -Path $inventoryPath
-    Assert-PackageRepositoryInventorySchema -RepositoryInventoryDocumentInfo $documentInfo
+    Assert-PackageEndpointInventorySchema -EndpointInventoryDocumentInfo $documentInfo
     $documentInfo | Add-Member -MemberType NoteProperty -Name Exists -Value $true -Force
     return $documentInfo
 }
 
-function Get-PackageRepositoryInventoryEditInfo {
+function Get-PackageEndpointInventoryEditInfo {
     [CmdletBinding()]
     param()
 
-    $documentInfo = Get-PackageRepositoryInventoryInfo
-    if (-not $documentInfo.Document.PSObject.Properties['repositorySources'] -or $null -eq $documentInfo.Document.repositorySources) {
-        $documentInfo.Document | Add-Member -MemberType NoteProperty -Name 'repositorySources' -Value ([pscustomobject]@{}) -Force
+    $documentInfo = Get-PackageEndpointInventoryInfo
+    if (-not $documentInfo.Document.PSObject.Properties['endpoints'] -or $null -eq $documentInfo.Document.endpoints) {
+        $documentInfo.Document | Add-Member -MemberType NoteProperty -Name 'endpoints' -Value @() -Force
     }
     return $documentInfo
 }
 
-function Save-PackageRepositoryInventoryDocument {
+function Save-PackageEndpointInventoryDocument {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true)]
         [psobject]$DocumentInfo
     )
 
-    Assert-PackageRepositoryInventorySchema -RepositoryInventoryDocumentInfo $DocumentInfo
+    Assert-PackageEndpointInventorySchema -EndpointInventoryDocumentInfo $DocumentInfo
 
     $directory = Split-Path -Parent $DocumentInfo.Path
     if (-not [string]::IsNullOrWhiteSpace($directory)) {
@@ -144,24 +172,30 @@ function Save-PackageRepositoryInventoryDocument {
     }
 }
 
-function Get-PackageRepositorySourceProperty {
+function Get-PackageEndpointSourceProperty {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true)]
         [psobject]$Document,
 
         [Parameter(Mandatory = $true)]
-        [string]$RepositoryId
+        [string]$EndpointName
     )
 
-    if (-not $Document.PSObject.Properties['repositorySources'] -or $null -eq $Document.repositorySources) {
-        return $null
+    foreach ($source in @(Get-PackageEndpointSourceEntries -Document $Document)) {
+        if ($source.PSObject.Properties['endpointName'] -and
+            [string]::Equals([string]$source.endpointName, $EndpointName, [System.StringComparison]::OrdinalIgnoreCase)) {
+            return [pscustomobject]@{
+                Name  = [string]$source.endpointName
+                Value = $source
+            }
+        }
     }
 
-    return $Document.repositorySources.PSObject.Properties[$RepositoryId]
+    return $null
 }
 
-function Get-PackageNextRepositorySearchOrder {
+function Get-PackageNextEndpointSearchOrder {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true)]
@@ -169,9 +203,9 @@ function Get-PackageNextRepositorySearchOrder {
     )
 
     $maxSearchOrder = 0
-    foreach ($sourceProperty in @($Document.repositorySources.PSObject.Properties)) {
-        if ($sourceProperty.Value -and $sourceProperty.Value.PSObject.Properties['searchOrder']) {
-            $current = [int]$sourceProperty.Value.searchOrder
+    foreach ($source in @(Get-PackageEndpointSourceEntries -Document $Document)) {
+        if ($source -and $source.PSObject.Properties['searchOrder']) {
+            $current = [int]$source.searchOrder
             if ($current -gt $maxSearchOrder) {
                 $maxSearchOrder = $current
             }
@@ -181,32 +215,32 @@ function Get-PackageNextRepositorySearchOrder {
     return ([int]([Math]::Ceiling(($maxSearchOrder + 1) / 100.0) * 100))
 }
 
-function Get-PackageRepositorySearchOrderAfter {
+function Get-PackageEndpointSearchOrderAfter {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true)]
         [psobject]$Document,
 
         [Parameter(Mandatory = $true)]
-        [string]$AfterRepositoryId
+        [string]$AfterEndpointName
     )
 
-    $afterProperty = Get-PackageRepositorySourceProperty -Document $Document -RepositoryId $AfterRepositoryId
+    $afterProperty = Get-PackageEndpointSourceProperty -Document $Document -EndpointName $AfterEndpointName
     if (-not $afterProperty) {
-        throw "Package repository '$AfterRepositoryId' was not found, so no searchOrder can be placed after it."
+        throw "Package endpoint '$AfterEndpointName' was not found, so no searchOrder can be placed after it."
     }
     if (-not $afterProperty.Value.PSObject.Properties['searchOrder']) {
-        throw "Package repository '$AfterRepositoryId' has no searchOrder."
+        throw "Package endpoint '$AfterEndpointName' has no searchOrder."
     }
 
     $afterOrder = [int]$afterProperty.Value.searchOrder
     $nextHigherOrder = $null
-    foreach ($sourceProperty in @($Document.repositorySources.PSObject.Properties)) {
-        if (-not $sourceProperty.Value -or -not $sourceProperty.Value.PSObject.Properties['searchOrder']) {
+    foreach ($source in @(Get-PackageEndpointSourceEntries -Document $Document)) {
+        if (-not $source -or -not $source.PSObject.Properties['searchOrder']) {
             continue
         }
 
-        $currentOrder = [int]$sourceProperty.Value.searchOrder
+        $currentOrder = [int]$source.searchOrder
         if ($currentOrder -gt $afterOrder -and ($null -eq $nextHigherOrder -or $currentOrder -lt $nextHigherOrder)) {
             $nextHigherOrder = $currentOrder
         }
@@ -218,7 +252,7 @@ function Get-PackageRepositorySearchOrderAfter {
 
     $candidate = [int][Math]::Floor(($afterOrder + $nextHigherOrder) / 2)
     if ($candidate -le $afterOrder -or $candidate -ge $nextHigherOrder) {
-        throw "No integer searchOrder slot is available between '$AfterRepositoryId' ($afterOrder) and the next repository ($nextHigherOrder). Use -SearchOrder explicitly."
+        throw "No integer searchOrder slot is available between '$AfterEndpointName' ($afterOrder) and the next endpoint ($nextHigherOrder). Use -SearchOrder explicitly."
     }
 
     return $candidate
@@ -227,6 +261,9 @@ function Get-PackageRepositorySearchOrderAfter {
 function New-PackageFilesystemRepositorySource {
     [CmdletBinding()]
     param(
+        [Parameter(Mandatory = $true)]
+        [string]$EndpointName,
+
         [Parameter(Mandatory = $true)]
         [string]$BasePath,
 
@@ -246,6 +283,7 @@ function New-PackageFilesystemRepositorySource {
     }
 
     $source = [ordered]@{
+        endpointName = $EndpointName
         kind        = 'filesystem'
         enabled     = $Enabled
         searchOrder = $SearchOrder
@@ -264,7 +302,7 @@ function New-PackageFilesystemRepositorySource {
     return [pscustomobject]$source
 }
 
-function Resolve-PackageRepositoryRootForDisplay {
+function Resolve-PackageEndpointRootForDisplay {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true)]
@@ -307,11 +345,11 @@ function Get-PackageFileSha256 {
     return (Get-FileHash -LiteralPath $Path -Algorithm SHA256).Hash.ToLowerInvariant()
 }
 
-function Select-PackageRepositorySummary {
+function Select-PackageEndpointSummary {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true)]
-        [string]$RepositoryId,
+        [string]$EndpointName,
 
         [Parameter(Mandatory = $true)]
         [psobject]$Source,
@@ -330,20 +368,22 @@ function Select-PackageRepositorySummary {
 
     $notes = New-Object System.Collections.Generic.List[string]
     if (-not $enabled) {
-        $notes.Add('Disabled; package commands will not use this repository.') | Out-Null
+        $notes.Add('Disabled; package commands will not use this endpoint.') | Out-Null
     }
     if (-not $trusted) {
-        $notes.Add('Untrusted; definitions cannot be executed until the repository is trusted.') | Out-Null
+        $notes.Add('Untrusted; definitions cannot be executed until the endpoint is trusted.') | Out-Null
     }
     if ($kind -eq 'httpsCatalog') {
-        $notes.Add('HTTPS catalog repositories are reserved for future support and are not executable in v1.') | Out-Null
+        $notes.Add('HTTPS catalog endpoints are reserved for future support and are not executable in v1.') | Out-Null
     }
     if ($trusted -and [string]::Equals($trustMode, 'unsignedExplicit', [System.StringComparison]::OrdinalIgnoreCase)) {
         $notes.Add('Unsigned definitions are trusted by explicit local configuration.') | Out-Null
     }
 
     return [pscustomobject]@{
-        RepositoryId     = $RepositoryId
+        RepositorySourceId = $EndpointName
+        SourceId         = $EndpointName
+        EndpointName     = $EndpointName
         Kind             = $kind
         Enabled          = $enabled
         Trusted          = $trusted
@@ -352,7 +392,7 @@ function Select-PackageRepositorySummary {
         SearchOrder      = if ($Source.PSObject.Properties['searchOrder']) { [int]$Source.searchOrder } else { $null }
         DefinitionRoot   = if ($Source.PSObject.Properties['definitionRoot']) { [string]$Source.definitionRoot } else { $null }
         BasePath         = if ($Source.PSObject.Properties['basePath']) { [string]$Source.basePath } else { $null }
-        ResolvedRootPath = Resolve-PackageRepositoryRootForDisplay -Source $Source -ApplicationRootDirectory $ApplicationRootDirectory
+        ResolvedRootPath = Resolve-PackageEndpointRootForDisplay -Source $Source -ApplicationRootDirectory $ApplicationRootDirectory
         InventoryPath    = $InventoryPath
         TrustedAtUtc     = if ($Source.PSObject.Properties['trustedAtUtc']) { [string]$Source.trustedAtUtc } else { $null }
         TrustReason      = if ($Source.PSObject.Properties['trustReason']) { [string]$Source.trustReason } else { $null }
@@ -360,11 +400,11 @@ function Select-PackageRepositorySummary {
     }
 }
 
-function Get-PackageRepositorySummaries {
+function Get-PackageEndpointSummaries {
     [CmdletBinding()]
     param()
 
-    $documentInfo = Get-PackageRepositoryInventoryEditInfo
+    $documentInfo = Get-PackageEndpointInventoryEditInfo
     $applicationRootDirectory = $null
     try {
         $globalDocumentInfo = Read-PackageJsonDocument -Path (Get-PackageConfigPath)
@@ -372,22 +412,22 @@ function Get-PackageRepositorySummaries {
         $applicationRootDirectory = Resolve-PackageApplicationRootDirectory -PackageConfiguration $globalDocumentInfo.Document.package
     }
     catch {
-        Write-Warning "Repository summaries could not resolve application root. Showing raw repository inventory only. $($_.Exception.Message)"
+        Write-Warning "Endpoint summaries could not resolve application root. Showing raw endpoint inventory only. $($_.Exception.Message)"
     }
 
-    foreach ($sourceProperty in @($documentInfo.Document.repositorySources.PSObject.Properties)) {
-        Select-PackageRepositorySummary -RepositoryId $sourceProperty.Name -Source $sourceProperty.Value -InventoryPath $documentInfo.Path -ApplicationRootDirectory $applicationRootDirectory
+    foreach ($source in @(Get-PackageEndpointSourceEntries -Document $documentInfo.Document)) {
+        Select-PackageEndpointSummary -EndpointName ([string]$source.endpointName) -Source $source -InventoryPath $documentInfo.Path -ApplicationRootDirectory $applicationRootDirectory
     }
 }
 
-function New-PackageRepositoryCommandResult {
+function New-PackageEndpointCommandResult {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true)]
         [string]$Action,
 
         [Parameter(Mandatory = $true)]
-        [string]$RepositoryId,
+        [string]$EndpointName,
 
         [Parameter(Mandatory = $true)]
         [string]$InventoryPath,
@@ -410,21 +450,23 @@ function New-PackageRepositoryCommandResult {
     }
 
     return [pscustomobject]@{
-        Action        = $Action
-        RepositoryId  = $RepositoryId
-        InventoryPath = $InventoryPath
-        Status        = $Status
-        Before        = $Before
-        After         = $After
-        Notes         = @($Notes)
+        Action               = $Action
+        EndpointName         = $EndpointName
+        RepositorySourceId   = $EndpointName
+        SourceId             = $EndpointName
+        InventoryPath        = $InventoryPath
+        Status               = $Status
+        Before               = $Before
+        After                = $After
+        Notes                = @($Notes)
     }
 }
 
-function Resolve-PackageRepositoryRootPath {
+function Resolve-PackageEndpointRootPath {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true)]
-        [string]$RepositoryId,
+        [string]$EndpointName,
 
         [Parameter(Mandatory = $true)]
         [psobject]$Source,
@@ -435,22 +477,19 @@ function Resolve-PackageRepositoryRootPath {
 
     $kind = [string]$Source.kind
     if (-not [bool]$Source.enabled) {
-        throw "Package repository '$RepositoryId' is disabled in PackageRepositoryInventory.json."
+        throw "Package endpoint '$EndpointName' is disabled in PackageEndpointInventory.json."
     }
     if (-not [bool]$Source.trusted) {
-        throw "Package repository '$RepositoryId' is not trusted. Use Trust-PackageRepository for trusted filesystem repositories."
+        throw "Package endpoint '$EndpointName' is not trusted. Use Trust-PackageEndpoint for trusted filesystem endpoints."
     }
 
     if ([string]::Equals($kind, 'moduleLocal', [System.StringComparison]::OrdinalIgnoreCase)) {
-        if ([string]::Equals($RepositoryId, (Get-PackageDefaultRepositoryId), [System.StringComparison]::OrdinalIgnoreCase)) {
-            return [System.IO.Path]::GetFullPath((Join-Path (Get-PackageRepositoriesRoot) $RepositoryId))
-        }
         return Resolve-ConfiguredPath -PathValue ([string]$Source.definitionRoot) -BaseDirectory (Split-Path -Parent (Get-PackageConfigurationRoot)) -Tokens @{}
     }
 
     if ([string]::Equals($kind, 'filesystem', [System.StringComparison]::OrdinalIgnoreCase)) {
         if (-not [string]::Equals([string]$Source.trustMode, 'unsignedExplicit', [System.StringComparison]::OrdinalIgnoreCase)) {
-            throw "Package repository '$RepositoryId' is filesystem but does not use trustMode='unsignedExplicit'. Use Trust-PackageRepository -AllowUnsignedDefinitions."
+            throw "Package endpoint '$EndpointName' is filesystem but does not use trustMode='unsignedExplicit'. Use Trust-PackageEndpoint -AllowUnsignedDefinitions."
         }
         if (-not [string]::IsNullOrWhiteSpace($ApplicationRootDirectory)) {
             return Resolve-PackageConfiguredPath -PathValue ([string]$Source.basePath) -ApplicationRootDirectory $ApplicationRootDirectory
@@ -459,10 +498,10 @@ function Resolve-PackageRepositoryRootPath {
     }
 
     if ([string]::Equals($kind, 'httpsCatalog', [System.StringComparison]::OrdinalIgnoreCase)) {
-        throw "Package repository '$RepositoryId' uses kind 'httpsCatalog', which is reserved for future support and is not implemented yet."
+        throw "Package endpoint '$EndpointName' uses kind 'httpsCatalog', which is reserved for future support and is not implemented yet."
     }
 
-    throw "Package repository '$RepositoryId' uses unsupported kind '$kind'."
+    throw "Package endpoint '$EndpointName' uses unsupported kind '$kind'."
 }
 
 function Resolve-PackageDefinitionSnapshotReference {
@@ -473,9 +512,6 @@ function Resolve-PackageDefinitionSnapshotReference {
 
         [Parameter(Mandatory = $true)]
         [string]$DefinitionId,
-
-        [AllowNull()]
-        [string]$PublisherId = $null,
 
         [Parameter(Mandatory = $true)]
         [string]$PackageAssignmentInventoryFilePath,
@@ -497,12 +533,6 @@ function Resolve-PackageDefinitionSnapshotReference {
             if (-not [string]::IsNullOrWhiteSpace($RepositoryId)) {
                 $recordRepositoryId = if ($record.PSObject.Properties['definitionRepositorySourceId']) { [string]$record.definitionRepositorySourceId } else { $null }
                 if (-not [string]::Equals($recordRepositoryId, $RepositoryId, [System.StringComparison]::OrdinalIgnoreCase)) {
-                    continue
-                }
-            }
-            if (-not [string]::IsNullOrWhiteSpace($PublisherId)) {
-                $recordPublisherId = if ($record.PSObject.Properties['definitionPublisherId']) { [string]$record.definitionPublisherId } else { $null }
-                if (-not [string]::Equals($recordPublisherId, $PublisherId, [System.StringComparison]::OrdinalIgnoreCase)) {
                     continue
                 }
             }

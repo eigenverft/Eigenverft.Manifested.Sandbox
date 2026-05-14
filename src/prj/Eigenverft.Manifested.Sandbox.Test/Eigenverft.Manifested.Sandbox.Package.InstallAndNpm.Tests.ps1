@@ -720,9 +720,10 @@ exit /b 0
         $packageStateIndexFilePath = Join-Path $rootPath 'PackageAssignmentInventory.json'
         $definitionDocument = @{
             schemaVersion = '1.4'
-            id = 'Qwen35_9B_Q6_K_Model'
+            definitionId = 'Qwen35_9B_Q6_K_Model'
+            repositoryId = 'EigenverftModule'
             definitionPublication = @{
-                publisherId = 'EigenverftModule'
+                publisherId = 'Eigenverft'
                 publisherName = 'Eigenverft Module'
                 definitionRevision = 1
                 publishedAtUtc = '2026-05-13T12:00:00Z'
@@ -1030,4 +1031,5 @@ exit /b 0
     }
 
 }
+
 

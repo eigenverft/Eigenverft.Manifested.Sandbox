@@ -21,7 +21,7 @@
 . "$PSScriptRoot\Support\Package\Execution\Eigenverft.Manifested.Sandbox.Package.Bootstrap.ps1"
 . "$PSScriptRoot\Support\Package\Schema\Eigenverft.Manifested.Sandbox.Package.Config.ps1"
 . "$PSScriptRoot\Support\Package\Schema\Eigenverft.Manifested.Sandbox.Package.DepotInventory.Management.ps1"
-. "$PSScriptRoot\Support\Package\Schema\Eigenverft.Manifested.Sandbox.Package.RepositoryInventory.Management.ps1"
+. "$PSScriptRoot\Support\Package\Schema\Eigenverft.Manifested.Sandbox.Package.EndpointInventory.Management.ps1"
 . "$PSScriptRoot\Support\Package\Schema\Eigenverft.Manifested.Sandbox.Package.DefinitionReference.ps1"
 . "$PSScriptRoot\Support\Package\Schema\Eigenverft.Manifested.Sandbox.Package.DefinitionSchema.Wire1_4.ps1"
 . "$PSScriptRoot\Support\Package\Schema\Eigenverft.Manifested.Sandbox.Package.DefinitionSchema.ps1"
@@ -50,7 +50,7 @@
 . "$PSScriptRoot\Commands\Package\Eigenverft.Manifested.Sandbox.Cmd.GetPackageState.ps1"
 . "$PSScriptRoot\Commands\Package\Eigenverft.Manifested.Sandbox.Cmd.InvokePackage.ps1"
 . "$PSScriptRoot\Commands\Depot\Eigenverft.Manifested.Sandbox.Cmd.PackageDepot.ps1"
-. "$PSScriptRoot\Commands\Repository\Eigenverft.Manifested.Sandbox.Cmd.PackageRepository.ps1"
+. "$PSScriptRoot\Commands\Endpoint\Eigenverft.Manifested.Sandbox.Cmd.PackageEndpoint.ps1"
 . "$PSScriptRoot\Commands\Web\Eigenverft.Manifested.Sandbox.Cmd.InvokeWebRequestEx.ps1"
 . "$PSScriptRoot\Commands\Module\Eigenverft.Manifested.Sandbox.Cmd.Module.ps1"
 

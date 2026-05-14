@@ -256,8 +256,11 @@ validates the current schema, resolves runtime context and Package roots, and re
 combined config object for command orchestration.
 
 .PARAMETER DefinitionId
-The Package definition id. Repository resolution matches the JSON id, not the
+The Package definition id. Repository resolution matches the JSON definitionId, not the
 file name.
+
+.PARAMETER RepositoryId
+Optional. When set, only definition files whose JSON repositoryId equals this value are considered (after scanning all enabled trusted endpoints).
 
 .EXAMPLE
 Get-PackageConfig -DefinitionId VSCodeRuntime
@@ -266,9 +269,6 @@ Get-PackageConfig -DefinitionId VSCodeRuntime
     param(
         [AllowNull()]
         [string]$RepositoryId = $null,
-
-        [AllowNull()]
-        [string]$PublisherId = $null,
 
         [Parameter(Mandatory = $true)]
         [string]$DefinitionId,
@@ -298,30 +298,41 @@ Get-PackageConfig -DefinitionId VSCodeRuntime
         Resolve-PackageConfiguredPath -PathValue 'State\PackageAssignmentInventory.json' -ApplicationRootDirectory $applicationRootDirectory
     }
 
+    $repositoryMaterializationMode = 'packageFocused'
+    if ($packageGlobalConfig.PSObject.Properties['repositoryEnvironment'] -and $packageGlobalConfig.repositoryEnvironment -and
+        $packageGlobalConfig.repositoryEnvironment.PSObject.Properties['defaults'] -and $packageGlobalConfig.repositoryEnvironment.defaults -and
+        $packageGlobalConfig.repositoryEnvironment.defaults.PSObject.Properties['repositoryMaterializationMode'] -and
+        -not [string]::IsNullOrWhiteSpace([string]$packageGlobalConfig.repositoryEnvironment.defaults.repositoryMaterializationMode)) {
+        $repositoryMaterializationMode = [string]$packageGlobalConfig.repositoryEnvironment.defaults.repositoryMaterializationMode
+    }
+    if ($repositoryMaterializationMode -notin @('packageFocused', 'repositoryFocused')) {
+        throw "Package config '$($globalDocumentInfo.Path)' defines unsupported repositoryEnvironment.defaults.repositoryMaterializationMode '$repositoryMaterializationMode'. Use 'packageFocused' or 'repositoryFocused'."
+    }
+
     $definitionReference = $null
     if ([string]::Equals($DesiredState, 'Removed', [System.StringComparison]::OrdinalIgnoreCase)) {
         try {
-            $definitionReference = Resolve-PackageDefinitionSnapshotReference -RepositoryId $RepositoryId -DefinitionId $DefinitionId -PublisherId $PublisherId -PackageAssignmentInventoryFilePath $packageInventoryFilePath -LiveResolutionError $null
+            $definitionReference = Resolve-PackageDefinitionSnapshotReference -RepositoryId $RepositoryId -DefinitionId $DefinitionId -PackageAssignmentInventoryFilePath $packageInventoryFilePath -LiveResolutionError $null
             Write-PackageExecutionMessage -Message ("[STATE] Using assigned definition snapshot '{0}' for removed desired state." -f $definitionReference.DefinitionPath)
         }
         catch {
             try {
-                $definitionReference = Resolve-PackageDefinitionReference -RepositoryId $RepositoryId -DefinitionId $DefinitionId -PublisherId $PublisherId -ApplicationRootDirectory $applicationRootDirectory -LocalRepositoryRoot $localRepositoryRoot
+                $definitionReference = Resolve-PackageDefinitionReference -RepositoryId $RepositoryId -DefinitionId $DefinitionId -ApplicationRootDirectory $applicationRootDirectory -LocalRepositoryRoot $localRepositoryRoot -RepositoryMaterializationMode $repositoryMaterializationMode
             }
             catch {
-                $definitionReference = Resolve-PackageDefinitionSnapshotReference -RepositoryId $RepositoryId -DefinitionId $DefinitionId -PublisherId $PublisherId -PackageAssignmentInventoryFilePath $packageInventoryFilePath -LiveResolutionError $_.Exception.Message
+                $definitionReference = Resolve-PackageDefinitionSnapshotReference -RepositoryId $RepositoryId -DefinitionId $DefinitionId -PackageAssignmentInventoryFilePath $packageInventoryFilePath -LiveResolutionError $_.Exception.Message
                 Write-PackageExecutionMessage -Level 'WRN' -Message ("[WARN] Live package repository definition could not be resolved for definition '{0}'; using local assigned definition snapshot '{1}' for removal. Live error: {2}" -f $DefinitionId, $definitionReference.DefinitionPath, $_.Exception.Message)
             }
         }
     }
     else {
-        $definitionReference = Resolve-PackageDefinitionReference -RepositoryId $RepositoryId -DefinitionId $DefinitionId -PublisherId $PublisherId -ApplicationRootDirectory $applicationRootDirectory -LocalRepositoryRoot $localRepositoryRoot
+        $definitionReference = Resolve-PackageDefinitionReference -RepositoryId $RepositoryId -DefinitionId $DefinitionId -ApplicationRootDirectory $applicationRootDirectory -LocalRepositoryRoot $localRepositoryRoot -RepositoryMaterializationMode $repositoryMaterializationMode
     }
 
     $definitionDocumentInfo = Read-PackageJsonDocument -Path $definitionReference.DefinitionPath
-    Assert-PackageDefinitionSchema -DefinitionDocumentInfo $definitionDocumentInfo -DefinitionId $DefinitionId -DefinitionRepositoryId $definitionReference.RepositoryId
+    Assert-PackageDefinitionSchema -DefinitionDocumentInfo $definitionDocumentInfo -DefinitionId $DefinitionId
 
-    $repositoryInventoryInfo = Get-PackageRepositoryInventoryInfo
+    $endpointInventoryInfo = Get-PackageEndpointInventoryInfo
     $depotInventoryInfo = Get-PackageDepotInventoryInfo
     $sourceInventoryInfo = Get-PackageSourceInventoryInfo -ApplicationRootDirectory $applicationRootDirectory
 
@@ -378,7 +389,23 @@ Get-PackageConfig -DefinitionId VSCodeRuntime
         }
     }
 
-    $definitionRepositoryId = [string]$definitionReference.RepositoryId
+    $definitionWireRepositoryId = if ($definition.PSObject.Properties['repositoryId'] -and -not [string]::IsNullOrWhiteSpace([string]$definition.repositoryId)) {
+        [string]$definition.repositoryId
+    }
+    else {
+        [string](Get-PackageDefaultRepositoryId)
+    }
+    $definitionWireDefinitionId = if ($definition.PSObject.Properties['definitionId'] -and -not [string]::IsNullOrWhiteSpace([string]$definition.definitionId)) {
+        [string]$definition.definitionId
+    }
+    elseif ($definition.PSObject.Properties['id']) {
+        [string]$definition.id
+    }
+    else {
+        [string]$DefinitionId
+    }
+
+    $definitionRepositoryId = $definitionWireRepositoryId
 
     $display = if ($definition.display -and $definition.display.PSObject.Properties['default'] -and $null -ne $definition.display.default) {
         $definition.display.default
@@ -393,21 +420,22 @@ Get-PackageConfig -DefinitionId VSCodeRuntime
         ApplicationRootDirectory           = $applicationRootDirectory
         SourceInventoryPath                = $effectiveAcquisitionEnvironment.SourceInventoryPath
         SourceInventory                    = $sourceInventoryInfo.Document
-        RepositoryInventoryPath            = $repositoryInventoryInfo.Path
-        RepositoryInventory                = $repositoryInventoryInfo.Document
+        EndpointInventoryPath              = $endpointInventoryInfo.Path
+        EndpointInventory                  = $endpointInventoryInfo.Document
         DepotInventoryPath                 = $effectiveAcquisitionEnvironment.DepotInventoryPath
         DepotInventory                     = $depotInventoryInfo.Document
         EffectiveAcquisitionEnvironment    = $effectiveAcquisitionEnvironment
         DefinitionReference                = $definitionReference
         DefinitionPath                     = $definitionDocumentInfo.Path
         Definition                         = $definition
-        DefinitionId                       = [string]$definition.id
+        DefinitionId                       = $definitionWireDefinitionId
         DefinitionRepositoryId             = $definitionRepositoryId
         DefinitionPublisherId              = [string]$definitionReference.PublisherId
         DefinitionPublisherName            = [string]$definitionReference.PublisherName
         DefinitionRevision                 = [int]$definitionReference.DefinitionRevision
         DefinitionPublishedAtUtc           = [string]$definitionReference.PublishedAtUtc
-        DefinitionRepositorySourceId       = [string]$definitionReference.RepositoryId
+        DefinitionRepositorySourceId       = $definitionWireRepositoryId
+        DefinitionEndpointName             = if ($definitionReference.PSObject.Properties['EndpointName']) { [string]$definitionReference.EndpointName } else { $null }
         DefinitionSourceKind               = [string]$definitionReference.SourceKind
         DefinitionSourcePath               = [string]$definitionReference.SourcePath
         DefinitionSourceHash               = [string]$definitionReference.SourceHash
@@ -430,6 +458,7 @@ Get-PackageConfig -DefinitionId VSCodeRuntime
         DefaultPackageDepotDirectory       = $effectiveAcquisitionEnvironment.Stores.DefaultPackageDepotDirectory
         PreferredTargetInstallRootDirectory = $preferredTargetInstallDirectory
         LocalRepositoryRoot                = $localRepositoryRoot
+        RepositoryMaterializationMode      = $repositoryMaterializationMode
         ShimDirectory                      = $shimDirectory
         PackageDepotRelativePathTemplate   = $packageDepotRelativePathTemplate
         PackageWorkSlotDirectoryTemplate   = $packageWorkSlotDirectoryTemplate
@@ -583,6 +612,7 @@ New-PackageResult -PackageConfig $config
         OperationId                      = [guid]::NewGuid().ToString('n')
         OperationStartedAtUtc            = [DateTime]::UtcNow.ToString('o')
         DesiredState                     = $DesiredState
+        RepositorySourceId               = if ($PackageConfig.PSObject.Properties['DefinitionEndpointName'] -and -not [string]::IsNullOrWhiteSpace([string]$PackageConfig.DefinitionEndpointName)) { [string]$PackageConfig.DefinitionEndpointName } else { $null }
         RepositoryId                     = $PackageConfig.DefinitionRepositoryId
         Status                           = 'Pending'
         FailureReason                    = $null
@@ -601,7 +631,7 @@ New-PackageResult -PackageConfig $config
         OSVersion                        = $PackageConfig.OSVersion
         ReleaseTrack                     = $PackageConfig.ReleaseTrack
         SourceInventoryPath              = $PackageConfig.SourceInventoryPath
-        RepositoryInventoryPath          = $PackageConfig.RepositoryInventoryPath
+        EndpointInventoryPath            = $PackageConfig.EndpointInventoryPath
         DepotInventoryPath               = $PackageConfig.DepotInventoryPath
         DefinitionSourceKind             = $PackageConfig.DefinitionSourceKind
         DefinitionSourcePath             = $PackageConfig.DefinitionSourcePath

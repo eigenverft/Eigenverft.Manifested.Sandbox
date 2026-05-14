@@ -65,3 +65,4 @@ exit 0
         $LASTEXITCODE | Should -Be 0 -Because ($output -join [Environment]::NewLine)
     }
 }
+

@@ -61,10 +61,10 @@ Displays module information, per-definition Invoke-Package examples, and other e
     }
 
     $definitionIds = @()
-    $defaultRepo = 'EigenverftModule'
+    $defaultDefinitionRepositoryId = 'EigenverftModule'
     if (Get-Command Get-PackageDefaultRepositoryId -ErrorAction SilentlyContinue) {
         try {
-            $defaultRepo = [string](Get-PackageDefaultRepositoryId)
+            $defaultDefinitionRepositoryId = [string](Get-PackageDefaultRepositoryId)
         }
         catch {
         }
@@ -72,13 +72,17 @@ Displays module information, per-definition Invoke-Package examples, and other e
 
     if (Get-Command Get-PackageRepositoriesRoot -ErrorAction SilentlyContinue) {
         try {
-            $repoDir = Join-Path (Get-PackageRepositoriesRoot) $defaultRepo
-            if (Test-Path -LiteralPath $repoDir) {
+            $repositoriesRoot = Get-PackageRepositoriesRoot
+            $repoDir = Join-Path (Join-Path $repositoriesRoot 'Eigenverft') 'ModuleDefaults'
+            if (-not (Test-Path -LiteralPath $repoDir -PathType Container)) {
+                $repoDir = Join-Path $repositoriesRoot $defaultDefinitionRepositoryId
+            }
+            if (Test-Path -LiteralPath $repoDir -PathType Container) {
                 foreach ($jsonFile in Get-ChildItem -LiteralPath $repoDir -Filter *.json -File -Recurse) {
                     try {
                         $doc = Get-Content -LiteralPath $jsonFile.FullName -Raw | ConvertFrom-Json
                         $sv = if ($doc.PSObject.Properties['schemaVersion']) { [string]$doc.schemaVersion } else { '' }
-                        $id = if ($doc.PSObject.Properties['id']) { [string]$doc.id } else { '' }
+                        $id = if ($doc.PSObject.Properties['definitionId']) { [string]$doc.definitionId } elseif ($doc.PSObject.Properties['id']) { [string]$doc.id } else { '' }
                         if (-not [string]::IsNullOrWhiteSpace($sv) -and -not [string]::IsNullOrWhiteSpace($id) -and $doc.PSObject.Properties['packageOperations']) {
                             $definitionIds += $id
                         }
@@ -101,7 +105,7 @@ Displays module information, per-definition Invoke-Package examples, and other e
 
     if ($definitionIds.Count -gt 0) {
         $outputLines += @(
-            ('Shipped package definitions (repository ''{0}'', example assign; default repository - omit -RepositoryId):' -f $defaultRepo)
+            ('Shipped package definitions (definition JSON repositoryId ''{0}''; optional ''Invoke-Package -RepositoryId'' narrows the scan to that value; endpoints live in PackageEndpointInventory.json):' -f $defaultDefinitionRepositoryId)
             ($definitionIds | ForEach-Object { "- Invoke-Package -DefinitionId '{0}'" -f $_ })
             'Use -DesiredState Removed to uninstall a package-owned install when the definition supports it.'
         )

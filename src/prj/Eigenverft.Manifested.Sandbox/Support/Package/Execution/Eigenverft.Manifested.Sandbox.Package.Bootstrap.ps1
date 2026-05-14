@@ -6,6 +6,7 @@ $script:ManifestedPackageRoot = Split-Path -Parent (Split-Path -Parent (Split-Pa
 $script:ManifestedPackageConfigurationRoot = Join-Path $script:ManifestedPackageRoot 'Configuration'
 $script:ManifestedPackageRepositoriesRoot = Join-Path $script:ManifestedPackageRoot 'Repositories'
 $script:ManifestedPackageDefaultRepositoryId = 'EigenverftModule'
+$script:ManifestedPackageDefaultEndpointName = 'moduleDefaults'
 $script:ManifestedPackageSourceInventoryPathEnvironmentVariableName = 'EIGENVERFT_MANIFESTED_PACKAGE_SOURCE_INVENTORY_PATH'
 $script:ManifestedPackageSiteCodeEnvironmentVariableName = 'EIGENVERFT_MANIFESTED_PACKAGE_SITE_CODE'
 
@@ -48,10 +49,10 @@ Get-PackageRepositoriesRoot
 function Get-PackageDefaultRepositoryId {
 <#
 .SYNOPSIS
-Returns the shipped Package base repository id.
+Returns the default logical repository id used on shipped package definitions (JSON repositoryId).
 
 .DESCRIPTION
-Returns the repository id used for the definitions shipped with this module.
+This is the data-level `repositoryId` string carried on shipped definition documents. It is not an endpoint inventory row key.
 
 .EXAMPLE
 Get-PackageDefaultRepositoryId
@@ -60,6 +61,23 @@ Get-PackageDefaultRepositoryId
     param()
 
     return $script:ManifestedPackageDefaultRepositoryId
+}
+
+function Get-PackageDefaultEndpointName {
+<#
+.SYNOPSIS
+Returns the shipped module-local endpoint name from PackageEndpointInventory.json.
+
+.DESCRIPTION
+Identifies the default scan endpoint row (`endpointName`) that ships with the module. Used to protect removal of the last shipped endpoint configuration.
+
+.EXAMPLE
+Get-PackageDefaultEndpointName
+#>
+    [CmdletBinding()]
+    param()
+
+    return $script:ManifestedPackageDefaultEndpointName
 }
 
 function Get-PackageShippedConfigPath {
@@ -98,22 +116,21 @@ Get-PackageShippedDepotInventoryPath
     return (Join-Path (Join-Path (Get-PackageConfigurationRoot) 'Internal') 'PackageDepotInventory.json')
 }
 
-function Get-PackageShippedRepositoryInventoryPath {
+function Get-PackageShippedEndpointInventoryPath {
 <#
 .SYNOPSIS
-Returns the shipped Package repository-inventory path.
+Returns the shipped PackageEndpointInventory.json path.
 
 .DESCRIPTION
-Builds the module-relative path to the JSON document that defines Package
-definition repository defaults.
+Builds the module-relative path to the JSON document that defines Package definition scan endpoints.
 
 .EXAMPLE
-Get-PackageShippedRepositoryInventoryPath
+Get-PackageShippedEndpointInventoryPath
 #>
     [CmdletBinding()]
     param()
 
-    return (Join-Path (Join-Path (Get-PackageConfigurationRoot) 'Internal') 'PackageRepositoryInventory.json')
+    return (Join-Path (Join-Path (Get-PackageConfigurationRoot) 'Internal') 'PackageEndpointInventory.json')
 }
 
 function Get-PackageLocalRoot {
@@ -196,22 +213,22 @@ Get-PackageLocalDepotInventoryPath
     return [System.IO.Path]::GetFullPath((Join-Path (Join-Path (Get-PackageLocalRoot) 'Configuration\Internal') 'PackageDepotInventory.json'))
 }
 
-function Get-PackageLocalRepositoryInventoryPath {
+function Get-PackageLocalEndpointInventoryPath {
 <#
 .SYNOPSIS
-Returns the local Package repository-inventory path.
+Returns the local PackageEndpointInventory.json path.
 
 .DESCRIPTION
-Builds the local copy path for PackageRepositoryInventory.json. The local file can
+Builds the local copy path for PackageEndpointInventory.json. The local file can
 later be edited or refreshed independently of the module installation.
 
 .EXAMPLE
-Get-PackageLocalRepositoryInventoryPath
+Get-PackageLocalEndpointInventoryPath
 #>
     [CmdletBinding()]
     param()
 
-    return [System.IO.Path]::GetFullPath((Join-Path (Join-Path (Get-PackageLocalRoot) 'Configuration\Internal') 'PackageRepositoryInventory.json'))
+    return [System.IO.Path]::GetFullPath((Join-Path (Join-Path (Get-PackageLocalRoot) 'Configuration\Internal') 'PackageEndpointInventory.json'))
 }
 
 function Get-PackageConfigPath {
@@ -270,29 +287,29 @@ Get-PackageDepotInventoryPath
     return $localInventoryPath
 }
 
-function Get-PackageRepositoryInventoryPath {
+function Get-PackageEndpointInventoryPath {
 <#
 .SYNOPSIS
-Returns the active Package repository-inventory path.
+Returns the active PackageEndpointInventory.json path.
 
 .DESCRIPTION
-Returns the local PackageRepositoryInventory.json path, creating it from the shipped
+Returns the local PackageEndpointInventory.json path, creating it from the shipped
 module configuration when the local copy does not exist yet.
 
 .EXAMPLE
-Get-PackageRepositoryInventoryPath
+Get-PackageEndpointInventoryPath
 #>
     [CmdletBinding()]
     param()
 
-    $localInventoryPath = Get-PackageLocalRepositoryInventoryPath
+    $localInventoryPath = Get-PackageLocalEndpointInventoryPath
     if (-not (Test-Path -LiteralPath $localInventoryPath -PathType Leaf)) {
         $localInventoryDirectory = Split-Path -Parent $localInventoryPath
         if (-not [string]::IsNullOrWhiteSpace($localInventoryDirectory)) {
             $null = New-Item -ItemType Directory -Path $localInventoryDirectory -Force
         }
 
-        Copy-FileToPath -SourcePath (Get-PackageShippedRepositoryInventoryPath) -TargetPath $localInventoryPath -Overwrite | Out-Null
+        Copy-FileToPath -SourcePath (Get-PackageShippedEndpointInventoryPath) -TargetPath $localInventoryPath -Overwrite | Out-Null
     }
 
     return $localInventoryPath
@@ -340,8 +357,8 @@ function Get-PackageDefinitionPath {
 Returns the shipped Package definition path for an id.
 
 .DESCRIPTION
-Finds a Package definition JSON file in the shipped EigenverftModule repository
-by reading the JSON id. Filenames and subdirectories are storage details.
+Finds a Package definition JSON file in the shipped `Repositories\Eigenverft\ModuleDefaults` tree
+by reading the JSON definitionId. Filenames and subdirectories are storage details.
 
 .PARAMETER DefinitionId
 The Package definition id.
@@ -355,7 +372,7 @@ Get-PackageDefinitionPath -DefinitionId VSCodeRuntime
         [string]$DefinitionId
     )
 
-    $repositoryRoot = Join-Path (Get-PackageRepositoriesRoot) (Get-PackageDefaultRepositoryId)
+    $repositoryRoot = Join-Path (Get-PackageRepositoriesRoot) 'Eigenverft\ModuleDefaults'
     if (-not (Test-Path -LiteralPath $repositoryRoot -PathType Container)) {
         throw "Package repository root '$repositoryRoot' does not exist."
     }
@@ -363,8 +380,17 @@ Get-PackageDefinitionPath -DefinitionId VSCodeRuntime
     foreach ($jsonFile in @(Get-ChildItem -LiteralPath $repositoryRoot -Filter '*.json' -File -Recurse)) {
         try {
             $document = Get-Content -LiteralPath $jsonFile.FullName -Raw -ErrorAction Stop | ConvertFrom-Json -ErrorAction Stop
-            if ($document.PSObject.Properties['id'] -and
-                [string]::Equals([string]$document.id, $DefinitionId, [System.StringComparison]::OrdinalIgnoreCase)) {
+            $docDefinitionId = if ($document.PSObject.Properties['definitionId'] -and -not [string]::IsNullOrWhiteSpace([string]$document.definitionId)) {
+                [string]$document.definitionId
+            }
+            elseif ($document.PSObject.Properties['id']) {
+                [string]$document.id
+            }
+            else {
+                $null
+            }
+            if (-not [string]::IsNullOrWhiteSpace($docDefinitionId) -and
+                [string]::Equals($docDefinitionId, $DefinitionId, [System.StringComparison]::OrdinalIgnoreCase)) {
                 return [System.IO.Path]::GetFullPath($jsonFile.FullName)
             }
         }
@@ -373,6 +399,6 @@ Get-PackageDefinitionPath -DefinitionId VSCodeRuntime
         }
     }
 
-    throw "Package definition '$DefinitionId' was not found by JSON id under shipped repository '$repositoryRoot'."
+    throw "Package definition '$DefinitionId' was not found by JSON definitionId under shipped repository '$repositoryRoot'."
 }
 

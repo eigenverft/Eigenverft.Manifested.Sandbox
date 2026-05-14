@@ -38,9 +38,14 @@ function Get-PackageResultRepositoryId {
         [psobject]$PackageResult
     )
 
-    if ($PackageResult.PSObject.Properties['RepositoryId'] -and
-        -not [string]::IsNullOrWhiteSpace([string]$PackageResult.RepositoryId)) {
-        return [string]$PackageResult.RepositoryId
+    if ($PackageResult.PSObject.Properties['DefinitionRepositorySourceId'] -and
+        -not [string]::IsNullOrWhiteSpace([string]$PackageResult.DefinitionRepositorySourceId)) {
+        return [string]$PackageResult.DefinitionRepositorySourceId
+    }
+    if ($PackageResult.PackageConfig -and
+        $PackageResult.PackageConfig.PSObject.Properties['DefinitionRepositorySourceId'] -and
+        -not [string]::IsNullOrWhiteSpace([string]$PackageResult.PackageConfig.DefinitionRepositorySourceId)) {
+        return [string]$PackageResult.PackageConfig.DefinitionRepositorySourceId
     }
     if ($PackageResult.PackageConfig -and
         $PackageResult.PackageConfig.PSObject.Properties['DefinitionRepositoryId'] -and
@@ -61,13 +66,11 @@ function Resolve-PackageDependencyRepositoryId {
         [psobject]$Dependency
     )
 
-    if ($Dependency.PSObject.Properties['repositoryId']) {
-        if ([string]::IsNullOrWhiteSpace([string]$Dependency.repositoryId)) {
-            throw "Package definition '$($PackageResult.DefinitionId)' has dependency '$($Dependency.definitionId)' with empty repositoryId."
-        }
+    if ($Dependency.PSObject.Properties['repositoryId'] -and -not [string]::IsNullOrWhiteSpace([string]$Dependency.repositoryId)) {
         return [string]$Dependency.repositoryId
     }
 
+    # dependency.repositorySourceId historically referred to an inventory row; endpoint-only pinning is not mapped to Invoke-Package -RepositoryId (JSON repositoryId narrowing).
     return $null
 }
 
@@ -157,7 +160,8 @@ Resolve-PackageDependencies -PackageResult $result
 
     foreach ($dependency in @($definition.dependencies)) {
         if (-not $dependency.PSObject.Properties['definitionId'] -or [string]::IsNullOrWhiteSpace([string]$dependency.definitionId)) {
-            throw "Package definition '$($definition.id)' has dependency without definitionId."
+            $defLabel = if ($definition.PSObject.Properties['definitionId']) { [string]$definition.definitionId } elseif ($definition.PSObject.Properties['id']) { [string]$definition.id } else { [string]$PackageResult.DefinitionId }
+            throw "Package definition '$defLabel' has dependency without definitionId."
         }
 
         $dependencyDefinitionId = [string]$dependency.definitionId
@@ -187,13 +191,14 @@ Resolve-PackageDependencies -PackageResult $result
         $dependencyRepositoryText = if ([string]::IsNullOrWhiteSpace($dependencyRepositoryId)) { '<active repositories>' } else { $dependencyRepositoryId }
         Write-PackageExecutionMessage -Message ("[STEP] Ensuring package dependency '{0}' from repository '{1}'." -f $dependencyDefinitionId, $dependencyRepositoryText)
         $dependencyResult = Resolve-PackageDependencyDefinition -PackageResult $PackageResult -RepositoryId $dependencyRepositoryId -DefinitionId $dependencyDefinitionId -DependencyStack (@($currentStack) + $dependencyKey)
-        $resolvedDependencyRepositoryId = if ($dependencyResult -and $dependencyResult.PSObject.Properties['RepositoryId']) { [string]$dependencyResult.RepositoryId } else { $dependencyRepositoryId }
+        $resolvedDependencyRepositoryId = if ($dependencyResult) { Get-PackageResultRepositoryId -PackageResult $dependencyResult } else { $dependencyRepositoryId }
         $dependencyStatus = if ($dependencyResult) { [string]$dependencyResult.Status } else { '<none>' }
         if (-not $dependencyResult -or -not [string]::Equals($dependencyStatus, 'Ready', [System.StringComparison]::OrdinalIgnoreCase)) {
             throw "Package dependency '$dependencyRepositoryText/$dependencyDefinitionId' did not become ready. Status='$dependencyStatus'."
         }
 
         $dependencyRecords.Add([pscustomobject]@{
+            RepositorySourceId = $resolvedDependencyRepositoryId
             RepositoryId   = $resolvedDependencyRepositoryId
             DefinitionId   = $dependencyDefinitionId
             Status         = $dependencyStatus

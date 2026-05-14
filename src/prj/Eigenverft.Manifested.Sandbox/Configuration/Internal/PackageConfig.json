@@ -18,6 +18,11 @@
         "depotDistributionMode": "packageFocused"
       }
     },
+    "repositoryEnvironment": {
+      "defaults": {
+        "repositoryMaterializationMode": "packageFocused"
+      }
+    },
     "packageState": {
       "inventoryFilePath": "{applicationRootDirectory}/State/PackageAssignmentInventory.json",
       "operationHistoryFilePath": "{applicationRootDirectory}/State/PackageOperationHistory.json"

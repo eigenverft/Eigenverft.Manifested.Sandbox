@@ -1,10 +1,9 @@
 {
   "$schema": "../../Schema/eigenverft-module-package-definition-1.4.schema.json",
   "schemaVersion": "1.4",
-  "id": "PowerShell7",
   "definitionPublication": {
-    "publisherId": "EigenverftModule",
-    "publisherName": "Eigenverft Module",
+    "publisherId": "Eigenverft",
+    "publisherName": "Eigenverft",
     "definitionRevision": 1,
     "publishedAtUtc": "2026-05-13T12:00:00Z"
   },
@@ -246,5 +245,7 @@
         "workDirectories": true
       }
     }
-  }
+  },
+  "definitionId": "PowerShell7",
+  "repositoryId": "EigenverftModule"
 }

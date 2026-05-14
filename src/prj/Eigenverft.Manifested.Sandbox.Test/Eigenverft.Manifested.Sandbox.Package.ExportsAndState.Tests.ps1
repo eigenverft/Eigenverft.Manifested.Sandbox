@@ -12,6 +12,8 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - export
         $command | Should -Not -BeNullOrEmpty
         $command.Parameters.Keys | Should -Contain 'DefinitionId'
         $command.Parameters.Keys | Should -Contain 'RepositoryId'
+        $command.Parameters.Keys | Should -Not -Contain 'PublisherId'
+        $command.Parameters.Keys | Should -Not -Contain 'RepositorySourceId'
         $command.Parameters.Keys | Should -Contain 'DesiredState'
         $command.Parameters.Keys | Should -Contain 'FailFast'
         $command.Parameters.Keys | Should -Not -Contain 'CommandName'
@@ -45,21 +47,21 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - export
 
         @($module.ExportedCommands.Keys | Sort-Object) | Should -Be @(
             'Add-PackageDepot',
-            'Add-PackageRepository',
+            'Add-PackageEndpoint',
             'Add-TeamPackageDepot',
-            'Add-TeamPackageRepository',
+            'Add-TeamPackageEndpoint',
             'Get-PackageDepot',
-            'Get-PackageRepository',
+            'Get-PackageEndpoint',
             'Get-PackageState',
             'Get-SandboxVersion',
             'Invoke-Package',
             'Invoke-WebRequestEx',
             'Remove-PackageDepot',
-            'Remove-PackageRepository',
+            'Remove-PackageEndpoint',
             'Sandbox',
             'Set-PackageDepot',
-            'Set-PackageRepository',
-            'Trust-PackageRepository'
+            'Set-PackageEndpoint',
+            'Trust-PackageEndpoint'
         )
         Get-Command -Name 'Initialize-ProxyAccessProfile' -Module $module -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
     }
@@ -70,7 +72,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - export
         Test-Path -LiteralPath (Join-Path $moduleProjectRoot 'Commands\Package\Eigenverft.Manifested.Sandbox.Cmd.InvokePackage.ps1') -PathType Leaf | Should -BeTrue
         Test-Path -LiteralPath (Join-Path $moduleProjectRoot 'Commands\Package\Eigenverft.Manifested.Sandbox.Cmd.GetPackageState.ps1') -PathType Leaf | Should -BeTrue
         Test-Path -LiteralPath (Join-Path $moduleProjectRoot 'Commands\Depot\Eigenverft.Manifested.Sandbox.Cmd.PackageDepot.ps1') -PathType Leaf | Should -BeTrue
-        Test-Path -LiteralPath (Join-Path $moduleProjectRoot 'Commands\Repository\Eigenverft.Manifested.Sandbox.Cmd.PackageRepository.ps1') -PathType Leaf | Should -BeTrue
+        Test-Path -LiteralPath (Join-Path $moduleProjectRoot 'Commands\Endpoint\Eigenverft.Manifested.Sandbox.Cmd.PackageEndpoint.ps1') -PathType Leaf | Should -BeTrue
         Test-Path -LiteralPath (Join-Path $moduleProjectRoot 'Commands\Module\Eigenverft.Manifested.Sandbox.Cmd.Module.ps1') -PathType Leaf | Should -BeTrue
         Test-Path -LiteralPath (Join-Path $moduleProjectRoot 'Commands\Web\Eigenverft.Manifested.Sandbox.Cmd.InvokeWebRequestEx.ps1') -PathType Leaf | Should -BeTrue
     }
@@ -87,6 +89,11 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - export
             ShimDirectory                       = Join-Path $root 'Shims'
             PackageAssignmentInventoryFilePath            = Join-Path (Join-Path $root 'State') 'PackageAssignmentInventory.json'
             PackageOperationHistoryFilePath     = Join-Path (Join-Path $root 'State') 'PackageOperationHistory.json'
+            LocalEndpointInventoryPath          = Join-Path (Join-Path $root 'Configuration\Internal') 'PackageEndpointInventory.json'
+            LocalDepotInventoryPath             = Join-Path (Join-Path $root 'Configuration\Internal') 'PackageDepotInventory.json'
+            ApplicationRootDirectory            = $root
+            EndpointInventoryInfo               = [pscustomobject]@{ Path = (Join-Path (Join-Path $root 'Configuration\Internal') 'PackageEndpointInventory.json'); Exists = $false; Document = $null }
+            DepotInventoryInfo                  = [pscustomobject]@{ Path = (Join-Path (Join-Path $root 'Configuration\Internal') 'PackageDepotInventory.json'); Exists = $false; Document = $null }
         }
         $sourceInventoryPath = Join-Path (Join-Path $root 'Configuration\External') 'PackageSourceInventory.json'
 
@@ -149,8 +156,8 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - export
         $localRepositoryRoot = Join-Path $root 'PkgRepos'
         $shimDirectory = Join-Path $root 'Shims'
         $installDirectory = Join-Path $installRoot 'vsc-rt\stable\1.0.0\win32-x64'
-        $definitionCandidatePath = Join-Path $localRepositoryRoot 'Candidate\EigenverftModule\VSCodeRuntime.json'
-        $definitionAssignedSnapshotPath = Join-Path $localRepositoryRoot 'Assigned\EigenverftModule\VSCodeRuntime.json'
+        $definitionCandidatePath = Join-Path $localRepositoryRoot 'Candidate\Eigenverft\EigenverftModule\VSCodeRuntime.json'
+        $definitionAssignedSnapshotPath = Join-Path $localRepositoryRoot 'Assigned\Eigenverft\VSCodeRuntime.json'
         $sourceInventoryPath = Join-Path (Join-Path $root 'Configuration\External') 'PackageSourceInventory.json'
 
         $null = New-Item -ItemType Directory -Path $installDirectory -Force
@@ -176,6 +183,11 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - export
             ShimDirectory                       = $shimDirectory
             PackageAssignmentInventoryFilePath            = Join-Path (Join-Path $root 'State') 'PackageAssignmentInventory.json'
             PackageOperationHistoryFilePath     = Join-Path (Join-Path $root 'State') 'PackageOperationHistory.json'
+            LocalEndpointInventoryPath          = Join-Path (Join-Path $root 'Configuration\Internal') 'PackageEndpointInventory.json'
+            LocalDepotInventoryPath             = Join-Path (Join-Path $root 'Configuration\Internal') 'PackageDepotInventory.json'
+            ApplicationRootDirectory            = $root
+            EndpointInventoryInfo               = [pscustomobject]@{ Path = (Join-Path (Join-Path $root 'Configuration\Internal') 'PackageEndpointInventory.json'); Exists = $false; Document = $null }
+            DepotInventoryInfo                  = [pscustomobject]@{ Path = (Join-Path (Join-Path $root 'Configuration\Internal') 'PackageDepotInventory.json'); Exists = $false; Document = $null }
         }
         Write-TestJsonDocument -Path $config.PackageAssignmentInventoryFilePath -Document @{ records = @() }
         Write-TestJsonDocument -Path $config.PackageOperationHistoryFilePath -Document @{ records = @() }
@@ -183,8 +195,8 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - export
         $ownershipRecord = [pscustomobject]@{
             installSlotId    = 'VSCodeRuntime:stable:win32-x64'
             definitionId     = 'VSCodeRuntime'
-            definitionPublisherId = 'EigenverftModule'
-            definitionPublisherName = 'Eigenverft Module'
+            definitionPublisherId = 'Eigenverft'
+            definitionPublisherName = 'Eigenverft'
             definitionRevision = 1
             definitionPublishedAtUtc = '2026-05-13T12:00:00Z'
             definitionRepositorySourceId = 'EigenverftModule'
@@ -214,7 +226,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - export
         }
         $operationRecord = [pscustomobject]@{
             operationId    = 'test-operation'
-            repositoryId   = 'EigenverftModule'
+            repositorySourceId = 'moduleDefaults'
             definitionId   = 'VSCodeRuntime'
             desiredState   = 'Assigned'
             status         = 'Ready'
@@ -265,6 +277,11 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - export
             ShimDirectory                       = Join-Path $root 'Shims'
             PackageAssignmentInventoryFilePath            = Join-Path (Join-Path $root 'State') 'PackageAssignmentInventory.json'
             PackageOperationHistoryFilePath     = Join-Path (Join-Path $root 'State') 'PackageOperationHistory.json'
+            LocalEndpointInventoryPath          = Join-Path (Join-Path $root 'Configuration\Internal') 'PackageEndpointInventory.json'
+            LocalDepotInventoryPath             = Join-Path (Join-Path $root 'Configuration\Internal') 'PackageDepotInventory.json'
+            ApplicationRootDirectory            = $root
+            EndpointInventoryInfo               = [pscustomobject]@{ Path = (Join-Path (Join-Path $root 'Configuration\Internal') 'PackageEndpointInventory.json'); Exists = $false; Document = $null }
+            DepotInventoryInfo                  = [pscustomobject]@{ Path = (Join-Path (Join-Path $root 'Configuration\Internal') 'PackageDepotInventory.json'); Exists = $false; Document = $null }
         }
         $packageInventory = [pscustomobject]@{ Path = $config.PackageAssignmentInventoryFilePath; Records = @([pscustomobject]@{ definitionId = 'VSCodeRuntime' }) }
         $operationHistory = [pscustomobject]@{ Path = $config.PackageOperationHistoryFilePath; Records = @([pscustomobject]@{ definitionId = 'VSCodeRuntime' }) }
@@ -336,3 +353,4 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - export
     }
 
 }
+

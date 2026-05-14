@@ -161,6 +161,7 @@ function global:New-TestPackageGlobalDocument {
         [bool]$AllowFallback = $true,
         [AllowNull()]
         [string]$DepotDistributionMode = 'packageFocused',
+        [string]$RepositoryMaterializationMode = 'packageFocused',
         [string]$ReleaseTrack = 'stable',
         [string]$Strategy = 'latestByVersion',
         [hashtable]$EnvironmentSources = $null
@@ -193,6 +194,11 @@ function global:New-TestPackageGlobalDocument {
                 packageWorkSlotDirectory = $PackageWorkSlotDirectory
             }
             acquisitionEnvironment = $acquisitionEnvironment
+            repositoryEnvironment = @{
+                defaults = @{
+                    repositoryMaterializationMode = $RepositoryMaterializationMode
+                }
+            }
             packageState = @{
                 inventoryFilePath = if ($PSBoundParameters.ContainsKey('PackageAssignmentInventoryFilePath')) { $PackageAssignmentInventoryFilePath } else { '{applicationRootDirectory}/State/PackageAssignmentInventory.json' }
                 operationHistoryFilePath = if ($PSBoundParameters.ContainsKey('PackageOperationHistoryFilePath')) { $PackageOperationHistoryFilePath } else { '{applicationRootDirectory}/State/PackageOperationHistory.json' }
@@ -205,30 +211,55 @@ function global:New-TestPackageGlobalDocument {
     }
 }
 
-function global:New-TestRepositoryInventoryDocument {
+function global:New-TestEndpointInventoryDocument {
     param(
-        [hashtable]$RepositorySources = @{}
+        [hashtable]$EndpointSources = @{}
     )
 
-    $sources = @{
-        EigenverftModule = @{
+    $sources = New-Object System.Collections.Generic.List[object]
+    $sources.Add(@{
+            endpointName   = 'moduleDefaults'
             kind           = 'moduleLocal'
             enabled        = $true
             searchOrder    = 100
-            definitionRoot = 'Repositories/EigenverftModule'
+            definitionRoot = 'Repositories/Eigenverft/ModuleDefaults'
             trusted        = $true
             trustMode      = 'moduleShipped'
-        }
-    }
+        }) | Out-Null
 
-    foreach ($key in @($RepositorySources.Keys)) {
-        $sources[$key] = $RepositorySources[$key]
+    foreach ($key in @($EndpointSources.Keys)) {
+        $source = $EndpointSources[$key]
+        if (-not $source.ContainsKey('endpointName')) {
+            if ($source.ContainsKey('sourceId')) {
+                $source.endpointName = [string]$source.sourceId
+            }
+            else {
+                $source.endpointName = $key
+            }
+        }
+        $sources.Add($source) | Out-Null
     }
 
     return @{
-        inventoryVersion = 1
-        repositorySources = $sources
+        inventoryVersion = 2
+        endpoints = @($sources.ToArray())
     }
+}
+
+function global:Get-TestRepositorySource {
+    param(
+        [Parameter(Mandatory = $true)]
+        [psobject]$Document,
+
+        [Parameter(Mandatory = $true)]
+        [Alias('SourceId')]
+        [string]$EndpointName
+    )
+
+    $rows = if ($Document.PSObject.Properties['endpoints']) { @($Document.endpoints) } else { @() }
+    return @($rows | Where-Object {
+            [string]::Equals([string]$_.endpointName, $EndpointName, [System.StringComparison]::OrdinalIgnoreCase)
+        } | Select-Object -First 1)[0]
 }
 
 function global:Add-TestFilesystemSourceCapabilities {
@@ -498,13 +529,15 @@ function global:New-TestVSCodeDefinitionDocument {
 
         [string]$DefinitionId = 'VSCodeRuntime',
 
-        [string]$PublisherId = 'EigenverftModule',
+        [string]$PublisherId = 'Eigenverft',
 
-        [string]$PublisherName = 'Eigenverft Module',
+        [string]$PublisherName = 'Eigenverft',
 
         [int]$DefinitionRevision = 1,
 
         [string]$PublishedAtUtc = '2026-05-13T12:00:00Z',
+
+        [string]$RepositoryId = 'EigenverftModule',
 
         [string]$UpstreamBaseUri = 'https://update.code.visualstudio.com',
 
@@ -766,7 +799,8 @@ function global:New-TestVSCodeDefinitionDocument {
 
     return @{
         schemaVersion = '1.4'
-        id            = $DefinitionId
+        definitionId  = $DefinitionId
+        repositoryId  = $RepositoryId
         definitionPublication = @{
             publisherId = $PublisherId
             publisherName = $PublisherName
@@ -860,7 +894,7 @@ function global:Write-TestPackageDocuments {
         [object]$DepotInventoryDocument,
 
         [AllowNull()]
-        [object]$RepositoryInventoryDocument,
+        [object]$EndpointInventoryDocument,
 
         [AllowNull()]
         [object]$SourceInventoryDocument
@@ -868,7 +902,7 @@ function global:Write-TestPackageDocuments {
 
     $globalConfigPath = Join-Path $RootPath 'Configuration\Internal\PackageConfig.json'
     $depotInventoryPath = Join-Path $RootPath 'Configuration\Internal\PackageDepotInventory.json'
-    $repositoryInventoryPath = Join-Path $RootPath 'Configuration\Internal\PackageRepositoryInventory.json'
+    $endpointInventoryPath = Join-Path $RootPath 'Configuration\Internal\PackageEndpointInventory.json'
     $repositoryDefinitionsRoot = Join-Path $RootPath 'RepositoryDefinitions'
     $definitionPublisherId = if ($DefinitionDocument.PSObject.Properties['definitionPublication'] -and
         $DefinitionDocument.definitionPublication.PSObject.Properties['publisherId'] -and
@@ -876,18 +910,40 @@ function global:Write-TestPackageDocuments {
         [string]$DefinitionDocument.definitionPublication.publisherId
     }
     else {
-        'EigenverftModule'
+        'Eigenverft'
     }
-    $definitionPath = Join-Path (Join-Path $repositoryDefinitionsRoot $definitionPublisherId) "$($DefinitionDocument.id).json"
+    $definitionWireId = $null
+    if ($DefinitionDocument -is [System.Collections.IDictionary]) {
+        $dictKeys = @($DefinitionDocument.Keys | ForEach-Object { [string]$_ })
+        if ($dictKeys -contains 'definitionId' -and -not [string]::IsNullOrWhiteSpace([string]$DefinitionDocument['definitionId'])) {
+            $definitionWireId = [string]$DefinitionDocument['definitionId']
+        }
+        elseif ($dictKeys -contains 'id' -and -not [string]::IsNullOrWhiteSpace([string]$DefinitionDocument['id'])) {
+            $definitionWireId = [string]$DefinitionDocument['id']
+        }
+    }
+    else {
+        if ($DefinitionDocument.PSObject.Properties['definitionId'] -and -not [string]::IsNullOrWhiteSpace([string]$DefinitionDocument.definitionId)) {
+            $definitionWireId = [string]$DefinitionDocument.definitionId
+        }
+        elseif ($DefinitionDocument.PSObject.Properties['id'] -and -not [string]::IsNullOrWhiteSpace([string]$DefinitionDocument.id)) {
+            $definitionWireId = [string]$DefinitionDocument.id
+        }
+    }
+    if ([string]::IsNullOrWhiteSpace($definitionWireId)) {
+        throw 'Write-TestPackageDocuments requires DefinitionDocument.definitionId (or legacy id).'
+    }
+    $definitionPath = Join-Path (Join-Path $repositoryDefinitionsRoot $definitionPublisherId) "$definitionWireId.json"
     Write-TestJsonDocument -Path $globalConfigPath -Document $GlobalDocument
     if (-not $PSBoundParameters.ContainsKey('DepotInventoryDocument') -or $null -eq $DepotInventoryDocument) {
         $DepotInventoryDocument = New-TestDepotInventoryDocument -DefaultPackageDepotDirectory (Join-Path $RootPath 'PkgDepot')
     }
-    if (-not $PSBoundParameters.ContainsKey('RepositoryInventoryDocument') -or $null -eq $RepositoryInventoryDocument) {
-        $RepositoryInventoryDocument = @{
-            inventoryVersion = 1
-            repositorySources = @{
-                EigenverftModule = @{
+    if (-not $PSBoundParameters.ContainsKey('EndpointInventoryDocument') -or $null -eq $EndpointInventoryDocument) {
+        $EndpointInventoryDocument = @{
+            inventoryVersion = 2
+            endpoints = @(
+                @{
+                    endpointName = 'moduleDefaults'
                     kind = 'filesystem'
                     enabled = $true
                     searchOrder = 100
@@ -895,17 +951,17 @@ function global:Write-TestPackageDocuments {
                     trusted = $true
                     trustMode = 'unsignedExplicit'
                 }
-            }
+            )
         }
     }
     Write-TestJsonDocument -Path $depotInventoryPath -Document $DepotInventoryDocument
-    Write-TestJsonDocument -Path $repositoryInventoryPath -Document $RepositoryInventoryDocument
+    Write-TestJsonDocument -Path $endpointInventoryPath -Document $EndpointInventoryDocument
     Write-TestJsonDocument -Path $definitionPath -Document $DefinitionDocument
 
-    # Repository resolution no longer uses filename-based Get-PackageDefinitionPath.
-    # Keep the bootstrap-local repository inventory aligned for tests that mock
+    # Definition resolution no longer uses filename-based Get-PackageDefinitionPath.
+    # Keep the bootstrap-local PackageEndpointInventory.json aligned for tests that mock
     # PackageConfig.json only.
-    Write-TestJsonDocument -Path (Get-PackageLocalRepositoryInventoryPath) -Document $RepositoryInventoryDocument
+    Write-TestJsonDocument -Path (Get-PackageLocalEndpointInventoryPath) -Document $EndpointInventoryDocument
 
     $sourceInventoryPath = $null
     if ($PSBoundParameters.ContainsKey('SourceInventoryDocument') -and $null -ne $SourceInventoryDocument) {
@@ -914,10 +970,11 @@ function global:Write-TestPackageDocuments {
     }
 
     return [pscustomobject]@{
-        GlobalConfigPath   = $globalConfigPath
-        DepotInventoryPath = $depotInventoryPath
-        RepositoryInventoryPath = $repositoryInventoryPath
-        DefinitionPath     = $definitionPath
-        SourceInventoryPath = $sourceInventoryPath
+        GlobalConfigPath        = $globalConfigPath
+        DepotInventoryPath      = $depotInventoryPath
+        EndpointInventoryPath   = $endpointInventoryPath
+        DefinitionPath          = $definitionPath
+        SourceInventoryPath    = $sourceInventoryPath
     }
 }
+

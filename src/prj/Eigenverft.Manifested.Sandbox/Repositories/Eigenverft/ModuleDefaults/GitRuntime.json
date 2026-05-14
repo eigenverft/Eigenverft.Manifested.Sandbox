@@ -1,35 +1,27 @@
 {
   "$schema": "../../Schema/eigenverft-module-package-definition-1.4.schema.json",
   "schemaVersion": "1.4",
-  "id": "CodexCli",
   "definitionPublication": {
-    "publisherId": "EigenverftModule",
-    "publisherName": "Eigenverft Module",
+    "publisherId": "Eigenverft",
+    "publisherName": "Eigenverft",
     "definitionRevision": 1,
     "publishedAtUtc": "2026-05-13T12:00:00Z"
   },
   "display": {
     "default": {
-      "name": "Codex CLI",
-      "publisher": "OpenAI",
-      "corporation": "OpenAI",
-      "summary": "Pinned Codex CLI npm runtime"
+      "name": "Git for Windows",
+      "publisher": "git-for-windows",
+      "corporation": "git-for-windows",
+      "summary": "Portable MinGit runtime"
     }
   },
-  "dependencies": [
-    {
-      "definitionId": "VisualCppRedistributable"
-    },
-    {
-      "definitionId": "NodeRuntime"
-    }
-  ],
+  "dependencies": [],
   "artifacts": {
     "targets": [
       {
-        "id": "CodexCli-win32-x64-stable",
+        "id": "GitRuntime-64-bit-stable",
         "releaseTrack": "stable",
-        "artifactDistributionVariant": "win32-x64",
+        "artifactDistributionVariant": "64-bit",
         "constraints": {
           "os": [
             "windows"
@@ -41,12 +33,30 @@
         "versionSelection": {
           "strategy": "latestByVersion",
           "allowPrerelease": false
-        }
+        },
+        "fileNameTemplate": "MinGit-{version}-64-bit.zip",
+        "acquisitionCandidates": [
+          {
+            "kind": "packageDepot",
+            "searchOrder": 100,
+            "verification": {
+              "mode": "optional"
+            }
+          },
+          {
+            "kind": "download",
+            "sourceId": "gitForWindowsGitHub",
+            "searchOrder": 900,
+            "verification": {
+              "mode": "required"
+            }
+          }
+        ]
       },
       {
-        "id": "CodexCli-win32-arm64-stable",
+        "id": "GitRuntime-arm64-stable",
         "releaseTrack": "stable",
-        "artifactDistributionVariant": "win32-arm64",
+        "artifactDistributionVariant": "arm64",
         "constraints": {
           "os": [
             "windows"
@@ -58,39 +68,74 @@
         "versionSelection": {
           "strategy": "latestByVersion",
           "allowPrerelease": false
-        }
+        },
+        "fileNameTemplate": "MinGit-{version}-arm64.zip",
+        "acquisitionCandidates": [
+          {
+            "kind": "packageDepot",
+            "searchOrder": 100,
+            "verification": {
+              "mode": "optional"
+            }
+          },
+          {
+            "kind": "download",
+            "sourceId": "gitForWindowsGitHub",
+            "searchOrder": 900,
+            "verification": {
+              "mode": "required"
+            }
+          }
+        ]
       }
     ],
     "releases": [
       {
-        "version": "0.130.0",
+        "version": "2.54.0",
         "releaseTracks": [
           "stable"
         ],
+        "upstreamRelease": {
+          "sourceId": "gitForWindowsGitHub",
+          "releaseTag": "v2.54.0.windows.1"
+        },
         "targetArtifacts": {
-          "CodexCli-win32-x64-stable": {
-            "artifactId": "codex-runtime-win32-x64-stable"
+          "GitRuntime-64-bit-stable": {
+            "artifactId": "git-runtime-win-x64-stable",
+            "contentHash": {
+              "algorithm": "sha256",
+              "value": "04f937e1f0918b17b9be6f2294cb2bb66e96e1d9832d1c298e2de088a1d0e668"
+            }
           },
-          "CodexCli-win32-arm64-stable": {
-            "artifactId": "codex-runtime-win32-arm64-stable"
+          "GitRuntime-arm64-stable": {
+            "artifactId": "git-runtime-win-arm64-stable",
+            "contentHash": {
+              "algorithm": "sha256",
+              "value": "68f6bdda5b58f4e40f431c0da48b05ba5596445314d5e491e7b4aebb1ec2e985"
+            }
           }
         }
       }
     ],
-    "sources": {}
+    "sources": {
+      "gitForWindowsGitHub": {
+        "kind": "githubRelease",
+        "githubOwner": "git-for-windows",
+        "githubRepository": "git"
+      }
+    }
   },
   "presenceDiscovery": {
     "files": [
-      "codex.cmd",
-      "node_modules/@openai/codex/package.json"
+      "cmd/git.exe"
     ],
     "directories": [
-      "node_modules"
+      "cmd"
     ],
     "commands": [
       {
-        "name": "codex",
-        "relativePath": "codex.cmd",
+        "name": "git",
+        "relativePath": "cmd/git.exe",
         "requiredForState": true,
         "exposeCommand": true,
         "stateChecks": [
@@ -98,7 +143,8 @@
             "arguments": [
               "--version"
             ],
-            "outputPattern": "(?m)^(?<value>.+\\S.*)$"
+            "outputPattern": "(?im)^git version\\s+(?<value>\\d+\\.\\d+\\.\\d+)\\b",
+            "expectedValue": "{version}"
           }
         ]
       }
@@ -133,10 +179,10 @@
     },
     "assigned": {
       "install": {
-        "kind": "npmGlobalPackage",
-        "installerCommand": "npm",
-        "packageSpec": "@openai/codex@{version}",
-        "installDirectory": "codex-runtime/{releaseTrack}/{version}/{artifactDistributionVariant}"
+        "kind": "expandArchive",
+        "installDirectory": "git-runtime/{releaseTrack}/{version}/{artifactDistributionVariant}",
+        "expandedRoot": "auto",
+        "createDirectories": []
       },
       "readyStateCheck": {
         "use": "presenceDiscovery",
@@ -198,5 +244,7 @@
         "workDirectories": true
       }
     }
-  }
+  },
+  "definitionId": "GitRuntime",
+  "repositoryId": "EigenverftModule"
 }

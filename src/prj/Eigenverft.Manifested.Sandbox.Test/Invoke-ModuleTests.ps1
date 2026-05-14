@@ -177,3 +177,4 @@ if ([int]$summary.Failed -gt 0) {
     }
     exit 1
 }
+

@@ -51,3 +51,4 @@ Describe 'Eigenverft.Manifested.Sandbox module script analyzer' {
         $errorIssues | Should -BeNullOrEmpty -Because $issueText
     }
 }
+

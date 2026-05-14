@@ -524,7 +524,7 @@ function Assert-PackageDefinitionSchema_1_4 {
         [Parameter(Mandatory = $true)]
         [string]$DefinitionId,
 
-        [string]$DefinitionRepositoryId = (Get-PackageDefaultRepositoryId)
+        [string]$DefinitionRepositoryId = $null
     )
 
     $definition = $DefinitionDocumentInfo.Document
@@ -534,14 +534,24 @@ function Assert-PackageDefinitionSchema_1_4 {
         }
     }
 
-    foreach ($requiredProperty in @('schemaVersion', 'id', 'definitionPublication', 'display', 'dependencies', 'artifacts', 'presenceDiscovery', 'existingInstallDiscovery', 'packageOperations')) {
+    foreach ($retiredProperty in @('id')) {
+        if ($definition.PSObject.Properties[$retiredProperty]) {
+            throw "Package definition '$($DefinitionDocumentInfo.Path)' still uses retired top-level property 'id'. Use 'definitionId' instead."
+        }
+    }
+
+    foreach ($requiredProperty in @('schemaVersion', 'definitionId', 'repositoryId', 'definitionPublication', 'display', 'dependencies', 'artifacts', 'presenceDiscovery', 'existingInstallDiscovery', 'packageOperations')) {
         if (-not $definition.PSObject.Properties[$requiredProperty]) {
             throw "Package definition '$($DefinitionDocumentInfo.Path)' is missing required schemaVersion 1.4 property '$requiredProperty'."
         }
     }
 
-    if (-not [string]::Equals([string]$definition.id, $DefinitionId, [System.StringComparison]::OrdinalIgnoreCase)) {
-        throw "Package definition id '$($definition.id)' does not match expected id '$DefinitionId'."
+    if (-not [string]::Equals([string]$definition.definitionId, $DefinitionId, [System.StringComparison]::OrdinalIgnoreCase)) {
+        throw "Package definition definitionId '$($definition.definitionId)' does not match expected id '$DefinitionId'."
+    }
+
+    if ([string]::IsNullOrWhiteSpace([string]$definition.repositoryId)) {
+        throw "Package definition '$DefinitionId' requires non-empty repositoryId (data-level provenance; not used to select endpoints)."
     }
 
     foreach ($requiredPublicationProperty in @('publisherId', 'publisherName', 'definitionRevision', 'publishedAtUtc')) {
@@ -559,8 +569,13 @@ function Assert-PackageDefinitionSchema_1_4 {
     if (-not [int]::TryParse([string]$definition.definitionPublication.definitionRevision, [ref]$revision) -or $revision -lt 1) {
         throw "Package definition '$DefinitionId' definitionPublication.definitionRevision must be a positive integer."
     }
+    $pubRaw = $definition.definitionPublication.publishedAtUtc
     $publishedAtUtc = [DateTime]::MinValue
-    if (-not [DateTime]::TryParse([string]$definition.definitionPublication.publishedAtUtc, [ref]$publishedAtUtc)) {
+    if ($pubRaw -is [datetime]) {
+        $publishedAtUtc = [datetime]$pubRaw
+    }
+    elseif (-not [DateTime]::TryParse([string]$pubRaw, [CultureInfo]::InvariantCulture, [System.Globalization.DateTimeStyles]::RoundtripKind, [ref]$publishedAtUtc) -and
+        -not [DateTime]::TryParse([string]$pubRaw, [ref]$publishedAtUtc)) {
         throw "Package definition '$DefinitionId' definitionPublication.publishedAtUtc must be a valid UTC timestamp."
     }
 
@@ -597,8 +612,11 @@ function Assert-PackageDefinitionSchema_1_4 {
         if ($null -eq $dependency) {
             continue
         }
-        if ($dependency.PSObject.Properties['repositoryId'] -and [string]::IsNullOrWhiteSpace([string]$dependency.repositoryId)) {
-            throw "Package definition '$DefinitionId' has dependency with empty repositoryId."
+        if ($dependency.PSObject.Properties['repositoryId']) {
+            throw "Package definition '$DefinitionId' dependency still uses retired property 'repositoryId'. Use 'repositorySourceId'."
+        }
+        if ($dependency.PSObject.Properties['repositorySourceId'] -and [string]::IsNullOrWhiteSpace([string]$dependency.repositorySourceId)) {
+            throw "Package definition '$DefinitionId' has dependency with empty repositorySourceId."
         }
         if (-not $dependency.PSObject.Properties['definitionId'] -or [string]::IsNullOrWhiteSpace([string]$dependency.definitionId)) {
             throw "Package definition '$DefinitionId' has dependency without definitionId."
@@ -951,7 +969,7 @@ function Resolve-PackageEffectivePackage_1_4 {
         [string]$artifact.artifactId
     }
     else {
-        '{0}-{1}-{2}' -f [string]$definition.id, [string]$target.id, [string]$versionEntry.version
+        '{0}-{1}-{2}' -f [string]$definition.definitionId, [string]$target.id, [string]$versionEntry.version
     }
 
     return [pscustomobject]@{

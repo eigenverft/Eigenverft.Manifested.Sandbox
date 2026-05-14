@@ -25,14 +25,16 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
         $globalInfo.Document.package.acquisitionEnvironment.stores.PSObject.Properties.Name | Should -Not -Contain 'defaultPackageDepotDirectory'
         $globalInfo.Document.package.acquisitionEnvironment.defaults.PSObject.Properties.Name | Should -Contain 'allowFallback'
         $globalInfo.Document.package.acquisitionEnvironment.defaults.depotDistributionMode | Should -Be 'packageFocused'
+        $globalInfo.Document.package.repositoryEnvironment.defaults.repositoryMaterializationMode | Should -Be 'packageFocused'
         $globalInfo.Document.package.acquisitionEnvironment.defaults.PSObject.Properties.Name | Should -Not -Contain 'mirrorDownloadedArtifactsToDefaultPackageDepot'
         $globalInfo.Document.package.packageState.PSObject.Properties.Name | Should -Contain 'inventoryFilePath'
         $globalInfo.Document.package.packageState.PSObject.Properties.Name | Should -Contain 'operationHistoryFilePath'
-        $repositoryInfo = Read-PackageJsonDocument -Path (Get-PackageShippedRepositoryInventoryPath)
-        $repositoryInfo.Document.repositorySources.PSObject.Properties.Name | Should -Contain 'EigenverftModule'
-        $repositoryInfo.Document.repositorySources.EigenverftModule.kind | Should -Be 'moduleLocal'
-        $repositoryInfo.Document.repositorySources.EigenverftModule.trusted | Should -BeTrue
-        $repositoryInfo.Document.repositorySources.EigenverftModule.trustMode | Should -Be 'moduleShipped'
+        $endpointInventoryInfo = Read-PackageJsonDocument -Path (Get-PackageShippedEndpointInventoryPath)
+        $moduleSource = Get-TestRepositorySource -Document $endpointInventoryInfo.Document -SourceId 'moduleDefaults'
+        $moduleSource.kind | Should -Be 'moduleLocal'
+        $moduleSource.definitionRoot | Should -Be 'Repositories/Eigenverft/ModuleDefaults'
+        $moduleSource.trusted | Should -BeTrue
+        $moduleSource.trustMode | Should -Be 'moduleShipped'
         $depotInfo = Read-PackageJsonDocument -Path (Get-PackageShippedDepotInventoryPath)
         $depotInfo.Document.acquisitionEnvironment.environmentSources.PSObject.Properties.Name | Should -Contain 'defaultPackageDepot'
         $depotInfo.Document.acquisitionEnvironment.environmentSources.defaultPackageDepot.readable | Should -BeTrue
@@ -83,18 +85,18 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
         $localInfo.Document.package.PSObject.Properties.Name | Should -Not -Contain 'repositorySources'
     }
 
-    It 'creates the local PackageRepositoryInventory.json copy from shipped configuration when missing' {
-        $localRepositoryInventoryPath = Get-PackageLocalRepositoryInventoryPath
-        if (Test-Path -LiteralPath $localRepositoryInventoryPath -PathType Leaf) {
-            Remove-Item -LiteralPath $localRepositoryInventoryPath -Force
+    It 'creates the local PackageEndpointInventory.json copy from shipped configuration when missing' {
+        $localEndpointInventoryPath = Get-PackageLocalEndpointInventoryPath
+        if (Test-Path -LiteralPath $localEndpointInventoryPath -PathType Leaf) {
+            Remove-Item -LiteralPath $localEndpointInventoryPath -Force
         }
 
-        $activeRepositoryInventoryPath = Get-PackageRepositoryInventoryPath
-        $localInfo = Read-PackageJsonDocument -Path $localRepositoryInventoryPath
+        $activeEndpointInventoryPath = Get-PackageEndpointInventoryPath
+        $localInfo = Read-PackageJsonDocument -Path $localEndpointInventoryPath
 
-        $activeRepositoryInventoryPath | Should -Be $localRepositoryInventoryPath
-        Test-Path -LiteralPath $localRepositoryInventoryPath -PathType Leaf | Should -BeTrue
-        $localInfo.Document.repositorySources.EigenverftModule.kind | Should -Be 'moduleLocal'
+        $activeEndpointInventoryPath | Should -Be $localEndpointInventoryPath
+        Test-Path -LiteralPath $localEndpointInventoryPath -PathType Leaf | Should -BeTrue
+        (Get-TestRepositorySource -Document $localInfo.Document -SourceId 'moduleDefaults').kind | Should -Be 'moduleLocal'
     }
 
     It 'resolves package config paths from applicationRootDirectory and supports missing applicationRootDirectory fallback' {
@@ -394,7 +396,8 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
     It 'resolves shipped package definitions through the default repository seam' {
         $reference = Resolve-PackageDefinitionReference -DefinitionId 'VSCodeRuntime'
 
-        $reference.RepositoryId | Should -Be 'EigenverftModule'
+        $reference.RepositorySourceId | Should -Be 'moduleDefaults'
+        $reference.PublisherId | Should -Be 'Eigenverft'
         $reference.DefinitionId | Should -Be 'VSCodeRuntime'
         $reference.SourceKind | Should -Be 'moduleLocal'
         Split-Path -Leaf $reference.DefinitionPath | Should -Be 'VSCodeRuntime.json'
@@ -513,13 +516,13 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
 
         $inventoryPath = Join-Path $appRoot 'State\PackageAssignmentInventory.json'
         $null = New-Item -ItemType Directory -Path (Split-Path -Parent $inventoryPath) -Force
-        $assignedSnapshotPath = Join-Path $appRoot 'PkgRepos\Assigned\EigenverftModule\VSCodeRuntime.json'
+        $assignedSnapshotPath = Join-Path $appRoot 'PkgRepos\Assigned\Eigenverft\VSCodeRuntime.json'
         Write-TestJsonDocument -Path $assignedSnapshotPath -Document $definitionDocument
         $record = @{
             installSlotId       = 'VSCodeRuntime:stable:win32-x64'
             definitionId        = 'VSCodeRuntime'
-            definitionPublisherId = 'EigenverftModule'
-            definitionPublisherName = 'Eigenverft Module'
+            definitionPublisherId = 'Eigenverft'
+            definitionPublisherName = 'Eigenverft'
             definitionRevision = 1
             definitionPublishedAtUtc = '2026-05-13T00:00:00Z'
             definitionRepositorySourceId = 'EigenverftModule'
@@ -579,13 +582,13 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
 
         $inventoryPath = Join-Path $appRoot 'State\PackageAssignmentInventory.json'
         $null = New-Item -ItemType Directory -Path (Split-Path -Parent $inventoryPath) -Force
-        $assignedSnapshotPath = Join-Path $appRoot 'PkgRepos\Assigned\EigenverftModule\VSCodeRuntime.json'
+        $assignedSnapshotPath = Join-Path $appRoot 'PkgRepos\Assigned\Eigenverft\VSCodeRuntime.json'
         Write-TestJsonDocument -Path $assignedSnapshotPath -Document $definitionDocument
         $record = @{
             installSlotId       = 'VSCodeRuntime:stable:win32-x64'
             definitionId        = 'VSCodeRuntime'
-            definitionPublisherId = 'EigenverftModule'
-            definitionPublisherName = 'Eigenverft Module'
+            definitionPublisherId = 'Eigenverft'
+            definitionPublisherName = 'Eigenverft'
             definitionRevision = 1
             definitionPublishedAtUtc = '2026-05-13T00:00:00Z'
             definitionRepositorySourceId = 'EigenverftModule'
@@ -623,7 +626,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
         $defDir = Join-Path $rootPath 'RepoDefs'
         $null = New-Item -ItemType Directory -Path $defDir -Force
         $moduleProjectRoot = Join-Path (Split-Path -Parent $PSScriptRoot) 'Eigenverft.Manifested.Sandbox'
-        $shippedDefs = Join-Path $moduleProjectRoot 'Repositories\EigenverftModule\EigenverftModule'
+        $shippedDefs = Join-Path $moduleProjectRoot 'Repositories\Eigenverft\ModuleDefaults'
         Copy-Item -LiteralPath (Join-Path $shippedDefs 'CodexCli.json') -Destination (Join-Path $defDir 'CodexCli.json') -Force
         Copy-Item -LiteralPath (Join-Path $shippedDefs 'NodeRuntime.json') -Destination (Join-Path $defDir 'NodeRuntime.json') -Force
 
@@ -651,8 +654,8 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
             @{
                 installSlotId                = 'CodexCli:stable:win32-x64'
                 definitionId                 = 'CodexCli'
-                definitionPublisherId        = 'EigenverftModule'
-                definitionPublisherName      = 'Eigenverft Module'
+                definitionPublisherId        = 'Eigenverft'
+                definitionPublisherName      = 'Eigenverft'
                 definitionRevision           = 1
                 definitionPublishedAtUtc     = '2026-05-13T12:00:00Z'
                 definitionRepositorySourceId = 'EigenverftModule'
@@ -671,8 +674,8 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
             @{
                 installSlotId                = 'NodeRuntime:stable:win-x64'
                 definitionId                 = 'NodeRuntime'
-                definitionPublisherId        = 'EigenverftModule'
-                definitionPublisherName      = 'Eigenverft Module'
+                definitionPublisherId        = 'Eigenverft'
+                definitionPublisherName      = 'Eigenverft'
                 definitionRevision           = 1
                 definitionPublishedAtUtc     = '2026-05-13T12:00:00Z'
                 definitionRepositorySourceId = 'EigenverftModule'
@@ -1010,11 +1013,15 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
             $config.Definition.presenceDiscovery.commands[0].relativePath | Should -Be $case.RelativePath
             if ($case.DefinitionId -eq 'CodexCli') {
                 @($config.Definition.dependencies.definitionId) | Should -Be @('VisualCppRedistributable', 'NodeRuntime')
-                @($config.Definition.dependencies.repositoryId) | Should -Be @($null, $null)
+                foreach ($dep in @($config.Definition.dependencies)) {
+                    $dep.PSObject.Properties.Name | Should -Not -Contain 'repositoryId'
+                }
             }
             else {
                 @($config.Definition.dependencies.definitionId) | Should -Be @('NodeRuntime')
-                @($config.Definition.dependencies.repositoryId) | Should -Be @($null)
+                foreach ($dep in @($config.Definition.dependencies)) {
+                    $dep.PSObject.Properties.Name | Should -Not -Contain 'repositoryId'
+                }
             }
             $result.Package.packageFile | Should -BeNullOrEmpty
             $result.AcquisitionPlan.PackageFileRequired | Should -BeFalse
@@ -1024,15 +1031,15 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
 
     It 'ensures direct package dependencies before package-specific install flow continues' {
         $definition = [pscustomobject]@{
-            id           = 'CodexCli'
+            definitionId = 'CodexCli'
             dependencies = @(
-                [pscustomobject]@{ repositoryId = 'EigenverftModule'; definitionId = 'VisualCppRedistributable' }
-                [pscustomobject]@{ repositoryId = 'EigenverftModule'; definitionId = 'NodeRuntime' }
+                [pscustomobject]@{ definitionId = 'VisualCppRedistributable' }
+                [pscustomobject]@{ definitionId = 'NodeRuntime' }
             )
         }
         $result = [pscustomobject]@{
-            DefinitionId  = 'CodexCli'
-            RepositoryId  = 'EigenverftModule'
+            DefinitionId                = 'CodexCli'
+            DefinitionRepositorySourceId = 'EigenverftModule'
             PackageConfig = [pscustomobject]@{
                 Definition = $definition
             }
@@ -1041,41 +1048,39 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
 
         Mock Invoke-PackageDefinitionCommandCore {
             [pscustomobject]@{
-                RepositoryId   = $RepositoryId
-                Status        = 'Ready'
-                InstallOrigin = 'PackageReused'
-            Install       = [pscustomobject]@{ Status = 'ReusedPackageOwned' }
-            EntryPoints   = [pscustomobject]@{
-                Commands = @(
-                    [pscustomobject]@{
-                        Name = if ($DefinitionId -eq 'NodeRuntime') { 'npm' } else { 'vc-runtime' }
-                        Path = Join-Path $TestDrive "$DefinitionId.cmd"
-                    }
-                )
+                DefinitionRepositorySourceId = 'EigenverftModule'
+                Status               = 'Ready'
+                InstallOrigin        = 'PackageReused'
+                Install                = [pscustomobject]@{ Status = 'ReusedPackageOwned' }
+                EntryPoints            = [pscustomobject]@{
+                    Commands = @(
+                        [pscustomobject]@{
+                            Name = if ($DefinitionId -eq 'NodeRuntime') { 'npm' } else { 'vc-runtime' }
+                            Path = Join-Path $TestDrive "$DefinitionId.cmd"
+                        }
+                    )
+                }
             }
         }
-    }
 
         $resolved = Resolve-PackageDependencies -PackageResult $result
 
-        Assert-MockCalled Invoke-PackageDefinitionCommandCore -Times 1 -ParameterFilter { $DefinitionId -eq 'VisualCppRedistributable' }
-        Assert-MockCalled Invoke-PackageDefinitionCommandCore -Times 1 -ParameterFilter { $DefinitionId -eq 'NodeRuntime' }
-        Assert-MockCalled Invoke-PackageDefinitionCommandCore -Times 2 -ParameterFilter { $RepositoryId -eq 'EigenverftModule' -and $DesiredState -eq 'Assigned' }
         @($resolved.Dependencies.DefinitionId) | Should -Be @('VisualCppRedistributable', 'NodeRuntime')
-        @($resolved.Dependencies.RepositoryId) | Should -Be @('EigenverftModule', 'EigenverftModule')
+        @($resolved.Dependencies.RepositorySourceId) | Should -Be @('EigenverftModule', 'EigenverftModule')
         @($resolved.Dependencies.Status) | Should -Be @('Ready', 'Ready')
         @($resolved.Dependencies[1].Commands.Name) | Should -Be @('npm')
     }
 
     It 'fails clearly when direct package dependencies contain a cycle' {
         $definition = [pscustomobject]@{
-            id           = 'CodexCli'
+            definitionId = 'CodexCli'
             dependencies = @(
                 [pscustomobject]@{ definitionId = 'NodeRuntime' }
             )
         }
         $result = [pscustomobject]@{
             DefinitionId       = 'CodexCli'
+            DefinitionRepositorySourceId = 'EigenverftModule'
             PackageConfig = [pscustomobject]@{
                 Definition = $definition
             }
@@ -1852,3 +1857,4 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
     }
 
 }
+

@@ -144,8 +144,8 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - resour
         $record = $savedDocument.Document.records[0]
 
         $record.installSlotId | Should -Be 'VSCodeRuntime:stable:win32-x64'
-        $record.definitionPublisherId | Should -Be 'EigenverftModule'
-        $record.definitionPublisherName | Should -Be 'Eigenverft Module'
+        $record.definitionPublisherId | Should -Be 'Eigenverft'
+        $record.definitionPublisherName | Should -Be 'Eigenverft'
         $record.definitionRevision | Should -Be 1
         $record.definitionRepositorySourceId | Should -Be 'EigenverftModule'
         $record.definitionSourceKind | Should -Be 'filesystem'
@@ -157,7 +157,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - resour
         $record.definitionAssignedSnapshotHash | Should -Not -BeNullOrEmpty
         $record.definitionResolvedAtUtc | Should -Not -BeNullOrEmpty
         Test-Path -LiteralPath $record.definitionAssignedSnapshotPath -PathType Leaf | Should -BeTrue
-        (Read-PackageJsonDocument -Path $record.definitionAssignedSnapshotPath).Document.id | Should -Be 'VSCodeRuntime'
+        (Read-PackageJsonDocument -Path $record.definitionAssignedSnapshotPath).Document.definitionId | Should -Be 'VSCodeRuntime'
         $record.currentReleaseId | Should -Be 'vsCode-win-x64-stable'
         $record.currentVersion | Should -Be '3.0.0'
         $record.installDirectory | Should -Be $installRoot
@@ -182,3 +182,4 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - resour
         @($config.EnvironmentSources.PSObject.Properties.Name) | Should -Be @('defaultPackageDepot')
     }
 }
+

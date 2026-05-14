@@ -1,28 +1,27 @@
 {
   "$schema": "../../Schema/eigenverft-module-package-definition-1.4.schema.json",
   "schemaVersion": "1.4",
-  "id": "Qwen35_9B_Q6_K_Model",
   "definitionPublication": {
-    "publisherId": "EigenverftModule",
-    "publisherName": "Eigenverft Module",
+    "publisherId": "Eigenverft",
+    "publisherName": "Eigenverft",
     "definitionRevision": 1,
     "publishedAtUtc": "2026-05-13T12:00:00Z"
   },
   "display": {
     "default": {
-      "name": "Qwen 3.5 9B Q6_K",
-      "publisher": "Unsloth",
-      "corporation": "Unsloth AI",
-      "summary": "Quantized GGUF model resource for llama.cpp-compatible runtimes"
+      "name": "Cursor Agent CLI",
+      "publisher": "Anysphere",
+      "corporation": "Anysphere",
+      "summary": "Pinned Cursor Agent CLI (portable Windows bundle from Cursor lab CDN)"
     }
   },
   "dependencies": [],
   "artifacts": {
     "targets": [
       {
-        "id": "Qwen35_9B_Q6_K_Model-q6-k-stable",
+        "id": "CursorCli-win32-x64-stable",
         "releaseTrack": "stable",
-        "artifactDistributionVariant": "q6-k",
+        "artifactDistributionVariant": "win32-x64",
         "constraints": {
           "os": [
             "windows"
@@ -35,20 +34,56 @@
           "strategy": "latestByVersion",
           "allowPrerelease": false
         },
-        "fileNameTemplate": "Qwen3.5-9B-Q6_K.gguf",
+        "fileNameTemplate": "agent-cli-package-{version}-{artifactDistributionVariant}.zip",
         "acquisitionCandidates": [
           {
             "kind": "packageDepot",
             "searchOrder": 100,
             "verification": {
-              "mode": "required"
+              "mode": "optional"
             }
           },
           {
             "kind": "download",
-            "sourceId": "huggingFaceDownload",
+            "sourceId": "cursorAgentCliLab",
+            "sourcePath": "{version}/windows/x64/agent-cli-package.zip",
             "searchOrder": 900,
-            "sourcePath": "Qwen3.5-9B-Q6_K.gguf",
+            "verification": {
+              "mode": "required"
+            }
+          }
+        ]
+      },
+      {
+        "id": "CursorCli-win32-arm64-stable",
+        "releaseTrack": "stable",
+        "artifactDistributionVariant": "win32-arm64",
+        "constraints": {
+          "os": [
+            "windows"
+          ],
+          "cpu": [
+            "arm64"
+          ]
+        },
+        "versionSelection": {
+          "strategy": "latestByVersion",
+          "allowPrerelease": false
+        },
+        "fileNameTemplate": "agent-cli-package-{version}-{artifactDistributionVariant}.zip",
+        "acquisitionCandidates": [
+          {
+            "kind": "packageDepot",
+            "searchOrder": 100,
+            "verification": {
+              "mode": "optional"
+            }
+          },
+          {
+            "kind": "download",
+            "sourceId": "cursorAgentCliLab",
+            "sourcePath": "{version}/windows/arm64/agent-cli-package.zip",
+            "searchOrder": 900,
             "verification": {
               "mode": "required"
             }
@@ -58,34 +93,58 @@
     ],
     "releases": [
       {
-        "version": "3.5.0",
+        "version": "2026.05.09-0afadcc",
         "releaseTracks": [
           "stable"
         ],
         "targetArtifacts": {
-          "Qwen35_9B_Q6_K_Model-q6-k-stable": {
-            "artifactId": "qwen35-9b-q6-k-stable",
+          "CursorCli-win32-x64-stable": {
+            "artifactId": "cursor-cli-runtime-win32-x64-stable",
             "contentHash": {
               "algorithm": "sha256",
-              "value": "91898433cf5ce0a8f45516a4cc3e9343b6e01d052d01f684309098c66a326c59"
+              "value": "9acfc6043f021508bb91badc8b8d6c34ef00bd3389907d8930514f1c8b52f03c"
+            }
+          },
+          "CursorCli-win32-arm64-stable": {
+            "artifactId": "cursor-cli-runtime-win32-arm64-stable",
+            "contentHash": {
+              "algorithm": "sha256",
+              "value": "9b622fb0d7f51f8e1bfa5dcb840a5c5eaaf4829fda588e653fc04e3c83dbd1ac"
             }
           }
         }
       }
     ],
     "sources": {
-      "huggingFaceDownload": {
+      "cursorAgentCliLab": {
         "kind": "download",
-        "baseUri": "https://huggingface.co/unsloth/Qwen3.5-9B-GGUF/resolve/main/"
+        "baseUri": "https://downloads.cursor.com/lab/"
       }
     }
   },
   "presenceDiscovery": {
     "files": [
-      "Qwen3.5-9B-Q6_K.gguf"
+      "cursor-agent.cmd",
+      "node.exe"
     ],
     "directories": [],
-    "commands": [],
+    "commands": [
+      {
+        "name": "agent",
+        "relativePath": "cursor-agent.cmd",
+        "requiredForState": true,
+        "exposeCommand": true,
+        "stateChecks": [
+          {
+            "arguments": [
+              "--version"
+            ],
+            "outputPattern": "(?m)^(?<value>\\S+)\\s*$",
+            "expectedValue": "{version}"
+          }
+        ]
+      }
+    ],
     "apps": [],
     "metadataFiles": [],
     "signatures": [],
@@ -102,24 +161,24 @@
       "ownershipPolicy": {
         "allowAdoptExternal": false,
         "upgradeAdoptedInstall": false,
-        "requirePackageOwnership": false
+        "requirePackageOwnership": true
       },
       "compatibility": {
         "checks": [
           {
-            "kind": "physicalOrVideoMemoryGiB",
+            "kind": "osVersion",
             "operator": ">=",
-            "value": 16,
-            "onFail": "warn"
+            "value": "10.0"
           }
         ]
       }
     },
     "assigned": {
       "install": {
-        "kind": "placePackageFile",
-        "installDirectory": "qwen35-9b/{releaseTrack}/{version}/{artifactDistributionVariant}",
-        "targetRelativePath": "Qwen3.5-9B-Q6_K.gguf"
+        "kind": "expandArchive",
+        "installDirectory": "cursor-cli-runtime/{releaseTrack}/{version}/{artifactDistributionVariant}",
+        "expandedRoot": "dist-package",
+        "createDirectories": []
       },
       "readyStateCheck": {
         "use": "presenceDiscovery",
@@ -127,7 +186,7 @@
         "require": {
           "files": true,
           "directories": false,
-          "commands": false,
+          "commands": true,
           "apps": false,
           "metadataFiles": false,
           "signatures": false,
@@ -136,7 +195,11 @@
         }
       },
       "pathRegistration": {
-        "mode": "none"
+        "mode": "user",
+        "source": {
+          "kind": "shim",
+          "use": "presenceDiscovery.commands"
+        }
       },
       "versionUpdatePolicy": {
         "whenAssigned": "trackSelectedVersion",
@@ -177,5 +240,7 @@
         "workDirectories": true
       }
     }
-  }
+  },
+  "definitionId": "CursorCli",
+  "repositoryId": "EigenverftModule"
 }

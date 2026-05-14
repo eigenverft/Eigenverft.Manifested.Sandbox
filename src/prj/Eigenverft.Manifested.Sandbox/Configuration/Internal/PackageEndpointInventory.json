@@ -1,0 +1,23 @@
+{
+  "inventoryVersion": 4,
+  "endpoints": [
+    {
+      "endpointName": "moduleDefaults",
+      "kind": "moduleLocal",
+      "enabled": true,
+      "searchOrder": 100,
+      "definitionRoot": "Repositories/Eigenverft/ModuleDefaults",
+      "trusted": true,
+      "trustMode": "moduleShipped"
+    },
+    {
+      "endpointName": "corpPackageRepository",
+      "kind": "filesystem",
+      "enabled": false,
+      "searchOrder": 300,
+      "basePath": "\\\\corp-share\\PackageRepository",
+      "trusted": false,
+      "trustMode": "unsigned"
+    }
+  ]
+}

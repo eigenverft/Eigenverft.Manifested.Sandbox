@@ -1,26 +1,29 @@
 {
   "$schema": "../../Schema/eigenverft-module-package-definition-1.4.schema.json",
   "schemaVersion": "1.4",
-  "id": "CursorCli",
   "definitionPublication": {
-    "publisherId": "EigenverftModule",
-    "publisherName": "Eigenverft Module",
+    "publisherId": "Eigenverft",
+    "publisherName": "Eigenverft",
     "definitionRevision": 1,
     "publishedAtUtc": "2026-05-13T12:00:00Z"
   },
   "display": {
     "default": {
-      "name": "Cursor Agent CLI",
-      "publisher": "Anysphere",
-      "corporation": "Anysphere",
-      "summary": "Pinned Cursor Agent CLI (portable Windows bundle from Cursor lab CDN)"
+      "name": "OpenCode CLI",
+      "publisher": "SST",
+      "corporation": "SST",
+      "summary": "Pinned OpenCode CLI npm runtime"
     }
   },
-  "dependencies": [],
+  "dependencies": [
+    {
+      "definitionId": "NodeRuntime"
+    }
+  ],
   "artifacts": {
     "targets": [
       {
-        "id": "CursorCli-win32-x64-stable",
+        "id": "OpenCodeCli-win32-x64-stable",
         "releaseTrack": "stable",
         "artifactDistributionVariant": "win32-x64",
         "constraints": {
@@ -34,29 +37,10 @@
         "versionSelection": {
           "strategy": "latestByVersion",
           "allowPrerelease": false
-        },
-        "fileNameTemplate": "agent-cli-package-{version}-{artifactDistributionVariant}.zip",
-        "acquisitionCandidates": [
-          {
-            "kind": "packageDepot",
-            "searchOrder": 100,
-            "verification": {
-              "mode": "optional"
-            }
-          },
-          {
-            "kind": "download",
-            "sourceId": "cursorAgentCliLab",
-            "sourcePath": "{version}/windows/x64/agent-cli-package.zip",
-            "searchOrder": 900,
-            "verification": {
-              "mode": "required"
-            }
-          }
-        ]
+        }
       },
       {
-        "id": "CursorCli-win32-arm64-stable",
+        "id": "OpenCodeCli-win32-arm64-stable",
         "releaseTrack": "stable",
         "artifactDistributionVariant": "win32-arm64",
         "constraints": {
@@ -70,69 +54,39 @@
         "versionSelection": {
           "strategy": "latestByVersion",
           "allowPrerelease": false
-        },
-        "fileNameTemplate": "agent-cli-package-{version}-{artifactDistributionVariant}.zip",
-        "acquisitionCandidates": [
-          {
-            "kind": "packageDepot",
-            "searchOrder": 100,
-            "verification": {
-              "mode": "optional"
-            }
-          },
-          {
-            "kind": "download",
-            "sourceId": "cursorAgentCliLab",
-            "sourcePath": "{version}/windows/arm64/agent-cli-package.zip",
-            "searchOrder": 900,
-            "verification": {
-              "mode": "required"
-            }
-          }
-        ]
+        }
       }
     ],
     "releases": [
       {
-        "version": "2026.05.09-0afadcc",
+        "version": "1.14.46",
         "releaseTracks": [
           "stable"
         ],
         "targetArtifacts": {
-          "CursorCli-win32-x64-stable": {
-            "artifactId": "cursor-cli-runtime-win32-x64-stable",
-            "contentHash": {
-              "algorithm": "sha256",
-              "value": "9acfc6043f021508bb91badc8b8d6c34ef00bd3389907d8930514f1c8b52f03c"
-            }
+          "OpenCodeCli-win32-x64-stable": {
+            "artifactId": "opencode-runtime-win32-x64-stable"
           },
-          "CursorCli-win32-arm64-stable": {
-            "artifactId": "cursor-cli-runtime-win32-arm64-stable",
-            "contentHash": {
-              "algorithm": "sha256",
-              "value": "9b622fb0d7f51f8e1bfa5dcb840a5c5eaaf4829fda588e653fc04e3c83dbd1ac"
-            }
+          "OpenCodeCli-win32-arm64-stable": {
+            "artifactId": "opencode-runtime-win32-arm64-stable"
           }
         }
       }
     ],
-    "sources": {
-      "cursorAgentCliLab": {
-        "kind": "download",
-        "baseUri": "https://downloads.cursor.com/lab/"
-      }
-    }
+    "sources": {}
   },
   "presenceDiscovery": {
     "files": [
-      "cursor-agent.cmd",
-      "node.exe"
+      "opencode.cmd",
+      "node_modules/opencode-ai/package.json"
     ],
-    "directories": [],
+    "directories": [
+      "node_modules"
+    ],
     "commands": [
       {
-        "name": "agent",
-        "relativePath": "cursor-agent.cmd",
+        "name": "opencode",
+        "relativePath": "opencode.cmd",
         "requiredForState": true,
         "exposeCommand": true,
         "stateChecks": [
@@ -140,8 +94,7 @@
             "arguments": [
               "--version"
             ],
-            "outputPattern": "(?m)^(?<value>\\S+)\\s*$",
-            "expectedValue": "{version}"
+            "outputPattern": "(?m)^(?<value>.+\\S.*)$"
           }
         ]
       }
@@ -176,17 +129,17 @@
     },
     "assigned": {
       "install": {
-        "kind": "expandArchive",
-        "installDirectory": "cursor-cli-runtime/{releaseTrack}/{version}/{artifactDistributionVariant}",
-        "expandedRoot": "dist-package",
-        "createDirectories": []
+        "kind": "npmGlobalPackage",
+        "installerCommand": "npm",
+        "packageSpec": "opencode-ai@{version}",
+        "installDirectory": "opencode-runtime/{releaseTrack}/{version}/{artifactDistributionVariant}"
       },
       "readyStateCheck": {
         "use": "presenceDiscovery",
         "expectedVersion": "{version}",
         "require": {
           "files": true,
-          "directories": false,
+          "directories": true,
           "commands": true,
           "apps": false,
           "metadataFiles": false,
@@ -241,5 +194,7 @@
         "workDirectories": true
       }
     }
-  }
+  },
+  "definitionId": "OpenCodeCli",
+  "repositoryId": "EigenverftModule"
 }

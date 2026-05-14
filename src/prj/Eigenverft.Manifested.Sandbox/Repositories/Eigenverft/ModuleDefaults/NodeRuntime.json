@@ -1,26 +1,25 @@
 {
   "$schema": "../../Schema/eigenverft-module-package-definition-1.4.schema.json",
   "schemaVersion": "1.4",
-  "id": "PythonRuntime",
   "definitionPublication": {
-    "publisherId": "EigenverftModule",
-    "publisherName": "Eigenverft Module",
+    "publisherId": "Eigenverft",
+    "publisherName": "Eigenverft",
     "definitionRevision": 1,
     "publishedAtUtc": "2026-05-13T12:00:00Z"
   },
   "display": {
     "default": {
-      "name": "Python",
-      "publisher": "Python Software Foundation",
-      "corporation": "Python Software Foundation",
-      "summary": "Portable Python runtime from the official NuGet package"
+      "name": "Node.js",
+      "publisher": "OpenJS Foundation",
+      "corporation": "OpenJS Foundation",
+      "summary": "Portable Node.js runtime"
     }
   },
   "dependencies": [],
   "artifacts": {
     "targets": [
       {
-        "id": "PythonRuntime-win-x64-stable",
+        "id": "NodeRuntime-win-x64-stable",
         "releaseTrack": "stable",
         "artifactDistributionVariant": "win-x64",
         "constraints": {
@@ -35,7 +34,7 @@
           "strategy": "latestByVersion",
           "allowPrerelease": false
         },
-        "fileNameTemplate": "python.{version}.nupkg",
+        "fileNameTemplate": "node-v{version}-win-x64.zip",
         "acquisitionCandidates": [
           {
             "kind": "packageDepot",
@@ -46,8 +45,8 @@
           },
           {
             "kind": "download",
-            "sourceId": "pythonNuGetPackage",
-            "sourcePath": "python/{version}/python.{version}.nupkg",
+            "sourceId": "nodeJsRelease",
+            "sourcePath": "v{version}/node-v{version}-win-x64.zip",
             "searchOrder": 900,
             "verification": {
               "mode": "required"
@@ -56,7 +55,7 @@
         ]
       },
       {
-        "id": "PythonRuntime-win-arm64-stable",
+        "id": "NodeRuntime-win-arm64-stable",
         "releaseTrack": "stable",
         "artifactDistributionVariant": "win-arm64",
         "constraints": {
@@ -71,7 +70,7 @@
           "strategy": "latestByVersion",
           "allowPrerelease": false
         },
-        "fileNameTemplate": "pythonarm64.{version}.nupkg",
+        "fileNameTemplate": "node-v{version}-win-arm64.zip",
         "acquisitionCandidates": [
           {
             "kind": "packageDepot",
@@ -82,8 +81,8 @@
           },
           {
             "kind": "download",
-            "sourceId": "pythonNuGetPackage",
-            "sourcePath": "pythonarm64/{version}/pythonarm64.{version}.nupkg",
+            "sourceId": "nodeJsRelease",
+            "sourcePath": "v{version}/node-v{version}-win-arm64.zip",
             "searchOrder": 900,
             "verification": {
               "mode": "required"
@@ -94,50 +93,50 @@
     ],
     "releases": [
       {
-        "version": "3.13.13",
+        "version": "24.15.0",
         "releaseTracks": [
           "stable"
         ],
         "upstreamRelease": {
-          "sourceId": "pythonNuGetPackage",
-          "releaseTag": "3.13.13"
+          "sourceId": "nodeJsRelease",
+          "releaseTag": "v24.15.0"
         },
         "targetArtifacts": {
-          "PythonRuntime-win-x64-stable": {
-            "artifactId": "python-runtime-win-x64-stable",
+          "NodeRuntime-win-x64-stable": {
+            "artifactId": "node-runtime-win-x64-stable",
             "contentHash": {
               "algorithm": "sha256",
-              "value": "c2347c2975f661b2dafceacc94218dfe87781955a3cd309c633d343b8c8dac31"
+              "value": "cc5149eabd53779ce1e7bdc5401643622d0c7e6800ade18928a767e940bb0e62"
             }
           },
-          "PythonRuntime-win-arm64-stable": {
-            "artifactId": "python-runtime-win-arm64-stable",
+          "NodeRuntime-win-arm64-stable": {
+            "artifactId": "node-runtime-win-arm64-stable",
             "contentHash": {
               "algorithm": "sha256",
-              "value": "2a0406b834d4ff33414f70597b67797466ba2344baa534ab8f62c4eae1c3e599"
+              "value": "c9eb7402eda26e2ba7e44b6727fc85a8de56c5095b1f71ebd3062892211aa116"
             }
           }
         }
       }
     ],
     "sources": {
-      "pythonNuGetPackage": {
+      "nodeJsRelease": {
         "kind": "download",
-        "baseUri": "https://api.nuget.org/v3-flatcontainer/"
+        "baseUri": "https://nodejs.org/dist/"
       }
     }
   },
   "presenceDiscovery": {
     "files": [
-      "python.exe"
+      "node.exe",
+      "npm.cmd",
+      "npx.cmd"
     ],
-    "directories": [
-      "Lib/site-packages/pip"
-    ],
+    "directories": [],
     "commands": [
       {
-        "name": "python",
-        "relativePath": "python.exe",
+        "name": "node",
+        "relativePath": "node.exe",
         "requiredForState": true,
         "exposeCommand": true,
         "stateChecks": [
@@ -145,16 +144,36 @@
             "arguments": [
               "--version"
             ],
-            "outputPattern": "(?m)^Python\\s+(?<value>\\d+\\.\\d+\\.\\d+)\\s*$",
-            "expectedValue": "{version}"
-          },
+            "outputPattern": "(?m)^(?<value>v\\d+\\.\\d+\\.\\d+)\\s*$",
+            "expectedValue": "v{version}"
+          }
+        ]
+      },
+      {
+        "name": "npm",
+        "relativePath": "npm.cmd",
+        "requiredForState": true,
+        "exposeCommand": true,
+        "stateChecks": [
           {
             "arguments": [
-              "-m",
-              "pip",
               "--version"
             ],
-            "outputPattern": "(?m)^pip\\s+(?<value>\\d+\\.\\d+(?:\\.\\d+)?(?:[-+][0-9A-Za-z.\\-]+)?)\\s+from\\s+.+$"
+            "outputPattern": "(?m)^(?<value>\\d+\\.\\d+\\.\\d+(?:[-+][0-9A-Za-z.\\-]+)?)\\s*$"
+          }
+        ]
+      },
+      {
+        "name": "npx",
+        "relativePath": "npx.cmd",
+        "requiredForState": true,
+        "exposeCommand": true,
+        "stateChecks": [
+          {
+            "arguments": [
+              "--version"
+            ],
+            "outputPattern": "(?m)^(?<value>\\d+\\.\\d+\\.\\d+(?:[-+][0-9A-Za-z.\\-]+)?)\\s*$"
           }
         ]
       }
@@ -190,8 +209,8 @@
     "assigned": {
       "install": {
         "kind": "expandArchive",
-        "installDirectory": "python-runtime/{releaseTrack}/{version}/{artifactDistributionVariant}",
-        "expandedRoot": "tools",
+        "installDirectory": "node-runtime/{releaseTrack}/{version}/{artifactDistributionVariant}",
+        "expandedRoot": "auto",
         "createDirectories": []
       },
       "readyStateCheck": {
@@ -199,7 +218,7 @@
         "expectedVersion": "{version}",
         "require": {
           "files": true,
-          "directories": true,
+          "directories": false,
           "commands": true,
           "apps": false,
           "metadataFiles": false,
@@ -254,5 +273,7 @@
         "workDirectories": true
       }
     }
-  }
+  },
+  "definitionId": "NodeRuntime",
+  "repositoryId": "EigenverftModule"
 }

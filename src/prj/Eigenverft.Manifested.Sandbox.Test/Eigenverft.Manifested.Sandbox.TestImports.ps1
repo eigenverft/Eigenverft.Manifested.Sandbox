@@ -24,7 +24,7 @@ $moduleProjectRoot = Join-Path (Split-Path -Parent $PSScriptRoot) 'Eigenverft.Ma
 . "$moduleProjectRoot\Support\Package\Execution\Eigenverft.Manifested.Sandbox.Package.Bootstrap.ps1"
 . "$moduleProjectRoot\Support\Package\Schema\Eigenverft.Manifested.Sandbox.Package.Config.ps1"
 . "$moduleProjectRoot\Support\Package\Schema\Eigenverft.Manifested.Sandbox.Package.DepotInventory.Management.ps1"
-. "$moduleProjectRoot\Support\Package\Schema\Eigenverft.Manifested.Sandbox.Package.RepositoryInventory.Management.ps1"
+. "$moduleProjectRoot\Support\Package\Schema\Eigenverft.Manifested.Sandbox.Package.EndpointInventory.Management.ps1"
 . "$moduleProjectRoot\Support\Package\Schema\Eigenverft.Manifested.Sandbox.Package.DefinitionReference.ps1"
 . "$moduleProjectRoot\Support\Package\Schema\Eigenverft.Manifested.Sandbox.Package.DefinitionSchema.Wire1_4.ps1"
 . "$moduleProjectRoot\Support\Package\Schema\Eigenverft.Manifested.Sandbox.Package.DefinitionSchema.ps1"
@@ -53,9 +53,10 @@ $moduleProjectRoot = Join-Path (Split-Path -Parent $PSScriptRoot) 'Eigenverft.Ma
 . "$moduleProjectRoot\Commands\Package\Eigenverft.Manifested.Sandbox.Cmd.GetPackageState.ps1"
 . "$moduleProjectRoot\Commands\Package\Eigenverft.Manifested.Sandbox.Cmd.InvokePackage.ps1"
 . "$moduleProjectRoot\Commands\Depot\Eigenverft.Manifested.Sandbox.Cmd.PackageDepot.ps1"
-. "$moduleProjectRoot\Commands\Repository\Eigenverft.Manifested.Sandbox.Cmd.PackageRepository.ps1"
+. "$moduleProjectRoot\Commands\Endpoint\Eigenverft.Manifested.Sandbox.Cmd.PackageEndpoint.ps1"
 . "$moduleProjectRoot\Commands\Web\Eigenverft.Manifested.Sandbox.Cmd.InvokeWebRequestEx.ps1"
 . "$moduleProjectRoot\Commands\Module\Eigenverft.Manifested.Sandbox.Cmd.Module.ps1"
 
 # Package definitions
 # Package definitions are JSON-only.
+

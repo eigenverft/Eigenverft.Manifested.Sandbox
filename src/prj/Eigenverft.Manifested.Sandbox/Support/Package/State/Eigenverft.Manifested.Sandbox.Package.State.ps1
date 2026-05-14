@@ -127,7 +127,7 @@ function Get-PackageStateConfig {
 
     $packageGlobalConfig = $globalDocumentInfo.Document.package
     $applicationRootDirectory = Resolve-PackageApplicationRootDirectory -PackageConfiguration $packageGlobalConfig
-    $repositoryInventoryInfo = Get-PackageRepositoryInventoryInfo
+    $endpointInventoryInfo = Get-PackageEndpointInventoryInfo
     $depotInventoryInfo = Get-PackageDepotInventoryInfo
     $sourceInventoryInfo = Get-PackageSourceInventoryInfo -ApplicationRootDirectory $applicationRootDirectory
     $effectiveAcquisitionEnvironment = Resolve-PackageEffectiveAcquisitionEnvironment -PackageConfiguration $packageGlobalConfig -SourceInventoryInfo $sourceInventoryInfo -DepotInventoryInfo $depotInventoryInfo
@@ -176,10 +176,10 @@ function Get-PackageStateConfig {
         PackageConfigPath                   = $globalDocumentInfo.Path
         PackageConfigDocument               = $packageGlobalConfig
         ApplicationRootDirectory            = $applicationRootDirectory
-        LocalRepositoryInventoryPath        = Get-PackageLocalRepositoryInventoryPath
-        RepositoryInventoryPath             = $repositoryInventoryInfo.Path
-        RepositoryInventory                 = $repositoryInventoryInfo.Document
-        RepositoryInventoryInfo             = $repositoryInventoryInfo
+        LocalEndpointInventoryPath         = Get-PackageLocalEndpointInventoryPath
+        EndpointInventoryPath              = $endpointInventoryInfo.Path
+        EndpointInventory                  = $endpointInventoryInfo.Document
+        EndpointInventoryInfo              = $endpointInventoryInfo
         LocalDepotInventoryPath             = Get-PackageLocalDepotInventoryPath
         DepotInventoryPath                  = $effectiveAcquisitionEnvironment.DepotInventoryPath
         DepotInventory                      = $depotInventoryInfo.Document

@@ -1,28 +1,27 @@
 {
   "$schema": "../../Schema/eigenverft-module-package-definition-1.4.schema.json",
   "schemaVersion": "1.4",
-  "id": "NodeRuntime",
   "definitionPublication": {
-    "publisherId": "EigenverftModule",
-    "publisherName": "Eigenverft Module",
+    "publisherId": "Eigenverft",
+    "publisherName": "Eigenverft",
     "definitionRevision": 1,
     "publishedAtUtc": "2026-05-13T12:00:00Z"
   },
   "display": {
     "default": {
-      "name": "Node.js",
-      "publisher": "OpenJS Foundation",
-      "corporation": "OpenJS Foundation",
-      "summary": "Portable Node.js runtime"
+      "name": "Visual Studio Code",
+      "publisher": "Microsoft",
+      "corporation": "Microsoft Corporation",
+      "summary": "Code editor"
     }
   },
   "dependencies": [],
   "artifacts": {
     "targets": [
       {
-        "id": "NodeRuntime-win-x64-stable",
+        "id": "VSCodeRuntime-win32-x64-stable",
         "releaseTrack": "stable",
-        "artifactDistributionVariant": "win-x64",
+        "artifactDistributionVariant": "win32-x64",
         "constraints": {
           "os": [
             "windows"
@@ -35,7 +34,7 @@
           "strategy": "latestByVersion",
           "allowPrerelease": false
         },
-        "fileNameTemplate": "node-v{version}-win-x64.zip",
+        "fileNameTemplate": "VSCode-win32-x64-{version}.zip",
         "acquisitionCandidates": [
           {
             "kind": "packageDepot",
@@ -46,9 +45,9 @@
           },
           {
             "kind": "download",
-            "sourceId": "nodeJsRelease",
-            "sourcePath": "v{version}/node-v{version}-win-x64.zip",
+            "sourceId": "vsCodeUpdateService",
             "searchOrder": 900,
+            "sourcePath": "{version}/win32-x64-archive/stable",
             "verification": {
               "mode": "required"
             }
@@ -56,9 +55,9 @@
         ]
       },
       {
-        "id": "NodeRuntime-win-arm64-stable",
+        "id": "VSCodeRuntime-win32-arm64-stable",
         "releaseTrack": "stable",
-        "artifactDistributionVariant": "win-arm64",
+        "artifactDistributionVariant": "win32-arm64",
         "constraints": {
           "os": [
             "windows"
@@ -71,7 +70,7 @@
           "strategy": "latestByVersion",
           "allowPrerelease": false
         },
-        "fileNameTemplate": "node-v{version}-win-arm64.zip",
+        "fileNameTemplate": "VSCode-win32-arm64-{version}.zip",
         "acquisitionCandidates": [
           {
             "kind": "packageDepot",
@@ -82,9 +81,9 @@
           },
           {
             "kind": "download",
-            "sourceId": "nodeJsRelease",
-            "sourcePath": "v{version}/node-v{version}-win-arm64.zip",
+            "sourceId": "vsCodeUpdateService",
             "searchOrder": 900,
+            "sourcePath": "{version}/win32-arm64-archive/stable",
             "verification": {
               "mode": "required"
             }
@@ -94,50 +93,47 @@
     ],
     "releases": [
       {
-        "version": "24.15.0",
+        "version": "1.119.0",
         "releaseTracks": [
           "stable"
         ],
-        "upstreamRelease": {
-          "sourceId": "nodeJsRelease",
-          "releaseTag": "v24.15.0"
-        },
         "targetArtifacts": {
-          "NodeRuntime-win-x64-stable": {
-            "artifactId": "node-runtime-win-x64-stable",
+          "VSCodeRuntime-win32-x64-stable": {
+            "artifactId": "vsCode-win-x64-stable",
             "contentHash": {
               "algorithm": "sha256",
-              "value": "cc5149eabd53779ce1e7bdc5401643622d0c7e6800ade18928a767e940bb0e62"
+              "value": "fea13bf400c6770dd14eeabc0e47757ffe2703f1a3f2a258faa22bce3bdd21af"
             }
           },
-          "NodeRuntime-win-arm64-stable": {
-            "artifactId": "node-runtime-win-arm64-stable",
+          "VSCodeRuntime-win32-arm64-stable": {
+            "artifactId": "vsCode-win-arm64-stable",
             "contentHash": {
               "algorithm": "sha256",
-              "value": "c9eb7402eda26e2ba7e44b6727fc85a8de56c5095b1f71ebd3062892211aa116"
+              "value": "7e40617507cb917fdaa7b7f6312c3202352e2f2db102e80d28b80d2fee99e2ed"
             }
           }
         }
       }
     ],
     "sources": {
-      "nodeJsRelease": {
+      "vsCodeUpdateService": {
         "kind": "download",
-        "baseUri": "https://nodejs.org/dist/"
+        "baseUri": "https://update.code.visualstudio.com"
       }
     }
   },
   "presenceDiscovery": {
     "files": [
-      "node.exe",
-      "npm.cmd",
-      "npx.cmd"
+      "Code.exe",
+      "bin/code.cmd"
     ],
-    "directories": [],
+    "directories": [
+      "data"
+    ],
     "commands": [
       {
-        "name": "node",
-        "relativePath": "node.exe",
+        "name": "code",
+        "relativePath": "bin/code.cmd",
         "requiredForState": true,
         "exposeCommand": true,
         "stateChecks": [
@@ -145,57 +141,88 @@
             "arguments": [
               "--version"
             ],
-            "outputPattern": "(?m)^(?<value>v\\d+\\.\\d+\\.\\d+)\\s*$",
-            "expectedValue": "v{version}"
-          }
-        ]
-      },
-      {
-        "name": "npm",
-        "relativePath": "npm.cmd",
-        "requiredForState": true,
-        "exposeCommand": true,
-        "stateChecks": [
-          {
-            "arguments": [
-              "--version"
-            ],
-            "outputPattern": "(?m)^(?<value>\\d+\\.\\d+\\.\\d+(?:[-+][0-9A-Za-z.\\-]+)?)\\s*$"
-          }
-        ]
-      },
-      {
-        "name": "npx",
-        "relativePath": "npx.cmd",
-        "requiredForState": true,
-        "exposeCommand": true,
-        "stateChecks": [
-          {
-            "arguments": [
-              "--version"
-            ],
-            "outputPattern": "(?m)^(?<value>\\d+\\.\\d+\\.\\d+(?:[-+][0-9A-Za-z.\\-]+)?)\\s*$"
+            "outputPattern": "(?m)^(?<value>\\d+\\.\\d+\\.\\d+)\\s*$",
+            "expectedValue": "{version}"
           }
         ]
       }
     ],
-    "apps": [],
+    "apps": [
+      {
+        "name": "Code",
+        "relativePath": "Code.exe",
+        "requiredForState": true,
+        "exposeApp": true
+      }
+    ],
     "metadataFiles": [],
-    "signatures": [],
-    "fileDetails": [],
+    "signatures": [
+      {
+        "relativePath": "Code.exe",
+        "requireValid": true,
+        "subjectContains": "Microsoft Corporation"
+      }
+    ],
+    "fileDetails": [
+      {
+        "relativePath": "Code.exe",
+        "productName": "Visual Studio Code",
+        "fileDescription": "Visual Studio Code"
+      }
+    ],
     "registry": []
   },
   "existingInstallDiscovery": {
-    "enabled": false,
-    "searchLocations": [],
-    "installRootRules": []
+    "enabled": true,
+    "searchLocations": [
+      {
+        "id": "vsCodeCommandCodeCmd",
+        "kind": "command",
+        "searchOrder": 100,
+        "name": "code.cmd"
+      },
+      {
+        "id": "vsCodeCommandCode",
+        "kind": "command",
+        "searchOrder": 110,
+        "name": "code"
+      },
+      {
+        "id": "vsCodeProgramFilesCodeCmd",
+        "kind": "path",
+        "searchOrder": 120,
+        "path": "%ProgramFiles%/Microsoft VS Code/bin/code.cmd"
+      },
+      {
+        "id": "vsCodeLocalAppDataCodeCmd",
+        "kind": "path",
+        "searchOrder": 130,
+        "path": "%LOCALAPPDATA%/Programs/Microsoft VS Code/bin/code.cmd"
+      }
+    ],
+    "installRootRules": [
+      {
+        "match": {
+          "kind": "fileName",
+          "value": "code.cmd"
+        },
+        "installRootRelativePath": ".."
+      },
+      {
+        "match": {
+          "kind": "fileName",
+          "value": "Code.exe"
+        },
+        "installRootRelativePath": "."
+      }
+    ]
   },
   "packageOperations": {
     "policy": {
       "ownershipPolicy": {
-        "allowAdoptExternal": false,
-        "upgradeAdoptedInstall": false,
-        "requirePackageOwnership": true
+        "allowAdoptExternal": true,
+        "upgradeAdoptedInstall": true,
+        "requirePackageOwnership": false
       },
       "compatibility": {
         "checks": [
@@ -210,22 +237,24 @@
     "assigned": {
       "install": {
         "kind": "expandArchive",
-        "installDirectory": "node-runtime/{releaseTrack}/{version}/{artifactDistributionVariant}",
+        "installDirectory": "vsc-rt/{releaseTrack}/{version}/{artifactDistributionVariant}",
         "expandedRoot": "auto",
-        "createDirectories": []
+        "createDirectories": [
+          "data"
+        ]
       },
       "readyStateCheck": {
         "use": "presenceDiscovery",
         "expectedVersion": "{version}",
         "require": {
           "files": true,
-          "directories": false,
+          "directories": true,
           "commands": true,
-          "apps": false,
-          "metadataFiles": false,
-          "signatures": false,
-          "fileDetails": false,
-          "registry": false
+          "apps": true,
+          "metadataFiles": true,
+          "signatures": true,
+          "fileDetails": true,
+          "registry": true
         }
       },
       "pathRegistration": {
@@ -274,5 +303,7 @@
         "workDirectories": true
       }
     }
-  }
+  },
+  "definitionId": "VSCodeRuntime",
+  "repositoryId": "EigenverftModule"
 }

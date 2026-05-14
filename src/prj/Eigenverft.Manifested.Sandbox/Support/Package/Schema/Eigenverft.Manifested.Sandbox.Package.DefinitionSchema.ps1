@@ -85,7 +85,7 @@ Assert-PackageDefinitionSchema -DefinitionDocumentInfo $definitionInfo -Definiti
     }
     Assert-PackageDefinitionSchemaVersionSupported -SchemaVersionText $schemaVersionText -DefinitionDocumentPath $DefinitionDocumentInfo.Path
 
-    foreach ($requiredProperty in @('schemaVersion', 'id', 'definitionPublication', 'display', 'dependencies', 'artifacts', 'presenceDiscovery', 'existingInstallDiscovery', 'packageOperations')) {
+    foreach ($requiredProperty in @('schemaVersion', 'definitionId', 'repositoryId', 'definitionPublication', 'display', 'dependencies', 'artifacts', 'presenceDiscovery', 'existingInstallDiscovery', 'packageOperations')) {
         if (-not $definition.PSObject.Properties[$requiredProperty]) {
             throw "Package definition '$($DefinitionDocumentInfo.Path)' is missing required property '$requiredProperty'."
         }

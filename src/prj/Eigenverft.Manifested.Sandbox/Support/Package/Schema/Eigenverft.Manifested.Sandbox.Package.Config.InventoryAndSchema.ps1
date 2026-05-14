@@ -298,7 +298,17 @@ Assert-PackageConfigSchema -PackageConfigDocumentInfo $globalInfo
         }
     }
     if ($package.PSObject.Properties['repositorySources']) {
-        throw "Package config '$($PackageConfigDocumentInfo.Path)' still uses retired property 'repositorySources'. Use Configuration/Internal/PackageRepositoryInventory.json repositorySources."
+        throw "Package config '$($PackageConfigDocumentInfo.Path)' still uses retired property 'repositorySources'. Use Configuration/Internal/PackageEndpointInventory.json endpoints."
+    }
+    if ($package.PSObject.Properties['repositoryEnvironment'] -and $package.repositoryEnvironment) {
+        if ($package.repositoryEnvironment.PSObject.Properties['defaults'] -and $package.repositoryEnvironment.defaults) {
+            if ($package.repositoryEnvironment.defaults.PSObject.Properties['repositoryMaterializationMode']) {
+                $repositoryMaterializationMode = [string]$package.repositoryEnvironment.defaults.repositoryMaterializationMode
+                if ($repositoryMaterializationMode -notin @('packageFocused', 'repositoryFocused')) {
+                    throw "Package config '$($PackageConfigDocumentInfo.Path)' defines unsupported repositoryEnvironment.defaults.repositoryMaterializationMode '$repositoryMaterializationMode'. Use 'packageFocused' or 'repositoryFocused'."
+                }
+            }
+        }
     }
 
     if ($package.selectionDefaults.PSObject.Properties['channel']) {
