@@ -2,7 +2,7 @@
     Public package definition endpoint (scan root) management surface.
 
     Parameters named EndpointName identify a row by endpointName in PackageEndpointInventory.json.
-    Invoke-Package -RepositoryId is unrelated: it filters definitions by JSON repositoryId during resolution.
+    Invoke-Package -PublisherId is unrelated: it filters package definitions by trusted publisher identity.
 #>
 
 function Get-PackageEndpoint {

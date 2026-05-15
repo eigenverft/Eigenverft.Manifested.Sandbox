@@ -158,7 +158,7 @@ function Invoke-PackageAssignedFlow {
     )
 
     try {
-        Write-PackageExecutionMessage -Message ("[START] Invoke-Package repositorySource='{0}' definition='{1}' desiredState='{2}'." -f $PackageResult.RepositorySourceId, $PackageResult.DefinitionId, $PackageResult.DesiredState)
+        Write-PackageExecutionMessage -Message ("[START] Invoke-Package publisher='{0}' endpoint='{1}' definition='{2}' desiredState='{3}'." -f $PackageResult.DefinitionPublisherId, $PackageResult.DefinitionEndpointName, $PackageResult.DefinitionId, $PackageResult.DesiredState)
         $PackageResult.CurrentStep = 'InitializeLocalEnvironment'
         Write-PackageExecutionMessage -Message '[STEP] Initializing local package environment.'
         $PackageResult.LocalEnvironment = Initialize-PackageLocalEnvironment -PackageConfig $PackageResult.PackageConfig
@@ -196,7 +196,7 @@ function Invoke-PackageDefinitionCommandCore {
     [CmdletBinding()]
     param(
         [AllowNull()]
-        [string]$RepositoryId = $null,
+        [string]$PublisherId = $null,
 
         [Parameter(Mandatory = $true)]
         [ValidateNotNullOrEmpty()]
@@ -208,7 +208,7 @@ function Invoke-PackageDefinitionCommandCore {
         [object[]]$DependencyStack = @()
     )
 
-    $packageConfig = Get-PackageConfig -RepositoryId $RepositoryId -DefinitionId $DefinitionId -DesiredState $DesiredState
+    $packageConfig = Get-PackageConfig -PublisherId $PublisherId -DefinitionId $DefinitionId -DesiredState $DesiredState
     $result = New-PackageResult -DesiredState $DesiredState -PackageConfig $packageConfig
 
     if ([string]::Equals($DesiredState, 'Removed', [System.StringComparison]::OrdinalIgnoreCase)) {

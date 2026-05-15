@@ -94,7 +94,7 @@ function Select-PackageStateOwnershipRecord {
         DefinitionPublisherName = if ($Record.PSObject.Properties['definitionPublisherName']) { $Record.definitionPublisherName } else { $null }
         DefinitionRevision     = if ($Record.PSObject.Properties['definitionRevision']) { $Record.definitionRevision } else { $null }
         DefinitionPublishedAtUtc = if ($Record.PSObject.Properties['definitionPublishedAtUtc']) { $Record.definitionPublishedAtUtc } else { $null }
-        DefinitionRepositorySourceId = if ($Record.PSObject.Properties['definitionRepositorySourceId']) { $Record.definitionRepositorySourceId } else { $null }
+        DefinitionEndpointName = if ($Record.PSObject.Properties['definitionEndpointName']) { $Record.definitionEndpointName } else { $null }
         DefinitionSourceKind   = if ($Record.PSObject.Properties['definitionSourceKind']) { $Record.definitionSourceKind } else { $null }
         DefinitionSourcePath   = $Record.definitionSourcePath
         DefinitionSourceHash   = if ($Record.PSObject.Properties['definitionSourceHash']) { $Record.definitionSourceHash } else { $null }
@@ -128,6 +128,7 @@ function Get-PackageStateConfig {
     $packageGlobalConfig = $globalDocumentInfo.Document.package
     $applicationRootDirectory = Resolve-PackageApplicationRootDirectory -PackageConfiguration $packageGlobalConfig
     $endpointInventoryInfo = Get-PackageEndpointInventoryInfo
+    $publisherInventoryInfo = Get-PackagePublisherInventoryInfo
     $depotInventoryInfo = Get-PackageDepotInventoryInfo
     $sourceInventoryInfo = Get-PackageSourceInventoryInfo -ApplicationRootDirectory $applicationRootDirectory
     $effectiveAcquisitionEnvironment = Resolve-PackageEffectiveAcquisitionEnvironment -PackageConfiguration $packageGlobalConfig -SourceInventoryInfo $sourceInventoryInfo -DepotInventoryInfo $depotInventoryInfo
@@ -180,6 +181,10 @@ function Get-PackageStateConfig {
         EndpointInventoryPath              = $endpointInventoryInfo.Path
         EndpointInventory                  = $endpointInventoryInfo.Document
         EndpointInventoryInfo              = $endpointInventoryInfo
+        LocalPublisherInventoryPath        = Get-PackageLocalPublisherInventoryPath
+        PublisherInventoryPath             = $publisherInventoryInfo.Path
+        PublisherInventory                 = $publisherInventoryInfo.Document
+        PublisherInventoryInfo             = $publisherInventoryInfo
         LocalDepotInventoryPath             = Get-PackageLocalDepotInventoryPath
         DepotInventoryPath                  = $effectiveAcquisitionEnvironment.DepotInventoryPath
         DepotInventory                      = $depotInventoryInfo.Document

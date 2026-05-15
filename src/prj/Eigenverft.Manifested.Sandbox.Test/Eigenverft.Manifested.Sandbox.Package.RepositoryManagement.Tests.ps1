@@ -131,7 +131,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - endpoi
     It 'rejects disabled or untrusted filesystem repositories during definition resolution' {
         $root = Join-Path $TestDrive 'repo-reject'
         $repositoryRoot = Join-Path $root 'team-repo'
-        Write-TestJsonDocument -Path (Join-Path $repositoryRoot 'VSCodeRuntime.json') -Document (New-TestVSCodeDefinitionDocument -Releases @(
+        Write-TestJsonDocument -Path (Join-Path $repositoryRoot 'TeamOnlyTool.json') -Document (New-TestVSCodeDefinitionDocument -DefinitionId 'TeamOnlyTool' -Releases @(
                 New-TestPackageRelease -Id 'vsCode-v1' -Version '1.0.0' -Architecture 'x64' -ArtifactDistributionVariant 'win32-x64'
             ))
         $inventoryPath = Join-Path $root 'Configuration\Internal\PackageEndpointInventory.json'
@@ -159,7 +159,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - endpoi
         $inventoryDocInfo | Add-Member -MemberType NoteProperty -Name Exists -Value $true -Force
         Mock Get-PackageEndpointInventoryInfo { return $inventoryDocInfo }
 
-        { Resolve-PackageDefinitionReference -DefinitionId 'VSCodeRuntime' } | Should -Throw '*was not found*'
+        { Resolve-PackageDefinitionReference -DefinitionId 'TeamOnlyTool' } | Should -Throw '*was not found*'
     }
 
     It 'reads live filesystem repository definitions on every assignment selection' {
@@ -167,7 +167,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - endpoi
         $applicationRoot = Join-Path $root 'AppRoot'
         $repositoryRoot = Join-Path $root 'team-repo'
         $definitionPath = Join-Path $repositoryRoot 'VSCodeRuntime.json'
-        Write-TestJsonDocument -Path $definitionPath -Document (New-TestVSCodeDefinitionDocument -RepositoryId 'TeamLiveRepo' -Releases @(
+        Write-TestJsonDocument -Path $definitionPath -Document (New-TestVSCodeDefinitionDocument -Releases @(
                 New-TestPackageRelease -Id 'vsCode-v1' -Version '1.0.0' -Architecture 'x64' -ArtifactDistributionVariant 'win32-x64'
             ))
         $globalDocument = New-TestPackageGlobalDocument -ApplicationRootDirectory $applicationRoot
@@ -186,7 +186,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - endpoi
                 }
             )
         }
-        $documents = Write-TestPackageDocuments -RootPath $root -GlobalDocument $globalDocument -DepotInventoryDocument $depotInventory -EndpointInventoryDocument $endpointInventory -DefinitionDocument (New-TestVSCodeDefinitionDocument -RepositoryId 'TeamLiveRepo' -Releases @(
+        $documents = Write-TestPackageDocuments -RootPath $root -GlobalDocument $globalDocument -DepotInventoryDocument $depotInventory -EndpointInventoryDocument $endpointInventory -DefinitionDocument (New-TestVSCodeDefinitionDocument -Releases @(
                 New-TestPackageRelease -Id 'unused' -Version '0.0.0' -Architecture 'x64' -ArtifactDistributionVariant 'win32-x64'
             ))
 
@@ -198,14 +198,14 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - endpoi
             return $docInfo
         }
 
-        $firstResult = Resolve-PackagePackage -PackageResult (New-PackageResult -PackageConfig (Get-PackageConfig -RepositoryId 'TeamLiveRepo' -DefinitionId 'VSCodeRuntime')))
+        $firstResult = Resolve-PackagePackage -PackageResult (New-PackageResult -PackageConfig (Get-PackageConfig -DefinitionId 'VSCodeRuntime'))
         $firstResult.PackageVersion | Should -Be '1.0.0'
 
-        Write-TestJsonDocument -Path $definitionPath -Document (New-TestVSCodeDefinitionDocument -RepositoryId 'TeamLiveRepo' -Releases @(
+        Write-TestJsonDocument -Path $definitionPath -Document (New-TestVSCodeDefinitionDocument -Releases @(
                 New-TestPackageRelease -Id 'vsCode-v2' -Version '2.0.0' -Architecture 'x64' -ArtifactDistributionVariant 'win32-x64'
             ))
 
-        $secondResult = Resolve-PackagePackage -PackageResult (New-PackageResult -PackageConfig (Get-PackageConfig -RepositoryId 'TeamLiveRepo' -DefinitionId 'VSCodeRuntime')))
+        $secondResult = Resolve-PackagePackage -PackageResult (New-PackageResult -PackageConfig (Get-PackageConfig -DefinitionId 'VSCodeRuntime'))
         $secondResult.PackageVersion | Should -Be '2.0.0'
     }
 
@@ -246,7 +246,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - endpoi
                     definitionPublisherName = 'Eigenverft'
                     definitionRevision = 1
                     definitionPublishedAtUtc = '2026-05-13T12:00:00Z'
-                    definitionRepositorySourceId = 'EigenverftModule'
+                    definitionEndpointName = 'teamPackageRepository'
                     definitionSourceKind = 'filesystem'
                     definitionSourcePath = Join-Path $root 'missing-repo'
                     definitionAssignedSnapshotPath = $snapshotPath

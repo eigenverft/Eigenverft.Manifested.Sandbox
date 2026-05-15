@@ -5,8 +5,8 @@
 $script:ManifestedPackageRoot = Split-Path -Parent (Split-Path -Parent (Split-Path -Parent $PSScriptRoot))
 $script:ManifestedPackageConfigurationRoot = Join-Path $script:ManifestedPackageRoot 'Configuration'
 $script:ManifestedPackageRepositoriesRoot = Join-Path $script:ManifestedPackageRoot 'Repositories'
-$script:ManifestedPackageDefaultRepositoryId = 'EigenverftModule'
 $script:ManifestedPackageDefaultEndpointName = 'moduleDefaults'
+$script:ManifestedPackageDefaultPublisherId = 'Eigenverft'
 $script:ManifestedPackageSourceInventoryPathEnvironmentVariableName = 'EIGENVERFT_MANIFESTED_PACKAGE_SOURCE_INVENTORY_PATH'
 $script:ManifestedPackageSiteCodeEnvironmentVariableName = 'EIGENVERFT_MANIFESTED_PACKAGE_SITE_CODE'
 
@@ -46,21 +46,22 @@ Get-PackageRepositoriesRoot
     return $script:ManifestedPackageRepositoriesRoot
 }
 
-function Get-PackageDefaultRepositoryId {
+function Get-PackageDefaultPublisherId {
 <#
 .SYNOPSIS
-Returns the default logical repository id used on shipped package definitions (JSON repositoryId).
+Returns the default trusted publisher id used on shipped package definitions.
 
 .DESCRIPTION
-This is the data-level `repositoryId` string carried on shipped definition documents. It is not an endpoint inventory row key.
+This is the publisher namespace carried in definitionPublication.publisherId
+for shipped package definitions.
 
 .EXAMPLE
-Get-PackageDefaultRepositoryId
+Get-PackageDefaultPublisherId
 #>
     [CmdletBinding()]
     param()
 
-    return $script:ManifestedPackageDefaultRepositoryId
+    return $script:ManifestedPackageDefaultPublisherId
 }
 
 function Get-PackageDefaultEndpointName {
@@ -131,6 +132,17 @@ Get-PackageShippedEndpointInventoryPath
     param()
 
     return (Join-Path (Join-Path (Get-PackageConfigurationRoot) 'Internal') 'PackageEndpointInventory.json')
+}
+
+function Get-PackageShippedPublisherInventoryPath {
+<#
+.SYNOPSIS
+Returns the shipped PackagePublisherInventory.json path.
+#>
+    [CmdletBinding()]
+    param()
+
+    return (Join-Path (Join-Path (Get-PackageConfigurationRoot) 'Internal') 'PackagePublisherInventory.json')
 }
 
 function Get-PackageLocalRoot {
@@ -231,6 +243,17 @@ Get-PackageLocalEndpointInventoryPath
     return [System.IO.Path]::GetFullPath((Join-Path (Join-Path (Get-PackageLocalRoot) 'Configuration\Internal') 'PackageEndpointInventory.json'))
 }
 
+function Get-PackageLocalPublisherInventoryPath {
+<#
+.SYNOPSIS
+Returns the local PackagePublisherInventory.json path.
+#>
+    [CmdletBinding()]
+    param()
+
+    return [System.IO.Path]::GetFullPath((Join-Path (Join-Path (Get-PackageLocalRoot) 'Configuration\Internal') 'PackagePublisherInventory.json'))
+}
+
 function Get-PackageConfigPath {
 <#
 .SYNOPSIS
@@ -315,6 +338,27 @@ Get-PackageEndpointInventoryPath
     return $localInventoryPath
 }
 
+function Get-PackagePublisherInventoryPath {
+<#
+.SYNOPSIS
+Returns the active PackagePublisherInventory.json path.
+#>
+    [CmdletBinding()]
+    param()
+
+    $localInventoryPath = Get-PackageLocalPublisherInventoryPath
+    if (-not (Test-Path -LiteralPath $localInventoryPath -PathType Leaf)) {
+        $localInventoryDirectory = Split-Path -Parent $localInventoryPath
+        if (-not [string]::IsNullOrWhiteSpace($localInventoryDirectory)) {
+            $null = New-Item -ItemType Directory -Path $localInventoryDirectory -Force
+        }
+
+        Copy-FileToPath -SourcePath (Get-PackageShippedPublisherInventoryPath) -TargetPath $localInventoryPath -Overwrite | Out-Null
+    }
+
+    return $localInventoryPath
+}
+
 function Get-PackageSourceInventoryPathEnvironmentVariableName {
 <#
 .SYNOPSIS
@@ -380,7 +424,12 @@ Get-PackageDefinitionPath -DefinitionId VSCodeRuntime
     foreach ($jsonFile in @(Get-ChildItem -LiteralPath $repositoryRoot -Filter '*.json' -File -Recurse)) {
         try {
             $document = Get-Content -LiteralPath $jsonFile.FullName -Raw -ErrorAction Stop | ConvertFrom-Json -ErrorAction Stop
-            $docDefinitionId = if ($document.PSObject.Properties['definitionId'] -and -not [string]::IsNullOrWhiteSpace([string]$document.definitionId)) {
+            $docDefinitionId = if ($document.PSObject.Properties['definitionPublication'] -and
+                $document.definitionPublication.PSObject.Properties['definitionId'] -and
+                -not [string]::IsNullOrWhiteSpace([string]$document.definitionPublication.definitionId)) {
+                [string]$document.definitionPublication.definitionId
+            }
+            elseif ($document.PSObject.Properties['definitionId']) {
                 [string]$document.definitionId
             }
             elseif ($document.PSObject.Properties['id']) {

@@ -381,7 +381,6 @@ function Select-PackageEndpointSummary {
     }
 
     return [pscustomobject]@{
-        RepositorySourceId = $EndpointName
         SourceId         = $EndpointName
         EndpointName     = $EndpointName
         Kind             = $kind
@@ -452,7 +451,6 @@ function New-PackageEndpointCommandResult {
     return [pscustomobject]@{
         Action               = $Action
         EndpointName         = $EndpointName
-        RepositorySourceId   = $EndpointName
         SourceId             = $EndpointName
         InventoryPath        = $InventoryPath
         Status               = $Status
@@ -508,7 +506,7 @@ function Resolve-PackageDefinitionSnapshotReference {
     [CmdletBinding()]
     param(
         [AllowNull()]
-        [string]$RepositoryId = (Get-PackageDefaultRepositoryId),
+        [string]$PublisherId = $null,
 
         [Parameter(Mandatory = $true)]
         [string]$DefinitionId,
@@ -530,9 +528,9 @@ function Resolve-PackageDefinitionSnapshotReference {
             if (-not [string]::Equals([string]$record.definitionId, $DefinitionId, [System.StringComparison]::OrdinalIgnoreCase)) {
                 continue
             }
-            if (-not [string]::IsNullOrWhiteSpace($RepositoryId)) {
-                $recordRepositoryId = if ($record.PSObject.Properties['definitionRepositorySourceId']) { [string]$record.definitionRepositorySourceId } else { $null }
-                if (-not [string]::Equals($recordRepositoryId, $RepositoryId, [System.StringComparison]::OrdinalIgnoreCase)) {
+            if (-not [string]::IsNullOrWhiteSpace($PublisherId)) {
+                $recordPublisherId = if ($record.PSObject.Properties['definitionPublisherId']) { [string]$record.definitionPublisherId } else { $null }
+                if (-not [string]::Equals($recordPublisherId, $PublisherId, [System.StringComparison]::OrdinalIgnoreCase)) {
                     continue
                 }
             }
@@ -550,10 +548,10 @@ function Resolve-PackageDefinitionSnapshotReference {
 
     $selectedRecord = @($records | Sort-Object -Property updatedAtUtc -Descending | Select-Object -First 1)[0]
     $selectedSnapshotPath = [string]$selectedRecord.definitionAssignedSnapshotPath
-    $repositorySourceId = if ($selectedRecord.PSObject.Properties['definitionRepositorySourceId']) { [string]$selectedRecord.definitionRepositorySourceId } else { $null }
+    $endpointName = if ($selectedRecord.PSObject.Properties['definitionEndpointName']) { [string]$selectedRecord.definitionEndpointName } else { $null }
 
     return [pscustomobject]@{
-        RepositoryId       = $repositorySourceId
+        EndpointName       = $endpointName
         DefinitionId       = [string]$DefinitionId
         DefinitionPath     = [System.IO.Path]::GetFullPath($selectedSnapshotPath)
         SourceKind         = 'assignedSnapshot'

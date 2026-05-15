@@ -17,7 +17,7 @@ function Get-PackageDefinitionPublication {
     }
 
     $publication = $DefinitionDocument.definitionPublication
-    foreach ($requiredProperty in @('publisherId', 'publisherName', 'definitionRevision', 'publishedAtUtc')) {
+    foreach ($requiredProperty in @('publisherId', 'publisherName', 'definitionId', 'definitionRevision', 'publishedAtUtc')) {
         if (-not $publication.PSObject.Properties[$requiredProperty] -or [string]::IsNullOrWhiteSpace([string]$publication.$requiredProperty)) {
             throw "Package definition '$DefinitionPath' is missing definitionPublication.$requiredProperty."
         }
@@ -26,6 +26,7 @@ function Get-PackageDefinitionPublication {
     return [pscustomobject]@{
         PublisherId        = [string]$publication.publisherId
         PublisherName      = [string]$publication.publisherName
+        DefinitionId       = [string]$publication.definitionId
         DefinitionRevision = [int]$publication.definitionRevision
         PublishedAtUtc     = [string]$publication.publishedAtUtc
     }
@@ -45,22 +46,11 @@ function Get-PackageLocalDefinitionPath {
         [string]$PublisherId,
 
         [AllowNull()]
-        [string]$DefinitionRepositorySegment = $null,
-
-        [Parameter(Mandatory = $true)]
-        [string]$DefinitionId
+        [string]$DefinitionId = $null
     )
 
     $safePublisherId = ConvertTo-PackageSafePathSegment -Value $PublisherId
     $safeDefinitionId = ConvertTo-PackageSafePathSegment -Value $DefinitionId
-    if ([string]::Equals($Role, 'Candidate', [System.StringComparison]::OrdinalIgnoreCase)) {
-        if ([string]::IsNullOrWhiteSpace($DefinitionRepositorySegment)) {
-            throw 'DefinitionRepositorySegment (JSON repositoryId) is required when resolving a Candidate definition path.'
-        }
-        $safeRepositorySegment = ConvertTo-PackageSafePathSegment -Value $DefinitionRepositorySegment
-        return [System.IO.Path]::GetFullPath((Join-Path (Join-Path (Join-Path (Join-Path $LocalRepositoryRoot $Role) $safePublisherId) $safeRepositorySegment) ($safeDefinitionId + '.json')))
-    }
-
     return [System.IO.Path]::GetFullPath((Join-Path (Join-Path (Join-Path $LocalRepositoryRoot $Role) $safePublisherId) ($safeDefinitionId + '.json')))
 }
 
@@ -80,9 +70,6 @@ function Copy-PackageDefinitionToLocalDefinitionStore {
         [Parameter(Mandatory = $true)]
         [string]$PublisherId,
 
-        [AllowNull()]
-        [string]$DefinitionRepositorySegment = $null,
-
         [Parameter(Mandatory = $true)]
         [string]$DefinitionId,
 
@@ -90,7 +77,7 @@ function Copy-PackageDefinitionToLocalDefinitionStore {
         [int]$DefinitionRevision
     )
 
-    $targetPath = Get-PackageLocalDefinitionPath -Role $Role -LocalRepositoryRoot $LocalRepositoryRoot -PublisherId $PublisherId -DefinitionRepositorySegment $DefinitionRepositorySegment -DefinitionId $DefinitionId
+    $targetPath = Get-PackageLocalDefinitionPath -Role $Role -LocalRepositoryRoot $LocalRepositoryRoot -PublisherId $PublisherId -DefinitionId $DefinitionId
     $targetDirectory = Split-Path -Parent $targetPath
     $null = New-Item -ItemType Directory -Path $targetDirectory -Force
 
@@ -154,8 +141,8 @@ function Select-PackageDefinitionCandidatesFromEndpointScanRoot {
         [Parameter(Mandatory = $true)]
         [string]$ScanRootPath,
 
-        [Parameter(Mandatory = $true)]
-        [string]$DefinitionId
+        [AllowNull()]
+        [string]$DefinitionId = $null
     )
 
     $candidates = New-Object System.Collections.Generic.List[object]
@@ -163,34 +150,16 @@ function Select-PackageDefinitionCandidatesFromEndpointScanRoot {
         try {
             $definitionInfo = Read-PackageJsonDocument -Path $definitionPath
             $definition = $definitionInfo.Document
-            $docDefinitionId = if ($definition.PSObject.Properties['definitionId'] -and -not [string]::IsNullOrWhiteSpace([string]$definition.definitionId)) {
-                [string]$definition.definitionId
-            }
-            elseif ($definition.PSObject.Properties['id']) {
-                [string]$definition.id
-            }
-            else {
-                $null
-            }
+            $publication = Get-PackageDefinitionPublication -DefinitionDocument $definition -DefinitionPath $definitionPath
+            $docDefinitionId = [string]$publication.DefinitionId
             if ([string]::IsNullOrWhiteSpace($docDefinitionId) -or
-                -not [string]::Equals($docDefinitionId, $DefinitionId, [System.StringComparison]::OrdinalIgnoreCase)) {
+                (-not [string]::IsNullOrWhiteSpace($DefinitionId) -and
+                -not [string]::Equals($docDefinitionId, $DefinitionId, [System.StringComparison]::OrdinalIgnoreCase))) {
                 continue
             }
 
-            $definitionDataRepositoryId = if ($definition.PSObject.Properties['repositoryId'] -and -not [string]::IsNullOrWhiteSpace([string]$definition.repositoryId)) {
-                [string]$definition.repositoryId
-            }
-            else {
-                [string](Get-PackageDefaultRepositoryId)
-            }
-
-            $publication = Get-PackageDefinitionPublication -DefinitionDocument $definition -DefinitionPath $definitionPath
-
             $candidates.Add([pscustomobject]@{
                 EndpointName               = $EndpointName
-                RepositorySourceId         = $EndpointName
-                RepositoryId               = $EndpointName
-                DefinitionDataRepositoryId = $definitionDataRepositoryId
                 EndpointSourceKind         = [string]$EndpointSource.kind
                 DefinitionScanRootPath     = $ScanRootPath
                 DefinitionId               = $docDefinitionId
@@ -227,11 +196,9 @@ function Get-PackageEnabledTrustedEndpointSources {
             }
             $endpointName = [string]$source.endpointName
             [pscustomobject]@{
-                EndpointName       = $endpointName
-                RepositorySourceId = $endpointName
-                RepositoryId       = $endpointName
-                Source               = $source
-                SearchOrder          = if ($source.PSObject.Properties['searchOrder']) { [int]$source.searchOrder } else { 1000 }
+                EndpointName = $endpointName
+                Source       = $source
+                SearchOrder  = if ($source.PSObject.Properties['searchOrder']) { [int]$source.searchOrder } else { 1000 }
             }
         }
     )
@@ -239,7 +206,7 @@ function Get-PackageEnabledTrustedEndpointSources {
     return @($sources | Sort-Object -Property SearchOrder, EndpointName)
 }
 
-function Sync-PackageRepositoryCandidateDefinitions {
+function Get-PackageDefinitionCandidateRows {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true)]
@@ -248,48 +215,119 @@ function Sync-PackageRepositoryCandidateDefinitions {
         [AllowNull()]
         [string]$ApplicationRootDirectory = $null,
 
+        [AllowNull()]
+        [string]$DefinitionId = $null
+    )
+
+    $candidateRows = New-Object System.Collections.Generic.List[object]
+    foreach ($sourceRow in @($SourceRows)) {
+        $endpointName = [string]$sourceRow.EndpointName
+        $scanRootPath = Resolve-PackageEndpointRootPath -EndpointName $endpointName -Source $sourceRow.Source -ApplicationRootDirectory $ApplicationRootDirectory
+        foreach ($candidate in @(Select-PackageDefinitionCandidatesFromEndpointScanRoot -EndpointName $endpointName -EndpointSource $sourceRow.Source -ScanRootPath $scanRootPath -DefinitionId $DefinitionId)) {
+            $candidate | Add-Member -MemberType NoteProperty -Name EndpointSearchOrder -Value ([int]$sourceRow.SearchOrder) -Force
+            $candidateRows.Add($candidate) | Out-Null
+        }
+    }
+
+    return @($candidateRows.ToArray())
+}
+
+function Select-PackageDefinitionCandidateWinner {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [object[]]$Candidates,
+
+        [Parameter(Mandatory = $true)]
+        [object[]]$PublisherRows,
+
+        [Parameter(Mandatory = $true)]
+        [string]$DefinitionId,
+
+        [AllowNull()]
+        [string]$PublisherId = $null
+    )
+
+    $publisherById = @{}
+    foreach ($publisherRow in @($PublisherRows)) {
+        $publisherById[[string]$publisherRow.PublisherId] = $publisherRow
+    }
+
+    if (-not [string]::IsNullOrWhiteSpace($PublisherId) -and -not $publisherById.ContainsKey($PublisherId)) {
+        throw "Package definition publisher '$PublisherId' is not enabled and trusted in PackagePublisherInventory.json."
+    }
+
+    $trustedCandidates = @(
+        foreach ($candidate in @($Candidates)) {
+            if (-not $publisherById.ContainsKey([string]$candidate.PublisherId)) {
+                continue
+            }
+            if (-not [string]::IsNullOrWhiteSpace($PublisherId) -and
+                -not [string]::Equals([string]$candidate.PublisherId, [string]$PublisherId, [System.StringComparison]::OrdinalIgnoreCase)) {
+                continue
+            }
+
+            $publisherRow = $publisherById[[string]$candidate.PublisherId]
+            $candidate | Add-Member -MemberType NoteProperty -Name PublisherSearchOrder -Value ([int]$publisherRow.SearchOrder) -Force
+            $candidate | Add-Member -MemberType NoteProperty -Name PublisherTrustMode -Value ([string]$publisherRow.TrustMode) -Force
+            $candidate
+        }
+    )
+
+    if ($trustedCandidates.Count -eq 0) {
+        $suffix = if ([string]::IsNullOrWhiteSpace($PublisherId)) { '' } else { " for publisher '$PublisherId'" }
+        throw "Package definition '$DefinitionId' was found only from untrusted or disabled publishers$suffix."
+    }
+
+    if ([string]::IsNullOrWhiteSpace($PublisherId)) {
+        $minPublisherOrder = (@($trustedCandidates) | Measure-Object -Property PublisherSearchOrder -Minimum).Minimum
+        $minPublisherIds = @($trustedCandidates |
+            Where-Object { [int]$_.PublisherSearchOrder -eq [int]$minPublisherOrder } |
+            Select-Object -ExpandProperty PublisherId -Unique)
+        if ($minPublisherIds.Count -gt 1) {
+            throw "Package definition '$DefinitionId' is provided by multiple trusted publishers with the same publisher searchOrder '$minPublisherOrder': $($minPublisherIds -join ', '). Use -PublisherId or change PackagePublisherInventory.json searchOrder."
+        }
+        $trustedCandidates = @($trustedCandidates | Where-Object { [string]::Equals([string]$_.PublisherId, [string]$minPublisherIds[0], [System.StringComparison]::OrdinalIgnoreCase) })
+    }
+
+    $bestRevision = (@($trustedCandidates) | Measure-Object -Property DefinitionRevision -Maximum).Maximum
+    $bestRevisionCandidates = @($trustedCandidates | Where-Object { [int]$_.DefinitionRevision -eq [int]$bestRevision })
+    $bestHashes = @($bestRevisionCandidates | Select-Object -ExpandProperty SourceHash -Unique)
+    if ($bestHashes.Count -gt 1) {
+        $locations = (@($bestRevisionCandidates) | ForEach-Object { "'$($_.EndpointName):$($_.DefinitionPath) hash=$($_.SourceHash)'" }) -join ', '
+        throw "Package definition '$DefinitionId' publisher '$($bestRevisionCandidates[0].PublisherId)' reused definitionRevision '$bestRevision' with different content across endpoints. Matching candidates: $locations. Publish a higher revision or disable one endpoint."
+    }
+
+    return @($bestRevisionCandidates | Sort-Object -Property EndpointSearchOrder, EndpointName, DefinitionPath | Select-Object -First 1)[0]
+}
+
+function Sync-PackageRepositoryCandidateDefinitions {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [object[]]$SourceRows,
+
+        [Parameter(Mandatory = $true)]
+        [object[]]$PublisherRows,
+
+        [AllowNull()]
+        [string]$ApplicationRootDirectory = $null,
+
         [Parameter(Mandatory = $true)]
         [string]$LocalRepositoryRoot
     )
 
+    $allCandidates = @(Get-PackageDefinitionCandidateRows -SourceRows $SourceRows -ApplicationRootDirectory $ApplicationRootDirectory)
+    $keys = @($allCandidates | ForEach-Object { [string]$_.DefinitionId } | Sort-Object -Unique)
     $materializedCount = 0
-    foreach ($sourceRow in @($SourceRows)) {
-        $endpointName = [string]$sourceRow.EndpointName
+    foreach ($definitionId in @($keys)) {
         try {
-            $scanRootPath = Resolve-PackageEndpointRootPath -EndpointName $endpointName -Source $sourceRow.Source -ApplicationRootDirectory $ApplicationRootDirectory
-            foreach ($definitionPath in @(Get-PackageDefinitionJsonPathsUnderDirectory -DirectoryPath $scanRootPath)) {
-                try {
-                    $definitionInfo = Read-PackageJsonDocument -Path $definitionPath
-                    $doc = $definitionInfo.Document
-                    $docDefinitionId = if ($doc.PSObject.Properties['definitionId'] -and -not [string]::IsNullOrWhiteSpace([string]$doc.definitionId)) {
-                        [string]$doc.definitionId
-                    }
-                    elseif ($doc.PSObject.Properties['id']) {
-                        [string]$doc.id
-                    }
-                    else {
-                        continue
-                    }
-                    if ([string]::IsNullOrWhiteSpace($docDefinitionId)) {
-                        continue
-                    }
-                    $definitionRepositorySegment = if ($doc.PSObject.Properties['repositoryId'] -and -not [string]::IsNullOrWhiteSpace([string]$doc.repositoryId)) {
-                        [string]$doc.repositoryId
-                    }
-                    else {
-                        [string](Get-PackageDefaultRepositoryId)
-                    }
-                    $publication = Get-PackageDefinitionPublication -DefinitionDocument $doc -DefinitionPath $definitionPath
-                    Copy-PackageDefinitionToLocalDefinitionStore -Role 'Candidate' -SourcePath $definitionPath -LocalRepositoryRoot $LocalRepositoryRoot -PublisherId ([string]$publication.PublisherId) -DefinitionRepositorySegment $definitionRepositorySegment -DefinitionId $docDefinitionId -DefinitionRevision ([int]$publication.DefinitionRevision) | Out-Null
-                    $materializedCount++
-                }
-                catch {
-                    Write-PackageExecutionMessage -Level 'WRN' -Message ("[WARN] Skipped repository-focused Candidate materialization for '{0}' from endpoint '{1}': {2}" -f $definitionPath, $endpointName, $_.Exception.Message)
-                }
-            }
+            $winner = Select-PackageDefinitionCandidateWinner -Candidates @($allCandidates | Where-Object { [string]::Equals([string]$_.DefinitionId, [string]$definitionId, [System.StringComparison]::OrdinalIgnoreCase) }) -PublisherRows $PublisherRows -DefinitionId $definitionId
+            Copy-PackageDefinitionToLocalDefinitionStore -Role 'Candidate' -SourcePath $winner.DefinitionPath -LocalRepositoryRoot $LocalRepositoryRoot -PublisherId ([string]$winner.PublisherId) -DefinitionId ([string]$winner.DefinitionId) -DefinitionRevision ([int]$winner.DefinitionRevision) | Out-Null
+            $materializedCount++
         }
         catch {
-            Write-PackageExecutionMessage -Level 'WRN' -Message ("[WARN] Skipped repository-focused Candidate materialization for endpoint '{0}': {1}" -f $endpointName, $_.Exception.Message)
+            Write-PackageExecutionMessage -Level 'WRN' -Message ("[WARN] Skipped repository-focused Candidate materialization for definition '{0}': {1}" -f $definitionId, $_.Exception.Message)
         }
     }
 
@@ -302,16 +340,14 @@ function Resolve-PackageDefinitionReference {
 Resolves a Package definition identity to a local materialized definition path.
 
 .DESCRIPTION
-PackageEndpointInventory.json lists scan endpoints. All enabled trusted endpoints are searched in searchOrder.
-Matching uses JSON definitionId. Optional RepositoryId filters
-to definitions whose JSON repositoryId equals that value (data-level, not an endpoint row key).
-The winning live definition (highest definitionRevision, then searchOrder, endpointName, publisherId, path) is copied under
-PkgRepos using publisher and JSON repositoryId path segments.
+PackageEndpointInventory.json lists scan endpoints. PackagePublisherInventory.json
+lists trusted publisher namespaces. Matching uses definitionPublication.definitionId,
+then publisher trust/search order, then definitionRevision.
 #>
     [CmdletBinding()]
     param(
         [AllowNull()]
-        [string]$RepositoryId = $null,
+        [string]$PublisherId = $null,
 
         [Parameter(Mandatory = $true)]
         [ValidateNotNullOrEmpty()]
@@ -328,8 +364,9 @@ PkgRepos using publisher and JSON repositoryId path segments.
     )
 
     $endpointInventoryInfo = Get-PackageEndpointInventoryInfo
-    $candidateRows = New-Object System.Collections.Generic.List[object]
+    $publisherInventoryInfo = Get-PackagePublisherInventoryInfo
     $sourceRows = @(Get-PackageEnabledTrustedEndpointSources -EndpointInventoryDocument $endpointInventoryInfo.Document)
+    $publisherRows = @(Get-PackageEnabledTrustedPublisherRows -PublisherInventoryDocument $publisherInventoryInfo.Document)
 
     $resolvedLocalRepositoryRoot = if ([string]::IsNullOrWhiteSpace($LocalRepositoryRoot)) {
         Get-PackageDefaultLocalRepositoryRoot
@@ -339,48 +376,22 @@ PkgRepos using publisher and JSON repositoryId path segments.
     }
 
     if ([string]::Equals($RepositoryMaterializationMode, 'repositoryFocused', [System.StringComparison]::OrdinalIgnoreCase)) {
-        $count = Sync-PackageRepositoryCandidateDefinitions -SourceRows $sourceRows -ApplicationRootDirectory $ApplicationRootDirectory -LocalRepositoryRoot $resolvedLocalRepositoryRoot
+        $count = Sync-PackageRepositoryCandidateDefinitions -SourceRows $sourceRows -PublisherRows $publisherRows -ApplicationRootDirectory $ApplicationRootDirectory -LocalRepositoryRoot $resolvedLocalRepositoryRoot
         Write-PackageExecutionMessage -Message ("[STATE] Repository-focused definition materialization refreshed {0} Candidate definition file(s)." -f $count)
     }
 
-    foreach ($sourceRow in @($sourceRows)) {
-        $endpointName = [string]$sourceRow.EndpointName
-        $scanRootPath = Resolve-PackageEndpointRootPath -EndpointName $endpointName -Source $sourceRow.Source -ApplicationRootDirectory $ApplicationRootDirectory
-        foreach ($candidate in @(Select-PackageDefinitionCandidatesFromEndpointScanRoot -EndpointName $endpointName -EndpointSource $sourceRow.Source -ScanRootPath $scanRootPath -DefinitionId $DefinitionId)) {
-            $candidate | Add-Member -MemberType NoteProperty -Name SearchOrder -Value ([int]$sourceRow.SearchOrder) -Force
-            $candidateRows.Add($candidate) | Out-Null
-        }
-    }
-
-    $candidates = @($candidateRows.ToArray())
-    if (-not [string]::IsNullOrWhiteSpace($RepositoryId)) {
-        $candidates = @($candidates | Where-Object {
-            [string]::Equals([string]$_.DefinitionDataRepositoryId, [string]$RepositoryId, [System.StringComparison]::OrdinalIgnoreCase)
-        })
-    }
-
+    $candidates = @(Get-PackageDefinitionCandidateRows -SourceRows $sourceRows -ApplicationRootDirectory $ApplicationRootDirectory -DefinitionId $DefinitionId)
     if ($candidates.Count -eq 0) {
-        $narrow = if ([string]::IsNullOrWhiteSpace($RepositoryId)) { '' } else { " with JSON repositoryId filter '$RepositoryId'" }
+        $narrow = if ([string]::IsNullOrWhiteSpace($PublisherId)) { '' } else { " for publisher '$PublisherId'" }
         throw "Package definition '$DefinitionId' was not found in enabled trusted endpoints$narrow."
     }
 
-    $bestRevision = (@($candidates) | Measure-Object -Property DefinitionRevision -Maximum).Maximum
-    $bestRevisionCandidates = @($candidates | Where-Object { [int]$_.DefinitionRevision -eq [int]$bestRevision })
-    $bestHashes = @($bestRevisionCandidates | Select-Object -ExpandProperty SourceHash -Unique)
-    if ($bestHashes.Count -gt 1) {
-        $locations = (@($bestRevisionCandidates) | ForEach-Object { "'$($_.EndpointName):$($_.DefinitionPath) hash=$($_.SourceHash)'" }) -join ', '
-        throw "Package definition '$DefinitionId' publisher '$($bestRevisionCandidates[0].PublisherId)' reused definitionRevision '$bestRevision' with different content across endpoints. Matching candidates: $locations. Use -RepositoryId to narrow by JSON repositoryId or publish a higher revision."
-    }
-
-    $selected = @($bestRevisionCandidates | Sort-Object -Property SearchOrder, EndpointName, PublisherId, DefinitionPath | Select-Object -First 1)[0]
+    $selected = Select-PackageDefinitionCandidateWinner -Candidates $candidates -PublisherRows $publisherRows -DefinitionId $DefinitionId -PublisherId $PublisherId
     $selectedSourceRow = @($sourceRows | Where-Object { [string]::Equals([string]$_.EndpointName, [string]$selected.EndpointName, [System.StringComparison]::OrdinalIgnoreCase) } | Select-Object -First 1)[0]
-    $candidateCopy = Copy-PackageDefinitionToLocalDefinitionStore -Role 'Candidate' -SourcePath $selected.DefinitionPath -LocalRepositoryRoot $resolvedLocalRepositoryRoot -PublisherId $selected.PublisherId -DefinitionRepositorySegment $selected.DefinitionDataRepositoryId -DefinitionId $selected.DefinitionId -DefinitionRevision $selected.DefinitionRevision
+    $candidateCopy = Copy-PackageDefinitionToLocalDefinitionStore -Role 'Candidate' -SourcePath $selected.DefinitionPath -LocalRepositoryRoot $resolvedLocalRepositoryRoot -PublisherId $selected.PublisherId -DefinitionId $selected.DefinitionId -DefinitionRevision $selected.DefinitionRevision
 
     return [pscustomobject]@{
         EndpointName                  = [string]$selected.EndpointName
-        RepositorySourceId            = [string]$selected.EndpointName
-        RepositoryId                  = [string]$selected.EndpointName
-        DefinitionDataRepositoryId    = [string]$selected.DefinitionDataRepositoryId
         DefinitionId                  = [string]$selected.DefinitionId
         DefinitionPath                = [System.IO.Path]::GetFullPath($candidateCopy.Path)
         SourceKind                    = [string]$selected.EndpointSourceKind
@@ -394,8 +405,10 @@ PkgRepos using publisher and JSON repositoryId path segments.
         ResolvedAtUtc                 = [DateTime]::UtcNow.ToString('o')
         SnapshotFallback              = $false
         EndpointInventoryPath         = $endpointInventoryInfo.Path
+        PublisherInventoryPath        = $publisherInventoryInfo.Path
         Trusted                       = $true
-        TrustMode                     = if ($selectedSourceRow) { [string]$selectedSourceRow.Source.trustMode } else { $null }
+        EndpointTrustMode             = if ($selectedSourceRow) { [string]$selectedSourceRow.Source.trustMode } else { $null }
+        PublisherTrustMode            = [string]$selected.PublisherTrustMode
         PublisherId                   = [string]$selected.PublisherId
         PublisherName                 = [string]$selected.PublisherName
         DefinitionRevision            = [int]$selected.DefinitionRevision

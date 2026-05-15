@@ -1,13 +1,14 @@
 {
-  "$comment": "Schema-first draft for Visual Studio Code Windows user setup (x64). Acquisition URL and sha256 were taken from microsoft/winget-pkgs (Microsoft.VisualStudioCode.installer.yaml, user scope x64) on 2026-05-10; silent-install flags follow https://code.visualstudio.com/docs/setup/windows (Inno Setup + /mergetasks=!runcode).",
-  "$schema": "../../Schema/eigenverft-module-package-definition-1.4.schema.json",
-  "schemaVersion": "1.4",
+  "$schema": "../../Schema/eigenverft-module-package-definition-1.5.schema.json",
+  "schemaVersion": "1.5",
   "definitionPublication": {
     "publisherId": "Eigenverft",
     "publisherName": "Eigenverft",
+    "definitionId": "VSCodeUser",
     "definitionRevision": 1,
-    "publishedAtUtc": "2026-05-13T12:00:00Z"
+    "publishedAtUtc": "05/13/2026 12:00:00"
   },
+  "$comment": "Schema-first draft for Visual Studio Code Windows user setup (x64). Acquisition URL and sha256 were taken from microsoft/winget-pkgs (Microsoft.VisualStudioCode.installer.yaml, user scope x64) on 2026-05-10; silent-install flags follow https://code.visualstudio.com/docs/setup/windows (Inno Setup + /mergetasks=!runcode).",
   "display": {
     "default": {
       "name": "Visual Studio Code (User)",
@@ -227,7 +228,5 @@
         "workDirectories": true
       }
     }
-  },
-  "definitionId": "VSCodeUser",
-  "repositoryId": "EigenverftModule"
+  }
 }

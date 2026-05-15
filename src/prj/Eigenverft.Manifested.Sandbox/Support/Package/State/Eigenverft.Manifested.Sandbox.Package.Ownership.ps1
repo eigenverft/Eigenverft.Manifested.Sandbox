@@ -195,7 +195,7 @@ Copy-PackageDefinitionToAssignedSnapshot -PackageResult $result
     $assignedCopy = Copy-PackageDefinitionToLocalDefinitionStore -Role 'Assigned' -SourcePath $sourcePath -LocalRepositoryRoot $localRepositoryRoot -PublisherId $publisherId -DefinitionId ([string]$PackageResult.DefinitionId) -DefinitionRevision $definitionRevision
 
     return [pscustomobject]@{
-        RepositorySourceId      = if ($config.PSObject.Properties['DefinitionRepositorySourceId']) { [string]$config.DefinitionRepositorySourceId } else { [string]$config.DefinitionRepositoryId }
+        EndpointName            = if ($config.PSObject.Properties['DefinitionEndpointName']) { [string]$config.DefinitionEndpointName } else { $null }
         PublisherId             = $publisherId
         PublisherName           = $publisherName
         DefinitionRevision      = $definitionRevision
@@ -411,7 +411,7 @@ Update-PackageInventoryRecord -PackageResult $result
         definitionPublisherName = $definitionCopy.PublisherName
         definitionRevision = $definitionCopy.DefinitionRevision
         definitionPublishedAtUtc = $definitionCopy.PublishedAtUtc
-        definitionRepositorySourceId = $definitionCopy.RepositorySourceId
+        definitionEndpointName = $definitionCopy.EndpointName
         definitionSourceKind = $definitionCopy.SourceKind
         definitionSourcePath = $definitionCopy.SourcePath
         definitionSourceHash = $definitionCopy.SourceHash

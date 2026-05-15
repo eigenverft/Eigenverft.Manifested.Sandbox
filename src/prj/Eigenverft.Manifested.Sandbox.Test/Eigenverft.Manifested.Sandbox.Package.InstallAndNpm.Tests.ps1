@@ -719,12 +719,11 @@ exit /b 0
         $preferredTargetInstallDirectory = Join-Path $rootPath 'installs'
         $packageStateIndexFilePath = Join-Path $rootPath 'PackageAssignmentInventory.json'
         $definitionDocument = @{
-            schemaVersion = '1.4'
-            definitionId = 'Qwen35_9B_Q6_K_Model'
-            repositoryId = 'EigenverftModule'
+            schemaVersion = '1.5'
             definitionPublication = @{
                 publisherId = 'Eigenverft'
                 publisherName = 'Eigenverft Module'
+                definitionId = 'Qwen35_9B_Q6_K_Model'
                 definitionRevision = 1
                 publishedAtUtc = '2026-05-13T12:00:00Z'
             }

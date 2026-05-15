@@ -11,8 +11,8 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - export
 
         $command | Should -Not -BeNullOrEmpty
         $command.Parameters.Keys | Should -Contain 'DefinitionId'
-        $command.Parameters.Keys | Should -Contain 'RepositoryId'
-        $command.Parameters.Keys | Should -Not -Contain 'PublisherId'
+        $command.Parameters.Keys | Should -Contain 'PublisherId'
+        $command.Parameters.Keys | Should -Not -Contain 'RepositoryId'
         $command.Parameters.Keys | Should -Not -Contain 'RepositorySourceId'
         $command.Parameters.Keys | Should -Contain 'DesiredState'
         $command.Parameters.Keys | Should -Contain 'FailFast'
@@ -199,7 +199,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - export
             definitionPublisherName = 'Eigenverft'
             definitionRevision = 1
             definitionPublishedAtUtc = '2026-05-13T12:00:00Z'
-            definitionRepositorySourceId = 'EigenverftModule'
+            definitionEndpointName = 'moduleDefaults'
             definitionSourceKind = 'moduleLocal'
             definitionSourcePath = Join-Path $root 'VSCodeRuntime.json'
             definitionSourceHash = 'source-hash'
@@ -226,7 +226,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - export
         }
         $operationRecord = [pscustomobject]@{
             operationId    = 'test-operation'
-            repositorySourceId = 'moduleDefaults'
+            definitionEndpointName = 'moduleDefaults'
             definitionId   = 'VSCodeRuntime'
             desiredState   = 'Assigned'
             status         = 'Ready'
@@ -250,7 +250,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - export
         $state.PackageRecordCount | Should -Be 1
         $state.OperationRecordCount | Should -Be 1
         $state.PackageRecords[0].InstallSlotId | Should -Be 'VSCodeRuntime:stable:win32-x64'
-        $state.PackageRecords[0].DefinitionRepositorySourceId | Should -Be 'EigenverftModule'
+        $state.PackageRecords[0].DefinitionEndpointName | Should -Be 'moduleDefaults'
         $state.PackageRecords[0].DefinitionCandidateExists | Should -BeTrue
         $state.PackageRecords[0].DefinitionAssignedSnapshotExists | Should -BeTrue
         $state.PackageRecords[0].InstallDirectoryExists | Should -BeTrue

@@ -67,7 +67,8 @@ function Select-PackageOperationDependencySummary {
 
     $dependencyResult = if ($Dependency.PSObject.Properties['Result']) { $Dependency.Result } else { $null }
     return [pscustomobject]@{
-        repositorySourceId = if ($Dependency.PSObject.Properties['RepositorySourceId']) { [string]$Dependency.RepositorySourceId } elseif ($dependencyResult -and $dependencyResult.PSObject.Properties['RepositorySourceId']) { [string]$dependencyResult.RepositorySourceId } elseif ($Dependency.PSObject.Properties['RepositoryId']) { [string]$Dependency.RepositoryId } elseif ($dependencyResult -and $dependencyResult.PSObject.Properties['RepositoryId']) { [string]$dependencyResult.RepositoryId } else { $null }
+        publisherId   = if ($Dependency.PSObject.Properties['PublisherId']) { [string]$Dependency.PublisherId } elseif ($dependencyResult -and $dependencyResult.PSObject.Properties['DefinitionPublisherId']) { [string]$dependencyResult.DefinitionPublisherId } else { $null }
+        endpointName  = if ($dependencyResult -and $dependencyResult.PSObject.Properties['DefinitionEndpointName']) { [string]$dependencyResult.DefinitionEndpointName } else { $null }
         definitionId  = if ($Dependency.PSObject.Properties['DefinitionId']) { [string]$Dependency.DefinitionId } elseif ($dependencyResult -and $dependencyResult.PSObject.Properties['DefinitionId']) { [string]$dependencyResult.DefinitionId } else { $null }
         desiredState  = if ($dependencyResult -and $dependencyResult.PSObject.Properties['DesiredState']) { [string]$dependencyResult.DesiredState } else { 'Assigned' }
         status        = if ($Dependency.PSObject.Properties['Status']) { [string]$Dependency.Status } elseif ($dependencyResult -and $dependencyResult.PSObject.Properties['Status']) { [string]$dependencyResult.Status } else { $null }
@@ -115,11 +116,10 @@ Creates one operation-history record from a finalized Package result.
         operationId                   = $operationId
         startedAtUtc                  = $startedAtUtc
         completedAtUtc                = $CompletedAtUtc
-        repositorySourceId            = if ($PackageResult.PSObject.Properties['RepositorySourceId']) { [string]$PackageResult.RepositorySourceId } else { [string]$PackageResult.RepositoryId }
         definitionId                  = [string]$PackageResult.DefinitionId
         definitionPublisherId         = if ($PackageResult.PSObject.Properties['DefinitionPublisherId']) { [string]$PackageResult.DefinitionPublisherId } else { $null }
         definitionRevision            = if ($PackageResult.PSObject.Properties['DefinitionRevision']) { [int]$PackageResult.DefinitionRevision } else { $null }
-        definitionRepositorySourceId  = if ($PackageResult.PSObject.Properties['DefinitionRepositorySourceId']) { [string]$PackageResult.DefinitionRepositorySourceId } else { $null }
+        definitionEndpointName        = if ($PackageResult.PSObject.Properties['DefinitionEndpointName']) { [string]$PackageResult.DefinitionEndpointName } else { $null }
         definitionCandidatePath       = if ($PackageResult.PSObject.Properties['DefinitionCandidatePath']) { [string]$PackageResult.DefinitionCandidatePath } else { $null }
         definitionAssignedSnapshotPath = if ($PackageResult.PSObject.Properties['DefinitionAssignedSnapshotPath']) { [string]$PackageResult.DefinitionAssignedSnapshotPath } else { $null }
         desiredState                  = [string]$PackageResult.DesiredState

@@ -537,8 +537,6 @@ function global:New-TestVSCodeDefinitionDocument {
 
         [string]$PublishedAtUtc = '2026-05-13T12:00:00Z',
 
-        [string]$RepositoryId = 'EigenverftModule',
-
         [string]$UpstreamBaseUri = 'https://update.code.visualstudio.com',
 
         [hashtable]$UpstreamSources = $null,
@@ -798,12 +796,11 @@ function global:New-TestVSCodeDefinitionDocument {
     }
 
     return @{
-        schemaVersion = '1.4'
-        definitionId  = $DefinitionId
-        repositoryId  = $RepositoryId
+        schemaVersion = '1.5'
         definitionPublication = @{
             publisherId = $PublisherId
             publisherName = $PublisherName
+            definitionId = $DefinitionId
             definitionRevision = $DefinitionRevision
             publishedAtUtc = $PublishedAtUtc
         }
@@ -897,12 +894,16 @@ function global:Write-TestPackageDocuments {
         [object]$EndpointInventoryDocument,
 
         [AllowNull()]
+        [object]$PublisherInventoryDocument,
+
+        [AllowNull()]
         [object]$SourceInventoryDocument
     )
 
     $globalConfigPath = Join-Path $RootPath 'Configuration\Internal\PackageConfig.json'
     $depotInventoryPath = Join-Path $RootPath 'Configuration\Internal\PackageDepotInventory.json'
     $endpointInventoryPath = Join-Path $RootPath 'Configuration\Internal\PackageEndpointInventory.json'
+    $publisherInventoryPath = Join-Path $RootPath 'Configuration\Internal\PackagePublisherInventory.json'
     $repositoryDefinitionsRoot = Join-Path $RootPath 'RepositoryDefinitions'
     $definitionPublisherId = if ($DefinitionDocument.PSObject.Properties['definitionPublication'] -and
         $DefinitionDocument.definitionPublication.PSObject.Properties['publisherId'] -and
@@ -915,23 +916,31 @@ function global:Write-TestPackageDocuments {
     $definitionWireId = $null
     if ($DefinitionDocument -is [System.Collections.IDictionary]) {
         $dictKeys = @($DefinitionDocument.Keys | ForEach-Object { [string]$_ })
-        if ($dictKeys -contains 'definitionId' -and -not [string]::IsNullOrWhiteSpace([string]$DefinitionDocument['definitionId'])) {
-            $definitionWireId = [string]$DefinitionDocument['definitionId']
+        if ($dictKeys -contains 'definitionPublication') {
+            $publication = $DefinitionDocument['definitionPublication']
+            if ($publication -is [System.Collections.IDictionary] -and $publication.Contains('definitionId') -and -not [string]::IsNullOrWhiteSpace([string]$publication['definitionId'])) {
+                $definitionWireId = [string]$publication['definitionId']
+            }
+            elseif ($publication.PSObject.Properties['definitionId'] -and -not [string]::IsNullOrWhiteSpace([string]$publication.definitionId)) {
+                $definitionWireId = [string]$publication.definitionId
+            }
         }
-        elseif ($dictKeys -contains 'id' -and -not [string]::IsNullOrWhiteSpace([string]$DefinitionDocument['id'])) {
+        if ([string]::IsNullOrWhiteSpace($definitionWireId) -and $dictKeys -contains 'id' -and -not [string]::IsNullOrWhiteSpace([string]$DefinitionDocument['id'])) {
             $definitionWireId = [string]$DefinitionDocument['id']
         }
     }
     else {
-        if ($DefinitionDocument.PSObject.Properties['definitionId'] -and -not [string]::IsNullOrWhiteSpace([string]$DefinitionDocument.definitionId)) {
-            $definitionWireId = [string]$DefinitionDocument.definitionId
+        if ($DefinitionDocument.PSObject.Properties['definitionPublication'] -and
+            $DefinitionDocument.definitionPublication.PSObject.Properties['definitionId'] -and
+            -not [string]::IsNullOrWhiteSpace([string]$DefinitionDocument.definitionPublication.definitionId)) {
+            $definitionWireId = [string]$DefinitionDocument.definitionPublication.definitionId
         }
         elseif ($DefinitionDocument.PSObject.Properties['id'] -and -not [string]::IsNullOrWhiteSpace([string]$DefinitionDocument.id)) {
             $definitionWireId = [string]$DefinitionDocument.id
         }
     }
     if ([string]::IsNullOrWhiteSpace($definitionWireId)) {
-        throw 'Write-TestPackageDocuments requires DefinitionDocument.definitionId (or legacy id).'
+        throw 'Write-TestPackageDocuments requires DefinitionDocument.definitionPublication.definitionId (or legacy id).'
     }
     $definitionPath = Join-Path (Join-Path $repositoryDefinitionsRoot $definitionPublisherId) "$definitionWireId.json"
     Write-TestJsonDocument -Path $globalConfigPath -Document $GlobalDocument
@@ -954,14 +963,31 @@ function global:Write-TestPackageDocuments {
             )
         }
     }
+    if (-not $PSBoundParameters.ContainsKey('PublisherInventoryDocument') -or $null -eq $PublisherInventoryDocument) {
+        $PublisherInventoryDocument = @{
+            inventoryVersion = 1
+            publishers = @(
+                @{
+                    publisherId = $definitionPublisherId
+                    publisherName = $definitionPublisherId
+                    enabled = $true
+                    trusted = $true
+                    searchOrder = 100
+                    trustMode = 'unsignedExplicit'
+                }
+            )
+        }
+    }
     Write-TestJsonDocument -Path $depotInventoryPath -Document $DepotInventoryDocument
     Write-TestJsonDocument -Path $endpointInventoryPath -Document $EndpointInventoryDocument
+    Write-TestJsonDocument -Path $publisherInventoryPath -Document $PublisherInventoryDocument
     Write-TestJsonDocument -Path $definitionPath -Document $DefinitionDocument
 
     # Definition resolution no longer uses filename-based Get-PackageDefinitionPath.
     # Keep the bootstrap-local PackageEndpointInventory.json aligned for tests that mock
     # PackageConfig.json only.
     Write-TestJsonDocument -Path (Get-PackageLocalEndpointInventoryPath) -Document $EndpointInventoryDocument
+    Write-TestJsonDocument -Path (Get-PackageLocalPublisherInventoryPath) -Document $PublisherInventoryDocument
 
     $sourceInventoryPath = $null
     if ($PSBoundParameters.ContainsKey('SourceInventoryDocument') -and $null -ne $SourceInventoryDocument) {
@@ -973,6 +999,7 @@ function global:Write-TestPackageDocuments {
         GlobalConfigPath        = $globalConfigPath
         DepotInventoryPath      = $depotInventoryPath
         EndpointInventoryPath   = $endpointInventoryPath
+        PublisherInventoryPath  = $publisherInventoryPath
         DefinitionPath          = $definitionPath
         SourceInventoryPath    = $sourceInventoryPath
     }

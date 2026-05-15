@@ -322,7 +322,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
     It 'runs Invoke-Package with active repository search and assigned state' {
         Mock Invoke-PackageDefinitionCommandCore {
             [pscustomobject]@{
-                RepositoryId = $RepositoryId
+                PublisherId = $PublisherId
                 DefinitionId = $DefinitionId
                 DesiredState = $DesiredState
                 Status       = 'Ready'
@@ -332,7 +332,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
         $result = Invoke-Package -DefinitionId 'GitRuntime'
 
         Assert-MockCalled Invoke-PackageDefinitionCommandCore -Times 1 -ParameterFilter {
-            [string]::IsNullOrWhiteSpace($RepositoryId) -and
+            [string]::IsNullOrWhiteSpace($PublisherId) -and
             $DefinitionId -eq 'GitRuntime' -and
             $DesiredState -eq 'Assigned'
         }
@@ -342,7 +342,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
     It 'runs Invoke-Package definition id arrays in listed order' {
         Mock Invoke-PackageDefinitionCommandCore {
             [pscustomobject]@{
-                RepositoryId = $RepositoryId
+                PublisherId = $PublisherId
                 DefinitionId = $DefinitionId
                 DesiredState = $DesiredState
                 Status       = 'Ready'
@@ -359,7 +359,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
     It 'continues Invoke-Package definition id arrays after a failed result by default' {
         Mock Invoke-PackageDefinitionCommandCore {
             [pscustomobject]@{
-                RepositoryId = $RepositoryId
+                PublisherId = $PublisherId
                 DefinitionId = $DefinitionId
                 DesiredState = $DesiredState
                 Status       = if ($DefinitionId -eq 'GitRuntime') { 'Failed' } else { 'Ready' }
@@ -378,7 +378,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
     It 'stops Invoke-Package arrays after the first failed result when FailFast is set' {
         Mock Invoke-PackageDefinitionCommandCore {
             [pscustomobject]@{
-                RepositoryId = $RepositoryId
+                PublisherId = $PublisherId
                 DefinitionId = $DefinitionId
                 DesiredState = $DesiredState
                 Status       = if ($DefinitionId -eq 'GitRuntime') { 'Failed' } else { 'Ready' }
@@ -393,18 +393,18 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
         $results[0].Status | Should -Be 'Failed'
     }
 
-    It 'resolves shipped package definitions through the default repository seam' {
+    It 'resolves shipped package definitions through trusted publisher and endpoint seams' {
         $reference = Resolve-PackageDefinitionReference -DefinitionId 'VSCodeRuntime'
 
-        $reference.RepositorySourceId | Should -Be 'moduleDefaults'
+        $reference.EndpointName | Should -Be 'moduleDefaults'
         $reference.PublisherId | Should -Be 'Eigenverft'
         $reference.DefinitionId | Should -Be 'VSCodeRuntime'
         $reference.SourceKind | Should -Be 'moduleLocal'
         Split-Path -Leaf $reference.DefinitionPath | Should -Be 'VSCodeRuntime.json'
     }
 
-    It 'fails clearly for unsupported package repositories' {
-        { Resolve-PackageDefinitionReference -RepositoryId 'OtherRepository' -DefinitionId 'VSCodeRuntime' } | Should -Throw "*was not found*"
+    It 'fails clearly for untrusted or unknown package publishers' {
+        { Resolve-PackageDefinitionReference -PublisherId 'OtherPublisher' -DefinitionId 'VSCodeRuntime' } | Should -Throw "*publisher 'OtherPublisher'*"
     }
 
     It 'completes removed desired state when inventory is missing and whenNotInInventory is succeed' {
@@ -525,7 +525,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
             definitionPublisherName = 'Eigenverft'
             definitionRevision = 1
             definitionPublishedAtUtc = '2026-05-13T00:00:00Z'
-            definitionRepositorySourceId = 'EigenverftModule'
+            definitionEndpointName = 'moduleDefaults'
             definitionSourceKind = 'filesystem'
             definitionSourcePath = $documents.DefinitionPath
             definitionSourceHash = (Get-PackageFileSha256 -Path $documents.DefinitionPath)
@@ -591,7 +591,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
             definitionPublisherName = 'Eigenverft'
             definitionRevision = 1
             definitionPublishedAtUtc = '2026-05-13T00:00:00Z'
-            definitionRepositorySourceId = 'EigenverftModule'
+            definitionEndpointName = 'moduleDefaults'
             definitionSourceKind = 'filesystem'
             definitionSourcePath = $documents.DefinitionPath
             definitionSourceHash = (Get-PackageFileSha256 -Path $documents.DefinitionPath)
@@ -658,7 +658,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
                 definitionPublisherName      = 'Eigenverft'
                 definitionRevision           = 1
                 definitionPublishedAtUtc     = '2026-05-13T12:00:00Z'
-                definitionRepositorySourceId = 'EigenverftModule'
+                definitionEndpointName        = 'moduleDefaults'
                 definitionSourcePath         = (Join-Path $defDir 'CodexCli.json')
                 definitionAssignedSnapshotPath = (Join-Path $defDir 'CodexCli.json')
                 definitionAssignedSnapshotHash = (Get-PackageFileSha256 -Path (Join-Path $defDir 'CodexCli.json'))
@@ -678,7 +678,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
                 definitionPublisherName      = 'Eigenverft'
                 definitionRevision           = 1
                 definitionPublishedAtUtc     = '2026-05-13T12:00:00Z'
-                definitionRepositorySourceId = 'EigenverftModule'
+                definitionEndpointName        = 'moduleDefaults'
                 definitionSourcePath         = (Join-Path $defDir 'NodeRuntime.json')
                 definitionAssignedSnapshotPath = (Join-Path $defDir 'NodeRuntime.json')
                 definitionAssignedSnapshotHash = (Get-PackageFileSha256 -Path (Join-Path $defDir 'NodeRuntime.json'))
@@ -822,7 +822,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
 
         $config.DefinitionId | Should -Be 'LlamaCppRuntime'
         @($config.Definition.dependencies.definitionId) | Should -Be @('VisualCppRedistributable')
-        @($config.Definition.dependencies.repositoryId) | Should -Be @($null)
+        @($config.Definition.dependencies.publisherId) | Should -Be @($null)
         $sourceDefinition.Kind | Should -Be 'githubRelease'
         $sourceDefinition.GitHubOwner | Should -Be 'ggml-org'
         $sourceDefinition.GitHubRepository | Should -Be 'llama.cpp'
@@ -1039,7 +1039,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
         }
         $result = [pscustomobject]@{
             DefinitionId                = 'CodexCli'
-            DefinitionRepositorySourceId = 'EigenverftModule'
+            DefinitionPublisherId       = 'Eigenverft'
             PackageConfig = [pscustomobject]@{
                 Definition = $definition
             }
@@ -1048,7 +1048,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
 
         Mock Invoke-PackageDefinitionCommandCore {
             [pscustomobject]@{
-                DefinitionRepositorySourceId = 'EigenverftModule'
+                DefinitionPublisherId = 'Eigenverft'
                 Status               = 'Ready'
                 InstallOrigin        = 'PackageReused'
                 Install                = [pscustomobject]@{ Status = 'ReusedPackageOwned' }
@@ -1066,7 +1066,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
         $resolved = Resolve-PackageDependencies -PackageResult $result
 
         @($resolved.Dependencies.DefinitionId) | Should -Be @('VisualCppRedistributable', 'NodeRuntime')
-        @($resolved.Dependencies.RepositorySourceId) | Should -Be @('EigenverftModule', 'EigenverftModule')
+        @($resolved.Dependencies.PublisherId) | Should -Be @('Eigenverft', 'Eigenverft')
         @($resolved.Dependencies.Status) | Should -Be @('Ready', 'Ready')
         @($resolved.Dependencies[1].Commands.Name) | Should -Be @('npm')
     }
@@ -1080,14 +1080,14 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
         }
         $result = [pscustomobject]@{
             DefinitionId       = 'CodexCli'
-            DefinitionRepositorySourceId = 'EigenverftModule'
+            DefinitionPublisherId = 'Eigenverft'
             PackageConfig = [pscustomobject]@{
                 Definition = $definition
             }
             Dependencies       = @()
         }
 
-        { Resolve-PackageDependencies -PackageResult $result -DependencyStack @('EigenverftModule:CodexCli', 'EigenverftModule:NodeRuntime') } | Should -Throw '*dependency cycle*'
+        { Resolve-PackageDependencies -PackageResult $result -DependencyStack @('Eigenverft:CodexCli', 'Eigenverft:NodeRuntime') } | Should -Throw '*dependency cycle*'
     }
 
     It 'loads the shipped PythonRuntime definition and selects the fixed NuGet package release' {

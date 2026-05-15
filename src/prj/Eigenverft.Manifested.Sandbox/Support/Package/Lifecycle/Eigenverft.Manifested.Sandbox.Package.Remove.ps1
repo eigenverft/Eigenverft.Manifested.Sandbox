@@ -19,7 +19,7 @@ function Get-PackageInventoryDependentBlockingRecords {
         [string]$ExcludeInstallSlotId,
 
         [Parameter(Mandatory = $true)]
-        [string]$TargetRepositoryId,
+        [string]$TargetPublisherId,
 
         [Parameter(Mandatory = $true)]
         [string]$TargetDefinitionId
@@ -34,8 +34,8 @@ function Get-PackageInventoryDependentBlockingRecords {
             continue
         }
 
-        $parentRepositoryId = if ($record.PSObject.Properties['definitionRepositorySourceId'] -and -not [string]::IsNullOrWhiteSpace([string]$record.definitionRepositorySourceId)) {
-            [string]$record.definitionRepositorySourceId
+        $parentPublisherId = if ($record.PSObject.Properties['definitionPublisherId'] -and -not [string]::IsNullOrWhiteSpace([string]$record.definitionPublisherId)) {
+            [string]$record.definitionPublisherId
         }
         else { $null }
         $parentDefinitionId = [string]$record.definitionId
@@ -52,7 +52,7 @@ function Get-PackageInventoryDependentBlockingRecords {
 
         try {
             $definitionDocumentInfo = Read-PackageJsonDocument -Path $parentSnapshotPath
-            Assert-PackageDefinitionSchema -DefinitionDocumentInfo $definitionDocumentInfo -DefinitionId $parentDefinitionId -DefinitionRepositoryId $parentRepositoryId
+            Assert-PackageDefinitionSchema -DefinitionDocumentInfo $definitionDocumentInfo -DefinitionId $parentDefinitionId -PublisherId $parentPublisherId
         }
         catch {
             throw "Package removal dependency scan failed while reading assigned definition snapshot '$parentSnapshotPath' for inventory installSlotId '$slot': $($_.Exception.Message)"
@@ -73,21 +73,21 @@ function Get-PackageInventoryDependentBlockingRecords {
                 continue
             }
 
-            $depRepositoryId = if ($dependency.PSObject.Properties['repositorySourceId'] -and -not [string]::IsNullOrWhiteSpace([string]$dependency.repositorySourceId)) {
-                [string]$dependency.repositorySourceId
+            $depPublisherId = if ($dependency.PSObject.Properties['publisherId'] -and -not [string]::IsNullOrWhiteSpace([string]$dependency.publisherId)) {
+                [string]$dependency.publisherId
             }
             else {
                 $null
             }
 
             $definitionMatches = [string]::Equals($depDefinitionId, $TargetDefinitionId, [System.StringComparison]::OrdinalIgnoreCase)
-            $repositoryMatches = [string]::IsNullOrWhiteSpace($depRepositoryId) -or
-                [string]::Equals($depRepositoryId, $TargetRepositoryId, [System.StringComparison]::OrdinalIgnoreCase)
-            if ($definitionMatches -and $repositoryMatches) {
+            $publisherMatches = [string]::IsNullOrWhiteSpace($depPublisherId) -or
+                [string]::Equals($depPublisherId, $TargetPublisherId, [System.StringComparison]::OrdinalIgnoreCase)
+            if ($definitionMatches -and $publisherMatches) {
                 $blockers.Add([pscustomobject]@{
                     DependentInstallSlotId = $slot
                     DependentDefinitionId  = $parentDefinitionId
-                    DependentRepositoryId  = $parentRepositoryId
+                    DependentPublisherId   = $parentPublisherId
                 }) | Out-Null
                 break
             }
@@ -108,17 +108,17 @@ function Assert-PackageRemovalDependencyDependents {
         return $PackageResult
     }
 
-    $targetRepositoryId = Get-PackageResultRepositoryId -PackageResult $PackageResult
+    $targetPublisherId = Get-PackageResultPublisherId -PackageResult $PackageResult
     $targetDefinitionId = [string]$PackageResult.DefinitionId
     $excludeSlotId = Get-PackageInstallSlotId -PackageResult $PackageResult
-    $blockers = @(Get-PackageInventoryDependentBlockingRecords -PackageConfig $PackageResult.PackageConfig -ExcludeInstallSlotId $excludeSlotId -TargetRepositoryId $targetRepositoryId -TargetDefinitionId $targetDefinitionId)
+    $blockers = @(Get-PackageInventoryDependentBlockingRecords -PackageConfig $PackageResult.PackageConfig -ExcludeInstallSlotId $excludeSlotId -TargetPublisherId $targetPublisherId -TargetDefinitionId $targetDefinitionId)
     if ($blockers.Count -gt 0) {
         $summaries = @(
             foreach ($b in @($blockers)) {
-                "'$($b.DependentRepositoryId)/$($b.DependentDefinitionId)' (installSlotId=$($b.DependentInstallSlotId))"
+                "'$($b.DependentPublisherId)/$($b.DependentDefinitionId)' (installSlotId=$($b.DependentInstallSlotId))"
             }
         )
-        throw ("Package removal blocked: '{0}/{1}' is still declared as a dependency by installed package(s): {2}. Remove those packages first (or implement removeDependencies)." -f $targetRepositoryId, $targetDefinitionId, ($summaries -join '; '))
+        throw ("Package removal blocked: '{0}/{1}' is still declared as a dependency by installed package(s): {2}. Remove those packages first (or implement removeDependencies)." -f $targetPublisherId, $targetDefinitionId, ($summaries -join '; '))
     }
 
     return $PackageResult
@@ -136,7 +136,8 @@ function Get-PackageExistingInstallSearchLocationById {
 
     $discovery = $Definition.existingInstallDiscovery
     if (-not $discovery -or -not $discovery.PSObject.Properties['searchLocations']) {
-        throw "Package definition '$($Definition.id)' is missing existingInstallDiscovery.searchLocations required for removal uninstall discovery."
+        $label = if ($Definition.PSObject.Properties['definitionPublication'] -and $Definition.definitionPublication.PSObject.Properties['definitionId']) { [string]$Definition.definitionPublication.definitionId } else { '<unknown>' }
+        throw "Package definition '$label' is missing existingInstallDiscovery.searchLocations required for removal uninstall discovery."
     }
 
     foreach ($searchLocation in @(Get-PackageExistingInstallSearchLocations -SearchLocations @($discovery.searchLocations))) {
@@ -146,7 +147,8 @@ function Get-PackageExistingInstallSearchLocationById {
         }
     }
 
-    throw "Package definition '$($Definition.id)' has no existingInstallDiscovery.searchLocations entry with id '$SearchLocationId'."
+    $label = if ($Definition.PSObject.Properties['definitionPublication'] -and $Definition.definitionPublication.PSObject.Properties['definitionId']) { [string]$Definition.definitionPublication.definitionId } else { '<unknown>' }
+    throw "Package definition '$label' has no existingInstallDiscovery.searchLocations entry with id '$SearchLocationId'."
 }
 
 function Get-PackageUninstallExecutableAndArgumentTail {
@@ -627,7 +629,7 @@ function Invoke-PackageRemovedFlow {
     )
 
     try {
-        Write-PackageExecutionMessage -Message ("[START] Invoke-Package repositorySource='{0}' definition='{1}' desiredState='{2}'." -f $PackageResult.RepositorySourceId, $PackageResult.DefinitionId, $PackageResult.DesiredState)
+        Write-PackageExecutionMessage -Message ("[START] Invoke-Package publisher='{0}' endpoint='{1}' definition='{2}' desiredState='{3}'." -f $PackageResult.DefinitionPublisherId, $PackageResult.DefinitionEndpointName, $PackageResult.DefinitionId, $PackageResult.DesiredState)
 
         $PackageResult.CurrentStep = 'InitializeLocalEnvironment'
         Write-PackageExecutionMessage -Message '[STEP] Initializing local package environment.'

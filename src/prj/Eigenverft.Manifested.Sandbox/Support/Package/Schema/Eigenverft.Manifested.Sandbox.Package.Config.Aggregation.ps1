@@ -259,8 +259,8 @@ combined config object for command orchestration.
 The Package definition id. Repository resolution matches the JSON definitionId, not the
 file name.
 
-.PARAMETER RepositoryId
-Optional. When set, only definition files whose JSON repositoryId equals this value are considered (after scanning all enabled trusted endpoints).
+.PARAMETER PublisherId
+Optional. When set, only definitions from this trusted publisher are considered.
 
 .EXAMPLE
 Get-PackageConfig -DefinitionId VSCodeRuntime
@@ -268,7 +268,7 @@ Get-PackageConfig -DefinitionId VSCodeRuntime
     [CmdletBinding()]
     param(
         [AllowNull()]
-        [string]$RepositoryId = $null,
+        [string]$PublisherId = $null,
 
         [Parameter(Mandatory = $true)]
         [string]$DefinitionId,
@@ -312,27 +312,28 @@ Get-PackageConfig -DefinitionId VSCodeRuntime
     $definitionReference = $null
     if ([string]::Equals($DesiredState, 'Removed', [System.StringComparison]::OrdinalIgnoreCase)) {
         try {
-            $definitionReference = Resolve-PackageDefinitionSnapshotReference -RepositoryId $RepositoryId -DefinitionId $DefinitionId -PackageAssignmentInventoryFilePath $packageInventoryFilePath -LiveResolutionError $null
+            $definitionReference = Resolve-PackageDefinitionSnapshotReference -PublisherId $PublisherId -DefinitionId $DefinitionId -PackageAssignmentInventoryFilePath $packageInventoryFilePath -LiveResolutionError $null
             Write-PackageExecutionMessage -Message ("[STATE] Using assigned definition snapshot '{0}' for removed desired state." -f $definitionReference.DefinitionPath)
         }
         catch {
             try {
-                $definitionReference = Resolve-PackageDefinitionReference -RepositoryId $RepositoryId -DefinitionId $DefinitionId -ApplicationRootDirectory $applicationRootDirectory -LocalRepositoryRoot $localRepositoryRoot -RepositoryMaterializationMode $repositoryMaterializationMode
+                $definitionReference = Resolve-PackageDefinitionReference -PublisherId $PublisherId -DefinitionId $DefinitionId -ApplicationRootDirectory $applicationRootDirectory -LocalRepositoryRoot $localRepositoryRoot -RepositoryMaterializationMode $repositoryMaterializationMode
             }
             catch {
-                $definitionReference = Resolve-PackageDefinitionSnapshotReference -RepositoryId $RepositoryId -DefinitionId $DefinitionId -PackageAssignmentInventoryFilePath $packageInventoryFilePath -LiveResolutionError $_.Exception.Message
+                $definitionReference = Resolve-PackageDefinitionSnapshotReference -PublisherId $PublisherId -DefinitionId $DefinitionId -PackageAssignmentInventoryFilePath $packageInventoryFilePath -LiveResolutionError $_.Exception.Message
                 Write-PackageExecutionMessage -Level 'WRN' -Message ("[WARN] Live package repository definition could not be resolved for definition '{0}'; using local assigned definition snapshot '{1}' for removal. Live error: {2}" -f $DefinitionId, $definitionReference.DefinitionPath, $_.Exception.Message)
             }
         }
     }
     else {
-        $definitionReference = Resolve-PackageDefinitionReference -RepositoryId $RepositoryId -DefinitionId $DefinitionId -ApplicationRootDirectory $applicationRootDirectory -LocalRepositoryRoot $localRepositoryRoot -RepositoryMaterializationMode $repositoryMaterializationMode
+        $definitionReference = Resolve-PackageDefinitionReference -PublisherId $PublisherId -DefinitionId $DefinitionId -ApplicationRootDirectory $applicationRootDirectory -LocalRepositoryRoot $localRepositoryRoot -RepositoryMaterializationMode $repositoryMaterializationMode
     }
 
     $definitionDocumentInfo = Read-PackageJsonDocument -Path $definitionReference.DefinitionPath
-    Assert-PackageDefinitionSchema -DefinitionDocumentInfo $definitionDocumentInfo -DefinitionId $DefinitionId
+    Assert-PackageDefinitionSchema -DefinitionDocumentInfo $definitionDocumentInfo -DefinitionId $DefinitionId -PublisherId $PublisherId
 
     $endpointInventoryInfo = Get-PackageEndpointInventoryInfo
+    $publisherInventoryInfo = Get-PackagePublisherInventoryInfo
     $depotInventoryInfo = Get-PackageDepotInventoryInfo
     $sourceInventoryInfo = Get-PackageSourceInventoryInfo -ApplicationRootDirectory $applicationRootDirectory
 
@@ -389,23 +390,14 @@ Get-PackageConfig -DefinitionId VSCodeRuntime
         }
     }
 
-    $definitionWireRepositoryId = if ($definition.PSObject.Properties['repositoryId'] -and -not [string]::IsNullOrWhiteSpace([string]$definition.repositoryId)) {
-        [string]$definition.repositoryId
-    }
-    else {
-        [string](Get-PackageDefaultRepositoryId)
-    }
-    $definitionWireDefinitionId = if ($definition.PSObject.Properties['definitionId'] -and -not [string]::IsNullOrWhiteSpace([string]$definition.definitionId)) {
-        [string]$definition.definitionId
-    }
-    elseif ($definition.PSObject.Properties['id']) {
-        [string]$definition.id
+    $definitionWireDefinitionId = if ($definition.PSObject.Properties['definitionPublication'] -and
+        $definition.definitionPublication.PSObject.Properties['definitionId'] -and
+        -not [string]::IsNullOrWhiteSpace([string]$definition.definitionPublication.definitionId)) {
+        [string]$definition.definitionPublication.definitionId
     }
     else {
         [string]$DefinitionId
     }
-
-    $definitionRepositoryId = $definitionWireRepositoryId
 
     $display = if ($definition.display -and $definition.display.PSObject.Properties['default'] -and $null -ne $definition.display.default) {
         $definition.display.default
@@ -422,6 +414,8 @@ Get-PackageConfig -DefinitionId VSCodeRuntime
         SourceInventory                    = $sourceInventoryInfo.Document
         EndpointInventoryPath              = $endpointInventoryInfo.Path
         EndpointInventory                  = $endpointInventoryInfo.Document
+        PublisherInventoryPath             = $publisherInventoryInfo.Path
+        PublisherInventory                 = $publisherInventoryInfo.Document
         DepotInventoryPath                 = $effectiveAcquisitionEnvironment.DepotInventoryPath
         DepotInventory                     = $depotInventoryInfo.Document
         EffectiveAcquisitionEnvironment    = $effectiveAcquisitionEnvironment
@@ -429,12 +423,10 @@ Get-PackageConfig -DefinitionId VSCodeRuntime
         DefinitionPath                     = $definitionDocumentInfo.Path
         Definition                         = $definition
         DefinitionId                       = $definitionWireDefinitionId
-        DefinitionRepositoryId             = $definitionRepositoryId
         DefinitionPublisherId              = [string]$definitionReference.PublisherId
         DefinitionPublisherName            = [string]$definitionReference.PublisherName
         DefinitionRevision                 = [int]$definitionReference.DefinitionRevision
         DefinitionPublishedAtUtc           = [string]$definitionReference.PublishedAtUtc
-        DefinitionRepositorySourceId       = $definitionWireRepositoryId
         DefinitionEndpointName             = if ($definitionReference.PSObject.Properties['EndpointName']) { [string]$definitionReference.EndpointName } else { $null }
         DefinitionSourceKind               = [string]$definitionReference.SourceKind
         DefinitionSourcePath               = [string]$definitionReference.SourcePath
@@ -612,19 +604,17 @@ New-PackageResult -PackageConfig $config
         OperationId                      = [guid]::NewGuid().ToString('n')
         OperationStartedAtUtc            = [DateTime]::UtcNow.ToString('o')
         DesiredState                     = $DesiredState
-        RepositorySourceId               = if ($PackageConfig.PSObject.Properties['DefinitionEndpointName'] -and -not [string]::IsNullOrWhiteSpace([string]$PackageConfig.DefinitionEndpointName)) { [string]$PackageConfig.DefinitionEndpointName } else { $null }
-        RepositoryId                     = $PackageConfig.DefinitionRepositoryId
+        PublisherId                      = $PackageConfig.DefinitionPublisherId
         Status                           = 'Pending'
         FailureReason                    = $null
         ErrorMessage                     = $null
         CurrentStep                      = 'Pending'
         DefinitionId                     = $PackageConfig.DefinitionId
-        DefinitionRepositoryId           = $PackageConfig.DefinitionRepositoryId
         DefinitionPublisherId            = $PackageConfig.DefinitionPublisherId
         DefinitionPublisherName          = $PackageConfig.DefinitionPublisherName
         DefinitionRevision               = $PackageConfig.DefinitionRevision
         DefinitionPublishedAtUtc         = $PackageConfig.DefinitionPublishedAtUtc
-        DefinitionRepositorySourceId     = $PackageConfig.DefinitionRepositorySourceId
+        DefinitionEndpointName           = $PackageConfig.DefinitionEndpointName
         Display                          = $PackageConfig.Display
         Platform                         = $PackageConfig.Platform
         Architecture                     = $PackageConfig.Architecture
@@ -632,6 +622,7 @@ New-PackageResult -PackageConfig $config
         ReleaseTrack                     = $PackageConfig.ReleaseTrack
         SourceInventoryPath              = $PackageConfig.SourceInventoryPath
         EndpointInventoryPath            = $PackageConfig.EndpointInventoryPath
+        PublisherInventoryPath           = $PackageConfig.PublisherInventoryPath
         DepotInventoryPath               = $PackageConfig.DepotInventoryPath
         DefinitionSourceKind             = $PackageConfig.DefinitionSourceKind
         DefinitionSourcePath             = $PackageConfig.DefinitionSourcePath
