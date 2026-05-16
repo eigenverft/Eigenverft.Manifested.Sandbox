@@ -111,7 +111,7 @@ Resolve-PackagePreAssignmentSatisfaction -PackageResult $result
         return $PackageResult
     }
 
-    $PackageResult = Test-PackageAssignedReadiness -PackageResult $PackageResult
+    $PackageResult = Test-PackageAssignedReadiness -PackageResult $PackageResult -FailedCheckLogLevel 'INF'
     if ($PackageResult.Readiness -and $PackageResult.Readiness.Accepted) {
         $PackageResult.InstallOrigin = 'AlreadySatisfied'
         $PackageResult.Assigned = [pscustomobject]@{

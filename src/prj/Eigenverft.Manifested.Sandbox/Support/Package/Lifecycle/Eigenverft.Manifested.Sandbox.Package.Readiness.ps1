@@ -211,13 +211,21 @@ the Package result object.
 .PARAMETER PackageResult
 The Package result object to validate.
 
+.PARAMETER FailedCheckLogLevel
+Severity for per-check messages when readiness is not accepted. Use 'INF' for
+expected-not-ready probes (for example machine-prerequisite pre-assignment or
+absence verification) so missing registry keys or files do not look like faults.
+
 .EXAMPLE
 Test-PackageAssignedReadiness -PackageResult $result
 #>
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true)]
-        [psobject]$PackageResult
+        [psobject]$PackageResult,
+
+        [Parameter()]
+        [string]$FailedCheckLogLevel = 'WRN'
     )
 
     $package = $PackageResult.Package
@@ -574,6 +582,7 @@ Test-PackageAssignedReadiness -PackageResult $result
 
     $failedCount = @($allResults | Where-Object { $_.Status -ne 'Ready' }).Count
     Write-PackageExecutionMessage -Message ("[STATE] Readiness completed for '{0}' with accepted='{1}', failedChecks={2}." -f $installDirectory, $accepted, $failedCount)
+    $perCheckLevel = if ([string]::IsNullOrWhiteSpace($FailedCheckLogLevel)) { 'WRN' } else { $FailedCheckLogLevel }
     foreach ($failedCheck in @($failedChecks)) {
         $targetText = if (-not [string]::IsNullOrWhiteSpace([string]$failedCheck.RelativePath)) {
             [string]$failedCheck.RelativePath
@@ -584,7 +593,7 @@ Test-PackageAssignedReadiness -PackageResult $result
         else {
             '<none>'
         }
-        Write-PackageExecutionMessage -Level 'WRN' -Message ('[READINESS] {0} failed for ''{1}'' with status=''{2}'', actual="{3}", expected="{4}".' -f $failedCheck.Kind, $targetText, $failedCheck.Status, $failedCheck.Actual, $failedCheck.Expected)
+        Write-PackageExecutionMessage -Level $perCheckLevel -Message ('[READINESS] {0} failed for ''{1}'' with status=''{2}'', actual="{3}", expected="{4}".' -f $failedCheck.Kind, $targetText, $failedCheck.Status, $failedCheck.Actual, $failedCheck.Expected)
     }
 
     return $PackageResult
@@ -629,7 +638,7 @@ requires that substantive checks do not report full readiness success.
 
     $null = $package | Add-Member -Force -MemberType NoteProperty -Name 'readiness' -Value $readinessModel
     try {
-        $null = Test-PackageAssignedReadiness -PackageResult $PackageResult
+        $null = Test-PackageAssignedReadiness -PackageResult $PackageResult -FailedCheckLogLevel 'INF'
     }
     finally {
         if ($null -ne $oldReadiness) {

@@ -504,7 +504,7 @@ function Resolve-PackageDefinitionSnapshotReference {
     )
 
     if ($records.Count -eq 0) {
-        throw "Package definition '$DefinitionId' could not be resolved from the live repository source, and no usable assigned definition snapshot was found in '$PackageAssignmentInventoryFilePath'. Live error: $LiveResolutionError"
+        throw "Package definition '$DefinitionId' could not be resolved from configured endpoints, and no usable assigned definition snapshot was found in '$PackageAssignmentInventoryFilePath'. Live error: $LiveResolutionError"
     }
 
     $selectedRecord = @($records | Sort-Object -Property updatedAtUtc -Descending | Select-Object -First 1)[0]

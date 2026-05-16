@@ -10,7 +10,7 @@ The primary intent is fast, repeatable setup inside Windows Sandbox. The same mo
 - Ready-to-download Windows Sandbox profile in the repo for repeatable bring-up
 - Package-backed provisioning for `python`, `pwsh`, `git`, `gh`, `code`, `notepad++`, `node`, `npm`, `opencode`, `gemini`, `qwen`, `codex`, Qwen GGUF model resources, llama.cpp, and VC++ prerequisites
 - Package state tracking through local package assignment inventory and operation history under `%LOCALAPPDATA%\Programs\Evf.Sandbox`
-- Package depot/repository layout that can reuse local artifacts and resolve package definitions from configured sources
+- Package depot plus endpoint definition layout that can reuse local artifacts and resolve package definitions from configured endpoints
 - Managed npm ownership under the sandbox Node runtime, including proxy-aware npm configuration when Windows resolves the npm registry through a proxy
 - Proxy-aware startup and download handling for managed or corporate Windows environments
 - Compacted embedded startup helpers so the `.wsb` `LogonCommand` fits within the practical 8 KB command-line limit

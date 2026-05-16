@@ -904,7 +904,7 @@ function global:Write-TestPackageDocuments {
     $depotInventoryPath = Join-Path $RootPath 'Configuration\Internal\PackageDepotInventory.json'
     $endpointInventoryPath = Join-Path $RootPath 'Configuration\Internal\PackageEndpointInventory.json'
     $publisherInventoryPath = Join-Path $RootPath 'Configuration\Internal\PackagePublisherInventory.json'
-    $repositoryDefinitionsRoot = Join-Path $RootPath 'RepositoryDefinitions'
+    $endpointDefinitionsRoot = Join-Path $RootPath 'EndpointDefinitions'
     $definitionPublisherId = if ($DefinitionDocument.PSObject.Properties['definitionPublication'] -and
         $DefinitionDocument.definitionPublication.PSObject.Properties['publisherId'] -and
         -not [string]::IsNullOrWhiteSpace([string]$DefinitionDocument.definitionPublication.publisherId)) {
@@ -942,7 +942,7 @@ function global:Write-TestPackageDocuments {
     if ([string]::IsNullOrWhiteSpace($definitionWireId)) {
         throw 'Write-TestPackageDocuments requires DefinitionDocument.definitionPublication.definitionId (or legacy id).'
     }
-    $definitionPath = Join-Path (Join-Path $repositoryDefinitionsRoot $definitionPublisherId) "$definitionWireId.json"
+    $definitionPath = Join-Path (Join-Path $endpointDefinitionsRoot $definitionPublisherId) "$definitionWireId.json"
     Write-TestJsonDocument -Path $globalConfigPath -Document $GlobalDocument
     if (-not $PSBoundParameters.ContainsKey('DepotInventoryDocument') -or $null -eq $DepotInventoryDocument) {
         $DepotInventoryDocument = New-TestDepotInventoryDocument -DefaultPackageDepotDirectory (Join-Path $RootPath 'PkgDepot')
@@ -956,7 +956,7 @@ function global:Write-TestPackageDocuments {
                     kind = 'filesystem'
                     enabled = $true
                     searchOrder = 100
-                    basePath = $repositoryDefinitionsRoot
+                    basePath = $endpointDefinitionsRoot
                 }
             )
         }

@@ -10,8 +10,8 @@ Shows the resolved module version, shipped package-definition examples, and othe
 
 .DESCRIPTION
 Resolves the highest available or loaded Eigenverft.Manifested.Sandbox module version, lists
-example Invoke-Package lines for each shipped definition JSON discovered under the default
-repository folder (when package bootstrap commands are available), then lists remaining exported
+example Invoke-Package lines for each shipped definition JSON discovered under the packaged
+endpoint defaults tree (when package bootstrap commands are available), then lists remaining exported
 commands in alphabetical order.
 
 .EXAMPLE
