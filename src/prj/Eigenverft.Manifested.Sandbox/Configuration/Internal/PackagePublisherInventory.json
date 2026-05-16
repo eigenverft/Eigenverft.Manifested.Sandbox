@@ -6,7 +6,6 @@
       "publisherName": "Eigenverft",
       "enabled": true,
       "trusted": true,
-      "searchOrder": 100,
       "trustMode": "moduleShipped"
     }
   ]

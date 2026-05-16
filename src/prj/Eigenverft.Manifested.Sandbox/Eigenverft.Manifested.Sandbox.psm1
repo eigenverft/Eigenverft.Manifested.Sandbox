@@ -52,6 +52,7 @@
 . "$PSScriptRoot\Commands\Package\Eigenverft.Manifested.Sandbox.Cmd.InvokePackage.ps1"
 . "$PSScriptRoot\Commands\Depot\Eigenverft.Manifested.Sandbox.Cmd.PackageDepot.ps1"
 . "$PSScriptRoot\Commands\Endpoint\Eigenverft.Manifested.Sandbox.Cmd.PackageEndpoint.ps1"
+. "$PSScriptRoot\Commands\Publisher\Eigenverft.Manifested.Sandbox.Cmd.PackagePublisher.ps1"
 . "$PSScriptRoot\Commands\Web\Eigenverft.Manifested.Sandbox.Cmd.InvokeWebRequestEx.ps1"
 . "$PSScriptRoot\Commands\Module\Eigenverft.Manifested.Sandbox.Cmd.Module.ps1"
 

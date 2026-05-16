@@ -47,7 +47,7 @@ function Assert-PackageEndpointSource {
         [string]$DocumentPath
     )
 
-    foreach ($requiredProperty in @('endpointName', 'kind', 'enabled', 'searchOrder', 'trusted', 'trustMode')) {
+    foreach ($requiredProperty in @('endpointName', 'kind', 'enabled', 'searchOrder')) {
         if (-not $SourceValue.PSObject.Properties[$requiredProperty]) {
             throw "Package endpoint '$EndpointName' in '$DocumentPath' is missing '$requiredProperty'."
         }
@@ -58,33 +58,25 @@ function Assert-PackageEndpointSource {
     if ($SourceValue.PSObject.Properties['priority']) {
         throw "Package endpoint '$EndpointName' in '$DocumentPath' still uses retired property 'priority'. Use 'searchOrder'."
     }
+    foreach ($retiredTrustProperty in @('trusted', 'trustMode', 'trustedAtUtc', 'trustReason')) {
+        if ($SourceValue.PSObject.Properties[$retiredTrustProperty]) {
+            throw "Package endpoint '$EndpointName' in '$DocumentPath' still uses retired property '$retiredTrustProperty'. Endpoint inventory defines scan locations only; use PackagePublisherInventory.json for publisher trust."
+        }
+    }
 
     $kind = [string]$SourceValue.kind
-    $trustMode = [string]$SourceValue.trustMode
     if ($kind -notin @('moduleLocal', 'filesystem', 'httpsCatalog')) {
         throw "Package endpoint '$EndpointName' in '$DocumentPath' has unsupported kind '$kind'."
-    }
-    if ($trustMode -notin @('moduleShipped', 'unsigned', 'unsignedExplicit', 'signedCatalog')) {
-        throw "Package endpoint '$EndpointName' in '$DocumentPath' has unsupported trustMode '$trustMode'."
     }
 
     if ([string]::Equals($kind, 'moduleLocal', [System.StringComparison]::OrdinalIgnoreCase)) {
         if (-not $SourceValue.PSObject.Properties['definitionRoot'] -or [string]::IsNullOrWhiteSpace([string]$SourceValue.definitionRoot)) {
             throw "Package endpoint '$EndpointName' in '$DocumentPath' is missing definitionRoot."
         }
-        if (-not [bool]$SourceValue.trusted -or -not [string]::Equals($trustMode, 'moduleShipped', [System.StringComparison]::OrdinalIgnoreCase)) {
-            throw "Package endpoint '$EndpointName' in '$DocumentPath' kind moduleLocal must use trusted=true and trustMode='moduleShipped'."
-        }
     }
     elseif ([string]::Equals($kind, 'filesystem', [System.StringComparison]::OrdinalIgnoreCase)) {
         if (-not $SourceValue.PSObject.Properties['basePath'] -or [string]::IsNullOrWhiteSpace([string]$SourceValue.basePath)) {
             throw "Package endpoint '$EndpointName' in '$DocumentPath' is missing basePath."
-        }
-        if ([bool]$SourceValue.trusted -and -not [string]::Equals($trustMode, 'unsignedExplicit', [System.StringComparison]::OrdinalIgnoreCase)) {
-            throw "Package endpoint '$EndpointName' in '$DocumentPath' kind filesystem must use trustMode='unsignedExplicit' when trusted=true."
-        }
-        if ([string]::Equals($trustMode, 'unsignedExplicit', [System.StringComparison]::OrdinalIgnoreCase) -and -not [bool]$SourceValue.trusted) {
-            throw "Package endpoint '$EndpointName' in '$DocumentPath' uses trustMode='unsignedExplicit' but trusted is false."
         }
     }
     elseif ([string]::Equals($kind, 'httpsCatalog', [System.StringComparison]::OrdinalIgnoreCase)) {
@@ -258,7 +250,7 @@ function Get-PackageEndpointSearchOrderAfter {
     return $candidate
 }
 
-function New-PackageFilesystemRepositorySource {
+function New-PackageFilesystemEndpointSource {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true)]
@@ -270,12 +262,7 @@ function New-PackageFilesystemRepositorySource {
         [Parameter(Mandatory = $true)]
         [int]$SearchOrder,
 
-        [bool]$Enabled = $true,
-
-        [bool]$Trusted = $false,
-
-        [AllowNull()]
-        [string]$TrustReason = $null
+        [bool]$Enabled = $true
     )
 
     if ([string]::IsNullOrWhiteSpace($BasePath)) {
@@ -288,15 +275,6 @@ function New-PackageFilesystemRepositorySource {
         enabled     = $Enabled
         searchOrder = $SearchOrder
         basePath    = $BasePath
-        trusted     = $Trusted
-        trustMode   = if ($Trusted) { 'unsignedExplicit' } else { 'unsigned' }
-    }
-
-    if ($Trusted) {
-        $source['trustedAtUtc'] = [DateTime]::UtcNow.ToString('o')
-        if (-not [string]::IsNullOrWhiteSpace($TrustReason)) {
-            $source['trustReason'] = $TrustReason
-        }
     }
 
     return [pscustomobject]$source
@@ -362,39 +340,28 @@ function Select-PackageEndpointSummary {
     )
 
     $enabled = if ($Source.PSObject.Properties['enabled']) { [bool]$Source.enabled } else { $true }
-    $trusted = if ($Source.PSObject.Properties['trusted']) { [bool]$Source.trusted } else { $false }
     $kind = if ($Source.PSObject.Properties['kind']) { [string]$Source.kind } else { $null }
-    $trustMode = if ($Source.PSObject.Properties['trustMode']) { [string]$Source.trustMode } else { $null }
 
     $notes = New-Object System.Collections.Generic.List[string]
     if (-not $enabled) {
         $notes.Add('Disabled; package commands will not use this endpoint.') | Out-Null
     }
-    if (-not $trusted) {
-        $notes.Add('Untrusted; definitions cannot be executed until the endpoint is trusted.') | Out-Null
-    }
     if ($kind -eq 'httpsCatalog') {
         $notes.Add('HTTPS catalog endpoints are reserved for future support and are not executable in v1.') | Out-Null
     }
-    if ($trusted -and [string]::Equals($trustMode, 'unsignedExplicit', [System.StringComparison]::OrdinalIgnoreCase)) {
-        $notes.Add('Unsigned definitions are trusted by explicit local configuration.') | Out-Null
-    }
+    $notes.Add('Definition execution is controlled by PackagePublisherInventory.json publisher trust.') | Out-Null
 
     return [pscustomobject]@{
         SourceId         = $EndpointName
         EndpointName     = $EndpointName
         Kind             = $kind
         Enabled          = $enabled
-        Trusted          = $trusted
-        TrustMode        = $trustMode
-        Effective        = ($enabled -and $trusted -and $kind -in @('moduleLocal', 'filesystem'))
+        Effective        = ($enabled -and $kind -in @('moduleLocal', 'filesystem'))
         SearchOrder      = if ($Source.PSObject.Properties['searchOrder']) { [int]$Source.searchOrder } else { $null }
         DefinitionRoot   = if ($Source.PSObject.Properties['definitionRoot']) { [string]$Source.definitionRoot } else { $null }
         BasePath         = if ($Source.PSObject.Properties['basePath']) { [string]$Source.basePath } else { $null }
         ResolvedRootPath = Resolve-PackageEndpointRootForDisplay -Source $Source -ApplicationRootDirectory $ApplicationRootDirectory
         InventoryPath    = $InventoryPath
-        TrustedAtUtc     = if ($Source.PSObject.Properties['trustedAtUtc']) { [string]$Source.trustedAtUtc } else { $null }
-        TrustReason      = if ($Source.PSObject.Properties['trustReason']) { [string]$Source.trustReason } else { $null }
         Notes            = @($notes.ToArray())
     }
 }
@@ -477,18 +444,12 @@ function Resolve-PackageEndpointRootPath {
     if (-not [bool]$Source.enabled) {
         throw "Package endpoint '$EndpointName' is disabled in PackageEndpointInventory.json."
     }
-    if (-not [bool]$Source.trusted) {
-        throw "Package endpoint '$EndpointName' is not trusted. Use Trust-PackageEndpoint for trusted filesystem endpoints."
-    }
 
     if ([string]::Equals($kind, 'moduleLocal', [System.StringComparison]::OrdinalIgnoreCase)) {
         return Resolve-ConfiguredPath -PathValue ([string]$Source.definitionRoot) -BaseDirectory (Split-Path -Parent (Get-PackageConfigurationRoot)) -Tokens @{}
     }
 
     if ([string]::Equals($kind, 'filesystem', [System.StringComparison]::OrdinalIgnoreCase)) {
-        if (-not [string]::Equals([string]$Source.trustMode, 'unsignedExplicit', [System.StringComparison]::OrdinalIgnoreCase)) {
-            throw "Package endpoint '$EndpointName' is filesystem but does not use trustMode='unsignedExplicit'. Use Trust-PackageEndpoint -AllowUnsignedDefinitions."
-        }
         if (-not [string]::IsNullOrWhiteSpace($ApplicationRootDirectory)) {
             return Resolve-PackageConfiguredPath -PathValue ([string]$Source.basePath) -ApplicationRootDirectory $ApplicationRootDirectory
         }

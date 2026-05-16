@@ -3,8 +3,8 @@
   "$id": "https://eigenverft.local/schemas/eigenverft-module-package-definition-1.5.schema.json",
   "title": "Eigenverft module package definition document (wire format 1.5)",
   "$comment": "META: This file is the JSON Schema for INSTANCE documents (one package definition per file). It is not itself a package definition. Runtime validates instances with PowerShell (DefinitionSchema.ps1 + DefinitionSchema.Wire1_5.ps1). In 1.5 definitionPublication.publisherId + definitionPublication.definitionId is the durable package-definition identity. Endpoints are discovery locations only. Filenames are storage detail, though the recommended repository layout is <publisherId>/<definitionId>.json.",
-  "description": "AUTHOR TASK - Produce or edit one complete package-definition JSON object for Eigenverft.Manifested.Sandbox. Required logical order: schemaVersion, definitionPublication, display, dependencies, artifacts, presenceDiscovery, existingInstallDiscovery, packageOperations. Use schemaVersion exactly 1.5.\n\nPUBLICATION: definitionPublication.publisherId is the trusted maintainer namespace for this definition (for shipped definitions: Eigenverft). definitionPublication.definitionId is the machine package definition id used by Invoke-Package. Increment definitionPublication.definitionRevision for every meaningful JSON change, including same-day quick fixes. publishedAtUtc is audit metadata only; revision is the update key within one publisher/definition.\n\nDEPENDENCIES: dependencies is required but may be []. dependency.publisherId is optional; omit it to let Invoke-Package resolve by trusted publisher search order, or include it to pin one publisher.\n\nCOMMON TRAPS: root repositoryId and root definitionId are retired; download candidates need sourceId+sourcePath (or artifact sourcePath) OR direct url/urlTemplate; GitHub release sources require real release assets and releaseTag; NSIS and Inno Setup are different install kinds; package-managed shims and installer-managed PATH should be chosen deliberately.",
-  "x-eigenverftAgentHint": "If you are an LLM or autonomous coding agent: create or edit a package-definition INSTANCE JSON file that conforms to this schema and DefinitionSchema.Wire1_5.ps1. Shipped examples live under Repositories/Eigenverft/ModuleDefaults. Prefer the repository layout <publisherId>/<definitionId>.json, but keep definitionPublication.definitionId authoritative. Always include definitionPublication and bump definitionRevision for definition changes.",
+  "description": "AUTHOR TASK - Produce or edit one complete package-definition JSON object for Eigenverft.Manifested.Sandbox. Required logical order: schemaVersion, definitionPublication, display, dependencies, artifacts, presenceDiscovery, existingInstallDiscovery, packageOperations. Use schemaVersion exactly 1.5.\n\nPUBLICATION: definitionPublication.publisherId is the trusted maintainer namespace for this definition (for shipped definitions: Eigenverft). definitionPublication.definitionId is the machine package definition id used by Invoke-Package. Increment definitionPublication.definitionRevision for every meaningful JSON change, including same-day quick fixes. publishedAtUtc is audit metadata only; revision is the update key within one publisher/definition.\n\nDEPENDENCIES: dependencies is required but may be []. dependency.publisherId is optional; omit it to let Invoke-Package resolve by trusted publisher conflict policy, or include it to pin one publisher.\n\nCOMMON TRAPS: root repositoryId and root definitionId are retired; download candidates need sourceId+sourcePath (or artifact sourcePath) OR direct url/urlTemplate; GitHub release sources require real release assets and releaseTag; NSIS and Inno Setup are different install kinds; package-managed shims and installer-managed PATH should be chosen deliberately.",
+  "x-eigenverftAgentHint": "If you are an LLM or autonomous coding agent: create or edit a package-definition INSTANCE JSON file that conforms to this schema and DefinitionSchema.Wire1_5.ps1. Shipped examples live under Endpoint/Defaults/Eigenverft. Prefer the repository layout <publisherId>/<definitionId>.json, but keep definitionPublication.definitionId authoritative. Always include definitionPublication and bump definitionRevision for definition changes.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -24,7 +24,7 @@
     },
     "$schema": {
       "type": "string",
-      "description": "Optional. In instance documents set to ../../Schema/eigenverft-module-package-definition-1.5.schema.json (relative to Repositories/Eigenverft/ModuleDefaults) so editors attach validation; runtime ignores."
+      "description": "Optional. In instance documents set to ../../../Schema/PackageDefinition/eigenverft-module-package-definition-1.5.schema.json (relative to Endpoint/Defaults/Eigenverft) so editors attach validation; runtime ignores."
     },
     "schemaVersion": {
       "type": "string",
@@ -41,7 +41,7 @@
     },
     "dependencies": {
       "type": "array",
-      "description": "Required array (may be empty []). Lists other package definitions that must reach Assigned before this one. publisherId is optional; omit it for trusted publisher search order, include it to pin one publisher. Do not use retired repositoryId or repositorySourceId on dependency objects.",
+      "description": "Required array (may be empty []). Lists other package definitions that must reach Assigned before this one. publisherId is optional; omit it for trusted publisher conflict policy, include it to pin one publisher. Do not use retired repositoryId or repositorySourceId on dependency objects.",
       "items": {
         "$ref": "#/$defs/dependency"
       }
@@ -154,7 +154,7 @@
       "properties": {
         "publisherId": {
           "$ref": "#/$defs/identifier",
-          "description": "Optional publisher namespace pin for this dependency. Omit to use trusted publisher search order."
+          "description": "Optional publisher namespace pin for this dependency. Omit to use trusted publisher conflict policy."
         },
         "definitionId": {
           "$ref": "#/$defs/identifier",
@@ -1770,5 +1770,3 @@
     }
   }
 }
-
-

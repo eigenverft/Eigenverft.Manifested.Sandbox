@@ -4,7 +4,7 @@
 
 $script:ManifestedPackageRoot = Split-Path -Parent (Split-Path -Parent (Split-Path -Parent $PSScriptRoot))
 $script:ManifestedPackageConfigurationRoot = Join-Path $script:ManifestedPackageRoot 'Configuration'
-$script:ManifestedPackageRepositoriesRoot = Join-Path $script:ManifestedPackageRoot 'Repositories'
+$script:ManifestedPackageShippedEndpointRoot = Join-Path $script:ManifestedPackageRoot 'Endpoint'
 $script:ManifestedPackageDefaultEndpointName = 'moduleDefaults'
 $script:ManifestedPackageDefaultPublisherId = 'Eigenverft'
 $script:ManifestedPackageSourceInventoryPathEnvironmentVariableName = 'EIGENVERFT_MANIFESTED_PACKAGE_SOURCE_INVENTORY_PATH'
@@ -28,22 +28,22 @@ Get-PackageConfigurationRoot
     return $script:ManifestedPackageConfigurationRoot
 }
 
-function Get-PackageRepositoriesRoot {
+function Get-PackageShippedEndpointRoot {
 <#
 .SYNOPSIS
-Returns the shipped Package repositories directory.
+Returns the shipped Package endpoint directory.
 
 .DESCRIPTION
-Resolves the module-relative directory that contains shipped Package
-definition repositories.
+Resolves the module-relative directory that contains shipped Package definition
+scan endpoints.
 
 .EXAMPLE
-Get-PackageRepositoriesRoot
+Get-PackageShippedEndpointRoot
 #>
     [CmdletBinding()]
     param()
 
-    return $script:ManifestedPackageRepositoriesRoot
+    return $script:ManifestedPackageShippedEndpointRoot
 }
 
 function Get-PackageDefaultPublisherId {
@@ -401,8 +401,8 @@ function Get-PackageDefinitionPath {
 Returns the shipped Package definition path for an id.
 
 .DESCRIPTION
-Finds a Package definition JSON file in the shipped `Repositories\Eigenverft\ModuleDefaults` tree
-by reading the JSON definitionId. Filenames and subdirectories are storage details.
+Finds a Package definition JSON file in the shipped `Endpoint\Defaults` tree by
+reading the JSON definitionId. Filenames and subdirectories are storage details.
 
 .PARAMETER DefinitionId
 The Package definition id.
@@ -416,24 +416,18 @@ Get-PackageDefinitionPath -DefinitionId VSCodeRuntime
         [string]$DefinitionId
     )
 
-    $repositoryRoot = Join-Path (Get-PackageRepositoriesRoot) 'Eigenverft\ModuleDefaults'
-    if (-not (Test-Path -LiteralPath $repositoryRoot -PathType Container)) {
-        throw "Package repository root '$repositoryRoot' does not exist."
+    $endpointRoot = Join-Path (Get-PackageShippedEndpointRoot) 'Defaults'
+    if (-not (Test-Path -LiteralPath $endpointRoot -PathType Container)) {
+        throw "Package shipped endpoint root '$endpointRoot' does not exist."
     }
 
-    foreach ($jsonFile in @(Get-ChildItem -LiteralPath $repositoryRoot -Filter '*.json' -File -Recurse)) {
+    foreach ($jsonFile in @(Get-ChildItem -LiteralPath $endpointRoot -Filter '*.json' -File -Recurse)) {
         try {
             $document = Get-Content -LiteralPath $jsonFile.FullName -Raw -ErrorAction Stop | ConvertFrom-Json -ErrorAction Stop
             $docDefinitionId = if ($document.PSObject.Properties['definitionPublication'] -and
                 $document.definitionPublication.PSObject.Properties['definitionId'] -and
                 -not [string]::IsNullOrWhiteSpace([string]$document.definitionPublication.definitionId)) {
                 [string]$document.definitionPublication.definitionId
-            }
-            elseif ($document.PSObject.Properties['definitionId']) {
-                [string]$document.definitionId
-            }
-            elseif ($document.PSObject.Properties['id']) {
-                [string]$document.id
             }
             else {
                 $null
@@ -448,6 +442,6 @@ Get-PackageDefinitionPath -DefinitionId VSCodeRuntime
         }
     }
 
-    throw "Package definition '$DefinitionId' was not found by JSON definitionId under shipped repository '$repositoryRoot'."
+    throw "Package definition '$DefinitionId' was not found by JSON definitionId under shipped endpoint '$endpointRoot'."
 }
 

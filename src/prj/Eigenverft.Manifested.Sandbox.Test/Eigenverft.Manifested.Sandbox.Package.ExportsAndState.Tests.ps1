@@ -48,20 +48,23 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - export
         @($module.ExportedCommands.Keys | Sort-Object) | Should -Be @(
             'Add-PackageDepot',
             'Add-PackageEndpoint',
+            'Add-PackagePublisher',
             'Add-TeamPackageDepot',
             'Add-TeamPackageEndpoint',
             'Get-PackageDepot',
             'Get-PackageEndpoint',
+            'Get-PackagePublisher',
             'Get-PackageState',
             'Get-SandboxVersion',
             'Invoke-Package',
             'Invoke-WebRequestEx',
             'Remove-PackageDepot',
             'Remove-PackageEndpoint',
+            'Remove-PackagePublisher',
             'Sandbox',
             'Set-PackageDepot',
             'Set-PackageEndpoint',
-            'Trust-PackageEndpoint'
+            'Set-PackagePublisher'
         )
         Get-Command -Name 'Initialize-ProxyAccessProfile' -Module $module -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
     }
@@ -73,6 +76,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - export
         Test-Path -LiteralPath (Join-Path $moduleProjectRoot 'Commands\Package\Eigenverft.Manifested.Sandbox.Cmd.GetPackageState.ps1') -PathType Leaf | Should -BeTrue
         Test-Path -LiteralPath (Join-Path $moduleProjectRoot 'Commands\Depot\Eigenverft.Manifested.Sandbox.Cmd.PackageDepot.ps1') -PathType Leaf | Should -BeTrue
         Test-Path -LiteralPath (Join-Path $moduleProjectRoot 'Commands\Endpoint\Eigenverft.Manifested.Sandbox.Cmd.PackageEndpoint.ps1') -PathType Leaf | Should -BeTrue
+        Test-Path -LiteralPath (Join-Path $moduleProjectRoot 'Commands\Publisher\Eigenverft.Manifested.Sandbox.Cmd.PackagePublisher.ps1') -PathType Leaf | Should -BeTrue
         Test-Path -LiteralPath (Join-Path $moduleProjectRoot 'Commands\Module\Eigenverft.Manifested.Sandbox.Cmd.Module.ps1') -PathType Leaf | Should -BeTrue
         Test-Path -LiteralPath (Join-Path $moduleProjectRoot 'Commands\Web\Eigenverft.Manifested.Sandbox.Cmd.InvokeWebRequestEx.ps1') -PathType Leaf | Should -BeTrue
     }
@@ -156,7 +160,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - export
         $localRepositoryRoot = Join-Path $root 'PkgRepos'
         $shimDirectory = Join-Path $root 'Shims'
         $installDirectory = Join-Path $installRoot 'vsc-rt\stable\1.0.0\win32-x64'
-        $definitionCandidatePath = Join-Path $localRepositoryRoot 'Candidate\Eigenverft\EigenverftModule\VSCodeRuntime.json'
+        $definitionCandidatePath = Join-Path $localRepositoryRoot 'Candidate\Eigenverft\VSCodeRuntime.json'
         $definitionAssignedSnapshotPath = Join-Path $localRepositoryRoot 'Assigned\Eigenverft\VSCodeRuntime.json'
         $sourceInventoryPath = Join-Path (Join-Path $root 'Configuration\External') 'PackageSourceInventory.json'
 

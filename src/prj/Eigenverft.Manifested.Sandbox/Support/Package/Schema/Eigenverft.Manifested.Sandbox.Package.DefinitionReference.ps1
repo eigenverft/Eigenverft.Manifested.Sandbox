@@ -179,7 +179,7 @@ function Select-PackageDefinitionCandidatesFromEndpointScanRoot {
     return @($candidates.ToArray())
 }
 
-function Get-PackageEnabledTrustedEndpointSources {
+function Get-PackageEnabledEndpointSources {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true)]
@@ -189,9 +189,6 @@ function Get-PackageEnabledTrustedEndpointSources {
     $sources = @(
         foreach ($source in @(Get-PackageEndpointSourceEntries -Document $EndpointInventoryDocument)) {
             if (-not [bool]$source.enabled) {
-                continue
-            }
-            if (-not [bool]$source.trusted) {
                 continue
             }
             $endpointName = [string]$source.endpointName
@@ -245,7 +242,10 @@ function Select-PackageDefinitionCandidateWinner {
         [string]$DefinitionId,
 
         [AllowNull()]
-        [string]$PublisherId = $null
+        [string]$PublisherId = $null,
+
+        [ValidateSet('fail', 'warnFirst', 'first', 'warnLast', 'last')]
+        [string]$DefinitionPublisherConflictMode = 'fail'
     )
 
     $publisherById = @{}
@@ -268,7 +268,6 @@ function Select-PackageDefinitionCandidateWinner {
             }
 
             $publisherRow = $publisherById[[string]$candidate.PublisherId]
-            $candidate | Add-Member -MemberType NoteProperty -Name PublisherSearchOrder -Value ([int]$publisherRow.SearchOrder) -Force
             $candidate | Add-Member -MemberType NoteProperty -Name PublisherTrustMode -Value ([string]$publisherRow.TrustMode) -Force
             $candidate
         }
@@ -280,14 +279,25 @@ function Select-PackageDefinitionCandidateWinner {
     }
 
     if ([string]::IsNullOrWhiteSpace($PublisherId)) {
-        $minPublisherOrder = (@($trustedCandidates) | Measure-Object -Property PublisherSearchOrder -Minimum).Minimum
-        $minPublisherIds = @($trustedCandidates |
-            Where-Object { [int]$_.PublisherSearchOrder -eq [int]$minPublisherOrder } |
-            Select-Object -ExpandProperty PublisherId -Unique)
-        if ($minPublisherIds.Count -gt 1) {
-            throw "Package definition '$DefinitionId' is provided by multiple trusted publishers with the same publisher searchOrder '$minPublisherOrder': $($minPublisherIds -join ', '). Use -PublisherId or change PackagePublisherInventory.json searchOrder."
+        $publisherIds = @($trustedCandidates | Select-Object -ExpandProperty PublisherId -Unique)
+        if ($publisherIds.Count -gt 1) {
+            if ([string]::Equals($DefinitionPublisherConflictMode, 'fail', [System.StringComparison]::OrdinalIgnoreCase)) {
+                throw "Package definition '$DefinitionId' is provided by multiple trusted publishers: $($publisherIds -join ', '). Use -PublisherId or set package.repositoryEnvironment.defaults.definitionPublisherConflictMode."
+            }
+
+            $descending = $DefinitionPublisherConflictMode -in @('warnLast', 'last')
+            $selectedByEndpoint = if ($descending) {
+                @($trustedCandidates | Sort-Object -Property EndpointSearchOrder, EndpointName, DefinitionPath -Descending | Select-Object -First 1)[0]
+            }
+            else {
+                @($trustedCandidates | Sort-Object -Property EndpointSearchOrder, EndpointName, DefinitionPath | Select-Object -First 1)[0]
+            }
+            $selectedPublisherId = [string]$selectedByEndpoint.PublisherId
+            if ($DefinitionPublisherConflictMode -in @('warnFirst', 'warnLast')) {
+                Write-PackageExecutionMessage -Level 'WRN' -Message ("[WARN] Package definition '{0}' is provided by multiple trusted publishers ({1}); definitionPublisherConflictMode='{2}' selected publisher '{3}' from endpoint '{4}'." -f $DefinitionId, ($publisherIds -join ', '), $DefinitionPublisherConflictMode, $selectedPublisherId, [string]$selectedByEndpoint.EndpointName)
+            }
+            $trustedCandidates = @($trustedCandidates | Where-Object { [string]::Equals([string]$_.PublisherId, $selectedPublisherId, [System.StringComparison]::OrdinalIgnoreCase) })
         }
-        $trustedCandidates = @($trustedCandidates | Where-Object { [string]::Equals([string]$_.PublisherId, [string]$minPublisherIds[0], [System.StringComparison]::OrdinalIgnoreCase) })
     }
 
     $bestRevision = (@($trustedCandidates) | Measure-Object -Property DefinitionRevision -Maximum).Maximum
@@ -301,7 +311,7 @@ function Select-PackageDefinitionCandidateWinner {
     return @($bestRevisionCandidates | Sort-Object -Property EndpointSearchOrder, EndpointName, DefinitionPath | Select-Object -First 1)[0]
 }
 
-function Sync-PackageRepositoryCandidateDefinitions {
+function Sync-PackageEndpointCandidateDefinitions {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true)]
@@ -314,7 +324,10 @@ function Sync-PackageRepositoryCandidateDefinitions {
         [string]$ApplicationRootDirectory = $null,
 
         [Parameter(Mandatory = $true)]
-        [string]$LocalRepositoryRoot
+        [string]$LocalRepositoryRoot,
+
+        [ValidateSet('fail', 'warnFirst', 'first', 'warnLast', 'last')]
+        [string]$DefinitionPublisherConflictMode = 'fail'
     )
 
     $allCandidates = @(Get-PackageDefinitionCandidateRows -SourceRows $SourceRows -ApplicationRootDirectory $ApplicationRootDirectory)
@@ -322,7 +335,7 @@ function Sync-PackageRepositoryCandidateDefinitions {
     $materializedCount = 0
     foreach ($definitionId in @($keys)) {
         try {
-            $winner = Select-PackageDefinitionCandidateWinner -Candidates @($allCandidates | Where-Object { [string]::Equals([string]$_.DefinitionId, [string]$definitionId, [System.StringComparison]::OrdinalIgnoreCase) }) -PublisherRows $PublisherRows -DefinitionId $definitionId
+            $winner = Select-PackageDefinitionCandidateWinner -Candidates @($allCandidates | Where-Object { [string]::Equals([string]$_.DefinitionId, [string]$definitionId, [System.StringComparison]::OrdinalIgnoreCase) }) -PublisherRows $PublisherRows -DefinitionId $definitionId -DefinitionPublisherConflictMode $DefinitionPublisherConflictMode
             Copy-PackageDefinitionToLocalDefinitionStore -Role 'Candidate' -SourcePath $winner.DefinitionPath -LocalRepositoryRoot $LocalRepositoryRoot -PublisherId ([string]$winner.PublisherId) -DefinitionId ([string]$winner.DefinitionId) -DefinitionRevision ([int]$winner.DefinitionRevision) | Out-Null
             $materializedCount++
         }
@@ -342,7 +355,7 @@ Resolves a Package definition identity to a local materialized definition path.
 .DESCRIPTION
 PackageEndpointInventory.json lists scan endpoints. PackagePublisherInventory.json
 lists trusted publisher namespaces. Matching uses definitionPublication.definitionId,
-then publisher trust/search order, then definitionRevision.
+then publisher trust and conflict policy, then definitionRevision.
 #>
     [CmdletBinding()]
     param(
@@ -360,12 +373,15 @@ then publisher trust/search order, then definitionRevision.
         [string]$LocalRepositoryRoot = $null,
 
         [ValidateSet('packageFocused', 'repositoryFocused')]
-        [string]$RepositoryMaterializationMode = 'packageFocused'
+        [string]$RepositoryMaterializationMode = 'packageFocused',
+
+        [ValidateSet('fail', 'warnFirst', 'first', 'warnLast', 'last')]
+        [string]$DefinitionPublisherConflictMode = 'fail'
     )
 
     $endpointInventoryInfo = Get-PackageEndpointInventoryInfo
     $publisherInventoryInfo = Get-PackagePublisherInventoryInfo
-    $sourceRows = @(Get-PackageEnabledTrustedEndpointSources -EndpointInventoryDocument $endpointInventoryInfo.Document)
+    $sourceRows = @(Get-PackageEnabledEndpointSources -EndpointInventoryDocument $endpointInventoryInfo.Document)
     $publisherRows = @(Get-PackageEnabledTrustedPublisherRows -PublisherInventoryDocument $publisherInventoryInfo.Document)
 
     $resolvedLocalRepositoryRoot = if ([string]::IsNullOrWhiteSpace($LocalRepositoryRoot)) {
@@ -376,17 +392,17 @@ then publisher trust/search order, then definitionRevision.
     }
 
     if ([string]::Equals($RepositoryMaterializationMode, 'repositoryFocused', [System.StringComparison]::OrdinalIgnoreCase)) {
-        $count = Sync-PackageRepositoryCandidateDefinitions -SourceRows $sourceRows -PublisherRows $publisherRows -ApplicationRootDirectory $ApplicationRootDirectory -LocalRepositoryRoot $resolvedLocalRepositoryRoot
+        $count = Sync-PackageEndpointCandidateDefinitions -SourceRows $sourceRows -PublisherRows $publisherRows -ApplicationRootDirectory $ApplicationRootDirectory -LocalRepositoryRoot $resolvedLocalRepositoryRoot -DefinitionPublisherConflictMode $DefinitionPublisherConflictMode
         Write-PackageExecutionMessage -Message ("[STATE] Repository-focused definition materialization refreshed {0} Candidate definition file(s)." -f $count)
     }
 
     $candidates = @(Get-PackageDefinitionCandidateRows -SourceRows $sourceRows -ApplicationRootDirectory $ApplicationRootDirectory -DefinitionId $DefinitionId)
     if ($candidates.Count -eq 0) {
         $narrow = if ([string]::IsNullOrWhiteSpace($PublisherId)) { '' } else { " for publisher '$PublisherId'" }
-        throw "Package definition '$DefinitionId' was not found in enabled trusted endpoints$narrow."
+        throw "Package definition '$DefinitionId' was not found in enabled endpoints$narrow."
     }
 
-    $selected = Select-PackageDefinitionCandidateWinner -Candidates $candidates -PublisherRows $publisherRows -DefinitionId $DefinitionId -PublisherId $PublisherId
+    $selected = Select-PackageDefinitionCandidateWinner -Candidates $candidates -PublisherRows $publisherRows -DefinitionId $DefinitionId -PublisherId $PublisherId -DefinitionPublisherConflictMode $DefinitionPublisherConflictMode
     $selectedSourceRow = @($sourceRows | Where-Object { [string]::Equals([string]$_.EndpointName, [string]$selected.EndpointName, [System.StringComparison]::OrdinalIgnoreCase) } | Select-Object -First 1)[0]
     $candidateCopy = Copy-PackageDefinitionToLocalDefinitionStore -Role 'Candidate' -SourcePath $selected.DefinitionPath -LocalRepositoryRoot $resolvedLocalRepositoryRoot -PublisherId $selected.PublisherId -DefinitionId $selected.DefinitionId -DefinitionRevision $selected.DefinitionRevision
 
@@ -407,7 +423,6 @@ then publisher trust/search order, then definitionRevision.
         EndpointInventoryPath         = $endpointInventoryInfo.Path
         PublisherInventoryPath        = $publisherInventoryInfo.Path
         Trusted                       = $true
-        EndpointTrustMode             = if ($selectedSourceRow) { [string]$selectedSourceRow.Source.trustMode } else { $null }
         PublisherTrustMode            = [string]$selected.PublisherTrustMode
         PublisherId                   = [string]$selected.PublisherId
         PublisherName                 = [string]$selected.PublisherName

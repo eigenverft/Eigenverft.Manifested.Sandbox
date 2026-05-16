@@ -20,7 +20,8 @@
     },
     "repositoryEnvironment": {
       "defaults": {
-        "repositoryMaterializationMode": "packageFocused"
+        "repositoryMaterializationMode": "packageFocused",
+        "definitionPublisherConflictMode": "fail"
       }
     },
     "packageState": {

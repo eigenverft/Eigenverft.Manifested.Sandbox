@@ -83,7 +83,7 @@ Use `$c` when you want startup to do more than just show the module version.
 # Simple sanity check after bootstrap
 $c='Get-SandboxVersion'
 
-# Bootstrap, then prepare a fuller sandbox toolset (default repository source is moduleDefaults; definitions under Repositories/Eigenverft/ModuleDefaults)
+# Bootstrap, then prepare a fuller sandbox toolset (default endpoint is moduleDefaults; definitions under Endpoint/Defaults/Eigenverft)
 $c='Get-SandboxVersion; Invoke-Package -DefinitionId VisualCppRedistributable,PythonRuntime,PowerShell7,GitRuntime,VSCodeRuntime,NotepadPlusPlus,NodeRuntime,OpenCodeCli,CodexCli,LlamaCppRuntime,Qwen35_9B_Q6_K_Model; Get-PackageState'
 
 # Bootstrap, then download and run another script
@@ -108,7 +108,7 @@ The startup helpers are compacted and compressed so the Windows Sandbox `LogonCo
 
 The module exports a single package dispatcher, **`Invoke-Package`**, plus helpers such as **`Get-PackageState`**, **`Get-SandboxVersion`**, **`Sandbox`**, and **`Invoke-WebRequestEx`**.
 
-`Invoke-Package` requires `-DefinitionId` and scans every **enabled, trusted** row in `Configuration/Internal/PackageEndpointInventory.json` in `searchOrder`. Discovery matches the parsed wire document’s `definitionId` to your `-DefinitionId`; the JSON `repositoryId` on the file is **data-level metadata only** (provenance, materialized paths) and is **not** joined to endpoint rows. Optional `-RepositoryId` **narrows** the candidate set to definitions whose JSON `repositoryId` equals that string (same case rules as today). When several files match, the engine prefers the highest `definitionPublication.definitionRevision`, then a deterministic tie-break (`searchOrder`, then path). Ambiguity throws and lists `endpointName` and paths. Shipped definitions use `repositoryId` `EigenverftModule` and live under `Repositories\Eigenverft\ModuleDefaults` behind the shipped `moduleDefaults` endpoint row. Pass `-DesiredState Assigned` or `Removed`, and optional `-FailFast`.
+`Invoke-Package` requires `-DefinitionId` and scans every **enabled** row in `Configuration/Internal/PackageEndpointInventory.json` in endpoint `searchOrder`. Discovery matches `definitionPublication.definitionId`, then filters to publishers trusted in `PackagePublisherInventory.json`. Optional `-PublisherId` pins one publisher. If multiple trusted publishers provide the same definition id, `PackageConfig.json` controls the conflict mode; the default is `fail`. Shipped definitions use publisher `Eigenverft` and live under `Endpoint\Defaults\Eigenverft` behind the shipped `moduleDefaults` endpoint row. Pass `-DesiredState Assigned` or `Removed`, and optional `-FailFast`.
 
 `Get-SandboxVersion` prints the module version, example `Invoke-Package` lines for each shipped definition discovered on disk, and the remaining exported commands.
 
@@ -117,8 +117,9 @@ The module exports a single package dispatcher, **`Invoke-Package`**, plus helpe
 | Term | Meaning |
 | --- | --- |
 | **Package depot** | Durable artifact storage for downloaded or mirrored package files such as installers, archives, model files, and runtime payloads. The default local depot folder is `PkgDepot`. |
-| **Package repository** | Source of package definition JSON files. Repositories describe what to assign or remove; they do not store package artifacts. Local definition snapshots use the default `PkgRepos` folder. |
-| **Endpoint** | A row in `PackageEndpointInventory.json` (`endpointName`, paths, trust, `searchOrder`). Endpoints are **scan roots only**. Repository cmdlets (`Get-PackageRepository`, `Add-PackageRepository`, …) use `-RepositoryId` as the parameter name for that row’s `endpointName`. `Invoke-Package -RepositoryId` is unrelated: it filters definitions by JSON `repositoryId` during resolution. |
+| **Endpoint** | A scan root for package definition JSON files. Endpoints describe where to discover definitions; they do not imply trust. |
+| **Publisher** | Trusted package-definition authority from `PackagePublisherInventory.json`. The identity is `definitionPublication.publisherId`. |
+| **PkgRepos** | Local materialized definition copies used for Candidate and Assigned snapshots. This is not a discovery endpoint. |
 | **Assigned** | Desired state that makes a package definition ready on the machine by reusing, adopting, repairing, or assigning it as policy allows. |
 | **Removed** | Desired state that removes a tracked package when that package definition supports removal. |
 | **Package assignment inventory** | Current tracked **Assigned** package facts: definition, selected version, install directory, ownership kind, and definition snapshot. |
@@ -130,7 +131,8 @@ The module exports a single package dispatcher, **`Invoke-Package`**, plus helpe
 | --- | --- |
 | `Configuration/Internal/PackageConfig.json` | Main package configuration: application paths, selection defaults, and acquisition policy. |
 | `Configuration/Internal/PackageDepotInventory.json` | Depot roots, capabilities, search order, and mirror-target flags. |
-| `Configuration/Internal/PackageEndpointInventory.json` | Package definition scan endpoints (paths, enablement, trust, order). |
+| `Configuration/Internal/PackageEndpointInventory.json` | Package definition scan endpoints (paths, enablement, order). |
+| `Configuration/Internal/PackagePublisherInventory.json` | Package definition publisher trust policy. |
 | `Configuration/External/PackageSourceInventory.json` | Optional external/site acquisition overlays; can be overridden with `EIGENVERFT_MANIFESTED_PACKAGE_SOURCE_INVENTORY_PATH`. |
 | `State/PackageAssignmentInventory.json` | Current tracked **Assigned** package facts. |
 | `State/PackageOperationHistory.json` | Append-only command history for **Assigned** and **Removed** runs. |

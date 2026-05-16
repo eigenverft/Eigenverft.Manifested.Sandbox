@@ -308,6 +308,12 @@ Assert-PackageConfigSchema -PackageConfigDocumentInfo $globalInfo
                     throw "Package config '$($PackageConfigDocumentInfo.Path)' defines unsupported repositoryEnvironment.defaults.repositoryMaterializationMode '$repositoryMaterializationMode'. Use 'packageFocused' or 'repositoryFocused'."
                 }
             }
+            if ($package.repositoryEnvironment.defaults.PSObject.Properties['definitionPublisherConflictMode']) {
+                $definitionPublisherConflictMode = [string]$package.repositoryEnvironment.defaults.definitionPublisherConflictMode
+                if ($definitionPublisherConflictMode -notin @('fail', 'warnFirst', 'first', 'warnLast', 'last')) {
+                    throw "Package config '$($PackageConfigDocumentInfo.Path)' defines unsupported repositoryEnvironment.defaults.definitionPublisherConflictMode '$definitionPublisherConflictMode'. Use 'fail', 'warnFirst', 'first', 'warnLast', or 'last'."
+                }
+            }
         }
     }
 

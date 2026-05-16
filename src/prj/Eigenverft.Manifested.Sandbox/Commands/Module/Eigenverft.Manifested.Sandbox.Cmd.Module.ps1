@@ -70,12 +70,12 @@ Displays module information, per-definition Invoke-Package examples, and other e
         }
     }
 
-    if (Get-Command Get-PackageRepositoriesRoot -ErrorAction SilentlyContinue) {
+    if (Get-Command Get-PackageShippedEndpointRoot -ErrorAction SilentlyContinue) {
         try {
-            $repositoriesRoot = Get-PackageRepositoriesRoot
-            $repoDir = Join-Path (Join-Path $repositoriesRoot 'Eigenverft') 'ModuleDefaults'
-            if (Test-Path -LiteralPath $repoDir -PathType Container) {
-                foreach ($jsonFile in Get-ChildItem -LiteralPath $repoDir -Filter *.json -File -Recurse) {
+            $endpointRoot = Get-PackageShippedEndpointRoot
+            $definitionRoot = Join-Path $endpointRoot 'Defaults'
+            if (Test-Path -LiteralPath $definitionRoot -PathType Container) {
+                foreach ($jsonFile in Get-ChildItem -LiteralPath $definitionRoot -Filter *.json -File -Recurse) {
                     try {
                         $doc = Get-Content -LiteralPath $jsonFile.FullName -Raw | ConvertFrom-Json
                         $sv = if ($doc.PSObject.Properties['schemaVersion']) { [string]$doc.schemaVersion } else { '' }
@@ -115,7 +115,7 @@ Displays module information, per-definition Invoke-Package examples, and other e
     }
     else {
         $outputLines += @(
-            'Shipped package definitions: (none discovered; import the full module to scan Repositories.)'
+            'Shipped package definitions: (none discovered; import the full module to scan Endpoint/Defaults.)'
             ''
         )
     }

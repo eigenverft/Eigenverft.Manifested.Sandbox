@@ -162,6 +162,7 @@ function global:New-TestPackageGlobalDocument {
         [AllowNull()]
         [string]$DepotDistributionMode = 'packageFocused',
         [string]$RepositoryMaterializationMode = 'packageFocused',
+        [string]$DefinitionPublisherConflictMode = 'fail',
         [string]$ReleaseTrack = 'stable',
         [string]$Strategy = 'latestByVersion',
         [hashtable]$EnvironmentSources = $null
@@ -197,6 +198,7 @@ function global:New-TestPackageGlobalDocument {
             repositoryEnvironment = @{
                 defaults = @{
                     repositoryMaterializationMode = $RepositoryMaterializationMode
+                    definitionPublisherConflictMode = $DefinitionPublisherConflictMode
                 }
             }
             packageState = @{
@@ -222,9 +224,7 @@ function global:New-TestEndpointInventoryDocument {
             kind           = 'moduleLocal'
             enabled        = $true
             searchOrder    = 100
-            definitionRoot = 'Repositories/Eigenverft/ModuleDefaults'
-            trusted        = $true
-            trustMode      = 'moduleShipped'
+            definitionRoot = 'Endpoint/Defaults'
         }) | Out-Null
 
     foreach ($key in @($EndpointSources.Keys)) {
@@ -246,7 +246,7 @@ function global:New-TestEndpointInventoryDocument {
     }
 }
 
-function global:Get-TestRepositorySource {
+function global:Get-TestEndpointSource {
     param(
         [Parameter(Mandatory = $true)]
         [psobject]$Document,
@@ -957,8 +957,6 @@ function global:Write-TestPackageDocuments {
                     enabled = $true
                     searchOrder = 100
                     basePath = $repositoryDefinitionsRoot
-                    trusted = $true
-                    trustMode = 'unsignedExplicit'
                 }
             )
         }
@@ -972,7 +970,6 @@ function global:Write-TestPackageDocuments {
                     publisherName = $definitionPublisherId
                     enabled = $true
                     trusted = $true
-                    searchOrder = 100
                     trustMode = 'unsignedExplicit'
                 }
             )

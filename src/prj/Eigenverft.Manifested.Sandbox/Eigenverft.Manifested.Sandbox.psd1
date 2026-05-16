@@ -76,17 +76,20 @@ FunctionsToExport = @(
     'Add-PackageDepot',
     'Add-TeamPackageDepot',
     'Add-PackageEndpoint',
+    'Add-PackagePublisher',
     'Add-TeamPackageEndpoint',
     'Get-PackageDepot',
     'Get-PackageEndpoint',
+    'Get-PackagePublisher',
     'Get-PackageState',
     'Invoke-Package',
     'Invoke-WebRequestEx',
     'Remove-PackageDepot',
     'Remove-PackageEndpoint',
+    'Remove-PackagePublisher',
     'Set-PackageDepot',
     'Set-PackageEndpoint',
-    'Trust-PackageEndpoint'
+    'Set-PackagePublisher'
 )
 
 # Cmdlets to export from this module, for best performance, do not use wildcards and do not delete the entry, use an empty array if there are no cmdlets to export.

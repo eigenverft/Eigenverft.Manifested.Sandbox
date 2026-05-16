@@ -26,15 +26,16 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
         $globalInfo.Document.package.acquisitionEnvironment.defaults.PSObject.Properties.Name | Should -Contain 'allowFallback'
         $globalInfo.Document.package.acquisitionEnvironment.defaults.depotDistributionMode | Should -Be 'packageFocused'
         $globalInfo.Document.package.repositoryEnvironment.defaults.repositoryMaterializationMode | Should -Be 'packageFocused'
+        $globalInfo.Document.package.repositoryEnvironment.defaults.definitionPublisherConflictMode | Should -Be 'fail'
         $globalInfo.Document.package.acquisitionEnvironment.defaults.PSObject.Properties.Name | Should -Not -Contain 'mirrorDownloadedArtifactsToDefaultPackageDepot'
         $globalInfo.Document.package.packageState.PSObject.Properties.Name | Should -Contain 'inventoryFilePath'
         $globalInfo.Document.package.packageState.PSObject.Properties.Name | Should -Contain 'operationHistoryFilePath'
         $endpointInventoryInfo = Read-PackageJsonDocument -Path (Get-PackageShippedEndpointInventoryPath)
-        $moduleSource = Get-TestRepositorySource -Document $endpointInventoryInfo.Document -SourceId 'moduleDefaults'
+        $moduleSource = Get-TestEndpointSource -Document $endpointInventoryInfo.Document -SourceId 'moduleDefaults'
         $moduleSource.kind | Should -Be 'moduleLocal'
-        $moduleSource.definitionRoot | Should -Be 'Repositories/Eigenverft/ModuleDefaults'
-        $moduleSource.trusted | Should -BeTrue
-        $moduleSource.trustMode | Should -Be 'moduleShipped'
+        $moduleSource.definitionRoot | Should -Be 'Endpoint/Defaults'
+        $moduleSource.PSObject.Properties['trusted'] | Should -BeNullOrEmpty
+        $moduleSource.PSObject.Properties['trustMode'] | Should -BeNullOrEmpty
         $depotInfo = Read-PackageJsonDocument -Path (Get-PackageShippedDepotInventoryPath)
         $depotInfo.Document.acquisitionEnvironment.environmentSources.PSObject.Properties.Name | Should -Contain 'defaultPackageDepot'
         $depotInfo.Document.acquisitionEnvironment.environmentSources.defaultPackageDepot.readable | Should -BeTrue
@@ -96,7 +97,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
 
         $activeEndpointInventoryPath | Should -Be $localEndpointInventoryPath
         Test-Path -LiteralPath $localEndpointInventoryPath -PathType Leaf | Should -BeTrue
-        (Get-TestRepositorySource -Document $localInfo.Document -SourceId 'moduleDefaults').kind | Should -Be 'moduleLocal'
+        (Get-TestEndpointSource -Document $localInfo.Document -SourceId 'moduleDefaults').kind | Should -Be 'moduleLocal'
     }
 
     It 'resolves package config paths from applicationRootDirectory and supports missing applicationRootDirectory fallback' {
@@ -407,6 +408,83 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
         { Resolve-PackageDefinitionReference -PublisherId 'OtherPublisher' -DefinitionId 'VSCodeRuntime' } | Should -Throw "*publisher 'OtherPublisher'*"
     }
 
+    It 'applies definition publisher conflict policy across trusted publishers' {
+        $rootPath = Join-Path $TestDrive 'publisher-conflict-policy'
+        $endpointA = Join-Path $rootPath 'EndpointA'
+        $endpointB = Join-Path $rootPath 'EndpointB'
+        $localRepositoryRoot = Join-Path $rootPath 'PkgRepos'
+
+        Write-TestJsonDocument -Path (Join-Path (Join-Path $endpointA 'Alpha') 'SharedTool.json') -Document (New-TestVSCodeDefinitionDocument -DefinitionId 'SharedTool' -PublisherId 'Alpha' -PublisherName 'Alpha' -Releases @(
+                New-TestPackageRelease -Id 'shared-alpha' -Version '1.0.0' -Architecture 'x64'
+            ))
+        Write-TestJsonDocument -Path (Join-Path (Join-Path $endpointB 'Beta') 'SharedTool.json') -Document (New-TestVSCodeDefinitionDocument -DefinitionId 'SharedTool' -PublisherId 'Beta' -PublisherName 'Beta' -Releases @(
+                New-TestPackageRelease -Id 'shared-beta' -Version '1.0.0' -Architecture 'x64'
+            ))
+
+        $endpointInventoryPath = Join-Path $rootPath 'PackageEndpointInventory.json'
+        $publisherInventoryPath = Join-Path $rootPath 'PackagePublisherInventory.json'
+        Write-TestJsonDocument -Path $endpointInventoryPath -Document @{
+            inventoryVersion = 2
+            endpoints = @(
+                @{ endpointName = 'alphaEndpoint'; kind = 'filesystem'; enabled = $true; searchOrder = 100; basePath = $endpointA },
+                @{ endpointName = 'betaEndpoint'; kind = 'filesystem'; enabled = $true; searchOrder = 200; basePath = $endpointB }
+            )
+        }
+        Write-TestJsonDocument -Path $publisherInventoryPath -Document @{
+            inventoryVersion = 1
+            publishers = @(
+                @{ publisherId = 'Alpha'; publisherName = 'Alpha'; enabled = $true; trusted = $true; trustMode = 'unsignedExplicit' },
+                @{ publisherId = 'Beta'; publisherName = 'Beta'; enabled = $true; trusted = $true; trustMode = 'unsignedExplicit' }
+            )
+        }
+
+        Mock Get-PackageEndpointInventoryPath { $endpointInventoryPath }
+        Mock Get-PackagePublisherInventoryPath { $publisherInventoryPath }
+
+        { Resolve-PackageDefinitionReference -DefinitionId 'SharedTool' -LocalRepositoryRoot $localRepositoryRoot -DefinitionPublisherConflictMode 'fail' } | Should -Throw '*multiple trusted publishers*Use -PublisherId*'
+
+        $first = Resolve-PackageDefinitionReference -DefinitionId 'SharedTool' -LocalRepositoryRoot $localRepositoryRoot -DefinitionPublisherConflictMode 'warnFirst'
+        $last = Resolve-PackageDefinitionReference -DefinitionId 'SharedTool' -LocalRepositoryRoot $localRepositoryRoot -DefinitionPublisherConflictMode 'last'
+
+        $first.PublisherId | Should -Be 'Alpha'
+        $last.PublisherId | Should -Be 'Beta'
+    }
+
+    It 'fails when one publisher reuses a definition revision with different bytes across endpoints' {
+        $rootPath = Join-Path $TestDrive 'publisher-reused-revision'
+        $endpointA = Join-Path $rootPath 'EndpointA'
+        $endpointB = Join-Path $rootPath 'EndpointB'
+        $localRepositoryRoot = Join-Path $rootPath 'PkgRepos'
+
+        Write-TestJsonDocument -Path (Join-Path (Join-Path $endpointA 'Alpha') 'SharedTool.json') -Document (New-TestVSCodeDefinitionDocument -DefinitionId 'SharedTool' -PublisherId 'Alpha' -PublisherName 'Alpha' -DefinitionRevision 7 -Releases @(
+                New-TestPackageRelease -Id 'shared-alpha' -Version '1.0.0' -Architecture 'x64'
+            ))
+        Write-TestJsonDocument -Path (Join-Path (Join-Path $endpointB 'Alpha') 'SharedTool.json') -Document (New-TestVSCodeDefinitionDocument -DefinitionId 'SharedTool' -PublisherId 'Alpha' -PublisherName 'Alpha' -DefinitionRevision 7 -Releases @(
+                New-TestPackageRelease -Id 'shared-alpha' -Version '1.0.1' -Architecture 'x64'
+            ))
+
+        $endpointInventoryPath = Join-Path $rootPath 'PackageEndpointInventory.json'
+        $publisherInventoryPath = Join-Path $rootPath 'PackagePublisherInventory.json'
+        Write-TestJsonDocument -Path $endpointInventoryPath -Document @{
+            inventoryVersion = 2
+            endpoints = @(
+                @{ endpointName = 'alphaPrimary'; kind = 'filesystem'; enabled = $true; searchOrder = 100; basePath = $endpointA },
+                @{ endpointName = 'alphaMirror'; kind = 'filesystem'; enabled = $true; searchOrder = 200; basePath = $endpointB }
+            )
+        }
+        Write-TestJsonDocument -Path $publisherInventoryPath -Document @{
+            inventoryVersion = 1
+            publishers = @(
+                @{ publisherId = 'Alpha'; publisherName = 'Alpha'; enabled = $true; trusted = $true; trustMode = 'unsignedExplicit' }
+            )
+        }
+
+        Mock Get-PackageEndpointInventoryPath { $endpointInventoryPath }
+        Mock Get-PackagePublisherInventoryPath { $publisherInventoryPath }
+
+        { Resolve-PackageDefinitionReference -DefinitionId 'SharedTool' -LocalRepositoryRoot $localRepositoryRoot } | Should -Throw '*reused definitionRevision*different content across endpoints*'
+    }
+
     It 'completes removed desired state when inventory is missing and whenNotInInventory is succeed' {
         $rootPath = Join-Path $TestDrive 'removed-no-inventory-succeed'
         $globalDocument = New-TestPackageGlobalDocument -ApplicationRootDirectory (Join-Path $rootPath 'AppRoot')
@@ -626,7 +704,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
         $defDir = Join-Path $rootPath 'RepoDefs'
         $null = New-Item -ItemType Directory -Path $defDir -Force
         $moduleProjectRoot = Join-Path (Split-Path -Parent $PSScriptRoot) 'Eigenverft.Manifested.Sandbox'
-        $shippedDefs = Join-Path $moduleProjectRoot 'Repositories\Eigenverft\ModuleDefaults'
+        $shippedDefs = Join-Path $moduleProjectRoot 'Endpoint\Defaults\Eigenverft'
         Copy-Item -LiteralPath (Join-Path $shippedDefs 'CodexCli.json') -Destination (Join-Path $defDir 'CodexCli.json') -Force
         Copy-Item -LiteralPath (Join-Path $shippedDefs 'NodeRuntime.json') -Destination (Join-Path $defDir 'NodeRuntime.json') -Force
 
@@ -1857,4 +1935,3 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
     }
 
 }
-

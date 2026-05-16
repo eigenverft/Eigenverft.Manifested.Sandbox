@@ -1,8 +1,8 @@
 <#
     Public package definition endpoint (scan root) management surface.
 
-    Parameters named EndpointName identify a row by endpointName in PackageEndpointInventory.json.
-    Invoke-Package -PublisherId is unrelated: it filters package definitions by trusted publisher identity.
+    Endpoints are discovery locations. Publisher trust is managed separately
+    through PackagePublisherInventory.json and the PackagePublisher commands.
 #>
 
 function Get-PackageEndpoint {
@@ -24,6 +24,36 @@ function Get-PackageEndpoint {
     return $match
 }
 
+function Get-PackageEndpointDiscoveredPublisherIds {
+    [CmdletBinding()]
+    param(
+        [AllowNull()]
+        [string]$ResolvedRootPath
+    )
+
+    if ([string]::IsNullOrWhiteSpace($ResolvedRootPath) -or
+        -not (Test-Path -LiteralPath $ResolvedRootPath -PathType Container)) {
+        return @()
+    }
+
+    $publisherIds = New-Object 'System.Collections.Generic.HashSet[string]' ([System.StringComparer]::OrdinalIgnoreCase)
+    foreach ($jsonFile in @(Get-ChildItem -LiteralPath $ResolvedRootPath -Filter '*.json' -File -Recurse -ErrorAction SilentlyContinue)) {
+        try {
+            $document = Get-Content -LiteralPath $jsonFile.FullName -Raw -ErrorAction Stop | ConvertFrom-Json -ErrorAction Stop
+            if ($document.PSObject.Properties['definitionPublication'] -and
+                $document.definitionPublication.PSObject.Properties['publisherId'] -and
+                -not [string]::IsNullOrWhiteSpace([string]$document.definitionPublication.publisherId)) {
+                $publisherIds.Add([string]$document.definitionPublication.publisherId) | Out-Null
+            }
+        }
+        catch {
+            continue
+        }
+    }
+
+    return @($publisherIds | Sort-Object)
+}
+
 function Add-PackageEndpoint {
     [CmdletBinding(SupportsShouldProcess = $true)]
     param(
@@ -39,12 +69,7 @@ function Add-PackageEndpoint {
 
         [string]$After,
 
-        [switch]$Disabled,
-
-        [switch]$TrustUnsigned,
-
-        [AllowNull()]
-        [string]$TrustReason = $null
+        [switch]$Disabled
     )
 
     Assert-PackageEndpointName -EndpointName $EndpointName
@@ -63,18 +88,8 @@ function Add-PackageEndpoint {
     else {
         Get-PackageNextEndpointSearchOrder -Document $documentInfo.Document
     }
-    $resolvedTrustReason = if ($TrustUnsigned.IsPresent) {
-        if (-not [string]::IsNullOrWhiteSpace($TrustReason)) {
-            [string]$TrustReason
-        }
-        else {
-            'Trusted by Add-PackageEndpoint -TrustUnsigned.'
-        }
-    }
-    else {
-        $null
-    }
-    $source = New-PackageFilesystemRepositorySource -EndpointName $EndpointName -BasePath $BasePath -SearchOrder $resolvedSearchOrder -Enabled (-not $Disabled.IsPresent) -Trusted $TrustUnsigned.IsPresent -TrustReason $resolvedTrustReason
+
+    $source = New-PackageFilesystemEndpointSource -EndpointName $EndpointName -BasePath $BasePath -SearchOrder $resolvedSearchOrder -Enabled (-not $Disabled.IsPresent)
 
     if ($PSCmdlet.ShouldProcess($documentInfo.Path, "Add package endpoint '$EndpointName'")) {
         $documentInfo.Document.endpoints = @($documentInfo.Document.endpoints) + $source
@@ -84,25 +99,24 @@ function Add-PackageEndpoint {
     $afterSummary = Get-PackageEndpoint -EndpointName $EndpointName
     $notes = New-Object System.Collections.Generic.List[string]
     if ($Disabled.IsPresent) {
-        $notes.Add("Endpoint '$EndpointName' was added disabled; package commands will not use it until enabled.") | Out-Null
-    }
-    if ($TrustUnsigned.IsPresent) {
-        $notes.Add("Endpoint '$EndpointName' trusts unsigned filesystem definitions by explicit local configuration.") | Out-Null
+        $notes.Add("Endpoint '$EndpointName' was added disabled; package commands will not scan it until enabled.") | Out-Null
     }
     else {
-        $notes.Add("Endpoint '$EndpointName' was added untrusted; run Trust-PackageEndpoint -EndpointName '$EndpointName' -AllowUnsignedDefinitions before executing definitions from it.") | Out-Null
+        $notes.Add("Endpoint '$EndpointName' was added as a scan location. Package execution still requires a trusted publisher in PackagePublisherInventory.json.") | Out-Null
+    }
+
+    $publisherIds = @(Get-PackageEndpointDiscoveredPublisherIds -ResolvedRootPath $afterSummary.ResolvedRootPath)
+    if ($publisherIds.Count -gt 0) {
+        $notes.Add("Discovered publisher id(s): $($publisherIds -join ', '). Use Add-PackagePublisher or Set-PackagePublisher -AllowUnsignedDefinitions for publishers you trust.") | Out-Null
+    }
+    else {
+        $notes.Add("No package definition publishers were discovered at '$($afterSummary.ResolvedRootPath)' yet.") | Out-Null
     }
 
     return New-PackageEndpointCommandResult -Action 'Add' -EndpointName $EndpointName -InventoryPath $documentInfo.Path -Before $null -After $afterSummary -Status 'Added' -Notes @($notes.ToArray())
 }
 
 function Add-TeamPackageEndpoint {
-    <#
-    .NOTES
-    By default the team endpoint is added trusted for unsigned filesystem definitions so offline
-    team shares work without a separate Trust-PackageEndpoint step. Use -Untrusted to require an
-    explicit Trust-PackageEndpoint -AllowUnsignedDefinitions later (stricter workflow).
-    #>
     [CmdletBinding(SupportsShouldProcess = $true)]
     param(
         [Parameter(Mandatory = $true)]
@@ -110,15 +124,13 @@ function Add-TeamPackageEndpoint {
         [string]$BasePath,
 
         [ValidateNotNullOrEmpty()]
-        [string]$EndpointName = 'teamPackageRepository',
+        [string]$EndpointName = 'teamPackageEndpoint',
 
         [int]$SearchOrder = -1,
 
         [string]$After,
 
-        [switch]$Disabled,
-
-        [switch]$Untrusted
+        [switch]$Disabled
     )
 
     $parameters = @{
@@ -136,10 +148,6 @@ function Add-TeamPackageEndpoint {
     }
     if ($Disabled.IsPresent) {
         $parameters.Disabled = $true
-    }
-    if (-not $Untrusted.IsPresent) {
-        $parameters.TrustUnsigned = $true
-        $parameters.TrustReason = 'Trusted by Add-TeamPackageEndpoint (team share default).'
     }
     if ($PSBoundParameters.ContainsKey('WhatIf')) {
         $parameters.WhatIf = [bool]$PSBoundParameters.WhatIf
@@ -164,9 +172,7 @@ function Set-PackageEndpoint {
 
         [switch]$Enable,
 
-        [switch]$Disable,
-
-        [switch]$Untrust
+        [switch]$Disable
     )
 
     Assert-PackageEndpointName -EndpointName $EndpointName
@@ -189,15 +195,6 @@ function Set-PackageEndpoint {
     if ($PSBoundParameters.ContainsKey('SearchOrder')) { $source | Add-Member -MemberType NoteProperty -Name 'searchOrder' -Value ([int]$SearchOrder.Value) -Force }
     if ($Enable.IsPresent) { $source | Add-Member -MemberType NoteProperty -Name 'enabled' -Value $true -Force }
     if ($Disable.IsPresent) { $source | Add-Member -MemberType NoteProperty -Name 'enabled' -Value $false -Force }
-    if ($Untrust.IsPresent) {
-        if ([string]::Equals([string]$source.kind, 'moduleLocal', [System.StringComparison]::OrdinalIgnoreCase)) {
-            throw "Package endpoint '$EndpointName' is moduleLocal and cannot be untrusted."
-        }
-        $source | Add-Member -MemberType NoteProperty -Name 'trusted' -Value $false -Force
-        $source | Add-Member -MemberType NoteProperty -Name 'trustMode' -Value 'unsigned' -Force
-        if ($source.PSObject.Properties['trustedAtUtc']) { $source.PSObject.Properties.Remove('trustedAtUtc') }
-        if ($source.PSObject.Properties['trustReason']) { $source.PSObject.Properties.Remove('trustReason') }
-    }
 
     if ($PSCmdlet.ShouldProcess($documentInfo.Path, "Set package endpoint '$EndpointName'")) {
         Save-PackageEndpointInventoryDocument -DocumentInfo $documentInfo
@@ -206,58 +203,14 @@ function Set-PackageEndpoint {
     $after = Get-PackageEndpoint -EndpointName $EndpointName
     $notes = New-Object System.Collections.Generic.List[string]
     if (-not [bool]$after.Enabled) {
-        $notes.Add("Endpoint '$EndpointName' was updated but remains disabled; package commands will not use it until enabled.") | Out-Null
-    }
-    if (-not [bool]$after.Trusted) {
-        $notes.Add("Endpoint '$EndpointName' is untrusted; package commands will not execute definitions from it.") | Out-Null
+        $notes.Add("Endpoint '$EndpointName' was updated but remains disabled; package commands will not scan it until enabled.") | Out-Null
     }
     if ($PSBoundParameters.ContainsKey('BasePath')) {
         $notes.Add("Endpoint '$EndpointName' base path is now '$($after.BasePath)' and resolves to '$($after.ResolvedRootPath)'.") | Out-Null
     }
+    $notes.Add("Publisher trust is managed separately with Add-PackagePublisher and Set-PackagePublisher.") | Out-Null
 
     return New-PackageEndpointCommandResult -Action 'Set' -EndpointName $EndpointName -InventoryPath $documentInfo.Path -Before $before -After $after -Status 'Updated' -Notes @($notes.ToArray())
-}
-
-function Trust-PackageEndpoint {
-    [CmdletBinding(SupportsShouldProcess = $true)]
-    param(
-        [Parameter(Mandatory = $true)]
-        [ValidateNotNullOrEmpty()]
-        [string]$EndpointName,
-
-        [switch]$AllowUnsignedDefinitions
-    )
-
-    Assert-PackageEndpointName -EndpointName $EndpointName
-    if (-not $AllowUnsignedDefinitions.IsPresent) {
-        throw "Trust-PackageEndpoint v1 supports only explicit unsigned filesystem trust. Re-run with -AllowUnsignedDefinitions if this is intentional."
-    }
-
-    $before = Get-PackageEndpoint -EndpointName $EndpointName
-    $documentInfo = Get-PackageEndpointInventoryEditInfo
-    $sourceProperty = Get-PackageEndpointSourceProperty -Document $documentInfo.Document -EndpointName $EndpointName
-    if (-not $sourceProperty) {
-        throw "Package endpoint '$EndpointName' was not found in '$($documentInfo.Path)'."
-    }
-
-    $source = $sourceProperty.Value
-    if (-not [string]::Equals([string]$source.kind, 'filesystem', [System.StringComparison]::OrdinalIgnoreCase)) {
-        throw "Package endpoint '$EndpointName' is kind '$($source.kind)'. Trust-PackageEndpoint v1 only supports filesystem endpoints."
-    }
-
-    $source | Add-Member -MemberType NoteProperty -Name 'trusted' -Value $true -Force
-    $source | Add-Member -MemberType NoteProperty -Name 'trustMode' -Value 'unsignedExplicit' -Force
-    $source | Add-Member -MemberType NoteProperty -Name 'trustedAtUtc' -Value ([DateTime]::UtcNow.ToString('o')) -Force
-    $source | Add-Member -MemberType NoteProperty -Name 'trustReason' -Value 'Trusted by Trust-PackageEndpoint -AllowUnsignedDefinitions.' -Force
-
-    if ($PSCmdlet.ShouldProcess($documentInfo.Path, "Trust package endpoint '$EndpointName'")) {
-        Save-PackageEndpointInventoryDocument -DocumentInfo $documentInfo
-    }
-
-    $after = Get-PackageEndpoint -EndpointName $EndpointName
-    return New-PackageEndpointCommandResult -Action 'Trust' -EndpointName $EndpointName -InventoryPath $documentInfo.Path -Before $before -After $after -Status 'Trusted' -Notes @(
-        "Endpoint '$EndpointName' now trusts unsigned filesystem definitions by explicit local configuration."
-    )
 }
 
 function Remove-PackageEndpoint {
@@ -290,6 +243,6 @@ function Remove-PackageEndpoint {
     }
 
     return New-PackageEndpointCommandResult -Action 'Remove' -EndpointName $EndpointName -InventoryPath $documentInfo.Path -Before $before -After $null -Status 'Removed' -Notes @(
-        "Endpoint '$EndpointName' was removed from configuration only. Repository files, installed packages, and local definition snapshots were not deleted."
+        "Endpoint '$EndpointName' was removed from configuration only. Endpoint files, installed packages, publisher policy, and local definition snapshots were not deleted."
     )
 }

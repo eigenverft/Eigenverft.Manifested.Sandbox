@@ -6,18 +6,14 @@
       "kind": "moduleLocal",
       "enabled": true,
       "searchOrder": 100,
-      "definitionRoot": "Repositories/Eigenverft/ModuleDefaults",
-      "trusted": true,
-      "trustMode": "moduleShipped"
+      "definitionRoot": "Endpoint/Defaults"
     },
     {
-      "endpointName": "corpPackageRepository",
+      "endpointName": "corpPackageEndpoint",
       "kind": "filesystem",
       "enabled": false,
       "searchOrder": 300,
-      "basePath": "\\\\corp-share\\PackageRepository",
-      "trusted": false,
-      "trustMode": "unsigned"
+      "basePath": "\\\\corp-share\\PackageEndpoint"
     }
   ]
 }

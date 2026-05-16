@@ -55,6 +55,7 @@ $moduleProjectRoot = Join-Path (Split-Path -Parent $PSScriptRoot) 'Eigenverft.Ma
 . "$moduleProjectRoot\Commands\Package\Eigenverft.Manifested.Sandbox.Cmd.InvokePackage.ps1"
 . "$moduleProjectRoot\Commands\Depot\Eigenverft.Manifested.Sandbox.Cmd.PackageDepot.ps1"
 . "$moduleProjectRoot\Commands\Endpoint\Eigenverft.Manifested.Sandbox.Cmd.PackageEndpoint.ps1"
+. "$moduleProjectRoot\Commands\Publisher\Eigenverft.Manifested.Sandbox.Cmd.PackagePublisher.ps1"
 . "$moduleProjectRoot\Commands\Web\Eigenverft.Manifested.Sandbox.Cmd.InvokeWebRequestEx.ps1"
 . "$moduleProjectRoot\Commands\Module\Eigenverft.Manifested.Sandbox.Cmd.Module.ps1"
 
