@@ -27,6 +27,8 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - export
         $text | Should -Match 'Invoke-Package -DefinitionId ''GitRuntime'''
         $text | Should -Match 'Invoke-Package -DefinitionId CodexCli,'
         $text | Should -Not -Match 'VSCodeUser,'
+        $text | Should -Match "Add-TeamPackagePublisher -PublisherId 'My Team'"
+        $text | Should -Match 'definitionPublication.publisherId'
         $text | Should -Match 'Other exported commands:'
     }
 
@@ -51,6 +53,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - export
             'Add-PackagePublisher',
             'Add-TeamPackageDepot',
             'Add-TeamPackageEndpoint',
+            'Add-TeamPackagePublisher',
             'Get-PackageDepot',
             'Get-PackageEndpoint',
             'Get-PackagePublisher',

@@ -70,6 +70,12 @@
       "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]*$",
       "description": "Portable id segment. Keep ids stable and avoid spaces so paths, inventory keys, and repository references stay predictable."
     },
+    "publisherIdentifier": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^[A-Za-z][A-Za-z0-9_.-]*( [A-Za-z0-9_.-]+)*$",
+      "description": "Package-definition maintainer namespace. Human team names such as My Team are allowed; spaces must separate non-empty words. This is distinct from compact definitionId values."
+    },
     "display": {
       "type": "object",
       "additionalProperties": false,
@@ -94,8 +100,8 @@
       ],
       "properties": {
         "publisherId": {
-          "$ref": "#/$defs/identifier",
-          "description": "Maintainer namespace for this definition, e.g. Eigenverft (shipped module defaults) or TeamTools. Not the upstream app vendor."
+          "$ref": "#/$defs/publisherIdentifier",
+          "description": "Maintainer namespace for this definition, e.g. Eigenverft (shipped module defaults) or My Team. Not the upstream app vendor."
         },
         "publisherName": {
           "type": "string",
@@ -153,7 +159,7 @@
       ],
       "properties": {
         "publisherId": {
-          "$ref": "#/$defs/identifier",
+          "$ref": "#/$defs/publisherIdentifier",
           "description": "Optional publisher namespace pin for this dependency. Omit to use trusted publisher conflict policy."
         },
         "definitionId": {

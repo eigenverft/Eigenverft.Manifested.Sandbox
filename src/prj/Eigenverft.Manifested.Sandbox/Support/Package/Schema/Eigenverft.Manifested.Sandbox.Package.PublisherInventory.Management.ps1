@@ -12,8 +12,8 @@ function Assert-PackagePublisherId {
     if ([string]::IsNullOrWhiteSpace($PublisherId)) {
         throw 'Package publisher id must not be empty.'
     }
-    if ($PublisherId -notmatch '^[A-Za-z][A-Za-z0-9_.-]*$') {
-        throw "Package publisher '$PublisherId' is invalid. Use letters, numbers, '.', '-' or '_' and start with a letter."
+    if ($PublisherId -notmatch '^[A-Za-z][A-Za-z0-9_.-]*( [A-Za-z0-9_.-]+)*$') {
+        throw "Package publisher '$PublisherId' is invalid. Use letters, numbers, spaces, '.', '-' or '_' and start with a letter. Spaces must separate non-empty words."
     }
 }
 

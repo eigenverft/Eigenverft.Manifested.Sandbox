@@ -6,7 +6,7 @@
     "publisherName": "Eigenverft",
     "definitionId": "VSCodeUser",
     "definitionRevision": 1,
-    "publishedAtUtc": "05/13/2026 12:00:00"
+    "publishedAtUtc": "2026-05-13T12:00:00Z"
   },
   "$comment": "Schema-first draft for Visual Studio Code Windows user setup (x64). Acquisition URL and sha256 were taken from microsoft/winget-pkgs (Microsoft.VisualStudioCode.installer.yaml, user scope x64) on 2026-05-10; silent-install flags follow https://code.visualstudio.com/docs/setup/windows (Inno Setup + /mergetasks=!runcode).",
   "display": {

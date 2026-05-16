@@ -84,6 +84,26 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - endpoi
         $source.PSObject.Properties['searchOrder'] | Should -BeNullOrEmpty
     }
 
+    It 'adds a trusted team package publisher with the JSON publisher hint' {
+        $root = Join-Path $TestDrive 'publisher-add-team'
+        $inventoryPath = Join-Path $root 'Configuration\Internal\PackagePublisherInventory.json'
+        Write-TestJsonDocument -Path $inventoryPath -Document @{ inventoryVersion = 1; publishers = @() }
+
+        Mock Get-PackagePublisherInventoryPath { $inventoryPath }
+
+        $result = Add-TeamPackagePublisher -PublisherId 'My Team' -WarningAction SilentlyContinue
+        $source = (Read-PackageJsonDocument -Path $inventoryPath).Document.publishers | Select-Object -First 1
+
+        $result.Status | Should -Be 'Added'
+        $source.publisherId | Should -Be 'My Team'
+        $source.publisherName | Should -Be 'My Team'
+        $source.enabled | Should -BeTrue
+        $source.trusted | Should -BeTrue
+        $source.trustMode | Should -Be 'unsignedExplicit'
+        $result.Notes -join "`n" | Should -Match 'definitionPublication.publisherId'
+        $result.Notes -join "`n" | Should -Match 'My Team'
+    }
+
     It 'removes publisher policy without touching endpoint files' {
         $root = Join-Path $TestDrive 'publisher-remove'
         $endpointRoot = Join-Path $root 'team-endpoint'

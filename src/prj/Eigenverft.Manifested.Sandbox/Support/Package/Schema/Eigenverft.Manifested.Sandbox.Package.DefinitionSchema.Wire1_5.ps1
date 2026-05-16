@@ -560,6 +560,7 @@ function Assert-PackageDefinitionSchema_1_5 {
     if ([string]::IsNullOrWhiteSpace([string]$definition.definitionPublication.publisherId)) {
         throw "Package definition '$DefinitionId' definitionPublication.publisherId must not be empty."
     }
+    Assert-PackagePublisherId -PublisherId ([string]$definition.definitionPublication.publisherId)
     if ([string]::IsNullOrWhiteSpace([string]$definition.definitionPublication.publisherName)) {
         throw "Package definition '$DefinitionId' definitionPublication.publisherName must not be empty."
     }
@@ -628,6 +629,9 @@ function Assert-PackageDefinitionSchema_1_5 {
         }
         if ($dependency.PSObject.Properties['publisherId'] -and [string]::IsNullOrWhiteSpace([string]$dependency.publisherId)) {
             throw "Package definition '$DefinitionId' has dependency with empty publisherId."
+        }
+        if ($dependency.PSObject.Properties['publisherId']) {
+            Assert-PackagePublisherId -PublisherId ([string]$dependency.publisherId)
         }
         if (-not $dependency.PSObject.Properties['definitionId'] -or [string]::IsNullOrWhiteSpace([string]$dependency.definitionId)) {
             throw "Package definition '$DefinitionId' has dependency without definitionId."

@@ -78,6 +78,7 @@ FunctionsToExport = @(
     'Add-PackageEndpoint',
     'Add-PackagePublisher',
     'Add-TeamPackageEndpoint',
+    'Add-TeamPackagePublisher',
     'Get-PackageDepot',
     'Get-PackageEndpoint',
     'Get-PackagePublisher',

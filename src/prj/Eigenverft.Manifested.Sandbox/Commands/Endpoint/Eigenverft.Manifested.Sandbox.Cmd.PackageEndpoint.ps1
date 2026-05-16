@@ -107,7 +107,7 @@ function Add-PackageEndpoint {
 
     $publisherIds = @(Get-PackageEndpointDiscoveredPublisherIds -ResolvedRootPath $afterSummary.ResolvedRootPath)
     if ($publisherIds.Count -gt 0) {
-        $notes.Add("Discovered publisher id(s): $($publisherIds -join ', '). Use Add-PackagePublisher or Set-PackagePublisher -AllowUnsignedDefinitions for publishers you trust.") | Out-Null
+        $notes.Add("Discovered publisher id(s): $($publisherIds -join ', '). Use Add-TeamPackagePublisher -PublisherId '<publisherId>' for a trusted team publisher, or Add/Set-PackagePublisher for custom policy.") | Out-Null
     }
     else {
         $notes.Add("No package definition publishers were discovered at '$($afterSummary.ResolvedRootPath)' yet.") | Out-Null

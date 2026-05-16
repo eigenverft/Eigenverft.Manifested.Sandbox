@@ -110,6 +110,17 @@ The module exports a single package dispatcher, **`Invoke-Package`**, plus helpe
 
 `Invoke-Package` requires `-DefinitionId` and scans every **enabled** row in `Configuration/Internal/PackageEndpointInventory.json` in endpoint `searchOrder`. Discovery matches `definitionPublication.definitionId`, then filters to publishers trusted in `PackagePublisherInventory.json`. Optional `-PublisherId` pins one publisher. If multiple trusted publishers provide the same definition id, `PackageConfig.json` controls the conflict mode; the default is `fail`. Shipped definitions use publisher `Eigenverft` and live under `Endpoint\Defaults\Eigenverft` behind the shipped `moduleDefaults` endpoint row. Pass `-DesiredState Assigned` or `Removed`, and optional `-FailFast`.
 
+Team onboarding is intentionally short: add a depot for package payloads, add an endpoint for package definition JSON, then trust the team publisher identity used inside those JSON files.
+
+```powershell
+Add-TeamPackageDepot -BasePath '\\team-share\PackageDepot'
+Add-TeamPackageEndpoint -BasePath '\\team-share\PackageEndpoint'
+Add-TeamPackagePublisher -PublisherId 'My Team'
+Invoke-Package -DefinitionId 'OtherTextEditorFromTeamRepos'
+```
+
+Team package JSON files must set `definitionPublication.publisherId` to the same value, for example `My Team`.
+
 `Get-SandboxVersion` prints the module version, example `Invoke-Package` lines for each shipped definition discovered on disk, and the remaining exported commands.
 
 ### Package Vocabulary

@@ -112,6 +112,13 @@ Displays module information, per-definition Invoke-Package examples, and other e
             $outputLines += ("- Invoke-Package -DefinitionId {0}" -f ($bulkIds -join ','))
         }
         $outputLines += ''
+        $outputLines += 'Team setup example:'
+        $outputLines += "- Add-TeamPackageDepot -BasePath '\\team-share\PackageDepot'"
+        $outputLines += "- Add-TeamPackageEndpoint -BasePath '\\team-share\PackageEndpoint'"
+        $outputLines += "- Add-TeamPackagePublisher -PublisherId 'My Team'"
+        $outputLines += "Team package JSON files must set definitionPublication.publisherId to 'My Team'."
+        $outputLines += "- Invoke-Package -DefinitionId 'OtherTextEditorFromTeamRepos'"
+        $outputLines += ''
     }
     else {
         $outputLines += @(

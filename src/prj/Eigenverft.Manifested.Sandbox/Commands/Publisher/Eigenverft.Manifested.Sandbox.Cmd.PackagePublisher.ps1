@@ -77,6 +77,38 @@ function Add-PackagePublisher {
     return New-PackagePublisherCommandResult -Action 'Add' -PublisherId $PublisherId -InventoryPath $documentInfo.Path -Before $null -After $after -Status 'Added' -Notes @($notes.ToArray())
 }
 
+function Add-TeamPackagePublisher {
+    [CmdletBinding()]
+    param(
+        [ValidateNotNullOrEmpty()]
+        [string]$PublisherId = 'My Team',
+
+        [AllowNull()]
+        [string]$PublisherName = $null,
+
+        [switch]$Disabled
+    )
+
+    $publisherParameters = @{
+        PublisherId = $PublisherId
+        AllowUnsignedDefinitions = $true
+    }
+    if ($PSBoundParameters.ContainsKey('PublisherName')) {
+        $publisherParameters['PublisherName'] = $PublisherName
+    }
+    if ($Disabled.IsPresent) {
+        $publisherParameters['Disabled'] = $true
+    }
+
+    $result = Add-PackagePublisher @publisherParameters
+    $hint = "Team package definition JSON files must set definitionPublication.publisherId to '$PublisherId'."
+    Write-Warning $hint
+
+    $notes = @($result.Notes) + $hint
+    $result | Add-Member -MemberType NoteProperty -Name Notes -Value $notes -Force
+    return $result
+}
+
 function Set-PackagePublisher {
     [CmdletBinding(SupportsShouldProcess = $true)]
     param(
