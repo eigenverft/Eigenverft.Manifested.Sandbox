@@ -40,7 +40,7 @@ function Get-PackageLocalDefinitionPath {
         [string]$Role,
 
         [Parameter(Mandatory = $true)]
-        [string]$LocalRepositoryRoot,
+        [string]$LocalEndpointRoot,
 
         [Parameter(Mandatory = $true)]
         [string]$PublisherId,
@@ -51,7 +51,7 @@ function Get-PackageLocalDefinitionPath {
 
     $safePublisherId = ConvertTo-PackageSafePathSegment -Value $PublisherId
     $safeDefinitionId = ConvertTo-PackageSafePathSegment -Value $DefinitionId
-    return [System.IO.Path]::GetFullPath((Join-Path (Join-Path (Join-Path $LocalRepositoryRoot $Role) $safePublisherId) ($safeDefinitionId + '.json')))
+    return [System.IO.Path]::GetFullPath((Join-Path (Join-Path (Join-Path $LocalEndpointRoot $Role) $safePublisherId) ($safeDefinitionId + '.json')))
 }
 
 function Copy-PackageDefinitionToLocalDefinitionStore {
@@ -65,7 +65,7 @@ function Copy-PackageDefinitionToLocalDefinitionStore {
         [string]$SourcePath,
 
         [Parameter(Mandatory = $true)]
-        [string]$LocalRepositoryRoot,
+        [string]$LocalEndpointRoot,
 
         [Parameter(Mandatory = $true)]
         [string]$PublisherId,
@@ -77,7 +77,7 @@ function Copy-PackageDefinitionToLocalDefinitionStore {
         [int]$DefinitionRevision
     )
 
-    $targetPath = Get-PackageLocalDefinitionPath -Role $Role -LocalRepositoryRoot $LocalRepositoryRoot -PublisherId $PublisherId -DefinitionId $DefinitionId
+    $targetPath = Get-PackageLocalDefinitionPath -Role $Role -LocalEndpointRoot $LocalEndpointRoot -PublisherId $PublisherId -DefinitionId $DefinitionId
     $targetDirectory = Split-Path -Parent $targetPath
     $null = New-Item -ItemType Directory -Path $targetDirectory -Force
 
@@ -282,7 +282,7 @@ function Select-PackageDefinitionCandidateWinner {
         $publisherIds = @($trustedCandidates | Select-Object -ExpandProperty PublisherId -Unique)
         if ($publisherIds.Count -gt 1) {
             if ([string]::Equals($DefinitionPublisherConflictMode, 'fail', [System.StringComparison]::OrdinalIgnoreCase)) {
-                throw "Package definition '$DefinitionId' is provided by multiple trusted publishers: $($publisherIds -join ', '). Use -PublisherId or set package.repositoryEnvironment.defaults.definitionPublisherConflictMode."
+                throw "Package definition '$DefinitionId' is provided by multiple trusted publishers: $($publisherIds -join ', '). Use -PublisherId or set package.endpointEnvironment.defaults.definitionPublisherConflictMode."
             }
 
             $descending = $DefinitionPublisherConflictMode -in @('warnLast', 'last')
@@ -324,7 +324,7 @@ function Sync-PackageEndpointCandidateDefinitions {
         [string]$ApplicationRootDirectory = $null,
 
         [Parameter(Mandatory = $true)]
-        [string]$LocalRepositoryRoot,
+        [string]$LocalEndpointRoot,
 
         [ValidateSet('fail', 'warnFirst', 'first', 'warnLast', 'last')]
         [string]$DefinitionPublisherConflictMode = 'fail'
@@ -336,11 +336,11 @@ function Sync-PackageEndpointCandidateDefinitions {
     foreach ($definitionId in @($keys)) {
         try {
             $winner = Select-PackageDefinitionCandidateWinner -Candidates @($allCandidates | Where-Object { [string]::Equals([string]$_.DefinitionId, [string]$definitionId, [System.StringComparison]::OrdinalIgnoreCase) }) -PublisherRows $PublisherRows -DefinitionId $definitionId -DefinitionPublisherConflictMode $DefinitionPublisherConflictMode
-            Copy-PackageDefinitionToLocalDefinitionStore -Role 'Candidate' -SourcePath $winner.DefinitionPath -LocalRepositoryRoot $LocalRepositoryRoot -PublisherId ([string]$winner.PublisherId) -DefinitionId ([string]$winner.DefinitionId) -DefinitionRevision ([int]$winner.DefinitionRevision) | Out-Null
+            Copy-PackageDefinitionToLocalDefinitionStore -Role 'Candidate' -SourcePath $winner.DefinitionPath -LocalEndpointRoot $LocalEndpointRoot -PublisherId ([string]$winner.PublisherId) -DefinitionId ([string]$winner.DefinitionId) -DefinitionRevision ([int]$winner.DefinitionRevision) | Out-Null
             $materializedCount++
         }
         catch {
-            Write-PackageExecutionMessage -Level 'WRN' -Message ("[WARN] Skipped repository-focused Candidate materialization for definition '{0}': {1}" -f $definitionId, $_.Exception.Message)
+            Write-PackageExecutionMessage -Level 'WRN' -Message ("[WARN] Skipped endpoint-wide Candidate materialization for definition '{0}': {1}" -f $definitionId, $_.Exception.Message)
         }
     }
 
@@ -370,10 +370,10 @@ then publisher trust and conflict policy, then definitionRevision.
         [string]$ApplicationRootDirectory = $null,
 
         [AllowNull()]
-        [string]$LocalRepositoryRoot = $null,
+        [string]$LocalEndpointRoot = $null,
 
-        [ValidateSet('packageFocused', 'repositoryFocused')]
-        [string]$RepositoryMaterializationMode = 'packageFocused',
+        [ValidateSet('packageFocused', 'endpointFocused')]
+        [string]$EndpointMaterializationMode = 'packageFocused',
 
         [ValidateSet('fail', 'warnFirst', 'first', 'warnLast', 'last')]
         [string]$DefinitionPublisherConflictMode = 'fail'
@@ -384,16 +384,16 @@ then publisher trust and conflict policy, then definitionRevision.
     $sourceRows = @(Get-PackageEnabledEndpointSources -EndpointInventoryDocument $endpointInventoryInfo.Document)
     $publisherRows = @(Get-PackageEnabledTrustedPublisherRows -PublisherInventoryDocument $publisherInventoryInfo.Document)
 
-    $resolvedLocalRepositoryRoot = if ([string]::IsNullOrWhiteSpace($LocalRepositoryRoot)) {
-        Get-PackageDefaultLocalRepositoryRoot
+    $resolvedLocalEndpointRoot = if ([string]::IsNullOrWhiteSpace($LocalEndpointRoot)) {
+        Get-PackageDefaultLocalEndpointRoot
     }
     else {
-        [string]$LocalRepositoryRoot
+        [string]$LocalEndpointRoot
     }
 
-    if ([string]::Equals($RepositoryMaterializationMode, 'repositoryFocused', [System.StringComparison]::OrdinalIgnoreCase)) {
-        $count = Sync-PackageEndpointCandidateDefinitions -SourceRows $sourceRows -PublisherRows $publisherRows -ApplicationRootDirectory $ApplicationRootDirectory -LocalRepositoryRoot $resolvedLocalRepositoryRoot -DefinitionPublisherConflictMode $DefinitionPublisherConflictMode
-        Write-PackageExecutionMessage -Message ("[STATE] Repository-focused definition materialization refreshed {0} Candidate definition file(s)." -f $count)
+    if ([string]::Equals($EndpointMaterializationMode, 'endpointFocused', [System.StringComparison]::OrdinalIgnoreCase)) {
+        $count = Sync-PackageEndpointCandidateDefinitions -SourceRows $sourceRows -PublisherRows $publisherRows -ApplicationRootDirectory $ApplicationRootDirectory -LocalEndpointRoot $resolvedLocalEndpointRoot -DefinitionPublisherConflictMode $DefinitionPublisherConflictMode
+        Write-PackageExecutionMessage -Message ("[STATE] Endpoint-wide definition materialization refreshed {0} Candidate definition file(s)." -f $count)
     }
 
     $candidates = @(Get-PackageDefinitionCandidateRows -SourceRows $sourceRows -ApplicationRootDirectory $ApplicationRootDirectory -DefinitionId $DefinitionId)
@@ -403,8 +403,7 @@ then publisher trust and conflict policy, then definitionRevision.
     }
 
     $selected = Select-PackageDefinitionCandidateWinner -Candidates $candidates -PublisherRows $publisherRows -DefinitionId $DefinitionId -PublisherId $PublisherId -DefinitionPublisherConflictMode $DefinitionPublisherConflictMode
-    $selectedSourceRow = @($sourceRows | Where-Object { [string]::Equals([string]$_.EndpointName, [string]$selected.EndpointName, [System.StringComparison]::OrdinalIgnoreCase) } | Select-Object -First 1)[0]
-    $candidateCopy = Copy-PackageDefinitionToLocalDefinitionStore -Role 'Candidate' -SourcePath $selected.DefinitionPath -LocalRepositoryRoot $resolvedLocalRepositoryRoot -PublisherId $selected.PublisherId -DefinitionId $selected.DefinitionId -DefinitionRevision $selected.DefinitionRevision
+    $candidateCopy = Copy-PackageDefinitionToLocalDefinitionStore -Role 'Candidate' -SourcePath $selected.DefinitionPath -LocalEndpointRoot $resolvedLocalEndpointRoot -PublisherId $selected.PublisherId -DefinitionId $selected.DefinitionId -DefinitionRevision $selected.DefinitionRevision
 
     return [pscustomobject]@{
         EndpointName                  = [string]$selected.EndpointName
@@ -429,6 +428,6 @@ then publisher trust and conflict policy, then definitionRevision.
         DefinitionRevision            = [int]$selected.DefinitionRevision
         PublishedAtUtc                = [string]$selected.PublishedAtUtc
         MaterializationStatus         = [string]$candidateCopy.Status
-        RepositoryMaterializationMode = [string]$RepositoryMaterializationMode
+        EndpointMaterializationMode   = [string]$EndpointMaterializationMode
     }
 }

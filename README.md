@@ -130,7 +130,7 @@ Team package JSON files must set `definitionPublication.publisherId` to the same
 | **Package depot** | Durable artifact storage for downloaded or mirrored package files such as installers, archives, model files, and runtime payloads. The default local depot folder is `PkgDepot`. |
 | **Endpoint** | A scan root for package definition JSON files. Endpoints describe where to discover definitions; they do not imply trust. |
 | **Publisher** | Trusted package-definition authority from `PackagePublisherInventory.json`. The identity is `definitionPublication.publisherId`. |
-| **PkgRepos** | Local materialized definition copies used for Candidate and Assigned snapshots. This is not a discovery endpoint. |
+| **PkgEndpoint** | Default folder under the application root for **local** materialized package-definition copies (Candidate and Assigned snapshots). This is not a remote discovery endpoint. Renamed from `PkgRepos`; migrate files manually if you relied on the old path. |
 | **Assigned** | Desired state that makes a package definition ready on the machine by reusing, adopting, repairing, or assigning it as policy allows. |
 | **Removed** | Desired state that removes a tracked package when that package definition supports removal. |
 | **Package assignment inventory** | Current tracked **Assigned** package facts: definition, selected version, install directory, ownership kind, and definition snapshot. |
@@ -140,7 +140,7 @@ Team package JSON files must set `definitionPublication.publisherId` to the same
 
 | File | Role |
 | --- | --- |
-| `Configuration/Internal/PackageConfig.json` | Main package configuration: application paths, selection defaults, and acquisition policy. |
+| `Configuration/Internal/PackageConfig.json` | Main package configuration: application paths, `localEndpointRoot` (local definition materialization), selection defaults, acquisition policy, and `endpointEnvironment` defaults. |
 | `Configuration/Internal/PackageDepotInventory.json` | Depot roots, capabilities, search order, and mirror-target flags. |
 | `Configuration/Internal/PackageEndpointInventory.json` | Package definition scan endpoints (paths, enablement, order). |
 | `Configuration/Internal/PackagePublisherInventory.json` | Package definition publisher trust policy. |

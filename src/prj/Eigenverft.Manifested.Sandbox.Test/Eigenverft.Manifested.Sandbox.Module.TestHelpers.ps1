@@ -152,7 +152,7 @@ function global:New-TestPackageGlobalDocument {
         [string]$PackageInstallStageDirectory,
         [string]$DefaultPackageDepotDirectory,
         [string]$PreferredTargetInstallDirectory,
-        [string]$LocalRepositoryRoot,
+        [string]$LocalEndpointRoot,
         [string]$ShimDirectory,
         [string]$PackageAssignmentInventoryFilePath,
         [string]$PackageOperationHistoryFilePath,
@@ -161,7 +161,7 @@ function global:New-TestPackageGlobalDocument {
         [bool]$AllowFallback = $true,
         [AllowNull()]
         [string]$DepotDistributionMode = 'packageFocused',
-        [string]$RepositoryMaterializationMode = 'packageFocused',
+        [string]$EndpointMaterializationMode = 'packageFocused',
         [string]$DefinitionPublisherConflictMode = 'fail',
         [string]$ReleaseTrack = 'stable',
         [string]$Strategy = 'latestByVersion',
@@ -188,16 +188,16 @@ function global:New-TestPackageGlobalDocument {
         package = @{
             applicationRootDirectory = if ($PSBoundParameters.ContainsKey('ApplicationRootDirectory')) { $ApplicationRootDirectory } else { '%LOCALAPPDATA%/Programs/Evf.Sandbox' }
             preferredTargetInstallDirectory = if ($PSBoundParameters.ContainsKey('PreferredTargetInstallDirectory')) { $PreferredTargetInstallDirectory } else { '{applicationRootDirectory}/Inst' }
-            localRepositoryRoot = if ($PSBoundParameters.ContainsKey('LocalRepositoryRoot')) { $LocalRepositoryRoot } else { '{applicationRootDirectory}/PkgRepos' }
+            localEndpointRoot = if ($PSBoundParameters.ContainsKey('LocalEndpointRoot')) { $LocalEndpointRoot } else { '{applicationRootDirectory}/PkgEndpoint' }
             shimDirectory = if ($PSBoundParameters.ContainsKey('ShimDirectory')) { $ShimDirectory } else { '{applicationRootDirectory}/Shims' }
             layout = @{
                 packageDepotRelativePath = $PackageDepotRelativePath
                 packageWorkSlotDirectory = $PackageWorkSlotDirectory
             }
             acquisitionEnvironment = $acquisitionEnvironment
-            repositoryEnvironment = @{
+            endpointEnvironment = @{
                 defaults = @{
-                    repositoryMaterializationMode = $RepositoryMaterializationMode
+                    endpointMaterializationMode = $EndpointMaterializationMode
                     definitionPublisherConflictMode = $DefinitionPublisherConflictMode
                 }
             }

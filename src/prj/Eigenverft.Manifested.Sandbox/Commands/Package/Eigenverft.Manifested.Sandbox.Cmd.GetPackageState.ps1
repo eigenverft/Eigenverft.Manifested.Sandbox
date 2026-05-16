@@ -20,7 +20,7 @@ function Get-PackageState {
         PackageFileStaging  = Get-PackageStateDirectorySummary -Path $config.PackageFileStagingRootDirectory
         PackageInstallStage = Get-PackageStateDirectorySummary -Path $config.PackageInstallStageRootDirectory
         DefaultPackageDepot = Get-PackageStateDirectorySummary -Path $config.DefaultPackageDepotDirectory
-        LocalRepositoryRoot = Get-PackageStateDirectorySummary -Path $config.LocalRepositoryRoot
+        LocalEndpointRoot = Get-PackageStateDirectorySummary -Path $config.LocalEndpointRoot
         Shims               = Get-PackageStateDirectorySummary -Path $config.ShimDirectory
     }
 
@@ -57,7 +57,7 @@ function Get-PackageState {
         LocalDepotInventoryExists = Test-PackageStateLeafPath -Path $config.LocalDepotInventoryPath
         DepotInventoryPath        = $depotInventoryInfo.Path
         DepotInventoryExists      = [bool]$depotInventoryInfo.Exists
-        LocalRepositoryRoot       = $config.LocalRepositoryRoot
+        LocalEndpointRoot       = $config.LocalEndpointRoot
         PackageAssignmentInventoryPath      = $packageInventory.Path
         PackageAssignmentInventoryExists    = Test-PackageStateLeafPath -Path $packageInventory.Path
         PackageOperationHistoryPath      = $operationHistory.Path

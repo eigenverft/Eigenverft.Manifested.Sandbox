@@ -286,34 +286,38 @@ Assert-PackageConfigSchema -PackageConfigDocumentInfo $globalInfo
     }
 
     $package = $PackageConfigDocumentInfo.Document.package
-    foreach ($retiredProperty in @('managedStorageRoots', 'acquisitionDefaults', 'sourceBindings', 'downloadRootDirectory', 'installRootDirectory', 'allowSourceFallback', 'packageSelection', 'ownershipTracking')) {
+    foreach ($retiredProperty in @('managedStorageRoots', 'acquisitionDefaults', 'sourceBindings', 'downloadRootDirectory', 'installRootDirectory', 'allowSourceFallback', 'packageSelection', 'ownershipTracking', 'localRepositoryRoot', 'repositoryEnvironment')) {
         if ($package.PSObject.Properties[$retiredProperty]) {
             throw "Package config '$($PackageConfigDocumentInfo.Path)' still uses retired property '$retiredProperty'."
         }
     }
 
-    foreach ($requiredProperty in @('preferredTargetInstallDirectory', 'localRepositoryRoot', 'acquisitionEnvironment', 'packageState', 'selectionDefaults')) {
+    foreach ($requiredProperty in @('preferredTargetInstallDirectory', 'localEndpointRoot', 'endpointEnvironment', 'acquisitionEnvironment', 'packageState', 'selectionDefaults')) {
         if (-not $package.PSObject.Properties[$requiredProperty]) {
             throw "Package config '$($PackageConfigDocumentInfo.Path)' is missing required property '$requiredProperty'."
         }
     }
+
+    if ([string]::IsNullOrWhiteSpace([string]$package.localEndpointRoot)) {
+        throw "Package config '$($PackageConfigDocumentInfo.Path)' is missing localEndpointRoot."
+    }
     if ($package.PSObject.Properties['repositorySources']) {
         throw "Package config '$($PackageConfigDocumentInfo.Path)' still uses retired property 'repositorySources'. Use Configuration/Internal/PackageEndpointInventory.json endpoints."
     }
-    if ($package.PSObject.Properties['repositoryEnvironment'] -and $package.repositoryEnvironment) {
-        if ($package.repositoryEnvironment.PSObject.Properties['defaults'] -and $package.repositoryEnvironment.defaults) {
-            if ($package.repositoryEnvironment.defaults.PSObject.Properties['repositoryMaterializationMode']) {
-                $repositoryMaterializationMode = [string]$package.repositoryEnvironment.defaults.repositoryMaterializationMode
-                if ($repositoryMaterializationMode -notin @('packageFocused', 'repositoryFocused')) {
-                    throw "Package config '$($PackageConfigDocumentInfo.Path)' defines unsupported repositoryEnvironment.defaults.repositoryMaterializationMode '$repositoryMaterializationMode'. Use 'packageFocused' or 'repositoryFocused'."
-                }
-            }
-            if ($package.repositoryEnvironment.defaults.PSObject.Properties['definitionPublisherConflictMode']) {
-                $definitionPublisherConflictMode = [string]$package.repositoryEnvironment.defaults.definitionPublisherConflictMode
-                if ($definitionPublisherConflictMode -notin @('fail', 'warnFirst', 'first', 'warnLast', 'last')) {
-                    throw "Package config '$($PackageConfigDocumentInfo.Path)' defines unsupported repositoryEnvironment.defaults.definitionPublisherConflictMode '$definitionPublisherConflictMode'. Use 'fail', 'warnFirst', 'first', 'warnLast', or 'last'."
-                }
-            }
+    if (-not $package.endpointEnvironment.PSObject.Properties['defaults'] -or -not $package.endpointEnvironment.defaults) {
+        throw "Package config '$($PackageConfigDocumentInfo.Path)' is missing endpointEnvironment.defaults."
+    }
+    $endpointDefaults = $package.endpointEnvironment.defaults
+    if ($endpointDefaults.PSObject.Properties['endpointMaterializationMode']) {
+        $endpointMaterializationMode = [string]$endpointDefaults.endpointMaterializationMode
+        if ($endpointMaterializationMode -notin @('packageFocused', 'endpointFocused')) {
+            throw "Package config '$($PackageConfigDocumentInfo.Path)' defines unsupported endpointEnvironment.defaults.endpointMaterializationMode '$endpointMaterializationMode'. Use 'packageFocused' or 'endpointFocused'."
+        }
+    }
+    if ($endpointDefaults.PSObject.Properties['definitionPublisherConflictMode']) {
+        $definitionPublisherConflictMode = [string]$endpointDefaults.definitionPublisherConflictMode
+        if ($definitionPublisherConflictMode -notin @('fail', 'warnFirst', 'first', 'warnLast', 'last')) {
+            throw "Package config '$($PackageConfigDocumentInfo.Path)' defines unsupported endpointEnvironment.defaults.definitionPublisherConflictMode '$definitionPublisherConflictMode'. Use 'fail', 'warnFirst', 'first', 'warnLast', or 'last'."
         }
     }
 

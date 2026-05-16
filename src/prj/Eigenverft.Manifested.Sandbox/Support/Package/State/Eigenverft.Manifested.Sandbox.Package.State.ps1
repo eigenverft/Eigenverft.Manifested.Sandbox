@@ -157,12 +157,12 @@ function Get-PackageStateConfig {
         Resolve-PackageConfiguredPath -PathValue 'State\PackageOperationHistory.json' -ApplicationRootDirectory $applicationRootDirectory
     }
 
-    $localRepositoryRoot = if ($packageGlobalConfig.PSObject.Properties['localRepositoryRoot'] -and
-        -not [string]::IsNullOrWhiteSpace([string]$packageGlobalConfig.localRepositoryRoot)) {
-        Resolve-PackageConfiguredPath -PathValue ([string]$packageGlobalConfig.localRepositoryRoot) -ApplicationRootDirectory $applicationRootDirectory
+    $localEndpointRoot = if ($packageGlobalConfig.PSObject.Properties['localEndpointRoot'] -and
+        -not [string]::IsNullOrWhiteSpace([string]$packageGlobalConfig.localEndpointRoot)) {
+        Resolve-PackageConfiguredPath -PathValue ([string]$packageGlobalConfig.localEndpointRoot) -ApplicationRootDirectory $applicationRootDirectory
     }
     else {
-        Resolve-PackageConfiguredPath -PathValue 'PkgRepos' -ApplicationRootDirectory $applicationRootDirectory
+        Resolve-PackageConfiguredPath -PathValue 'PkgEndpoint' -ApplicationRootDirectory $applicationRootDirectory
     }
 
     $shimDirectory = if ($packageGlobalConfig.PSObject.Properties['shimDirectory'] -and
@@ -197,7 +197,7 @@ function Get-PackageStateConfig {
         PackageInstallStageRootDirectory      = $effectiveAcquisitionEnvironment.Stores.PackageInstallStageDirectory
         DefaultPackageDepotDirectory        = $effectiveAcquisitionEnvironment.Stores.DefaultPackageDepotDirectory
         PreferredTargetInstallRootDirectory = $preferredTargetInstallDirectory
-        LocalRepositoryRoot                 = $localRepositoryRoot
+        LocalEndpointRoot                 = $localEndpointRoot
         ShimDirectory                       = $shimDirectory
         PackageAssignmentInventoryFilePath            = $packageInventoryFilePath
         PackageOperationHistoryFilePath     = $packageOperationHistoryFilePath

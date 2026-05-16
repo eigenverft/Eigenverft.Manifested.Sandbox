@@ -285,22 +285,22 @@ Get-PackageDefaultOperationHistoryFilePath
     return [System.IO.Path]::GetFullPath((Join-Path (Join-Path (Get-PackageDefaultApplicationRootDirectory) 'State') 'PackageOperationHistory.json'))
 }
 
-function Get-PackageDefaultLocalRepositoryRoot {
+function Get-PackageDefaultLocalEndpointRoot {
 <#
 .SYNOPSIS
-Returns the default Package local repository root.
+Returns the default Package local endpoint definition root.
 
 .DESCRIPTION
-Builds the fallback local repository-copy root for package definitions that
-have been used successfully.
+Builds the fallback local root for materialized package-definition copies
+(Candidate and Assigned) sourced from configured endpoints.
 
 .EXAMPLE
-Get-PackageDefaultLocalRepositoryRoot
+Get-PackageDefaultLocalEndpointRoot
 #>
     [CmdletBinding()]
     param()
 
-    return [System.IO.Path]::GetFullPath((Join-Path (Get-PackageDefaultApplicationRootDirectory) 'PkgRepos'))
+    return [System.IO.Path]::GetFullPath((Join-Path (Get-PackageDefaultApplicationRootDirectory) 'PkgEndpoint'))
 }
 
 function Get-PackageDefaultSourceInventoryPath {

@@ -2,7 +2,7 @@
   "package": {
     "applicationRootDirectory": "%LOCALAPPDATA%/Programs/Evf.Sandbox",
     "preferredTargetInstallDirectory": "{applicationRootDirectory}/Inst",
-    "localRepositoryRoot": "{applicationRootDirectory}/PkgRepos",
+    "localEndpointRoot": "{applicationRootDirectory}/PkgEndpoint",
     "shimDirectory": "{applicationRootDirectory}/Shims",
     "layout": {
       "packageDepotRelativePath": "{definitionId}/{releaseTrack}/{version}/{artifactDistributionVariant}",
@@ -18,9 +18,9 @@
         "depotDistributionMode": "packageFocused"
       }
     },
-    "repositoryEnvironment": {
+    "endpointEnvironment": {
       "defaults": {
-        "repositoryMaterializationMode": "packageFocused",
+        "endpointMaterializationMode": "packageFocused",
         "definitionPublisherConflictMode": "fail"
       }
     },

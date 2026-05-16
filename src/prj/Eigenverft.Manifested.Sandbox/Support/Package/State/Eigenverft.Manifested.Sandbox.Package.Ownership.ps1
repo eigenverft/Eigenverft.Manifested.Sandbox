@@ -148,7 +148,7 @@ Copies the materialized Candidate Package definition into the Assigned snapshot 
 
 .DESCRIPTION
 Stores the exact definition used by a successful Assigned operation under the
-configured local repository root. The Assigned snapshot is the durable definition
+configured local endpoint definition root. The Assigned snapshot is the durable definition
 material used later by Removed and audit flows.
 
 .PARAMETER PackageResult
@@ -175,12 +175,12 @@ Copy-PackageDefinitionToAssignedSnapshot -PackageResult $result
         throw "Package definition Candidate path '$sourcePath' is not available for Assigned snapshot copy."
     }
 
-    $localRepositoryRoot = if ($config.PSObject.Properties['LocalRepositoryRoot'] -and
-        -not [string]::IsNullOrWhiteSpace([string]$config.LocalRepositoryRoot)) {
-        [string]$config.LocalRepositoryRoot
+    $localEndpointRoot = if ($config.PSObject.Properties['LocalEndpointRoot'] -and
+        -not [string]::IsNullOrWhiteSpace([string]$config.LocalEndpointRoot)) {
+        [string]$config.LocalEndpointRoot
     }
     else {
-        Get-PackageDefaultLocalRepositoryRoot
+        Get-PackageDefaultLocalEndpointRoot
     }
 
     $publisherId = if ($config.PSObject.Properties['DefinitionPublisherId'] -and
@@ -192,7 +192,7 @@ Copy-PackageDefinitionToAssignedSnapshot -PackageResult $result
     }
     $publisherName = if ($config.PSObject.Properties['DefinitionPublisherName']) { [string]$config.DefinitionPublisherName } else { $null }
     $definitionRevision = if ($config.PSObject.Properties['DefinitionRevision']) { [int]$config.DefinitionRevision } else { 0 }
-    $assignedCopy = Copy-PackageDefinitionToLocalDefinitionStore -Role 'Assigned' -SourcePath $sourcePath -LocalRepositoryRoot $localRepositoryRoot -PublisherId $publisherId -DefinitionId ([string]$PackageResult.DefinitionId) -DefinitionRevision $definitionRevision
+    $assignedCopy = Copy-PackageDefinitionToLocalDefinitionStore -Role 'Assigned' -SourcePath $sourcePath -LocalEndpointRoot $localEndpointRoot -PublisherId $publisherId -DefinitionId ([string]$PackageResult.DefinitionId) -DefinitionRevision $definitionRevision
 
     return [pscustomobject]@{
         EndpointName            = if ($config.PSObject.Properties['DefinitionEndpointName']) { [string]$config.DefinitionEndpointName } else { $null }

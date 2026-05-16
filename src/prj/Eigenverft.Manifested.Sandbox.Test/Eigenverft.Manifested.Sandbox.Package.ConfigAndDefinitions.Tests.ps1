@@ -11,7 +11,10 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
         $globalInfo.Document.package.PSObject.Properties.Name | Should -Contain 'preferredTargetInstallDirectory'
         $globalInfo.Document.package.PSObject.Properties.Name | Should -Contain 'applicationRootDirectory'
         $globalInfo.Document.package.PSObject.Properties.Name | Should -Not -Contain 'repositorySources'
-        $globalInfo.Document.package.PSObject.Properties.Name | Should -Contain 'localRepositoryRoot'
+        $globalInfo.Document.package.PSObject.Properties.Name | Should -Contain 'localEndpointRoot'
+        $globalInfo.Document.package.PSObject.Properties.Name | Should -Contain 'endpointEnvironment'
+        $globalInfo.Document.package.PSObject.Properties.Name | Should -Not -Contain 'localRepositoryRoot'
+        $globalInfo.Document.package.PSObject.Properties.Name | Should -Not -Contain 'repositoryEnvironment'
         $globalInfo.Document.package.PSObject.Properties.Name | Should -Contain 'shimDirectory'
         $globalInfo.Document.package.shimDirectory | Should -Be '{applicationRootDirectory}/Shims'
         $globalInfo.Document.package.PSObject.Properties.Name | Should -Contain 'layout'
@@ -25,8 +28,8 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
         $globalInfo.Document.package.acquisitionEnvironment.stores.PSObject.Properties.Name | Should -Not -Contain 'defaultPackageDepotDirectory'
         $globalInfo.Document.package.acquisitionEnvironment.defaults.PSObject.Properties.Name | Should -Contain 'allowFallback'
         $globalInfo.Document.package.acquisitionEnvironment.defaults.depotDistributionMode | Should -Be 'packageFocused'
-        $globalInfo.Document.package.repositoryEnvironment.defaults.repositoryMaterializationMode | Should -Be 'packageFocused'
-        $globalInfo.Document.package.repositoryEnvironment.defaults.definitionPublisherConflictMode | Should -Be 'fail'
+        $globalInfo.Document.package.endpointEnvironment.defaults.endpointMaterializationMode | Should -Be 'packageFocused'
+        $globalInfo.Document.package.endpointEnvironment.defaults.definitionPublisherConflictMode | Should -Be 'fail'
         $globalInfo.Document.package.acquisitionEnvironment.defaults.PSObject.Properties.Name | Should -Not -Contain 'mirrorDownloadedArtifactsToDefaultPackageDepot'
         $globalInfo.Document.package.packageState.PSObject.Properties.Name | Should -Contain 'inventoryFilePath'
         $globalInfo.Document.package.packageState.PSObject.Properties.Name | Should -Contain 'operationHistoryFilePath'
@@ -125,7 +128,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
         $config.PackageFileStagingRootDirectory | Should -Be ([System.IO.Path]::GetFullPath((Join-Path $applicationRootPath 'FileStage')))
         $config.PackageInstallStageRootDirectory | Should -Be ([System.IO.Path]::GetFullPath((Join-Path $applicationRootPath 'InstStage')))
         $config.DefaultPackageDepotDirectory | Should -Be ([System.IO.Path]::GetFullPath((Join-Path $applicationRootPath 'PkgDepot')))
-        $config.LocalRepositoryRoot | Should -Be ([System.IO.Path]::GetFullPath((Join-Path $applicationRootPath 'PkgRepos')))
+        $config.LocalEndpointRoot | Should -Be ([System.IO.Path]::GetFullPath((Join-Path $applicationRootPath 'PkgEndpoint')))
         $config.ShimDirectory | Should -Be ([System.IO.Path]::GetFullPath((Join-Path $applicationRootPath 'Shims')))
 
         $fallbackRootPath = Join-Path $TestDrive 'application-root-fallback'
@@ -246,7 +249,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
         Test-Path -LiteralPath (Join-Path $applicationRootPath 'Inst') -PathType Container | Should -BeTrue
         Test-Path -LiteralPath (Join-Path $applicationRootPath 'FileStage') -PathType Container | Should -BeTrue
         Test-Path -LiteralPath (Join-Path $applicationRootPath 'InstStage') -PathType Container | Should -BeTrue
-        Test-Path -LiteralPath (Join-Path $applicationRootPath 'PkgRepos') -PathType Container | Should -BeTrue
+        Test-Path -LiteralPath (Join-Path $applicationRootPath 'PkgEndpoint') -PathType Container | Should -BeTrue
         Test-Path -LiteralPath (Join-Path $applicationRootPath 'Shims') -PathType Container | Should -BeTrue
         Test-Path -LiteralPath (Join-Path (Join-Path $applicationRootPath 'Caches') 'npm') -PathType Container | Should -BeTrue
         Test-Path -LiteralPath $defaultDepotPath -PathType Container | Should -BeTrue
@@ -289,7 +292,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
         @($environment.CreatedDirectories).Count | Should -Be 0
         @($environment.ExistingDirectories).Count | Should -Be 0
         @($environment.SkippedSources).Count | Should -Be 0
-        Test-Path -LiteralPath $config.LocalRepositoryRoot -PathType Container | Should -BeTrue
+        Test-Path -LiteralPath $config.LocalEndpointRoot -PathType Container | Should -BeTrue
         Test-Path -LiteralPath $config.DefinitionCandidatePath -PathType Leaf | Should -BeTrue
         Test-Path -LiteralPath $config.DefaultPackageDepotDirectory -PathType Container | Should -BeFalse
     }
@@ -412,7 +415,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
         $rootPath = Join-Path $TestDrive 'publisher-conflict-policy'
         $endpointA = Join-Path $rootPath 'EndpointA'
         $endpointB = Join-Path $rootPath 'EndpointB'
-        $localRepositoryRoot = Join-Path $rootPath 'PkgRepos'
+        $localEndpointRoot = Join-Path $rootPath 'PkgEndpoint'
 
         Write-TestJsonDocument -Path (Join-Path (Join-Path $endpointA 'Alpha') 'SharedTool.json') -Document (New-TestVSCodeDefinitionDocument -DefinitionId 'SharedTool' -PublisherId 'Alpha' -PublisherName 'Alpha' -Releases @(
                 New-TestPackageRelease -Id 'shared-alpha' -Version '1.0.0' -Architecture 'x64'
@@ -441,10 +444,10 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
         Mock Get-PackageEndpointInventoryPath { $endpointInventoryPath }
         Mock Get-PackagePublisherInventoryPath { $publisherInventoryPath }
 
-        { Resolve-PackageDefinitionReference -DefinitionId 'SharedTool' -LocalRepositoryRoot $localRepositoryRoot -DefinitionPublisherConflictMode 'fail' } | Should -Throw '*multiple trusted publishers*Use -PublisherId*'
+        { Resolve-PackageDefinitionReference -DefinitionId 'SharedTool' -LocalEndpointRoot $localEndpointRoot -DefinitionPublisherConflictMode 'fail' } | Should -Throw '*multiple trusted publishers*Use -PublisherId*'
 
-        $first = Resolve-PackageDefinitionReference -DefinitionId 'SharedTool' -LocalRepositoryRoot $localRepositoryRoot -DefinitionPublisherConflictMode 'warnFirst'
-        $last = Resolve-PackageDefinitionReference -DefinitionId 'SharedTool' -LocalRepositoryRoot $localRepositoryRoot -DefinitionPublisherConflictMode 'last'
+        $first = Resolve-PackageDefinitionReference -DefinitionId 'SharedTool' -LocalEndpointRoot $localEndpointRoot -DefinitionPublisherConflictMode 'warnFirst'
+        $last = Resolve-PackageDefinitionReference -DefinitionId 'SharedTool' -LocalEndpointRoot $localEndpointRoot -DefinitionPublisherConflictMode 'last'
 
         $first.PublisherId | Should -Be 'Alpha'
         $last.PublisherId | Should -Be 'Beta'
@@ -454,7 +457,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
         $rootPath = Join-Path $TestDrive 'publisher-reused-revision'
         $endpointA = Join-Path $rootPath 'EndpointA'
         $endpointB = Join-Path $rootPath 'EndpointB'
-        $localRepositoryRoot = Join-Path $rootPath 'PkgRepos'
+        $localEndpointRoot = Join-Path $rootPath 'PkgEndpoint'
 
         Write-TestJsonDocument -Path (Join-Path (Join-Path $endpointA 'Alpha') 'SharedTool.json') -Document (New-TestVSCodeDefinitionDocument -DefinitionId 'SharedTool' -PublisherId 'Alpha' -PublisherName 'Alpha' -DefinitionRevision 7 -Releases @(
                 New-TestPackageRelease -Id 'shared-alpha' -Version '1.0.0' -Architecture 'x64'
@@ -482,7 +485,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
         Mock Get-PackageEndpointInventoryPath { $endpointInventoryPath }
         Mock Get-PackagePublisherInventoryPath { $publisherInventoryPath }
 
-        { Resolve-PackageDefinitionReference -DefinitionId 'SharedTool' -LocalRepositoryRoot $localRepositoryRoot } | Should -Throw '*reused definitionRevision*different content across endpoints*'
+        { Resolve-PackageDefinitionReference -DefinitionId 'SharedTool' -LocalEndpointRoot $localEndpointRoot } | Should -Throw '*reused definitionRevision*different content across endpoints*'
     }
 
     It 'completes removed desired state when inventory is missing and whenNotInInventory is succeed' {
@@ -594,7 +597,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
 
         $inventoryPath = Join-Path $appRoot 'State\PackageAssignmentInventory.json'
         $null = New-Item -ItemType Directory -Path (Split-Path -Parent $inventoryPath) -Force
-        $assignedSnapshotPath = Join-Path $appRoot 'PkgRepos\Assigned\Eigenverft\VSCodeRuntime.json'
+        $assignedSnapshotPath = Join-Path $appRoot 'PkgEndpoint\Assigned\Eigenverft\VSCodeRuntime.json'
         Write-TestJsonDocument -Path $assignedSnapshotPath -Document $definitionDocument
         $record = @{
             installSlotId       = 'VSCodeRuntime:stable:win32-x64'
@@ -660,7 +663,7 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
 
         $inventoryPath = Join-Path $appRoot 'State\PackageAssignmentInventory.json'
         $null = New-Item -ItemType Directory -Path (Split-Path -Parent $inventoryPath) -Force
-        $assignedSnapshotPath = Join-Path $appRoot 'PkgRepos\Assigned\Eigenverft\VSCodeRuntime.json'
+        $assignedSnapshotPath = Join-Path $appRoot 'PkgEndpoint\Assigned\Eigenverft\VSCodeRuntime.json'
         Write-TestJsonDocument -Path $assignedSnapshotPath -Document $definitionDocument
         $record = @{
             installSlotId       = 'VSCodeRuntime:stable:win32-x64'

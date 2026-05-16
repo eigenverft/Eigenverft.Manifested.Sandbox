@@ -256,7 +256,7 @@ validates the current schema, resolves runtime context and Package roots, and re
 combined config object for command orchestration.
 
 .PARAMETER DefinitionId
-The Package definition id. Repository resolution matches the JSON definitionId, not the
+The Package definition id. Definition resolution matches the JSON definitionId, not the
 file name.
 
 .PARAMETER PublisherId
@@ -282,12 +282,32 @@ Get-PackageConfig -DefinitionId VSCodeRuntime
 
     $packageGlobalConfig = $globalDocumentInfo.Document.package
     $applicationRootDirectory = Resolve-PackageApplicationRootDirectory -PackageConfiguration $packageGlobalConfig
-    $localRepositoryRoot = if ($packageGlobalConfig.PSObject.Properties['localRepositoryRoot'] -and
-        -not [string]::IsNullOrWhiteSpace([string]$packageGlobalConfig.localRepositoryRoot)) {
-        Resolve-PackageConfiguredPath -PathValue ([string]$packageGlobalConfig.localRepositoryRoot) -ApplicationRootDirectory $applicationRootDirectory
+    $localEndpointRoot = if ($packageGlobalConfig.PSObject.Properties['localEndpointRoot'] -and
+        -not [string]::IsNullOrWhiteSpace([string]$packageGlobalConfig.localEndpointRoot)) {
+        Resolve-PackageConfiguredPath -PathValue ([string]$packageGlobalConfig.localEndpointRoot) -ApplicationRootDirectory $applicationRootDirectory
     }
     else {
-        Resolve-PackageConfiguredPath -PathValue 'PkgRepos' -ApplicationRootDirectory $applicationRootDirectory
+        Resolve-PackageConfiguredPath -PathValue 'PkgEndpoint' -ApplicationRootDirectory $applicationRootDirectory
+    }
+
+    $endpointDefaults = $packageGlobalConfig.endpointEnvironment.defaults
+    $endpointMaterializationMode = 'packageFocused'
+    if ($endpointDefaults.PSObject.Properties['endpointMaterializationMode'] -and
+        -not [string]::IsNullOrWhiteSpace([string]$endpointDefaults.endpointMaterializationMode)) {
+        $endpointMaterializationMode = [string]$endpointDefaults.endpointMaterializationMode
+    }
+
+    if ($endpointMaterializationMode -notin @('packageFocused', 'endpointFocused')) {
+        throw "Package config '$($globalDocumentInfo.Path)' defines unsupported endpointEnvironment.defaults.endpointMaterializationMode '$endpointMaterializationMode'. Use 'packageFocused' or 'endpointFocused'."
+    }
+
+    $definitionPublisherConflictMode = 'fail'
+    if ($endpointDefaults.PSObject.Properties['definitionPublisherConflictMode'] -and
+        -not [string]::IsNullOrWhiteSpace([string]$endpointDefaults.definitionPublisherConflictMode)) {
+        $definitionPublisherConflictMode = [string]$endpointDefaults.definitionPublisherConflictMode
+    }
+    if ($definitionPublisherConflictMode -notin @('fail', 'warnFirst', 'first', 'warnLast', 'last')) {
+        throw "Package config '$($globalDocumentInfo.Path)' defines unsupported definitionPublisherConflictMode '$definitionPublisherConflictMode'. Use 'fail', 'warnFirst', 'first', 'warnLast', or 'last'."
     }
 
     $packageInventoryFilePath = if ($packageGlobalConfig.packageState.PSObject.Properties['inventoryFilePath'] -and
@@ -298,27 +318,6 @@ Get-PackageConfig -DefinitionId VSCodeRuntime
         Resolve-PackageConfiguredPath -PathValue 'State\PackageAssignmentInventory.json' -ApplicationRootDirectory $applicationRootDirectory
     }
 
-    $repositoryMaterializationMode = 'packageFocused'
-    if ($packageGlobalConfig.PSObject.Properties['repositoryEnvironment'] -and $packageGlobalConfig.repositoryEnvironment -and
-        $packageGlobalConfig.repositoryEnvironment.PSObject.Properties['defaults'] -and $packageGlobalConfig.repositoryEnvironment.defaults -and
-        $packageGlobalConfig.repositoryEnvironment.defaults.PSObject.Properties['repositoryMaterializationMode'] -and
-        -not [string]::IsNullOrWhiteSpace([string]$packageGlobalConfig.repositoryEnvironment.defaults.repositoryMaterializationMode)) {
-        $repositoryMaterializationMode = [string]$packageGlobalConfig.repositoryEnvironment.defaults.repositoryMaterializationMode
-    }
-    if ($repositoryMaterializationMode -notin @('packageFocused', 'repositoryFocused')) {
-        throw "Package config '$($globalDocumentInfo.Path)' defines unsupported repositoryEnvironment.defaults.repositoryMaterializationMode '$repositoryMaterializationMode'. Use 'packageFocused' or 'repositoryFocused'."
-    }
-    $definitionPublisherConflictMode = 'fail'
-    if ($packageGlobalConfig.PSObject.Properties['repositoryEnvironment'] -and $packageGlobalConfig.repositoryEnvironment -and
-        $packageGlobalConfig.repositoryEnvironment.PSObject.Properties['defaults'] -and $packageGlobalConfig.repositoryEnvironment.defaults -and
-        $packageGlobalConfig.repositoryEnvironment.defaults.PSObject.Properties['definitionPublisherConflictMode'] -and
-        -not [string]::IsNullOrWhiteSpace([string]$packageGlobalConfig.repositoryEnvironment.defaults.definitionPublisherConflictMode)) {
-        $definitionPublisherConflictMode = [string]$packageGlobalConfig.repositoryEnvironment.defaults.definitionPublisherConflictMode
-    }
-    if ($definitionPublisherConflictMode -notin @('fail', 'warnFirst', 'first', 'warnLast', 'last')) {
-        throw "Package config '$($globalDocumentInfo.Path)' defines unsupported repositoryEnvironment.defaults.definitionPublisherConflictMode '$definitionPublisherConflictMode'. Use 'fail', 'warnFirst', 'first', 'warnLast', or 'last'."
-    }
-
     $definitionReference = $null
     if ([string]::Equals($DesiredState, 'Removed', [System.StringComparison]::OrdinalIgnoreCase)) {
         try {
@@ -327,16 +326,16 @@ Get-PackageConfig -DefinitionId VSCodeRuntime
         }
         catch {
             try {
-                $definitionReference = Resolve-PackageDefinitionReference -PublisherId $PublisherId -DefinitionId $DefinitionId -ApplicationRootDirectory $applicationRootDirectory -LocalRepositoryRoot $localRepositoryRoot -RepositoryMaterializationMode $repositoryMaterializationMode -DefinitionPublisherConflictMode $definitionPublisherConflictMode
+                $definitionReference = Resolve-PackageDefinitionReference -PublisherId $PublisherId -DefinitionId $DefinitionId -ApplicationRootDirectory $applicationRootDirectory -LocalEndpointRoot $localEndpointRoot -EndpointMaterializationMode $endpointMaterializationMode -DefinitionPublisherConflictMode $definitionPublisherConflictMode
             }
             catch {
                 $definitionReference = Resolve-PackageDefinitionSnapshotReference -PublisherId $PublisherId -DefinitionId $DefinitionId -PackageAssignmentInventoryFilePath $packageInventoryFilePath -LiveResolutionError $_.Exception.Message
-                Write-PackageExecutionMessage -Level 'WRN' -Message ("[WARN] Live package repository definition could not be resolved for definition '{0}'; using local assigned definition snapshot '{1}' for removal. Live error: {2}" -f $DefinitionId, $definitionReference.DefinitionPath, $_.Exception.Message)
+                Write-PackageExecutionMessage -Level 'WRN' -Message ("[WARN] Live package definition from endpoints could not be resolved for definition '{0}'; using local assigned definition snapshot '{1}' for removal. Live error: {2}" -f $DefinitionId, $definitionReference.DefinitionPath, $_.Exception.Message)
             }
         }
     }
     else {
-        $definitionReference = Resolve-PackageDefinitionReference -PublisherId $PublisherId -DefinitionId $DefinitionId -ApplicationRootDirectory $applicationRootDirectory -LocalRepositoryRoot $localRepositoryRoot -RepositoryMaterializationMode $repositoryMaterializationMode -DefinitionPublisherConflictMode $definitionPublisherConflictMode
+        $definitionReference = Resolve-PackageDefinitionReference -PublisherId $PublisherId -DefinitionId $DefinitionId -ApplicationRootDirectory $applicationRootDirectory -LocalEndpointRoot $localEndpointRoot -EndpointMaterializationMode $endpointMaterializationMode -DefinitionPublisherConflictMode $definitionPublisherConflictMode
     }
 
     $definitionDocumentInfo = Read-PackageJsonDocument -Path $definitionReference.DefinitionPath
@@ -459,8 +458,8 @@ Get-PackageConfig -DefinitionId VSCodeRuntime
         PackageInstallStageRootDirectory     = $effectiveAcquisitionEnvironment.Stores.PackageInstallStageDirectory
         DefaultPackageDepotDirectory       = $effectiveAcquisitionEnvironment.Stores.DefaultPackageDepotDirectory
         PreferredTargetInstallRootDirectory = $preferredTargetInstallDirectory
-        LocalRepositoryRoot                = $localRepositoryRoot
-        RepositoryMaterializationMode      = $repositoryMaterializationMode
+        LocalEndpointRoot                  = $localEndpointRoot
+        EndpointMaterializationMode        = $endpointMaterializationMode
         DefinitionPublisherConflictMode    = $definitionPublisherConflictMode
         ShimDirectory                      = $shimDirectory
         PackageDepotRelativePathTemplate   = $packageDepotRelativePathTemplate
@@ -648,7 +647,7 @@ New-PackageResult -PackageConfig $config
         PackageInstallStageRootDirectory   = $PackageConfig.PackageInstallStageRootDirectory
         DefaultPackageDepotDirectory     = $PackageConfig.DefaultPackageDepotDirectory
         PreferredTargetInstallRootDirectory = $PackageConfig.PreferredTargetInstallRootDirectory
-        LocalRepositoryRoot              = $PackageConfig.LocalRepositoryRoot
+        LocalEndpointRoot              = $PackageConfig.LocalEndpointRoot
         ShimDirectory                    = $PackageConfig.ShimDirectory
         PackageAssignmentInventoryFilePath         = $PackageConfig.PackageAssignmentInventoryFilePath
         PackageOperationHistoryFilePath  = $PackageConfig.PackageOperationHistoryFilePath
