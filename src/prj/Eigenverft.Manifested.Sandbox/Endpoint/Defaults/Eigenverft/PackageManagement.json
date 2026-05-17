@@ -96,7 +96,7 @@
         "requiredVersion": "1.4.8.1",
         "scope": "CurrentUser",
         "requiredForState": true,
-        "requireNuGetProvider": true
+        "requireNuGetProvider": false
       }
     ]
   },
@@ -110,7 +110,7 @@
         "name": "PackageManagement",
         "requiredVersion": "1.4.8.1",
         "scope": "CurrentUser",
-        "requireNuGetProvider": true
+        "requireNuGetProvider": false
       }
     ],
     "installRootRules": []

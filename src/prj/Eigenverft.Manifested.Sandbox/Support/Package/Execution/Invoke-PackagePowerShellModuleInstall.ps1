@@ -154,7 +154,13 @@ function Ensure-NuGetProvider {
         [string]$ProviderDirectory
     )
 
-    $nuget = Get-PackageProvider -Name NuGet -ListAvailable -ErrorAction SilentlyContinue -WarningAction SilentlyContinue
+    $nuget = $null
+    try {
+        $nuget = Get-PackageProvider -Name NuGet -ListAvailable -ErrorAction SilentlyContinue -WarningAction SilentlyContinue
+    }
+    catch {
+        $nuget = $null
+    }
     if ($nuget) {
         return 'AlreadyAvailable'
     }
@@ -174,7 +180,13 @@ function Ensure-NuGetProvider {
     }
     Copy-Item -Path (Join-Path $ProviderDirectory '*') -Destination $targetRoot -Recurse -Force -ErrorAction Stop
 
-    $nuget = Get-PackageProvider -Name NuGet -ListAvailable -ErrorAction SilentlyContinue -WarningAction SilentlyContinue
+    $nuget = $null
+    try {
+        $nuget = Get-PackageProvider -Name NuGet -ListAvailable -ErrorAction SilentlyContinue -WarningAction SilentlyContinue
+    }
+    catch {
+        $nuget = $null
+    }
     if (-not $nuget) {
         throw "NuGet provider bootstrap failed after copying provider files to '$targetRoot'."
     }
@@ -262,10 +274,21 @@ try {
         if ($request.PSObject.Properties['requireNuGetProvider']) {
             $requireNuGetProvider = [bool]$request.requireNuGetProvider
         }
-        $nugetProvider = Get-PackageProvider -Name NuGet -ListAvailable -ErrorAction SilentlyContinue -WarningAction SilentlyContinue
-        $nugetProviderAvailable = [bool]$nugetProvider
+        # Align with Eigenverft.Manifested.Drydock Initialize-PackageManagement: local module detection via
+        # Get-Module only first; do not touch OneGet until a module is present and NuGet is policy-relevant.
+        # Get-PackageProvider loads PackageManagement and can fault on hosts that still need that bootstrap.
+        $nugetProviderAvailable = $true
+        if ($requireNuGetProvider -and $installed) {
+            try {
+                $nugetProvider = Get-PackageProvider -Name NuGet -ListAvailable -ErrorAction SilentlyContinue -WarningAction SilentlyContinue
+                $nugetProviderAvailable = [bool]$nugetProvider
+            }
+            catch {
+                $nugetProviderAvailable = $false
+            }
+        }
         $accepted = [bool]$installed
-        if ($requireNuGetProvider -and -not $nugetProviderAvailable) {
+        if ($requireNuGetProvider -and $installed -and -not $nugetProviderAvailable) {
             $accepted = $false
         }
         $status = if (-not $installed) {
