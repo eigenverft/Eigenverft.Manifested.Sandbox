@@ -190,7 +190,8 @@ function Invoke-PackagePowerShellModuleHelper {
         -InstallerKind 'powershellModuleInstaller' `
         -UiMode 'silent' `
         -LogPath $null `
-        -ElevationMode 'none'
+        -ElevationMode 'none' `
+        -WindowStyle 'Hidden'
 
     if (-not (Test-Path -LiteralPath $resultPath -PathType Leaf)) {
         throw "PowerShell module helper did not write result JSON '$resultPath'."

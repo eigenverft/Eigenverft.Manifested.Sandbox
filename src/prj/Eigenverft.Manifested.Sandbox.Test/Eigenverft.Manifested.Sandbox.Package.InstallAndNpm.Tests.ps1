@@ -278,7 +278,7 @@ exit /b 0
         $invokeCalls = New-Object System.Collections.Generic.List[object]
         Mock Get-PackageWindowsPowerShellPath { Join-Path $rootPath 'WindowsPowerShell\v1.0\powershell.exe' }
         Mock Invoke-PackageInstallerCommand {
-            param($PackageResult, $CommandPath, $CommandArguments, $WorkingDirectory, $TimeoutSec, $SuccessExitCodes, $RestartExitCodes, $TargetKind, $InstallerKind, $UiMode, $LogPath, $ElevationMode)
+            param($PackageResult, $CommandPath, $CommandArguments, $WorkingDirectory, $TimeoutSec, $SuccessExitCodes, $RestartExitCodes, $TargetKind, $InstallerKind, $UiMode, $LogPath, $ElevationMode, $WindowStyle)
             $resultPath = [string]$CommandArguments[([array]::IndexOf($CommandArguments, '-ResultPath') + 1)]
             [pscustomobject]@{
                 success = $true
@@ -299,6 +299,7 @@ exit /b 0
                 InstallerKind = $InstallerKind
                 UiMode = $UiMode
                 ElevationMode = $ElevationMode
+                WindowStyle = $WindowStyle
             }) | Out-Null
             [pscustomobject]@{
                 ExitCode = 0
@@ -341,6 +342,7 @@ exit /b 0
         $invokeCalls[0].TargetKind | Should -Be 'powershellModule'
         $invokeCalls[0].InstallerKind | Should -Be 'powershellModuleInstaller'
         $invokeCalls[0].ElevationMode | Should -Be 'none'
+        $invokeCalls[0].WindowStyle | Should -Be 'Hidden'
         Test-Path -LiteralPath (Join-Path $stageDirectory 'Nuget\Eigenverft.Manifested.Agent.1.20261.39327.nupkg') -PathType Leaf | Should -BeTrue
         $result.InstallKind | Should -Be 'powershellModuleInstaller'
         $result.Status | Should -Be 'Applied'
@@ -1031,7 +1033,7 @@ exit /b 0
             }
         }
         Mock Invoke-PackageInstallerCommand {
-            param($PackageResult, $CommandPath, $CommandArguments, $WorkingDirectory, $TimeoutSec, $SuccessExitCodes, $RestartExitCodes, $TargetKind, $InstallerKind, $UiMode, $LogPath, $ElevationMode)
+            param($PackageResult, $CommandPath, $CommandArguments, $WorkingDirectory, $TimeoutSec, $SuccessExitCodes, $RestartExitCodes, $TargetKind, $InstallerKind, $UiMode, $LogPath, $ElevationMode, $WindowStyle)
             $invokeCalls.Add([pscustomobject]@{
                 CommandPath = $CommandPath
                 CommandArguments = @($CommandArguments)

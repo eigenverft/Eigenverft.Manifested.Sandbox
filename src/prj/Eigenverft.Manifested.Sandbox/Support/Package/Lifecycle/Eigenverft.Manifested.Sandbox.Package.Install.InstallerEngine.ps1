@@ -71,7 +71,10 @@ the caller.
         [string]$LogPath,
 
         [AllowNull()]
-        [string]$ElevationMode
+        [string]$ElevationMode,
+
+        [ValidateSet('Normal', 'Hidden', 'Minimized', 'Maximized')]
+        [string]$WindowStyle = 'Normal'
     )
 
     if ([string]::IsNullOrWhiteSpace($CommandPath)) {
@@ -96,6 +99,9 @@ the caller.
     }
     if ($elevationPlan.ShouldElevate) {
         $startProcessParameters['Verb'] = 'RunAs'
+    }
+    if (-not [string]::Equals($WindowStyle, 'Normal', [System.StringComparison]::OrdinalIgnoreCase)) {
+        $startProcessParameters['WindowStyle'] = $WindowStyle
     }
 
     $process = Start-Process @startProcessParameters
