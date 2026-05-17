@@ -35,6 +35,7 @@
 . "$PSScriptRoot\Support\Package\State\Eigenverft.Manifested.Sandbox.Package.State.ps1"
 . "$PSScriptRoot\Support\Package\Lifecycle\Eigenverft.Manifested.Sandbox.Package.Readiness.ps1"
 . "$PSScriptRoot\Support\Package\Execution\Eigenverft.Manifested.Sandbox.Package.Npm.ps1"
+. "$PSScriptRoot\Support\Package\Execution\Eigenverft.Manifested.Sandbox.Package.PowerShellModule.ps1"
 # Package install fragments (order-sensitive); orchestrator last - mirror in TestImports.ps1
 . "$PSScriptRoot\Support\Package\Lifecycle\Eigenverft.Manifested.Sandbox.Package.Install.Existing.ps1"
 . "$PSScriptRoot\Support\Package\Lifecycle\Eigenverft.Manifested.Sandbox.Package.Install.Preparation.ps1"

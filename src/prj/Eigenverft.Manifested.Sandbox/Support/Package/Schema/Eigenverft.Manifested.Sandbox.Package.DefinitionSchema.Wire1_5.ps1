@@ -234,7 +234,7 @@ function Assert-PackagePresenceRequirementFlags_1_5 {
         [psobject]$Require
     )
 
-    $requiredRequirements = @('files', 'directories', 'commands', 'apps', 'metadataFiles', 'signatures', 'fileDetails', 'registry')
+    $requiredRequirements = @('files', 'directories', 'commands', 'apps', 'metadataFiles', 'signatures', 'fileDetails', 'registry', 'powerShellModules')
     foreach ($required in @($requiredRequirements)) {
         if (-not $Require.PSObject.Properties[$required]) {
             throw "Package definition '$DefinitionId' requires '$PropertyPath.require.$required'."
@@ -319,6 +319,22 @@ function Assert-PackageExistingInstallDiscovery_1_5 {
                     throw "Package definition '$DefinitionId' existingInstallDiscovery search '$($location.id)' uses unsupported installDirectorySource '$($location.installDirectorySource)'."
                 }
             }
+            'powershellModule' {
+                if (-not (Test-PackageDefinitionTextPropertyPresent_1_5 -InputObject $location -PropertyName 'name')) {
+                    throw "Package definition '$DefinitionId' existingInstallDiscovery search '$($location.id)' kind powershellModule requires name."
+                }
+                if (-not (Test-PackageDefinitionTextPropertyPresent_1_5 -InputObject $location -PropertyName 'requiredVersion')) {
+                    throw "Package definition '$DefinitionId' existingInstallDiscovery search '$($location.id)' kind powershellModule requires requiredVersion."
+                }
+                if ($location.PSObject.Properties['scope'] -and
+                    -not [string]::Equals([string]$location.scope, 'CurrentUser', [System.StringComparison]::OrdinalIgnoreCase) -and
+                    -not [string]::Equals([string]$location.scope, 'AllUsers', [System.StringComparison]::OrdinalIgnoreCase)) {
+                    throw "Package definition '$DefinitionId' existingInstallDiscovery search '$($location.id)' kind powershellModule uses unsupported scope '$($location.scope)'. Use CurrentUser or AllUsers."
+                }
+                if ($location.PSObject.Properties['requireNuGetProvider'] -and $location.requireNuGetProvider -isnot [bool]) {
+                    throw "Package definition '$DefinitionId' existingInstallDiscovery search '$($location.id)' kind powershellModule requireNuGetProvider must be boolean."
+                }
+            }
             default {
                 throw "Package definition '$DefinitionId' existingInstallDiscovery search '$($location.id)' uses unsupported kind '$($location.kind)'."
             }
@@ -389,6 +405,21 @@ function Assert-PackageAssignedInstallOperation_1_5 {
                 if (-not $targetArgument.PSObject.Properties['quoteValue'] -or $targetArgument.quoteValue -isnot [bool]) {
                     throw "Package definition '$DefinitionId' innoSetupInstaller targetDirectoryArgument.quoteValue must be boolean."
                 }
+            }
+        }
+        'powershellModuleInstaller' {
+            foreach ($required in @('moduleName', 'requiredVersion')) {
+                if (-not (Test-PackageDefinitionTextPropertyPresent_1_5 -InputObject $AssignedInstall -PropertyName $required)) {
+                    throw "Package definition '$DefinitionId' powershellModuleInstaller requires $required."
+                }
+            }
+            if ($AssignedInstall.PSObject.Properties['scope'] -and
+                -not [string]::Equals([string]$AssignedInstall.scope, 'CurrentUser', [System.StringComparison]::OrdinalIgnoreCase) -and
+                -not [string]::Equals([string]$AssignedInstall.scope, 'AllUsers', [System.StringComparison]::OrdinalIgnoreCase)) {
+                throw "Package definition '$DefinitionId' powershellModuleInstaller uses unsupported scope '$($AssignedInstall.scope)'. Use CurrentUser or AllUsers."
+            }
+            if ($AssignedInstall.PSObject.Properties['timeoutSec'] -and [int]$AssignedInstall.timeoutSec -lt 1) {
+                throw "Package definition '$DefinitionId' powershellModuleInstaller timeoutSec must be greater than zero."
             }
         }
     }
@@ -857,6 +888,7 @@ function New-PackageReadinessFromPresenceDiscovery {
         signatures     = if ($require.PSObject.Properties['signatures'] -and [bool]$require.signatures) { @($presenceDiscovery.signatures) } else { @() }
         fileDetails    = if ($require.PSObject.Properties['fileDetails'] -and [bool]$require.fileDetails) { @($presenceDiscovery.fileDetails) } else { @() }
         registryChecks = if ($require.PSObject.Properties['registry'] -and [bool]$require.registry) { @($presenceDiscovery.registry) } else { @() }
+        powerShellModules = if ($require.PSObject.Properties['powerShellModules'] -and [bool]$require.powerShellModules) { @($presenceDiscovery.powerShellModules) } else { @() }
     }
 }
 

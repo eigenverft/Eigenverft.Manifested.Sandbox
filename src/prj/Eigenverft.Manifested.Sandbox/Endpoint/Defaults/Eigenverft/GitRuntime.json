@@ -154,7 +154,8 @@
     "metadataFiles": [],
     "signatures": [],
     "fileDetails": [],
-    "registry": []
+    "registry": [],
+    "powerShellModules": []
   },
   "existingInstallDiscovery": {
     "enabled": false,
@@ -196,7 +197,8 @@
           "metadataFiles": false,
           "signatures": false,
           "fileDetails": false,
-          "registry": false
+          "registry": false,
+          "powerShellModules": false
         }
       },
       "pathRegistration": {
@@ -235,7 +237,8 @@
           "metadataFiles": false,
           "signatures": false,
           "fileDetails": false,
-          "registry": false
+          "registry": false,
+          "powerShellModules": false
         }
       },
       "postRemoveCleanup": {

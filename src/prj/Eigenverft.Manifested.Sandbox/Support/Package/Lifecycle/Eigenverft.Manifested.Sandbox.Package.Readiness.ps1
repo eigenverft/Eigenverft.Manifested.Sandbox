@@ -174,6 +174,7 @@ function New-PackageReadinessFailedCheckRecord {
         'signatures' { "signatureStatus='$($Check.SignatureStatus)'; signerSubject='$($Check.SignerSubject)'" }
         'fileDetails' { "productName='$($Check.ProductName)'; fileDescription='$($Check.FileDescription)'; fileVersion='$($Check.FileVersion)'; productVersion='$($Check.ProductVersion)'" }
         'registryChecks' { "actual='$($Check.ActualValue)'" }
+        'powerShellModules' { "installedVersion='$($Check.InstalledVersion)'; moduleBase='$($Check.ModuleBase)'; nugetProviderAvailable='$($Check.NuGetProviderAvailable)'" }
         default { $null }
     }
 
@@ -185,6 +186,7 @@ function New-PackageReadinessFailedCheckRecord {
         'signatures' { "requireValid='$($Check.RequireValid)'; subjectContains='$($Check.ExpectedSubjectContains)'" }
         'fileDetails' { "productName='$($Check.ExpectedProductName)'; fileDescription='$($Check.ExpectedFileDescription)'; fileVersion='$($Check.ExpectedFileVersion)'; productVersion='$($Check.ExpectedProductVersion)'" }
         'registryChecks' { if ([string]::IsNullOrWhiteSpace([string]$Check.ExpectedValue)) { 'registry value exists' } else { "expected='$($Check.ExpectedValue)'" } }
+        'powerShellModules' { "requiredVersion='$($Check.RequiredVersion)'; scope='$($Check.Scope)'; requireNuGetProvider='$($Check.RequireNuGetProvider)'" }
         default { $null }
     }
 
@@ -241,6 +243,7 @@ Test-PackageAssignedReadiness -PackageResult $result
             Signatures   = @()
             FileDetails  = @()
             Registry     = @()
+            PowerShellModules = @()
         }
         return $PackageResult
     }
@@ -266,6 +269,7 @@ Test-PackageAssignedReadiness -PackageResult $result
             Signatures       = @()
             FileDetails      = @()
             Registry         = @()
+            PowerShellModules = @()
         }
         return $PackageResult
     }
@@ -553,7 +557,66 @@ Test-PackageAssignedReadiness -PackageResult $result
         }) | Out-Null
     }
 
-    $allResults = @($fileResults.ToArray()) + @($directoryResults.ToArray()) + @($commandResults.ToArray()) + @($metadataResults.ToArray()) + @($signatureResults.ToArray()) + @($fileDetailResults.ToArray()) + @($registryResults.ToArray())
+    $powerShellModuleResults = New-Object System.Collections.Generic.List[object]
+    foreach ($moduleCheck in @($readiness.powerShellModules)) {
+        if ($null -eq $moduleCheck) {
+            continue
+        }
+
+        $moduleName = if ($moduleCheck.PSObject.Properties['name']) { [string]$moduleCheck.name } elseif ($moduleCheck.PSObject.Properties['moduleName']) { [string]$moduleCheck.moduleName } else { $null }
+        $requiredVersion = if ($moduleCheck.PSObject.Properties['requiredVersion']) {
+            Resolve-PackageTemplateText -Text ([string]$moduleCheck.requiredVersion) -PackageConfig $PackageResult.PackageConfig -Package $package
+        }
+        else {
+            $null
+        }
+        $scope = if ($moduleCheck.PSObject.Properties['scope'] -and -not [string]::IsNullOrWhiteSpace([string]$moduleCheck.scope)) {
+            [string]$moduleCheck.scope
+        }
+        else {
+            'CurrentUser'
+        }
+        $requireNuGetProvider = if ($moduleCheck.PSObject.Properties['requireNuGetProvider']) { [bool]$moduleCheck.requireNuGetProvider } else { $false }
+
+        $moduleStatus = $null
+        $status = 'Failed'
+        $errorMessage = $null
+        try {
+            if ([string]::IsNullOrWhiteSpace($moduleName) -or [string]::IsNullOrWhiteSpace($requiredVersion)) {
+                throw 'PowerShell module readiness requires name and requiredVersion.'
+            }
+            $moduleStatus = Test-PackagePowerShellModulePresence -PackageResult $PackageResult -Name $moduleName -RequiredVersion $requiredVersion -Scope $scope -RequireNuGetProvider $requireNuGetProvider
+            $status = if ($moduleStatus -and $moduleStatus.PSObject.Properties['installed'] -and [bool]$moduleStatus.installed) {
+                'Ready'
+            }
+            elseif ($moduleStatus -and $moduleStatus.PSObject.Properties['status']) {
+                [string]$moduleStatus.status
+            }
+            else {
+                'Missing'
+            }
+        }
+        catch {
+            $status = 'Failed'
+            $errorMessage = $_.Exception.Message
+        }
+
+        $powerShellModuleResults.Add([pscustomobject]@{
+            Name                   = $moduleName
+            RequiredVersion        = $requiredVersion
+            Scope                  = $scope
+            RequireNuGetProvider   = $requireNuGetProvider
+            Installed              = if ($moduleStatus -and $moduleStatus.PSObject.Properties['installed']) { [bool]$moduleStatus.installed } else { $false }
+            ModuleInstalled        = if ($moduleStatus -and $moduleStatus.PSObject.Properties['moduleInstalled']) { [bool]$moduleStatus.moduleInstalled } else { $null }
+            InstalledVersion       = if ($moduleStatus -and $moduleStatus.PSObject.Properties['installedVersion']) { [string]$moduleStatus.installedVersion } else { $null }
+            ModuleBase             = if ($moduleStatus -and $moduleStatus.PSObject.Properties['moduleBase']) { [string]$moduleStatus.moduleBase } else { $null }
+            NuGetProviderAvailable = if ($moduleStatus -and $moduleStatus.PSObject.Properties['nugetProviderAvailable']) { [bool]$moduleStatus.nugetProviderAvailable } else { $null }
+            Status                 = $status
+            ErrorMessage           = $errorMessage
+        }) | Out-Null
+    }
+
+    $allResults = @($fileResults.ToArray()) + @($directoryResults.ToArray()) + @($commandResults.ToArray()) + @($metadataResults.ToArray()) + @($signatureResults.ToArray()) + @($fileDetailResults.ToArray()) + @($registryResults.ToArray()) + @($powerShellModuleResults.ToArray())
     $accepted = (@($allResults | Where-Object { $_.Status -ne 'Ready' }).Count -eq 0)
     $failedChecks = @(
         foreach ($item in @($fileResults.ToArray() | Where-Object { $_.Status -ne 'Ready' })) { New-PackageReadinessFailedCheckRecord -Kind 'files' -Check $item }
@@ -563,6 +626,7 @@ Test-PackageAssignedReadiness -PackageResult $result
         foreach ($item in @($signatureResults.ToArray() | Where-Object { $_.Status -ne 'Ready' })) { New-PackageReadinessFailedCheckRecord -Kind 'signatures' -Check $item }
         foreach ($item in @($fileDetailResults.ToArray() | Where-Object { $_.Status -ne 'Ready' })) { New-PackageReadinessFailedCheckRecord -Kind 'fileDetails' -Check $item }
         foreach ($item in @($registryResults.ToArray() | Where-Object { $_.Status -ne 'Ready' })) { New-PackageReadinessFailedCheckRecord -Kind 'registryChecks' -Check $item }
+        foreach ($item in @($powerShellModuleResults.ToArray() | Where-Object { $_.Status -ne 'Ready' })) { New-PackageReadinessFailedCheckRecord -Kind 'powerShellModules' -Check $item }
     )
 
     $PackageResult.Readiness = [pscustomobject]@{
@@ -577,6 +641,7 @@ Test-PackageAssignedReadiness -PackageResult $result
         Signatures       = @($signatureResults.ToArray())
         FileDetails      = @($fileDetailResults.ToArray())
         Registry         = @($registryResults.ToArray())
+        PowerShellModules = @($powerShellModuleResults.ToArray())
         FailedChecks     = @($failedChecks)
     }
 
@@ -628,7 +693,7 @@ requires that substantive checks do not report full readiness success.
     $hadChecks = (@($readinessModel.files).Count -gt 0) -or (@($readinessModel.directories).Count -gt 0) -or
         (@($readinessModel.commandChecks).Count -gt 0) -or (@($readinessModel.metadataFiles).Count -gt 0) -or
         (@($readinessModel.signatures).Count -gt 0) -or (@($readinessModel.fileDetails).Count -gt 0) -or
-        (@($readinessModel.registryChecks).Count -gt 0)
+        (@($readinessModel.registryChecks).Count -gt 0) -or (@($readinessModel.powerShellModules).Count -gt 0)
 
     $package = $PackageResult.Package
     $oldReadiness = $null

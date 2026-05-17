@@ -566,7 +566,7 @@
     },
     "presenceDiscovery": {
       "type": "object",
-      "$comment": "Presence discovery replaces providedTools/discovery wording. It describes what proves presence, not where to fetch or how to install. Relative paths under files, directories, commands, apps, metadataFiles, signatures, fileDetails, and registry are resolved from the effective assigned install directory root after the package is placed on disk (the same root used for readiness and removal verification unless a step overrides it).",
+      "$comment": "Presence discovery replaces providedTools/discovery wording. It describes what proves presence, not where to fetch or how to install. Relative file/tool probes are resolved from the effective assigned install directory root; powerShellModules probes are checked through Windows PowerShell 5.1 and do not require an installDirectory.",
       "additionalProperties": false,
       "required": [
         "files",
@@ -576,7 +576,8 @@
         "metadataFiles",
         "signatures",
         "fileDetails",
-        "registry"
+        "registry",
+        "powerShellModules"
       ],
       "properties": {
         "$comment": {
@@ -630,6 +631,13 @@
           "type": "array",
           "items": {
             "$ref": "#/$defs/registryProbe"
+          }
+        },
+        "powerShellModules": {
+          "type": "array",
+          "description": "PowerShell module presence probes executed through Windows PowerShell 5.1. Use for powershellModuleInstaller readiness/adoption without requiring an installDirectory.",
+          "items": {
+            "$ref": "#/$defs/powerShellModuleProbe"
           }
         }
       }
@@ -801,6 +809,43 @@
         }
       }
     },
+    "powerShellModuleProbe": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "requiredVersion",
+        "scope",
+        "requiredForState"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "description": "PowerShell module name, for example PowerShellGet."
+        },
+        "requiredVersion": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Exact module version that must be visible to Windows PowerShell 5.1."
+        },
+        "scope": {
+          "type": "string",
+          "enum": [
+            "CurrentUser",
+            "AllUsers"
+          ]
+        },
+        "requiredForState": {
+          "type": "boolean"
+        },
+        "requireNuGetProvider": {
+          "type": "boolean",
+          "default": false,
+          "description": "When true, readiness/adoption also requires the NuGet PackageManagement provider. Use for PackageManagement bootstrap."
+        }
+      }
+    },
     "existingInstallDiscovery": {
       "type": "object",
       "$comment": "Existing install discovery is shared by assignment/adoption and removal. Give search locations stable ids so removal operations can reference the same registry/path discovery data.",
@@ -886,9 +931,31 @@
               "enum": [ "installLocation", "displayIcon", "displayIconDirectory", "uninstallString", "uninstallStringDirectory" ]
             }
           }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [ "id", "kind", "searchOrder", "name", "requiredVersion" ],
+          "properties": {
+            "id": { "$ref": "#/$defs/identifier", "description": "Stable id for this PowerShell module discovery entry." },
+            "kind": { "const": "powershellModule" },
+            "searchOrder": { "type": "integer", "minimum": 0 },
+            "name": { "type": "string", "minLength": 1 },
+            "requiredVersion": { "type": "string", "minLength": 1 },
+            "scope": {
+              "type": "string",
+              "enum": [ "CurrentUser", "AllUsers" ],
+              "default": "CurrentUser"
+            },
+            "requireNuGetProvider": {
+              "type": "boolean",
+              "default": false,
+              "description": "When true, adoption requires the NuGet PackageManagement provider in addition to the exact module."
+            }
+          }
         }
       ],
-      "description": "Existing install search location. Use command/path/directory for portable tools, windowsUninstallRegistryKey for installer-owned applications."
+      "description": "Existing install search location. Use command/path/directory for portable tools, windowsUninstallRegistryKey for installer-owned applications, and powershellModule for exact module adoption."
     },
     "installRootRule": {
       "type": "object",
@@ -917,7 +984,7 @@
     },
     "packageOperations": {
       "type": "object",
-      "$comment": "AUTHOR FOCUS: assigned chooses install engine (expandArchive, npmGlobalPackage, nsisInstaller, innoSetupInstaller, runInstaller, placePackageFile) and must agree with presenceDiscovery paths. removed must undo ownership safely (inventory row, shims, delete directory). policy sets compatibility and ownership rules before install.",
+      "$comment": "AUTHOR FOCUS: assigned chooses install engine (expandArchive, npmGlobalPackage, powershellModuleInstaller, nsisInstaller, innoSetupInstaller, runInstaller, placePackageFile) and must agree with presenceDiscovery. removed must undo ownership safely (inventory row, shims, delete directory). policy sets compatibility and ownership rules before install.",
       "additionalProperties": false,
       "required": [
         "policy",
@@ -999,6 +1066,9 @@
         },
         {
           "$ref": "#/$defs/assignInnoSetupInstaller"
+        },
+        {
+          "$ref": "#/$defs/assignPowerShellModuleInstaller"
         },
         {
           "$ref": "#/$defs/assignRunInstaller"
@@ -1239,6 +1309,52 @@
         },
         "restartExitCodes": {
           "$ref": "#/$defs/exitCodes"
+        }
+      }
+    },
+    "assignPowerShellModuleInstaller": {
+      "type": "object",
+      "additionalProperties": false,
+      "$comment": "Depot-backed PowerShell module adapter. The selected artifact must be the module .nupkg; the engine stages it under PackageInstallStage\\Nuget and installs from a temporary local PSRepository using Windows PowerShell 5.1. Do not use this as an online Install-Module wrapper.",
+      "required": [
+        "kind",
+        "moduleName",
+        "requiredVersion"
+      ],
+      "properties": {
+        "kind": {
+          "const": "powershellModuleInstaller"
+        },
+        "moduleName": {
+          "type": "string",
+          "minLength": 1,
+          "description": "PowerShell module name inside the .nupkg, for example PowerShellGet."
+        },
+        "requiredVersion": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Exact module version to install from the local PSRepository."
+        },
+        "scope": {
+          "type": "string",
+          "enum": [
+            "CurrentUser",
+            "AllUsers"
+          ],
+          "default": "CurrentUser"
+        },
+        "allowClobber": {
+          "type": "boolean",
+          "default": false
+        },
+        "skipPublisherCheck": {
+          "type": "boolean",
+          "default": false
+        },
+        "timeoutSec": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 600
         }
       }
     },
@@ -1510,7 +1626,8 @@
         "metadataFiles",
         "signatures",
         "fileDetails",
-        "registry"
+        "registry",
+        "powerShellModules"
       ],
       "properties": {
         "files": {
@@ -1535,6 +1652,9 @@
           "type": "boolean"
         },
         "registry": {
+          "type": "boolean"
+        },
+        "powerShellModules": {
           "type": "boolean"
         }
       }

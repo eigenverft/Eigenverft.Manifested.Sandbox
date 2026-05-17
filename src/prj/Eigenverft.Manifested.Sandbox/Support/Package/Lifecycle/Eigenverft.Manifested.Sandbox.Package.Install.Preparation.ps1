@@ -132,7 +132,8 @@ Resolve-PackagePreAssignmentSatisfaction -PackageResult $result
                 @($PackageResult.Readiness.MetadataFiles) +
                 @($PackageResult.Readiness.Signatures) +
                 @($PackageResult.Readiness.FileDetails) +
-                @($PackageResult.Readiness.Registry) |
+                @($PackageResult.Readiness.Registry) +
+                @($PackageResult.Readiness.PowerShellModules) |
                     Where-Object { $_.Status -ne 'Ready' }
             ).Count
         }

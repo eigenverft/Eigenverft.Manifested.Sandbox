@@ -171,7 +171,8 @@
         "fileDescription": "Visual Studio Code"
       }
     ],
-    "registry": []
+    "registry": [],
+    "powerShellModules": []
   },
   "existingInstallDiscovery": {
     "enabled": true,
@@ -255,7 +256,8 @@
           "metadataFiles": true,
           "signatures": true,
           "fileDetails": true,
-          "registry": true
+          "registry": true,
+          "powerShellModules": false
         }
       },
       "pathRegistration": {
@@ -294,7 +296,8 @@
           "metadataFiles": false,
           "signatures": false,
           "fileDetails": false,
-          "registry": false
+          "registry": false,
+          "powerShellModules": false
         }
       },
       "postRemoveCleanup": {

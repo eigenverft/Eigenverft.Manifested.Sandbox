@@ -4,120 +4,126 @@
   "definitionPublication": {
     "publisherId": "Eigenverft",
     "publisherName": "Eigenverft",
-    "definitionId": "OpenCodeCli",
+    "definitionId": "PowerShellGet",
     "definitionRevision": 1,
-    "publishedAtUtc": "2026-05-13T12:00:00Z"
+    "publishedAtUtc": "2026-05-17T12:00:00Z"
   },
   "display": {
     "default": {
-      "name": "OpenCode CLI",
-      "publisher": "SST",
-      "corporation": "SST",
-      "summary": "Pinned OpenCode CLI npm runtime"
+      "name": "PowerShellGet",
+      "publisher": "Microsoft",
+      "corporation": "Microsoft",
+      "summary": "Pinned PowerShellGet module installed from a depot-backed Gallery nupkg"
     }
   },
   "dependencies": [
     {
-      "definitionId": "NodeRuntime"
+      "publisherId": "Eigenverft",
+      "definitionId": "PackageManagement"
     }
   ],
   "artifacts": {
     "targets": [
       {
-        "id": "OpenCodeCli-win32-x64-stable",
+        "id": "PowerShellGet-psmodule-stable",
         "releaseTrack": "stable",
-        "artifactDistributionVariant": "win32-x64",
+        "artifactDistributionVariant": "psmodule-any",
         "constraints": {
           "os": [
             "windows"
           ],
           "cpu": [
-            "x64"
-          ]
-        },
-        "versionSelection": {
-          "strategy": "latestByVersion",
-          "allowPrerelease": false
-        }
-      },
-      {
-        "id": "OpenCodeCli-win32-arm64-stable",
-        "releaseTrack": "stable",
-        "artifactDistributionVariant": "win32-arm64",
-        "constraints": {
-          "os": [
-            "windows"
-          ],
-          "cpu": [
+            "x64",
             "arm64"
           ]
         },
         "versionSelection": {
           "strategy": "latestByVersion",
           "allowPrerelease": false
-        }
-      }
-    ],
-    "releases": [
-      {
-        "version": "1.14.46",
-        "releaseTracks": [
-          "stable"
-        ],
-        "targetArtifacts": {
-          "OpenCodeCli-win32-x64-stable": {
-            "artifactId": "opencode-runtime-win32-x64-stable"
-          },
-          "OpenCodeCli-win32-arm64-stable": {
-            "artifactId": "opencode-runtime-win32-arm64-stable"
-          }
-        }
-      }
-    ],
-    "sources": {}
-  },
-  "presenceDiscovery": {
-    "files": [
-      "opencode.cmd",
-      "node_modules/opencode-ai/package.json"
-    ],
-    "directories": [
-      "node_modules"
-    ],
-    "commands": [
-      {
-        "name": "opencode",
-        "relativePath": "opencode.cmd",
-        "requiredForState": true,
-        "exposeCommand": true,
-        "stateChecks": [
+        },
+        "fileNameTemplate": "PowerShellGet.{version}.nupkg",
+        "acquisitionCandidates": [
           {
-            "arguments": [
-              "--version"
-            ],
-            "outputPattern": "(?m)^(?<value>.+\\S.*)$"
+            "kind": "packageDepot",
+            "searchOrder": 100,
+            "verification": {
+              "mode": "optional"
+            }
+          },
+          {
+            "kind": "download",
+            "sourceId": "powerShellGalleryPackageApi",
+            "sourcePath": "PowerShellGet/{version}",
+            "searchOrder": 900,
+            "verification": {
+              "mode": "required"
+            }
           }
         ]
       }
     ],
+    "releases": [
+      {
+        "version": "2.2.5",
+        "releaseTracks": [
+          "stable"
+        ],
+        "targetArtifacts": {
+          "PowerShellGet-psmodule-stable": {
+            "artifactId": "powershellget-psmodule-stable",
+            "contentHash": {
+              "algorithm": "sha256",
+              "value": "6b8cebf2a464eaeb31b0a6d627355c30d9d1899dba0ce3bdd0d4e7afca148673"
+            }
+          }
+        }
+      }
+    ],
+    "sources": {
+      "powerShellGalleryPackageApi": {
+        "kind": "download",
+        "baseUri": "https://www.powershellgallery.com/api/v2/package/"
+      }
+    }
+  },
+  "presenceDiscovery": {
+    "files": [],
+    "directories": [],
+    "commands": [],
     "apps": [],
     "metadataFiles": [],
     "signatures": [],
     "fileDetails": [],
     "registry": [],
-    "powerShellModules": []
+    "powerShellModules": [
+      {
+        "name": "PowerShellGet",
+        "requiredVersion": "2.2.5",
+        "scope": "CurrentUser",
+        "requiredForState": true
+      }
+    ]
   },
   "existingInstallDiscovery": {
-    "enabled": false,
-    "searchLocations": [],
+    "enabled": true,
+    "searchLocations": [
+      {
+        "id": "currentUserPowerShellModule",
+        "kind": "powershellModule",
+        "searchOrder": 100,
+        "name": "PowerShellGet",
+        "requiredVersion": "2.2.5",
+        "scope": "CurrentUser"
+      }
+    ],
     "installRootRules": []
   },
   "packageOperations": {
     "policy": {
       "ownershipPolicy": {
-        "allowAdoptExternal": false,
+        "allowAdoptExternal": true,
         "upgradeAdoptedInstall": false,
-        "requirePackageOwnership": true
+        "requirePackageOwnership": false
       },
       "compatibility": {
         "checks": [
@@ -131,32 +137,31 @@
     },
     "assigned": {
       "install": {
-        "kind": "npmGlobalPackage",
-        "installerCommand": "npm",
-        "packageSpec": "opencode-ai@{version}",
-        "installDirectory": "opencode-runtime/{releaseTrack}/{version}/{artifactDistributionVariant}"
+        "kind": "powershellModuleInstaller",
+        "moduleName": "PowerShellGet",
+        "requiredVersion": "2.2.5",
+        "scope": "CurrentUser",
+        "allowClobber": true,
+        "skipPublisherCheck": false,
+        "timeoutSec": 600
       },
       "readyStateCheck": {
         "use": "presenceDiscovery",
         "expectedVersion": "{version}",
         "require": {
-          "files": true,
-          "directories": true,
-          "commands": true,
+          "files": false,
+          "directories": false,
+          "commands": false,
           "apps": false,
           "metadataFiles": false,
           "signatures": false,
           "fileDetails": false,
           "registry": false,
-          "powerShellModules": false
+          "powerShellModules": true
         }
       },
       "pathRegistration": {
-        "mode": "user",
-        "source": {
-          "kind": "shim",
-          "use": "presenceDiscovery.commands"
-        }
+        "mode": "none"
       },
       "versionUpdatePolicy": {
         "whenAssigned": "trackSelectedVersion",
@@ -167,22 +172,19 @@
     "removed": {
       "policy": {
         "whenNotInInventory": "succeed",
-        "allowedInventoryOwnershipKinds": [
-          "PackageInstalled"
-        ],
+        "allowedInventoryOwnershipKinds": [],
         "allowUntrackedExternalRemoval": false,
         "removeDependencies": false
       },
       "operation": {
-        "kind": "deleteInstallDirectory",
-        "pathSource": "inventory.installDirectory"
+        "kind": "none"
       },
       "absenceVerification": {
         "use": "presenceDiscovery",
         "require": {
-          "files": true,
+          "files": false,
           "directories": false,
-          "commands": true,
+          "commands": false,
           "apps": false,
           "metadataFiles": false,
           "signatures": false,

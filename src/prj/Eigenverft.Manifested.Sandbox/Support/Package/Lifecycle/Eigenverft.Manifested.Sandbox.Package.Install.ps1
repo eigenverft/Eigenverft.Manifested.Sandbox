@@ -53,6 +53,30 @@ Set-PackageAssignedState -PackageResult $result
         return $PackageResult
     }
 
+    if ($PackageResult.ExistingPackage -and $PackageResult.ExistingPackage.Decision -eq 'AdoptExternal' -and
+        [string]::Equals([string]$install.kind, 'powershellModuleInstaller', [System.StringComparison]::OrdinalIgnoreCase)) {
+        $moduleStatus = if ($PackageResult.ExistingPackage.PSObject.Properties['DiscoveryDetails']) { $PackageResult.ExistingPackage.DiscoveryDetails } else { $null }
+        $PackageResult.InstallDirectory = $null
+        $PackageResult.InstallOrigin = 'AdoptedExternal'
+        $PackageResult.Assigned = [pscustomobject]@{
+            Status           = 'AdoptedExternal'
+            InstallKind      = 'powershellModuleInstaller'
+            TargetKind       = 'powershellModule'
+            InstallDirectory = $null
+            ReusedExisting   = $true
+            CandidatePath    = $PackageResult.ExistingPackage.CandidatePath
+            ModuleName       = if ($moduleStatus -and $moduleStatus.PSObject.Properties['moduleName']) { [string]$moduleStatus.moduleName } else { [string]$install.moduleName }
+            RequiredVersion  = if ($moduleStatus -and $moduleStatus.PSObject.Properties['requiredVersion']) { [string]$moduleStatus.requiredVersion } else { [string]$install.requiredVersion }
+            InstalledVersion = if ($moduleStatus -and $moduleStatus.PSObject.Properties['installedVersion']) { [string]$moduleStatus.installedVersion } else { $null }
+            ModuleBase       = if ($moduleStatus -and $moduleStatus.PSObject.Properties['moduleBase']) { [string]$moduleStatus.moduleBase } else { $PackageResult.ExistingPackage.CandidatePath }
+            Scope            = if ($moduleStatus -and $moduleStatus.PSObject.Properties['scope']) { [string]$moduleStatus.scope } else { if ($install.PSObject.Properties['scope']) { [string]$install.scope } else { 'CurrentUser' } }
+            PackageFilePath  = $PackageResult.PackageFilePath
+        }
+        $PackageResult.Readiness = $PackageResult.ExistingPackage.Readiness
+        Write-PackageExecutionMessage -Message ("[ACTION] Adopted external PowerShell module '{0}' version '{1}'." -f [string]$PackageResult.Assigned.ModuleName, [string]$PackageResult.Assigned.RequiredVersion)
+        return $PackageResult
+    }
+
     if ($PackageResult.ExistingPackage -and $PackageResult.ExistingPackage.Decision -eq 'AdoptExternal') {
         $PackageResult.InstallDirectory = $PackageResult.ExistingPackage.InstallDirectory
         $PackageResult.InstallOrigin = 'AdoptedExternal'
@@ -127,6 +151,10 @@ Set-PackageAssignedState -PackageResult $result
             Write-PackageExecutionMessage -Message ("[ACTION] Installing npm global package into '{0}'." -f $PackageResult.InstallDirectory)
             $PackageResult.Assigned = Install-PackageNpmPackage -PackageResult $PackageResult
         }
+        'powershellModuleInstaller' {
+            Write-PackageExecutionMessage -Message ("[ACTION] Installing PowerShell module '{0}' from staged package file." -f [string]$install.moduleName)
+            $PackageResult.Assigned = Install-PackagePowerShellModule -PackageResult $PackageResult
+        }
         default {
             throw "Unsupported packageOperations.assigned.install.kind '$($install.kind)'."
         }
@@ -135,9 +163,12 @@ Set-PackageAssignedState -PackageResult $result
     $PackageResult.InstallOrigin = if ([string]::Equals((Get-PackageInstallTargetKind -Package $package), 'machinePrerequisite', [System.StringComparison]::OrdinalIgnoreCase)) {
         'PackageApplied'
     }
+    elseif ([string]::Equals([string]$install.kind, 'powershellModuleInstaller', [System.StringComparison]::OrdinalIgnoreCase)) {
+        'PackageApplied'
+    }
     else {
         'PackageInstalled'
     }
-    Write-PackageExecutionMessage -Message ("[ACTION] Completed Package-owned assign with status '{0}'." -f $PackageResult.Assigned.Status)
+    Write-PackageExecutionMessage -Message ("[ACTION] Completed Package assign with status '{0}'." -f $PackageResult.Assigned.Status)
     return $PackageResult
 }

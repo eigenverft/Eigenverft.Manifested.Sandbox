@@ -233,16 +233,31 @@ Get-PackageOwnershipRecord -PackageResult $result
     )
 
     $existingPackage = $PackageResult.ExistingPackage
-    if (-not $existingPackage -or [string]::IsNullOrWhiteSpace($existingPackage.InstallDirectory)) {
+    if (-not $existingPackage) {
+        return $null
+    }
+
+    $isPowerShellModuleCandidate = [string]::Equals([string]$existingPackage.SearchKind, 'powershellModule', [System.StringComparison]::OrdinalIgnoreCase)
+    if ((-not $isPowerShellModuleCandidate) -and [string]::IsNullOrWhiteSpace($existingPackage.InstallDirectory)) {
         return $null
     }
 
     $index = Get-PackageInventory -PackageConfig $PackageResult.PackageConfig
     $installSlotId = Get-PackageInstallSlotId -PackageResult $PackageResult
-    $normalizedInstallDirectory = [System.IO.Path]::GetFullPath($existingPackage.InstallDirectory)
+    $normalizedInstallDirectory = if ([string]::IsNullOrWhiteSpace([string]$existingPackage.InstallDirectory)) {
+        $null
+    }
+    else {
+        [System.IO.Path]::GetFullPath($existingPackage.InstallDirectory)
+    }
     foreach ($record in @($index.Records)) {
-        if ([string]::Equals([string]$record.installSlotId, $installSlotId, [System.StringComparison]::OrdinalIgnoreCase) -and
-            [string]::Equals([string]$record.installDirectory, $normalizedInstallDirectory, [System.StringComparison]::OrdinalIgnoreCase)) {
+        if (-not [string]::Equals([string]$record.installSlotId, $installSlotId, [System.StringComparison]::OrdinalIgnoreCase)) {
+            continue
+        }
+        if ($isPowerShellModuleCandidate -and [string]::IsNullOrWhiteSpace($normalizedInstallDirectory)) {
+            return $record
+        }
+        if ([string]::Equals([string]$record.installDirectory, $normalizedInstallDirectory, [System.StringComparison]::OrdinalIgnoreCase)) {
             return $record
         }
     }

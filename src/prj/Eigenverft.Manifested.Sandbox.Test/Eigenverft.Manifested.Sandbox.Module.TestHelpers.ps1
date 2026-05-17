@@ -634,6 +634,7 @@ function global:New-TestVSCodeDefinitionDocument {
                 signatures    = (@($readiness.signatures).Count -gt 0)
                 fileDetails   = (@($readiness.fileDetails).Count -gt 0)
                 registry      = (@($readiness.registryChecks).Count -gt 0)
+                powerShellModules = (@($readiness.powerShellModules).Count -gt 0)
             }
         }
     }
@@ -834,6 +835,7 @@ function global:New-TestVSCodeDefinitionDocument {
             signatures    = @($readiness.signatures)
             fileDetails   = @($readiness.fileDetails)
             registry      = @($readiness.registryChecks)
+            powerShellModules = @($readiness.powerShellModules)
         }
         existingInstallDiscovery = $existingInstallDiscovery
         packageOperations = @{
@@ -864,6 +866,7 @@ function global:New-TestVSCodeDefinitionDocument {
                         signatures    = $false
                         fileDetails   = $false
                         registry      = $false
+                        powerShellModules = $false
                     }
                 }
                 postRemoveCleanup = @{

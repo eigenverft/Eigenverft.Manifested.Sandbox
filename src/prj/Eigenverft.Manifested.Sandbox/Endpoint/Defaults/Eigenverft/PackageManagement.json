@@ -4,38 +4,39 @@
   "definitionPublication": {
     "publisherId": "Eigenverft",
     "publisherName": "Eigenverft",
-    "definitionId": "VisualCppRedistributable",
+    "definitionId": "PackageManagement",
     "definitionRevision": 1,
-    "publishedAtUtc": "2026-05-13T12:00:00Z"
+    "publishedAtUtc": "2026-05-17T12:00:00Z"
   },
   "display": {
     "default": {
-      "name": "Microsoft Visual C++ Redistributable",
+      "name": "PackageManagement",
       "publisher": "Microsoft",
-      "corporation": "Microsoft Corporation",
-      "summary": "Machine-wide Visual C++ runtime prerequisite"
+      "corporation": "Microsoft",
+      "summary": "Pinned PowerShell PackageManagement module installed from a depot-backed Gallery nupkg"
     }
   },
   "dependencies": [],
   "artifacts": {
     "targets": [
       {
-        "id": "VisualCppRedistributable-x64-stable",
+        "id": "PackageManagement-psmodule-stable",
         "releaseTrack": "stable",
-        "artifactDistributionVariant": "x64",
+        "artifactDistributionVariant": "psmodule-any",
         "constraints": {
           "os": [
             "windows"
           ],
           "cpu": [
-            "x64"
+            "x64",
+            "arm64"
           ]
         },
         "versionSelection": {
           "strategy": "latestByVersion",
           "allowPrerelease": false
         },
-        "fileNameTemplate": "vc_redist.x64.exe",
+        "fileNameTemplate": "PackageManagement.{version}.nupkg",
         "acquisitionCandidates": [
           {
             "kind": "packageDepot",
@@ -46,8 +47,8 @@
           },
           {
             "kind": "download",
-            "sourceId": "visualCppRedistributableDownload",
-            "sourcePath": "vc14/vc_redist.x64.exe",
+            "sourceId": "powerShellGalleryPackageApi",
+            "sourcePath": "PackageManagement/{version}",
             "searchOrder": 900,
             "verification": {
               "mode": "required"
@@ -58,26 +59,25 @@
     ],
     "releases": [
       {
-        "version": "14.0",
+        "version": "1.4.8.1",
         "releaseTracks": [
           "stable"
         ],
         "targetArtifacts": {
-          "VisualCppRedistributable-x64-stable": {
-            "artifactId": "vc-runtime-x64-stable",
-            "publisherSignature": {
-              "kind": "authenticode",
-              "requireValid": true,
-              "subjectContains": "Microsoft Corporation"
+          "PackageManagement-psmodule-stable": {
+            "artifactId": "package-management-psmodule-stable",
+            "contentHash": {
+              "algorithm": "sha256",
+              "value": "7e1f8a75b6bc8a83d8abff79f6690fc1dfbd534fd3e5733d97e19bcb5954c13e"
             }
           }
         }
       }
     ],
     "sources": {
-      "visualCppRedistributableDownload": {
+      "powerShellGalleryPackageApi": {
         "kind": "download",
-        "baseUri": "https://aka.ms/"
+        "baseUri": "https://www.powershellgallery.com/api/v2/package/"
       }
     }
   },
@@ -89,36 +89,36 @@
     "metadataFiles": [],
     "signatures": [],
     "fileDetails": [],
-    "registry": [
+    "registry": [],
+    "powerShellModules": [
       {
-        "paths": [
-          "HKLM:\\SOFTWARE\\Microsoft\\VisualStudio\\14.0\\VC\\Runtimes\\x64",
-          "HKLM:\\SOFTWARE\\Wow6432Node\\Microsoft\\VisualStudio\\14.0\\VC\\Runtimes\\x64"
-        ],
-        "valueName": "Installed",
-        "expectedValue": "1"
-      },
-      {
-        "paths": [
-          "HKLM:\\SOFTWARE\\Microsoft\\VisualStudio\\14.0\\VC\\Runtimes\\x64",
-          "HKLM:\\SOFTWARE\\Wow6432Node\\Microsoft\\VisualStudio\\14.0\\VC\\Runtimes\\x64"
-        ],
-        "valueName": "Version",
-        "operator": ">=",
-        "expectedValue": "14.0"
+        "name": "PackageManagement",
+        "requiredVersion": "1.4.8.1",
+        "scope": "CurrentUser",
+        "requiredForState": true,
+        "requireNuGetProvider": true
       }
-    ],
-    "powerShellModules": []
+    ]
   },
   "existingInstallDiscovery": {
-    "enabled": false,
-    "searchLocations": [],
+    "enabled": true,
+    "searchLocations": [
+      {
+        "id": "currentUserPowerShellModule",
+        "kind": "powershellModule",
+        "searchOrder": 100,
+        "name": "PackageManagement",
+        "requiredVersion": "1.4.8.1",
+        "scope": "CurrentUser",
+        "requireNuGetProvider": true
+      }
+    ],
     "installRootRules": []
   },
   "packageOperations": {
     "policy": {
       "ownershipPolicy": {
-        "allowAdoptExternal": false,
+        "allowAdoptExternal": true,
         "upgradeAdoptedInstall": false,
         "requirePackageOwnership": false
       },
@@ -134,27 +134,13 @@
     },
     "assigned": {
       "install": {
-        "kind": "runInstaller",
-        "targetKind": "machinePrerequisite",
-        "installerKind": "burn",
-        "uiMode": "quiet",
-        "elevation": "required",
-        "timeoutSec": 300,
-        "logRelativePath": "visual-cpp-redist/{timestamp}.log",
-        "commandArguments": [
-          "/install",
-          "/quiet",
-          "/norestart",
-          "/log",
-          "{logPath}"
-        ],
-        "successExitCodes": [
-          0,
-          1638
-        ],
-        "restartExitCodes": [
-          3010
-        ]
+        "kind": "powershellModuleInstaller",
+        "moduleName": "PackageManagement",
+        "requiredVersion": "1.4.8.1",
+        "scope": "CurrentUser",
+        "allowClobber": true,
+        "skipPublisherCheck": true,
+        "timeoutSec": 600
       },
       "readyStateCheck": {
         "use": "presenceDiscovery",
@@ -167,8 +153,8 @@
           "metadataFiles": false,
           "signatures": false,
           "fileDetails": false,
-          "registry": true,
-          "powerShellModules": false
+          "registry": false,
+          "powerShellModules": true
         }
       },
       "pathRegistration": {
@@ -193,9 +179,9 @@
       "absenceVerification": {
         "use": "presenceDiscovery",
         "require": {
-          "files": true,
+          "files": false,
           "directories": false,
-          "commands": true,
+          "commands": false,
           "apps": false,
           "metadataFiles": false,
           "signatures": false,

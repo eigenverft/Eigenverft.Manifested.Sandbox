@@ -164,7 +164,8 @@
         "productVersion": "{version}"
       }
     ],
-    "registry": []
+    "registry": [],
+    "powerShellModules": []
   },
   "existingInstallDiscovery": {
     "enabled": true,
@@ -231,7 +232,8 @@
           "metadataFiles": false,
           "signatures": true,
           "fileDetails": true,
-          "registry": false
+          "registry": false,
+          "powerShellModules": false
         }
       },
       "pathRegistration": {
@@ -284,7 +286,8 @@
           "metadataFiles": false,
           "signatures": false,
           "fileDetails": false,
-          "registry": false
+          "registry": false,
+          "powerShellModules": false
         }
       },
       "postRemoveCleanup": {

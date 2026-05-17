@@ -1110,6 +1110,40 @@ Invoke-TestPackageDescribe -Name 'Eigenverft.Manifested.Sandbox Package - config
         }
     }
 
+    It 'loads shipped depot-backed PowerShell module definitions with package-file acquisition' {
+        [Environment]::SetEnvironmentVariable($script:SourceInventoryEnvVarName, (Join-Path $TestDrive 'missing-inventory.json'), 'Process')
+
+        $cases = @(
+            [pscustomobject]@{ DefinitionId = 'PackageManagement'; ModuleName = 'PackageManagement'; Version = '1.4.8.1'; Hash = '7e1f8a75b6bc8a83d8abff79f6690fc1dfbd534fd3e5733d97e19bcb5954c13e'; Dependencies = @() }
+            [pscustomobject]@{ DefinitionId = 'PowerShellGet'; ModuleName = 'PowerShellGet'; Version = '2.2.5'; Hash = '6b8cebf2a464eaeb31b0a6d627355c30d9d1899dba0ce3bdd0d4e7afca148673'; Dependencies = @('PackageManagement') }
+            [pscustomobject]@{ DefinitionId = 'EigenverftManifestedAgent'; ModuleName = 'Eigenverft.Manifested.Agent'; Version = '1.20261.39327'; Hash = 'dd4eacf33d5eb8e6fc0a706fb2e18941b07d9466ae9532e7f94f2c5bcfe1727f'; Dependencies = @('PowerShellGet') }
+        )
+
+        foreach ($case in $cases) {
+            $config = Get-PackageConfig -DefinitionId $case.DefinitionId
+            $result = New-PackageResult -PackageConfig $config
+            $result = Resolve-PackagePackage -PackageResult $result
+            $result = Resolve-PackagePaths -PackageResult $result
+            $result = Build-PackageAcquisitionPlan -PackageResult $result
+
+            $config.DefinitionId | Should -Be $case.DefinitionId
+            @($config.Definition.dependencies.definitionId) | Should -Be $case.Dependencies
+            $result.Package.version | Should -Be $case.Version
+            $result.Package.assigned.install.kind | Should -Be 'powershellModuleInstaller'
+            $result.Package.assigned.install.moduleName | Should -Be $case.ModuleName
+            $result.Package.assigned.install.requiredVersion | Should -Be $case.Version
+            $config.Definition.presenceDiscovery.powerShellModules[0].name | Should -Be $case.ModuleName
+            $result.Package.readiness.powerShellModules[0].RequiredVersion | Should -Be $case.Version
+            $result.Package.ownershipPolicy.allowAdoptExternal | Should -BeTrue
+            $result.Package.ownershipPolicy.requirePackageOwnership | Should -BeFalse
+            $result.Package.packageFile.fileName | Should -Be ('{0}.{1}.nupkg' -f $case.ModuleName, $case.Version)
+            $result.Package.packageFile.contentHash.value | Should -Be $case.Hash
+            $result.InstallDirectory | Should -BeNullOrEmpty
+            $result.AcquisitionPlan.PackageFileRequired | Should -BeTrue
+            @($result.AcquisitionPlan.Candidates | ForEach-Object { $_.kind }) | Should -Be @('packageDepot', 'download')
+        }
+    }
+
     It 'ensures direct package dependencies before package-specific install flow continues' {
         $definition = [pscustomobject]@{
             definitionId = 'CodexCli'

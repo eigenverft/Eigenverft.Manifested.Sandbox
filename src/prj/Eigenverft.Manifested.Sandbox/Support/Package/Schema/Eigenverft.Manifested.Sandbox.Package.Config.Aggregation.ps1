@@ -525,6 +525,7 @@ Resolve-PackagePaths -PackageResult $result
         $installDirectoryTemplate = Resolve-PackageTemplateText -Text ([string]$assignedInstall.installDirectory) -PackageConfig $packageConfig -Package $package
     }
     elseif (-not [string]::Equals($installKind, 'reuseExisting', [System.StringComparison]::OrdinalIgnoreCase) -and
+        -not [string]::Equals($installKind, 'powershellModuleInstaller', [System.StringComparison]::OrdinalIgnoreCase) -and
         -not [string]::Equals($installTargetKind, 'machinePrerequisite', [System.StringComparison]::OrdinalIgnoreCase)) {
         throw "Package definition '$($definition.id)' does not define an install target path. Use packageOperations.assigned.install.installDirectory."
     }

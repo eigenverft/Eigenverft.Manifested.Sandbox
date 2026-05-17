@@ -478,6 +478,7 @@ Test-PackagePackageFileAcquisitionRequired -Package $package
         'placePackageFile' { return $true }
         'nsisInstaller' { return $true }
         'innoSetupInstaller' { return $true }
+        'powershellModuleInstaller' { return $true }
         'runInstaller' {
             return (-not $assignedInstall.PSObject.Properties['commandPath'] -or [string]::IsNullOrWhiteSpace([string]$assignedInstall.commandPath))
         }
@@ -1129,9 +1130,15 @@ Resolve-PackageInstallFile -PackageResult $result
         throw 'Resolve-PackageInstallFile requires a selected release with assigned settings.'
     }
 
+    $assignedInstall = Get-PackageAssignedInstallOperation -Release $package
+    $installKind = if ($assignedInstall -and $assignedInstall.PSObject.Properties['kind']) { [string]$assignedInstall.kind } else { $null }
+    $existingDecision = if ($PackageResult.ExistingPackage -and $PackageResult.ExistingPackage.PSObject.Properties['Decision']) { [string]$PackageResult.ExistingPackage.Decision } else { $null }
+    $keepPackageFileAcquisitionForAdoptedPowerShellModule = [string]::Equals($existingDecision, 'AdoptExternal', [System.StringComparison]::OrdinalIgnoreCase) -and
+        [string]::Equals($installKind, 'powershellModuleInstaller', [System.StringComparison]::OrdinalIgnoreCase)
     if ($PackageResult.ExistingPackage -and
         $PackageResult.ExistingPackage.PSObject.Properties['Decision'] -and
-        $PackageResult.ExistingPackage.Decision -in @('ReusePackageOwned', 'AdoptExternal')) {
+        $PackageResult.ExistingPackage.Decision -in @('ReusePackageOwned', 'AdoptExternal') -and
+        (-not $keepPackageFileAcquisitionForAdoptedPowerShellModule)) {
         $PackageResult.PackageFilePreparation = [pscustomobject]@{
             Success         = $true
             Status          = 'Skipped'

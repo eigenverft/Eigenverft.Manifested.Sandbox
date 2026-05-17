@@ -145,6 +145,7 @@ Find-PackageExistingPackage -PackageResult $result
         [psobject]$PackageResult
     )
 
+    $package = $PackageResult.Package
     if (-not [string]::IsNullOrWhiteSpace([string]$PackageResult.InstallDirectory) -and
         (Test-Path -LiteralPath $PackageResult.InstallDirectory -PathType Container)) {
         $resolvedPackageOwnedInstallDirectory = [System.IO.Path]::GetFullPath([string]$PackageResult.InstallDirectory)
@@ -207,6 +208,22 @@ Find-PackageExistingPackage -PackageResult $result
                     $discoveryDetails = $registryCandidate
                 }
             }
+            'powershellModule' {
+                if (-not $searchLocation.PSObject.Properties['name'] -or [string]::IsNullOrWhiteSpace([string]$searchLocation.name)) {
+                    throw "Package existingInstallDiscovery search for release '$($package.id)' is missing PowerShell module name."
+                }
+                if (-not $searchLocation.PSObject.Properties['requiredVersion'] -or [string]::IsNullOrWhiteSpace([string]$searchLocation.requiredVersion)) {
+                    throw "Package existingInstallDiscovery search for release '$($package.id)' is missing PowerShell module requiredVersion."
+                }
+                $requiredVersion = Resolve-PackageTemplateText -Text ([string]$searchLocation.requiredVersion) -PackageConfig $PackageResult.PackageConfig -Package $package
+                $scope = if ($searchLocation.PSObject.Properties['scope'] -and -not [string]::IsNullOrWhiteSpace([string]$searchLocation.scope)) { [string]$searchLocation.scope } else { 'CurrentUser' }
+                $requireNuGetProvider = if ($searchLocation.PSObject.Properties['requireNuGetProvider']) { [bool]$searchLocation.requireNuGetProvider } else { $false }
+                $moduleStatus = Test-PackagePowerShellModulePresence -PackageResult $PackageResult -Name ([string]$searchLocation.name) -RequiredVersion $requiredVersion -Scope $scope -RequireNuGetProvider $requireNuGetProvider
+                if ($moduleStatus -and $moduleStatus.PSObject.Properties['installed'] -and [bool]$moduleStatus.installed) {
+                    $candidatePath = if ($moduleStatus.PSObject.Properties['moduleBase']) { [string]$moduleStatus.moduleBase } else { $null }
+                    $discoveryDetails = $moduleStatus
+                }
+            }
             default {
                 throw "Unsupported Package existingInstallDiscovery search kind '$($searchLocation.kind)'."
             }
@@ -214,6 +231,21 @@ Find-PackageExistingPackage -PackageResult $result
 
         if ([string]::IsNullOrWhiteSpace($candidatePath)) {
             continue
+        }
+
+        if ([string]::Equals([string]$searchLocation.kind, 'powershellModule', [System.StringComparison]::OrdinalIgnoreCase)) {
+            $PackageResult.ExistingPackage = [pscustomobject]@{
+                SearchKind       = $searchLocation.kind
+                CandidatePath    = $candidatePath
+                InstallDirectory = $null
+                Decision         = 'Pending'
+                Readiness        = $null
+                Classification   = $null
+                OwnershipRecord  = $null
+                DiscoveryDetails = $discoveryDetails
+            }
+            Write-PackageExecutionMessage -Message ("[DISCOVERY] Found existing PowerShell module '{0}' via '{1}'." -f $candidatePath, $searchLocation.kind)
+            return $PackageResult
         }
 
         $installDirectory = Resolve-PackageExistingInstallRoot -ExistingInstallDiscovery $existingInstallDiscoveryInfo -CandidatePath $candidatePath
