@@ -77,11 +77,16 @@ function Find-InstalledModuleExact {
         [string]$RequiredVersion
     )
 
-    $required = [Version]$RequiredVersion
-    Get-Module -ListAvailable -Name $ModuleName -ErrorAction SilentlyContinue |
-        Where-Object { $_.Version -eq $required } |
-        Sort-Object -Property Version -Descending |
-        Select-Object -First 1
+    try {
+        $required = [Version]$RequiredVersion
+        return Get-Module -ListAvailable -Name $ModuleName -ErrorAction SilentlyContinue |
+            Where-Object { $_.Version -eq $required } |
+            Sort-Object -Property Version -Descending |
+            Select-Object -First 1
+    }
+    catch {
+        return $null
+    }
 }
 
 function Get-NuGetProviderTargetRoot {

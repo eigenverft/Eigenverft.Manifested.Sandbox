@@ -178,6 +178,10 @@ function Invoke-PackagePowerShellModuleHelper {
     Write-PackageExecutionMessage -Message ("[PATH] PowerShell module helper: {0}" -f $helperScriptPath)
     Write-PackageExecutionMessage -Message ("[PATH] PowerShell module local repository: {0}" -f $nugetDirectory)
 
+    # Install: keep Hidden to avoid flashing consoles. Check: use Normal — Start-Process -WindowStyle Hidden
+    # has been observed to yield exit code 0xFFFD0000 (-196608) on some hosts (e.g. WDAG) before the script runs.
+    $helperWindowStyle = if ($Operation -eq 'Check') { 'Normal' } else { 'Hidden' }
+
     $installerResult = Invoke-PackageInstallerCommand `
         -PackageResult $PackageResult `
         -CommandPath $powerShellPath `
@@ -191,7 +195,7 @@ function Invoke-PackagePowerShellModuleHelper {
         -UiMode 'silent' `
         -LogPath $null `
         -ElevationMode 'none' `
-        -WindowStyle 'Hidden'
+        -WindowStyle $helperWindowStyle
 
     if (-not (Test-Path -LiteralPath $resultPath -PathType Leaf)) {
         throw "PowerShell module helper did not write result JSON '$resultPath'."

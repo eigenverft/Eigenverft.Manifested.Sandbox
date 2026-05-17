@@ -349,6 +349,46 @@ exit /b 0
         $result.InstalledVersion | Should -Be '1.20261.39327'
     }
 
+    It 'uses Normal window style for powershell module helper Check' {
+        $rootPath = Join-Path $TestDrive 'psmodule-windowstyle-check'
+        $stageDirectory = Join-Path $rootPath 'InstStage'
+        $invokeCalls = New-Object System.Collections.Generic.List[object]
+        Mock Get-PackageWindowsPowerShellPath { Join-Path $rootPath 'WindowsPowerShell\v1.0\powershell.exe' }
+        Mock Invoke-PackageInstallerCommand {
+            param($PackageResult, $CommandPath, $CommandArguments, $WorkingDirectory, $TimeoutSec, $SuccessExitCodes, $RestartExitCodes, $TargetKind, $InstallerKind, $UiMode, $LogPath, $ElevationMode, $WindowStyle)
+            $resultPath = [string]$CommandArguments[([array]::IndexOf($CommandArguments, '-ResultPath') + 1)]
+            [pscustomobject]@{
+                success = $true
+                status = 'NotInstalled'
+                installed = $false
+                moduleInstalled = $false
+                moduleName = 'PowerShellGet'
+                requiredVersion = '2.2.5'
+            } | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $resultPath -Encoding UTF8
+            $invokeCalls.Add([pscustomobject]@{ WindowStyle = $WindowStyle }) | Out-Null
+            [pscustomobject]@{ ExitCode = 0; RestartRequired = $false }
+        }
+
+        $packageResult = [pscustomobject]@{
+            DefinitionId = 'PowerShellGet'
+            PackageInstallStageDirectory = $stageDirectory
+            Package = [pscustomobject]@{
+                assigned = [pscustomobject]@{
+                    install = [pscustomobject]@{
+                        kind = 'powershellModuleInstaller'
+                        moduleName = 'PowerShellGet'
+                        requiredVersion = '2.2.5'
+                        scope = 'CurrentUser'
+                    }
+                }
+            }
+        }
+
+        $null = Test-PackagePowerShellModulePresence -PackageResult $packageResult -Name 'PowerShellGet' -RequiredVersion '2.2.5'
+        $invokeCalls.Count | Should -Be 1
+        $invokeCalls[0].WindowStyle | Should -Be 'Normal'
+    }
+
     It 'does not short-circuit powershellModuleInstaller before acquisition' {
         $packageResult = [pscustomobject]@{
             InstallOrigin = $null
