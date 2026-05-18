@@ -259,6 +259,44 @@ function Install-ModuleFromLocalRepository {
     }
 }
 
+function Get-HelperDiagnostics {
+    param(
+        [AllowNull()]
+        [psobject]$Request,
+
+        [AllowNull()]
+        [string]$NuGetProviderStatus
+    )
+
+    $installModuleCommand = $null
+    try {
+        $installModuleCommand = Get-Command Install-Module -ErrorAction SilentlyContinue
+    }
+    catch {
+        $installModuleCommand = $null
+    }
+
+    $nugetDirectory = if ($Request -and $Request.PSObject.Properties['nugetDirectory']) { [string]$Request.nugetDirectory } else { $null }
+    $nupkgFiles = @()
+    if (-not [string]::IsNullOrWhiteSpace($nugetDirectory) -and (Test-Path -LiteralPath $nugetDirectory -PathType Container)) {
+        $nupkgFiles = @(Get-ChildItem -LiteralPath $nugetDirectory -Filter '*.nupkg' -File -ErrorAction SilentlyContinue | ForEach-Object { $_.Name })
+    }
+
+    return [pscustomobject]@{
+        psVersion                          = [string]$PSVersionTable.PSVersion
+        operation                          = if ($Request -and $Request.PSObject.Properties['operation']) { [string]$Request.operation } else { $null }
+        repositoryName                     = if ($Request -and $Request.PSObject.Properties['repositoryName']) { [string]$Request.repositoryName } else { $null }
+        nugetDirectory                     = $nugetDirectory
+        nupkgCount                         = @($nupkgFiles).Count
+        nupkgFiles                         = @($nupkgFiles)
+        nugetProviderStatus                = $NuGetProviderStatus
+        installModuleCommandSource         = if ($installModuleCommand) { [string]$installModuleCommand.Source } else { $null }
+        installModuleCommandVersion        = if ($installModuleCommand -and $installModuleCommand.Module) { [string]$installModuleCommand.Module.Version } else { $null }
+        installModuleHasAllowClobber       = if ($installModuleCommand) { $installModuleCommand.Parameters.ContainsKey('AllowClobber') } else { $false }
+        installModuleHasSkipPublisherCheck = if ($installModuleCommand) { $installModuleCommand.Parameters.ContainsKey('SkipPublisherCheck') } else { $false }
+    }
+}
+
 try {
     if (-not (Test-Path -LiteralPath $RequestPath -PathType Leaf)) {
         throw "Request JSON '$RequestPath' was not found."
@@ -337,13 +375,20 @@ try {
     exit 0
 }
 catch {
+    $errorRecord = $_
+    $invocation = $errorRecord.InvocationInfo
     Write-Result @{
-        success         = $false
-        status          = 'Failed'
-        installed       = $false
-        moduleName      = if ($request) { [string]$request.moduleName } else { $null }
-        requiredVersion = if ($request) { [string]$request.requiredVersion } else { $null }
-        errorMessage    = $_.Exception.Message
+        success                 = $false
+        status                  = 'Failed'
+        installed               = $false
+        moduleName              = if ($request) { [string]$request.moduleName } else { $null }
+        requiredVersion         = if ($request) { [string]$request.requiredVersion } else { $null }
+        errorMessage            = $errorRecord.Exception.Message
+        exceptionType           = $errorRecord.Exception.GetType().FullName
+        failingCommandName      = if ($invocation) { [string]$invocation.MyCommand.Name } else { $null }
+        scriptLineNumber        = if ($invocation) { [int]$invocation.ScriptLineNumber } else { $null }
+        offsetInLine            = if ($invocation) { [int]$invocation.OffsetInLine } else { $null }
+        diagnostics             = Get-HelperDiagnostics -Request $request -NuGetProviderStatus $null
     }
     exit 1
 }

@@ -178,6 +178,7 @@ function Invoke-PackagePowerShellModuleHelper {
     Write-PackageExecutionMessage -Message ("[PATH] PowerShell module helper: {0}" -f $helperScriptPath)
     Write-PackageExecutionMessage -Message ("[PATH] PowerShell module local repository: {0}" -f $nugetDirectory)
     Write-PackageExecutionMessage -Message ("[PSMODULE-DIAG] Helper launch: powershell='{0}', helper='{1}', request='{2}', result='{3}'." -f $powerShellPath, $helperScriptPath, $requestPath, $resultPath)
+    Write-PackageExecutionMessage -Message ("[PSMODULE-DIAG] Helper command arguments: {0}" -f ([string]::Join(' ', @($commandArguments | ForEach-Object { [string]$_ }))))
 
     $installerResult = $null
     try {
@@ -197,7 +198,27 @@ function Invoke-PackagePowerShellModuleHelper {
             -WindowStyle 'Hidden'
     }
     catch {
-        Write-PackageExecutionMessage -Level 'WRN' -Message ("[PSMODULE-DIAG] Helper process failed: resultJsonExists='{0}', error='{1}'." -f (Test-Path -LiteralPath $resultPath -PathType Leaf), $_.Exception.Message)
+        $resultJsonExists = Test-Path -LiteralPath $resultPath -PathType Leaf
+        Write-PackageExecutionMessage -Level 'WRN' -Message ("[PSMODULE-DIAG] Helper process failed: resultJsonExists='{0}', error='{1}'." -f $resultJsonExists, $_.Exception.Message)
+        if ($resultJsonExists) {
+            try {
+                $failedHelperResult = Get-Content -LiteralPath $resultPath -Raw | ConvertFrom-Json
+                $failedStatus = if ($failedHelperResult.PSObject.Properties['status']) { [string]$failedHelperResult.status } else { '<missing>' }
+                $failedMessage = if ($failedHelperResult.PSObject.Properties['errorMessage']) { [string]$failedHelperResult.errorMessage } else { '<missing>' }
+                Write-PackageExecutionMessage -Level 'WRN' -Message ("[PSMODULE-DIAG] Helper failure result: status='{0}', error='{1}'." -f $failedStatus, $failedMessage)
+                if ($failedHelperResult.PSObject.Properties['diagnostics'] -and $failedHelperResult.diagnostics) {
+                    $diag = $failedHelperResult.diagnostics
+                    Write-PackageExecutionMessage -Level 'WRN' -Message ("[PSMODULE-DIAG] Helper failure environment: psVersion='{0}', installModuleSource='{1}', allowClobberParam='{2}', skipPublisherCheckParam='{3}', nugetProviderStatus='{4}', repository='{5}', nupkgCount='{6}', nupkgFiles='{7}'." -f $diag.psVersion, $diag.installModuleCommandSource, $diag.installModuleHasAllowClobber, $diag.installModuleHasSkipPublisherCheck, $diag.nugetProviderStatus, $diag.repositoryName, $diag.nupkgCount, ([string]::Join(',', @($diag.nupkgFiles | ForEach-Object { [string]$_ }))))
+                }
+                throw "PowerShell module helper failed: $failedMessage"
+            }
+            catch {
+                if ($_.Exception.Message -like 'PowerShell module helper failed:*') {
+                    throw
+                }
+                Write-PackageExecutionMessage -Level 'WRN' -Message ("[PSMODULE-DIAG] Failed to read helper failure result JSON '{0}': {1}" -f $resultPath, $_.Exception.Message)
+            }
+        }
         throw
     }
 
