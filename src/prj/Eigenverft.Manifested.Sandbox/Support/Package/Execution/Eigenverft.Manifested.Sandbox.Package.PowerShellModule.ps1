@@ -167,37 +167,48 @@ function Invoke-PackagePowerShellModuleHelper {
         '-ExecutionPolicy'
         'Bypass'
         '-File'
-        $helperScriptPath
+        (Format-PackageProcessArgument -Value $helperScriptPath)
         '-RequestPath'
-        $requestPath
+        (Format-PackageProcessArgument -Value $requestPath)
         '-ResultPath'
-        $resultPath
+        (Format-PackageProcessArgument -Value $resultPath)
     )
 
     Write-PackageExecutionMessage -Message ("[STATE] PowerShell module helper operation='{0}', module='{1}', version='{2}'." -f $Operation, [string]$Install.moduleName, [string]$Install.requiredVersion)
     Write-PackageExecutionMessage -Message ("[PATH] PowerShell module helper: {0}" -f $helperScriptPath)
     Write-PackageExecutionMessage -Message ("[PATH] PowerShell module local repository: {0}" -f $nugetDirectory)
+    Write-PackageExecutionMessage -Message ("[PSMODULE-DIAG] Helper launch: powershell='{0}', helper='{1}', request='{2}', result='{3}'." -f $powerShellPath, $helperScriptPath, $requestPath, $resultPath)
 
-    $installerResult = Invoke-PackageInstallerCommand `
-        -PackageResult $PackageResult `
-        -CommandPath $powerShellPath `
-        -CommandArguments @($commandArguments) `
-        -WorkingDirectory $stageDirectory `
-        -TimeoutSec $timeoutSec `
-        -SuccessExitCodes @(0) `
-        -RestartExitCodes @() `
-        -TargetKind 'powershellModule' `
-        -InstallerKind 'powershellModuleInstaller' `
-        -UiMode 'silent' `
-        -LogPath $null `
-        -ElevationMode 'none' `
-        -WindowStyle 'Hidden'
+    $installerResult = $null
+    try {
+        $installerResult = Invoke-PackageInstallerCommand `
+            -PackageResult $PackageResult `
+            -CommandPath $powerShellPath `
+            -CommandArguments @($commandArguments) `
+            -WorkingDirectory $stageDirectory `
+            -TimeoutSec $timeoutSec `
+            -SuccessExitCodes @(0) `
+            -RestartExitCodes @() `
+            -TargetKind 'powershellModule' `
+            -InstallerKind 'powershellModuleInstaller' `
+            -UiMode 'silent' `
+            -LogPath $null `
+            -ElevationMode 'none' `
+            -WindowStyle 'Hidden'
+    }
+    catch {
+        Write-PackageExecutionMessage -Level 'WRN' -Message ("[PSMODULE-DIAG] Helper process failed: resultJsonExists='{0}', error='{1}'." -f (Test-Path -LiteralPath $resultPath -PathType Leaf), $_.Exception.Message)
+        throw
+    }
+
+    Write-PackageExecutionMessage -Message ("[PSMODULE-DIAG] Helper exited: exitCode='{0}', resultJsonExists='{1}'." -f $installerResult.ExitCode, (Test-Path -LiteralPath $resultPath -PathType Leaf))
 
     if (-not (Test-Path -LiteralPath $resultPath -PathType Leaf)) {
         throw "PowerShell module helper did not write result JSON '$resultPath'."
     }
 
     $helperResult = Get-Content -LiteralPath $resultPath -Raw | ConvertFrom-Json
+    Write-PackageExecutionMessage -Message ("[PSMODULE-DIAG] Helper result: success='{0}', status='{1}', installed='{2}'." -f $(if ($helperResult.PSObject.Properties['success']) { [string][bool]$helperResult.success } else { '<missing>' }), $(if ($helperResult.PSObject.Properties['status']) { [string]$helperResult.status } else { '<missing>' }), $(if ($helperResult.PSObject.Properties['installed']) { [string][bool]$helperResult.installed } else { '<missing>' }))
     if ($helperResult.PSObject.Properties['success'] -and -not [bool]$helperResult.success) {
         $message = if ($helperResult.PSObject.Properties['errorMessage']) { [string]$helperResult.errorMessage } else { 'unknown helper failure' }
         throw "PowerShell module helper failed: $message"
@@ -231,7 +242,9 @@ Checks for an exact PowerShell module version through the same PS5.1 helper used
 
         [string]$Scope = 'CurrentUser',
 
-        [bool]$RequireNuGetProvider = $false
+        [bool]$RequireNuGetProvider = $false,
+
+        [bool]$TreatFailureAsNotInstalled = $false
     )
 
     $install = [pscustomobject]@{
@@ -245,7 +258,30 @@ Checks for an exact PowerShell module version through the same PS5.1 helper used
         requireNuGetProvider = $RequireNuGetProvider
     }
 
-    $result = Invoke-PackagePowerShellModuleHelper -PackageResult $PackageResult -Install $install -Operation Check
+    try {
+        $result = Invoke-PackagePowerShellModuleHelper -PackageResult $PackageResult -Install $install -Operation Check
+    }
+    catch {
+        if (-not $TreatFailureAsNotInstalled) {
+            throw
+        }
+
+        Write-PackageExecutionMessage -Level 'WRN' -Message ("[PSMODULE-DIAG] PowerShell module check failed for '{0}' version '{1}'; treating it as not installed for existing-install discovery: {2}" -f $Name, $RequiredVersion, $_.Exception.Message)
+        return [pscustomobject]@{
+            success                = $false
+            status                 = 'ProbeFailed'
+            installed              = $false
+            moduleInstalled        = $false
+            moduleName             = $Name
+            requiredVersion        = $RequiredVersion
+            installedVersion       = $null
+            moduleBase             = $null
+            scope                  = $Scope
+            requireNuGetProvider   = $RequireNuGetProvider
+            nugetProviderAvailable = $null
+            errorMessage           = $_.Exception.Message
+        }
+    }
     return $result.HelperResult
 }
 

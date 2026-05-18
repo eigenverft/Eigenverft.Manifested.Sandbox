@@ -218,7 +218,7 @@ Find-PackageExistingPackage -PackageResult $result
                 $requiredVersion = Resolve-PackageTemplateText -Text ([string]$searchLocation.requiredVersion) -PackageConfig $PackageResult.PackageConfig -Package $package
                 $scope = if ($searchLocation.PSObject.Properties['scope'] -and -not [string]::IsNullOrWhiteSpace([string]$searchLocation.scope)) { [string]$searchLocation.scope } else { 'CurrentUser' }
                 $requireNuGetProvider = if ($searchLocation.PSObject.Properties['requireNuGetProvider']) { [bool]$searchLocation.requireNuGetProvider } else { $false }
-                $moduleStatus = Test-PackagePowerShellModulePresence -PackageResult $PackageResult -Name ([string]$searchLocation.name) -RequiredVersion $requiredVersion -Scope $scope -RequireNuGetProvider $requireNuGetProvider
+                $moduleStatus = Test-PackagePowerShellModulePresence -PackageResult $PackageResult -Name ([string]$searchLocation.name) -RequiredVersion $requiredVersion -Scope $scope -RequireNuGetProvider $requireNuGetProvider -TreatFailureAsNotInstalled $true
                 if ($moduleStatus -and $moduleStatus.PSObject.Properties['installed'] -and [bool]$moduleStatus.installed) {
                     $candidatePath = if ($moduleStatus.PSObject.Properties['moduleBase']) { [string]$moduleStatus.moduleBase } else { $null }
                     $discoveryDetails = $moduleStatus
