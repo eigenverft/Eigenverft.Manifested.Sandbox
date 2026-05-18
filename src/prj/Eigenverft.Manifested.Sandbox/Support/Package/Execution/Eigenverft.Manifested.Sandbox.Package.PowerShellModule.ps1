@@ -104,6 +104,81 @@ function New-PackagePowerShellModuleRequest {
     }
 }
 
+function Get-PackagePowerShellModuleDependencyPackageFile {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [psobject]$Dependency
+    )
+
+    $dependencyResult = if ($Dependency.PSObject.Properties['Result']) { $Dependency.Result } else { $null }
+    if (-not $dependencyResult) {
+        return $null
+    }
+
+    $installKind = if ($dependencyResult.Assigned -and $dependencyResult.Assigned.PSObject.Properties['InstallKind']) {
+        [string]$dependencyResult.Assigned.InstallKind
+    }
+    else {
+        $null
+    }
+    if (-not [string]::Equals($installKind, 'powershellModuleInstaller', [System.StringComparison]::OrdinalIgnoreCase)) {
+        return $null
+    }
+
+    foreach ($candidatePath in @(
+            $(if ($dependencyResult.PSObject.Properties['DefaultPackageDepotFilePath']) { [string]$dependencyResult.DefaultPackageDepotFilePath } else { $null })
+            $(if ($dependencyResult.Assigned -and $dependencyResult.Assigned.PSObject.Properties['PackageFilePath']) { [string]$dependencyResult.Assigned.PackageFilePath } else { $null })
+            $(if ($dependencyResult.PSObject.Properties['PackageFilePath']) { [string]$dependencyResult.PackageFilePath } else { $null })
+        )) {
+        if (-not [string]::IsNullOrWhiteSpace($candidatePath) -and
+            [string]::Equals([System.IO.Path]::GetExtension($candidatePath), '.nupkg', [System.StringComparison]::OrdinalIgnoreCase) -and
+            (Test-Path -LiteralPath $candidatePath -PathType Leaf)) {
+            return [System.IO.Path]::GetFullPath($candidatePath)
+        }
+    }
+
+    return $null
+}
+
+function Copy-PackagePowerShellModuleDependencyPackagesToLocalRepository {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [psobject]$PackageResult,
+
+        [Parameter(Mandatory = $true)]
+        [string]$NugetDirectory
+    )
+
+    $null = New-Item -ItemType Directory -Path $NugetDirectory -Force
+    $copied = New-Object System.Collections.Generic.List[string]
+    foreach ($dependency in @($PackageResult.Dependencies)) {
+        if ($null -eq $dependency) {
+            continue
+        }
+
+        $dependencyPackageFile = Get-PackagePowerShellModuleDependencyPackageFile -Dependency $dependency
+        if ([string]::IsNullOrWhiteSpace($dependencyPackageFile)) {
+            continue
+        }
+
+        $targetPath = [System.IO.Path]::GetFullPath((Join-Path $NugetDirectory (Split-Path -Leaf $dependencyPackageFile)))
+        if ([string]::Equals($dependencyPackageFile, $targetPath, [System.StringComparison]::OrdinalIgnoreCase)) {
+            continue
+        }
+
+        $null = Copy-FileToPath -SourcePath $dependencyPackageFile -TargetPath $targetPath -Overwrite
+        $copied.Add($targetPath) | Out-Null
+    }
+
+    if ($copied.Count -gt 0) {
+        Write-PackageExecutionMessage -Message ("[PSMODULE-DIAG] Staged PowerShell module dependency package(s) into local repository: {0}" -f ([string]::Join(', ', @($copied.ToArray()))))
+    }
+
+    return @($copied.ToArray())
+}
+
 function Invoke-PackagePowerShellModuleHelper {
     [CmdletBinding()]
     param(
@@ -146,6 +221,7 @@ function Invoke-PackagePowerShellModuleHelper {
     if ($Operation -eq 'Install') {
         $targetPackageFile = [System.IO.Path]::GetFullPath((Join-Path $nugetDirectory (Split-Path -Leaf ([string]$PackageResult.PackageFilePath))))
         $null = Copy-FileToPath -SourcePath ([string]$PackageResult.PackageFilePath) -TargetPath $targetPackageFile -Overwrite
+        $null = Copy-PackagePowerShellModuleDependencyPackagesToLocalRepository -PackageResult $PackageResult -NugetDirectory $nugetDirectory
     }
 
     $requestPath = [System.IO.Path]::GetFullPath((Join-Path $stageDirectory 'powershell-module-install-request.json'))

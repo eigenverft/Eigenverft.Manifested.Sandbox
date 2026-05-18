@@ -1440,6 +1440,35 @@ exit /b 0
         $packageResult.ExistingPackage.InstallDirectory | Should -Be ([System.IO.Path]::GetFullPath($installRoot))
     }
 
+    It 'stages PowerShell module dependency nupkg files into the local repository' {
+        $rootPath = Join-Path $TestDrive 'psmodule-dependency-local-repo'
+        $dependencyDepotFile = Join-Path $rootPath 'PkgDepot\PackageManagement.1.4.8.1.nupkg'
+        $nugetDirectory = Join-Path $rootPath 'InstStage\PowerShellGet\Nuget'
+        Write-TestTextFile -Path $dependencyDepotFile -Content 'dependency package'
+
+        $packageResult = [pscustomobject]@{
+            Dependencies = @(
+                [pscustomobject]@{
+                    DefinitionId = 'PackageManagement'
+                    Result = [pscustomobject]@{
+                        DefaultPackageDepotFilePath = $dependencyDepotFile
+                        PackageFilePath = Join-Path $rootPath 'FileStage\PackageManagement.1.4.8.1.nupkg'
+                        Assigned = [pscustomobject]@{
+                            InstallKind = 'powershellModuleInstaller'
+                        }
+                    }
+                }
+            )
+        }
+
+        $copied = Copy-PackagePowerShellModuleDependencyPackagesToLocalRepository -PackageResult $packageResult -NugetDirectory $nugetDirectory
+        $expectedPath = Join-Path $nugetDirectory 'PackageManagement.1.4.8.1.nupkg'
+
+        @($copied).Count | Should -Be 1
+        @($copied)[0] | Should -Be ([System.IO.Path]::GetFullPath($expectedPath))
+        Test-Path -LiteralPath $expectedPath -PathType Leaf | Should -BeTrue
+    }
+
     It 'routes filesystem package saves through Copy-FileToPath' {
         $sourcePath = Join-Path $TestDrive 'filesystem-save\source.zip'
         $targetPath = Join-Path $TestDrive 'filesystem-save\target.zip'
